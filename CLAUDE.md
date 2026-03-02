@@ -1,44 +1,81 @@
-# Makepad Skills - Claude Instructions
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ---
 
-## PROJECT GOAL: Makepad A2UI Renderer
+## Quick Commands
 
-### Objective
+```bash
+# On macOS, set SDKROOT before building (required for Metal headers)
+export SDKROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
 
-Build an **A2UI Renderer for Makepad** that enables AI agents to generate rich, interactive UIs rendered natively with Makepad widgets. This makes Makepad a first-class A2UI client alongside Lit, Angular, and Flutter (GenUI).
+# Run demos
+cargo run -p component-zoo    # Widget showcase
+cargo run -p a2ui-demo        # A2UI demo (select mode: Product Catalog, Math Charts, Live Editor)
 
-### What is A2UI?
+# Build bridge server (LLM-powered UI) - requires a2ui-bridge feature
+cargo build --bin a2ui-bridge --features a2ui-bridge
 
-**A2UI (Agent-to-UI)** is an open-source declarative JSON protocol for AI agents to generate interactive UIs:
-- **Declarative JSON**: Safe to execute across trust boundaries (no code execution)
-- **LLM-Optimized**: Flat adjacency list format easy for LLMs to generate
-- **Cross-Platform**: One response renders on Web, Mobile, Desktop
-- **Streaming**: Progressive UI updates as content generates
+# Run bridge with custom LLM (e.g., NVIDIA NIM)
+LLM_API_URL="https://integrate.api.nvidia.com/v1/chat/completions" \
+LLM_MODEL="minimaxai/minimax-m2.1" \
+LLM_API_KEY="nvapi-xxx" \
+LLM_PORT=8082 \
+./target/debug/a2ui-bridge
+
+# Watch server (live file editing)
+cargo run --bin watch-server --features mock-server
+
+# Generate math charts
+cargo run --bin math-charts
+
+# WebAssembly build
+cargo makepad wasm build -p component-zoo --release
+```
+
+---
+
+## Project Goal
+
+Build an **A2UI (Agent-to-UI) Renderer for Makepad** that enables AI agents to generate native, interactive UIs via declarative JSON protocol.
 
 ### Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Makepad Application                           │
-├─────────────────────────────────────────────────────────────────┤
-│  A2uiHost ←→ ContentGenerator ←→ LLM/A2A Server                 │
-│         ↓                                                        │
-│  A2uiMessageProcessor (Rust)                                     │
-│         ↓                                                        │
-│  A2uiSurface → DataModel → Makepad Widgets                      │
-└─────────────────────────────────────────────────────────────────┘
+LLM → A2UI Bridge (tools→JSON) → Makepad App (A2uiHost → A2uiProcessor → A2uiSurface → Widgets)
 ```
 
-### A2UI Protocol Messages
+### Workspace Crates
 
-| Message Type | Direction | Purpose |
-|--------------|-----------|---------|
-| `beginRendering` | Server→Client | Initialize a new UI surface |
-| `surfaceUpdate` | Server→Client | Add or update component tree |
-| `dataModelUpdate` | Server→Client | Update reactive data store |
-| `deleteSurface` | Server→Client | Remove a UI surface |
-| `userAction` | Client→Server | User interaction event |
+| Crate | Purpose |
+|-------|---------|
+| `crates/ui` | Core: A2UI protocol types, message processor, surface renderer |
+| `crates/a2ui-demo` | Demo app with bridge server, watch server, math charts |
+| `crates/component-zoo` | Widget showcase (Button, Checkbox, Slider, etc.) |
+| `crates/makepad-plot` | Chart library (29 2D/3D chart types) |
+
+### Key Files
+
+- `crates/ui/src/a2ui/message.rs` - Protocol types (serde)
+- `crates/ui/src/a2ui/processor.rs` - JSON → widget tree conversion
+- `crates/ui/src/a2ui/surface/` - Component rendering
+- `crates/a2ui-demo/src/a2ui_bridge.rs` - LLM → A2UI bridge server
+
+### Server Ports
+
+| Server | Port | Feature |
+|--------|------|---------|
+| A2UI Bridge | 8082 | `a2ui-bridge` |
+| Watch Server | 8080 | `mock-server` |
+
+---
+
+## A2UI Protocol
+
+Messages: `beginRendering`, `surfaceUpdate`, `dataModelUpdate`, `deleteSurface`, `userAction`
+
+Components map to Makepad widgets: Column→View, Row→View, Text→Label, Button→Button, List→PortalList, Chart→makepad-plot
 
 ---
 
@@ -364,8 +401,8 @@ When implementing, load these skills:
 
 ### Makepad Source
 
-- **Makepad Framework**: `/Users/zhangalex/Work/Projects/fw/makepad`
-- **This Project**: `/Users/zhangalex/Work/Projects/fw/makepad-component`
+- **Makepad Framework**: `https://github.com/makepad/makepad` (dev branch)
+- **This Project**: `/Users/sternelee/www/github/makepad-component`
 
 ---
 
@@ -538,8 +575,6 @@ nightly = ["makepad-widgets/nightly"]
 
 For deeper reference, check these codebases:
 
-- **Makepad**: `/Users/zhangalex/Work/Projects/fw/makepad` - Framework source
-- **A2UI**: `/Users/zhangalex/Work/Projects/fw/A2UI` - A2UI protocol and renderers
-- **GenUI**: `/Users/zhangalex/Work/Projects/fw/genui` - Flutter A2UI renderer
-- **Robrix**: `/Users/zhangalex/Work/Projects/fw/robrix` - Matrix client example
-- **Moly**: `/Users/zhangalex/Work/Projects/fw/moly` - AI chat example
+- **Makepad**: `https://github.com/makepad/makepad` - Framework source
+- **A2UI Protocol**: `https://github.com/ZhangHanDong/A2UI` - A2UI spec and renderers
+- **GenUI**: Flutter A2UI renderer reference
