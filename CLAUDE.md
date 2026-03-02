@@ -10,9 +10,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # On macOS, set SDKROOT before building (required for Metal headers)
 export SDKROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
 
-# Run demos
-cargo run -p component-zoo    # Widget showcase
-cargo run -p a2ui-demo        # A2UI demo (select mode: Product Catalog, Math Charts, Live Editor)
+# Run demos (use --bin to specify which binary)
+cargo run -p component-zoo --bin component-zoo    # Widget showcase
+cargo run -p a2ui-demo --bin a2ui-demo           # A2UI demo GUI
 
 # Build bridge server (LLM-powered UI) - requires a2ui-bridge feature
 cargo build --bin a2ui-bridge --features a2ui-bridge

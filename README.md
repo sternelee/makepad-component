@@ -116,10 +116,10 @@ git clone https://github.com/ZhangHanDong/makepad-component
 cd makepad-component
 
 # Run the component zoo (widget showcase)
-cargo run -p component-zoo
+cargo run -p component-zoo --bin component-zoo
 
 # Run the A2UI demo
-cargo run -p a2ui-demo
+cargo run -p a2ui-demo --bin a2ui-demo
 ```
 
 The A2UI demo starts with three mode buttons:
@@ -136,7 +136,7 @@ The A2UI demo starts with three mode buttons:
 Standalone widget showcase with all available Makepad components:
 
 ```bash
-cargo run -p component-zoo
+cargo run -p component-zoo --bin component-zoo
 ```
 
 ### A2UI Static Demo
@@ -144,7 +144,7 @@ cargo run -p component-zoo
 Product catalog with data-bound search, checkbox filters, slider, and add-to-cart buttons. No server needed:
 
 ```bash
-cargo run -p a2ui-demo
+cargo run -p a2ui-demo --bin a2ui-demo
 # Click "Product Catalog"
 ```
 
@@ -178,7 +178,7 @@ LLM_PORT=8082 \
 
 **Terminal 2: Start the Makepad App**
 ```bash
-cargo run -p a2ui-demo
+cargo run -p a2ui-demo --bin a2ui-demo
 # Click "Live Editor" — connects to localhost:8082 by default
 ```
 
@@ -251,7 +251,7 @@ cargo run --bin watch-server --features mock-server
 
 **Terminal 2: Start the Makepad App**
 ```bash
-cargo run -p a2ui-demo
+cargo run -p a2ui-demo --bin a2ui-demo
 # Click "Live Editor"
 ```
 
@@ -289,7 +289,7 @@ Generates mathematical function visualizations (2D line charts and 3D surfaces):
 cargo run --bin math-charts
 
 # Then view in the app
-cargo run -p a2ui-demo
+cargo run -p a2ui-demo --bin a2ui-demo
 # Click "Math Charts" or "Live Editor"
 ```
 
