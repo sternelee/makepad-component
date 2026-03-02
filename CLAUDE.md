@@ -10,6 +10,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # On macOS, set SDKROOT before building (required for Metal headers)
 export SDKROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
 
+# If build fails with "metal_xpc.o: found architecture 'x86_64', required architecture 'arm64'"
+# You need to patch makepad-platform/build.rs to add -target flag:
+# In platform/build.rs, find the "clang" command for metal_xpc.m and add:
+#   .args(&["-target", &format!("{}-apple-macos", arch)])
+# where arch = "arm64" for aarch64 targets
+
 # Run demos (use --bin to specify which binary)
 cargo run -p component-zoo --bin component-zoo    # Widget showcase
 cargo run -p a2ui-demo --bin a2ui-demo           # A2UI demo GUI
