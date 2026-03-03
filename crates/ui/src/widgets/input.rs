@@ -34,10 +34,10 @@ live_design! {
             uniform bg_color_focus: #FFFFFF
             uniform bg_color_disabled: #F5F5F5
 
-            uniform border_color: #E0E0E0
-            uniform border_color_hover: #BDBDBD
-            uniform border_color_focus: #4A90D9
-            uniform border_color_disabled: #EEEEEE
+            uniform border_color: #D1D1D6
+            uniform border_color_hover: #AEAEB2
+            uniform border_color_focus: #007AFF
+            uniform border_color_disabled: #D1D1D6
 
             fn pixel(self) -> vec4 {
                 let sdf = Sdf2d::viewport(self.pos * self.rect_size);
@@ -80,12 +80,12 @@ live_design! {
         draw_text: {
             instance disabled: 0.0
 
-            uniform color: #333333
-            uniform color_disabled: #9E9E9E
-            uniform color_empty: #9E9E9E
+            uniform color: #3D3D3D
+            uniform color_disabled: #AEAEB2
+            uniform color_empty: #AEAEB2
 
             text_style: <THEME_FONT_REGULAR> {
-                font_size: 14.0
+                font_size: 13.0
             }
 
             fn get_color(self) -> vec4 {
@@ -99,7 +99,7 @@ live_design! {
 
         draw_cursor: {
             instance focus: 0.0
-            uniform color: #4A90D9
+            uniform color: #007AFF
 
             fn pixel(self) -> vec4 {
                 let sdf = Sdf2d::viewport(self.pos * self.rect_size);
@@ -110,7 +110,7 @@ live_design! {
         }
 
         draw_selection: {
-            uniform color: #4A90D920
+            uniform color: #007AFF30
 
             fn pixel(self) -> vec4 {
                 let sdf = Sdf2d::viewport(self.pos * self.rect_size);
@@ -354,13 +354,13 @@ live_design! {
             instance hover: 0.0
             instance focus: 0.0
 
-            uniform bg_color: #F5F5F5
-            uniform bg_color_hover: #EEEEEE
+            uniform bg_color: #E8E8ED
+            uniform bg_color_hover: #D1D1D6
             uniform bg_color_focus: #FFFFFF
 
-            uniform border_color: #E0E0E0
-            uniform border_color_hover: #BDBDBD
-            uniform border_color_focus: #4A90D9
+            uniform border_color: #AEAEB2
+            uniform border_color_hover: #AEAEB2
+            uniform border_color_focus: #007AFF
 
             fn pixel(self) -> vec4 {
                 let sdf = Sdf2d::viewport(self.pos * self.rect_size);
@@ -393,10 +393,10 @@ live_design! {
 
         // Search icon
         search_icon = <Icon> {
-            icon_walk: { width: 16.0 }
+            icon_walk: { width: 14.0 }
             draw_icon: {
                 svg_file: (ICON_SEARCH)
-                color: #9E9E9E
+                color: #86868B
             }
         }
 
@@ -413,9 +413,9 @@ live_design! {
             }
 
             draw_text: {
-                text_style: <THEME_FONT_REGULAR> { font_size: 14.0 }
+                text_style: <THEME_FONT_REGULAR> { font_size: 13.0 }
                 fn get_color(self) -> vec4 {
-                    return mix(#333333, #9E9E9E, self.empty);
+                    return mix(#3D3D3D, #86868B, self.empty);
                 }
             }
 

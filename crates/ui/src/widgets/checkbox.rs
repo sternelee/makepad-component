@@ -68,7 +68,7 @@ live_design! {
 
         // Label text
         draw_label: {
-            text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
+            text_style: <THEME_FONT_REGULAR>{ font_size: 13.0 }
             color: (FOREGROUND)
         }
 

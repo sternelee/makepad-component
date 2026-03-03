@@ -30,10 +30,12 @@ live_design! {
                     sdf.rect(r, 0.0, sz.x - sz.y, sz.y);
                     sdf.circle(sz.x - r, r, r);
 
-                    let bg_off = #cbd5e1;
-                    let bg_on = #3b82f6;
+                    // macOS style colors: subtle gray when off, system green when on
+                    let bg_off = #E9E9EB;
+                    let bg_on = #34C759;  // macOS system green
                     let color = mix(bg_off, bg_on, self.on);
-                    let color = mix(color, #ffffff, self.hover * 0.1);
+                    // Subtle brighten on hover
+                    let color = mix(color, #FFFFFF, self.hover * 0.15);
 
                     sdf.fill(color);
                     return sdf.result;
@@ -111,6 +113,9 @@ pub struct MpSwitch {
 
     #[animator]
     animator: Animator,
+
+    #[rust]
+    initialized: bool,
 }
 
 #[derive(Clone, Debug, DefaultNone)]
@@ -161,16 +166,13 @@ impl Widget for MpSwitch {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
-        // Sync initial state
-        if self.on {
-            self.view.view(ids!(track)).apply_over(cx, live! {
-                draw_bg: { on: 1.0 }
-            });
-            self.view.view(ids!(thumb_wrap)).apply_over(cx, live! {
-                align: { x: 1.0 }
-            });
+        // 首次绘制时同步状态，保留动画过渡
+        if !self.initialized {
+            self.initialized = true;
+            if self.on {
+                self.animator_play(cx, ids!(on.on));
+            }
         }
-
         self.view.draw_walk(cx, scope, walk)
     }
 }

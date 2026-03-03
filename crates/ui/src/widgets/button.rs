@@ -7,7 +7,7 @@ live_design! {
 
     use crate::theme::colors::*;
 
-    // Base button component
+    // Base button component - macOS style
     pub MpButton = {{MpButton}} {
         width: Fit,
         height: Fit,
@@ -16,7 +16,7 @@ live_design! {
 
         draw_bg: {
             instance radius: 6.0
-            instance border_width: 1.0
+            instance border_width: 0.0
             instance border_color: #0000
             instance hover: 0.0
             instance pressed: 0.0
@@ -34,10 +34,12 @@ live_design! {
                     max(1.0, self.radius)
                 );
 
-                let bg_color = mix(self.color, self.color_hover, self.hover);
-                let final_color = mix(bg_color, self.color_pressed, self.pressed);
+                // Subtle hover: slightly brighten
+                let hover_color = mix(self.color, self.color_hover, self.hover * 0.6);
+                // Pressed: darken more noticeably
+                let pressed_color = mix(hover_color, self.color_pressed, self.pressed * 0.8);
 
-                sdf.fill_keep(final_color);
+                sdf.fill_keep(pressed_color);
 
                 if self.border_width > 0.0 {
                     sdf.stroke(self.border_color, self.border_width);
@@ -48,7 +50,7 @@ live_design! {
         }
 
         draw_text: {
-            text_style: <THEME_FONT_BOLD>{ font_size: 14.0 }
+            text_style: <THEME_FONT_REGULAR>{ font_size: 13.0 }
             color: (PRIMARY_FOREGROUND)
         }
 
@@ -69,18 +71,18 @@ live_design! {
             pressed = {
                 default: off
                 off = {
-                    from: { all: Forward { duration: 0.1 } }
+                    from: { all: Forward { duration: 0.08 } }
                     apply: { draw_bg: { pressed: 0.0 } }
                 }
                 on = {
-                    from: { all: Forward { duration: 0.1 } }
+                    from: { all: Forward { duration: 0.08 } }
                     apply: { draw_bg: { pressed: 1.0 } }
                 }
             }
         }
     }
 
-    // Variant: Primary Button (default)
+    // Variant: Primary Button (macOS system blue)
     pub MpButtonPrimary = <MpButton> {
         draw_bg: {
             color: (PRIMARY)
@@ -92,20 +94,22 @@ live_design! {
         }
     }
 
-    // Variant: Secondary Button
+    // Variant: Secondary Button - macOS style (lighter, subtle)
     pub MpButtonSecondary = <MpButton> {
+        padding: { left: 14, right: 14, top: 7, bottom: 7 }
         draw_bg: {
             color: (SECONDARY)
             color_hover: (SECONDARY_HOVER)
             color_pressed: (SECONDARY_ACTIVE)
-            border_color: (BORDER)
+            border_width: 0.0
         }
         draw_text: {
+            text_style: <THEME_FONT_REGULAR>{ font_size: 13.0 }
             color: (SECONDARY_FOREGROUND)
         }
     }
 
-    // Variant: Danger Button
+    // Variant: Danger Button (macOS system red)
     pub MpButtonDanger = <MpButton> {
         draw_bg: {
             color: (DANGER)
@@ -117,31 +121,31 @@ live_design! {
         }
     }
 
-    // Variant: Success Button
+    // Variant: Success Button (macOS system green)
     pub MpButtonSuccess = <MpButton> {
         draw_bg: {
             color: (SUCCESS)
             color_hover: (SUCCESS_HOVER)
-            color_pressed: (SUCCESS_HOVER)
+            color_pressed: (SUCCESS_ACTIVE)
         }
         draw_text: {
             color: (SUCCESS_FOREGROUND)
         }
     }
 
-    // Variant: Warning Button
+    // Variant: Warning Button (macOS system orange)
     pub MpButtonWarning = <MpButton> {
         draw_bg: {
             color: (WARNING)
             color_hover: (WARNING_HOVER)
-            color_pressed: (WARNING_HOVER)
+            color_pressed: (WARNING_ACTIVE)
         }
         draw_text: {
             color: (WARNING_FOREGROUND)
         }
     }
 
-    // Variant: Ghost Button
+    // Variant: Ghost Button - macOS style (transparent with hover fill)
     pub MpButtonGhost = <MpButton> {
         draw_bg: {
             color: (TRANSPARENT)
@@ -149,36 +153,40 @@ live_design! {
             color_pressed: (SECONDARY_ACTIVE)
         }
         draw_text: {
-            color: (FOREGROUND)
+            text_style: <THEME_FONT_REGULAR>{ font_size: 13.0 }
+            color: (PRIMARY)
         }
     }
 
-    // Variant: Outline Button
+    // Variant: Outline Button - macOS style
     pub MpButtonOutline = <MpButton> {
+        padding: { left: 14, right: 14, top: 7, bottom: 7 }
         draw_bg: {
             color: (TRANSPARENT)
             color_hover: (SECONDARY)
             color_pressed: (SECONDARY_ACTIVE)
+            border_width: 1.0
             border_color: (BORDER)
         }
         draw_text: {
+            text_style: <THEME_FONT_REGULAR>{ font_size: 13.0 }
             color: (FOREGROUND)
         }
     }
 
-    // Size: Small
+    // Size: Small - macOS compact size
     pub MpButtonSmall = <MpButton> {
         padding: { left: 12, right: 12, top: 4, bottom: 4 }
         draw_text: {
-            text_style: <THEME_FONT_BOLD>{ font_size: 12.0 }
+            text_style: <THEME_FONT_REGULAR>{ font_size: 11.0 }
         }
     }
 
     // Size: Large
     pub MpButtonLarge = <MpButton> {
-        padding: { left: 24, right: 24, top: 12, bottom: 12 }
+        padding: { left: 24, right: 24, top: 10, bottom: 10 }
         draw_text: {
-            text_style: <THEME_FONT_BOLD>{ font_size: 16.0 }
+            text_style: <THEME_FONT_REGULAR>{ font_size: 15.0 }
         }
     }
 }
