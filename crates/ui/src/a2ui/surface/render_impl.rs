@@ -61,6 +61,44 @@ impl A2uiSurface {
             ComponentType::Divider(_) => {
                 self.render_divider(cx);
             }
+            // Raycast-style containers
+            ComponentType::Detail(detail) => {
+                self.render_detail(cx, scope, surface, data_model, detail);
+            }
+            ComponentType::Form(form) => {
+                self.render_form(cx, scope, surface, data_model, form);
+            }
+            ComponentType::ActionPanel(ap) => {
+                self.render_action_panel(cx, scope, surface, data_model, ap);
+            }
+            ComponentType::Grid(grid) => {
+                self.render_grid(cx, scope, surface, data_model, grid);
+            }
+            // Raycast-style form components (using existing renderers where applicable)
+            ComponentType::PasswordField(pf) => {
+                self.render_password_field(cx, pf, data_model, component_id);
+            }
+            ComponentType::TextArea(ta) => {
+                self.render_text_area(cx, ta, data_model, component_id);
+            }
+            ComponentType::DatePicker(dp) => {
+                self.render_date_picker(cx, dp, data_model, component_id);
+            }
+            ComponentType::Dropdown(dd) => {
+                self.render_dropdown(cx, scope, surface, data_model, dd);
+            }
+            ComponentType::TagPicker(tp) => {
+                self.render_tag_picker(cx, scope, surface, data_model, tp);
+            }
+            ComponentType::FilePicker(fp) => {
+                self.render_file_picker(cx, fp, data_model, component_id);
+            }
+            ComponentType::ListItem(li) => {
+                self.render_list_item(cx, scope, surface, data_model, li);
+            }
+            ComponentType::DropdownItem(_) | ComponentType::DropdownSection(_) | ComponentType::TagPickerItem(_) => {
+                // These are rendered as children of their parent components
+            }
             _ => {
                 // Unsupported component - skip for now
             }
@@ -731,5 +769,533 @@ impl A2uiSurface {
     fn estimate_text_width(text: &str, font_size: f64) -> f64 {
         let avg_char_width = font_size * 0.55;
         text.len() as f64 * avg_char_width
+    }
+
+    // ============================================================================
+    // Detail Component (Raycast-style)
+    // ============================================================================
+
+    fn render_detail(
+        &mut self,
+        cx: &mut Cx2d,
+        scope: &mut Scope,
+        surface: &crate::a2ui::processor::Surface,
+        data_model: &DataModel,
+        detail: &DetailComponent,
+    ) {
+        let walk = Walk::fill_fit();
+        let layout = Layout {
+            flow: Flow::Down,
+            spacing: 12.0,
+            padding: Padding {
+                left: 16.0,
+                right: 16.0,
+                top: 12.0,
+                bottom: 12.0,
+            },
+            ..Layout::default()
+        };
+
+        cx.begin_turtle(walk, layout);
+
+        // Render markdown content if present
+        if let Some(markdown) = &detail.markdown {
+            let content = resolve_string_value_scoped(
+                markdown,
+                data_model,
+                self.current_scope.as_deref(),
+            );
+            // For now, render as plain text (markdown rendering would need additional implementation)
+            self.draw_card_text.draw_walk(cx, Walk::fit(), Align::default(), &content);
+        }
+
+        // Render metadata if present
+        if let Some(metadata) = &detail.metadata {
+            for item in metadata {
+                let key = resolve_string_value_scoped(
+                    &item.key,
+                    data_model,
+                    self.current_scope.as_deref(),
+                );
+                let value = resolve_string_value_scoped(
+                    &item.value,
+                    data_model,
+                    self.current_scope.as_deref(),
+                );
+                // Render key-value pair
+                let label_idx = self.label_count;
+                self.label_count += 1;
+                let label = self.pool_label(cx, label_idx);
+                label.set_text(&format!("{}: {}", key, value));
+                let _ = label.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+            }
+        }
+
+        // Render actions if present
+        if let Some(actions_id) = &detail.actions {
+            self.render_component(cx, scope, surface, data_model, actions_id);
+        }
+
+        cx.end_turtle();
+    }
+
+    // ============================================================================
+    // Form Component (Raycast-style)
+    // ============================================================================
+
+    fn render_form(
+        &mut self,
+        cx: &mut Cx2d,
+        scope: &mut Scope,
+        surface: &crate::a2ui::processor::Surface,
+        data_model: &DataModel,
+        form: &FormComponent,
+    ) {
+        let walk = Walk::fill_fit();
+        let layout = Layout {
+            flow: Flow::Down,
+            spacing: 16.0,
+            padding: Padding {
+                left: 16.0,
+                right: 16.0,
+                top: 12.0,
+                bottom: 12.0,
+            },
+            ..Layout::default()
+        };
+
+        cx.begin_turtle(walk, layout);
+
+        // Render form children (form items)
+        let children = form.children.clone();
+        self.render_children(cx, scope, surface, data_model, &children);
+
+        // Render actions at the bottom
+        if let Some(actions_id) = &form.actions {
+            // Add some spacing before actions
+            let spacer_walk = Walk::new(Size::fill(), Size::Fixed(16.0));
+            self.draw_divider.draw_walk(cx, spacer_walk);
+
+            self.render_component(cx, scope, surface, data_model, actions_id);
+        }
+
+        cx.end_turtle();
+    }
+
+    // ============================================================================
+    // ActionPanel Component (Raycast-style)
+    // ============================================================================
+
+    fn render_action_panel(
+        &mut self,
+        cx: &mut Cx2d,
+        scope: &mut Scope,
+        surface: &crate::a2ui::processor::Surface,
+        data_model: &DataModel,
+        ap: &ActionPanelComponent,
+    ) {
+        let walk = Walk::fill_fit();
+        let layout = Layout {
+            flow: Flow::Down,
+            spacing: 4.0,
+            padding: Padding {
+                left: 8.0,
+                right: 8.0,
+                top: 4.0,
+                bottom: 4.0,
+            },
+            ..Layout::default()
+        };
+
+        cx.begin_turtle(walk, layout);
+
+        // Render action children (buttons)
+        let children = ap.children.clone();
+        self.render_children(cx, scope, surface, data_model, &children);
+
+        cx.end_turtle();
+    }
+
+    // ============================================================================
+    // Grid Component (Raycast-style)
+    // ============================================================================
+
+    fn render_grid(
+        &mut self,
+        cx: &mut Cx2d,
+        scope: &mut Scope,
+        surface: &crate::a2ui::processor::Surface,
+        data_model: &DataModel,
+        grid: &GridComponent,
+    ) {
+        let columns = grid.columns.unwrap_or(3);
+
+        let walk = Walk::fill_fit();
+        let layout = Layout {
+            flow: Flow::right(),
+            spacing: 12.0,
+            align: Align { x: 0.0, y: 0.0 },
+            ..Layout::default()
+        };
+
+        cx.begin_turtle(walk, layout);
+
+        // Render children (grid items)
+        let children = grid.children.clone();
+        self.render_children(cx, scope, surface, data_model, &children);
+
+        cx.end_turtle();
+    }
+
+    // ============================================================================
+    // PasswordField Component (Raycast-style)
+    // ============================================================================
+
+    fn render_password_field(
+        &mut self,
+        cx: &mut Cx2d,
+        pf: &PasswordFieldComponent,
+        data_model: &DataModel,
+        component_id: &str,
+    ) {
+        // Similar to text field but with hidden input
+        let text_input_idx = self.text_input_meta.len();
+
+        let current_value = pf
+            .value
+            .as_ref()
+            .map(|v| resolve_string_value_scoped(v, data_model, self.current_scope.as_deref()))
+            .unwrap_or_default();
+
+        let placeholder = pf
+            .placeholder
+            .as_ref()
+            .map(|p| resolve_string_value_scoped(p, data_model, self.current_scope.as_deref()))
+            .unwrap_or_default();
+
+        let binding_path = pf.value.as_ref().and_then(|v| v.as_path().map(|p| {
+            if let Some(scope) = &self.current_scope {
+                format!("{}/{}", scope, p.trim_start_matches('/'))
+            } else {
+                p.to_string()
+            }
+        }));
+
+        let text_input = self.pool_text_input(cx, text_input_idx);
+        text_input.set_text(cx, &current_value);
+        if !placeholder.is_empty() {
+            text_input.set_empty_text(cx, placeholder);
+        }
+
+        // Password field - in production, would set a flag to hide text
+        let _ = text_input.draw_walk(cx, &mut Scope::empty(), Walk::new(Size::Fixed(200.0), Size::fit()));
+
+        self.text_input_meta.push((
+            component_id.to_string(),
+            binding_path,
+            current_value,
+        ));
+    }
+
+    // ============================================================================
+    // TextArea Component (Raycast-style)
+    // ============================================================================
+
+    fn render_text_area(
+        &mut self,
+        cx: &mut Cx2d,
+        ta: &TextAreaComponent,
+        data_model: &DataModel,
+        component_id: &str,
+    ) {
+        // For now, reuse text field rendering with larger size
+        // In production, this would render a multi-line text input
+        let text_input_idx = self.text_input_meta.len();
+
+        let current_value = ta
+            .value
+            .as_ref()
+            .map(|v| resolve_string_value_scoped(v, data_model, self.current_scope.as_deref()))
+            .unwrap_or_default();
+
+        let placeholder = ta
+            .placeholder
+            .as_ref()
+            .map(|p| resolve_string_value_scoped(p, data_model, self.current_scope.as_deref()))
+            .unwrap_or_default();
+
+        let binding_path = ta.value.as_ref().and_then(|v| v.as_path().map(|p| {
+            if let Some(scope) = &self.current_scope {
+                format!("{}/{}", scope, p.trim_start_matches('/'))
+            } else {
+                p.to_string()
+            }
+        }));
+
+        let text_input = self.pool_text_input(cx, text_input_idx);
+        text_input.set_text(cx, &current_value);
+        if !placeholder.is_empty() {
+            text_input.set_empty_text(cx, placeholder);
+        }
+
+        // Render with larger height for textarea
+        let _ = text_input.draw_walk(cx, &mut Scope::empty(), Walk::new(Size::Fixed(300.0), Size::Fixed(100.0)));
+
+        self.text_input_meta.push((
+            component_id.to_string(),
+            binding_path,
+            current_value,
+        ));
+    }
+
+    // ============================================================================
+    // DatePicker Component (Raycast-style)
+    // ============================================================================
+
+    fn render_date_picker(
+        &mut self,
+        cx: &mut Cx2d,
+        dp: &DatePickerComponent,
+        data_model: &DataModel,
+        component_id: &str,
+    ) {
+        // Render as a text input with date picker trigger
+        let text_input_idx = self.text_input_meta.len();
+
+        let current_value = dp
+            .value
+            .as_ref()
+            .map(|v| resolve_string_value_scoped(v, data_model, self.current_scope.as_deref()))
+            .unwrap_or_default();
+
+        let placeholder = match dp.date_type {
+            Some(DatePickerType::Date) => "Select date...",
+            Some(DatePickerType::DateTime) => "Select date and time...",
+            Some(DatePickerType::Time) => "Select time...",
+            None => "Select date...",
+        };
+
+        let binding_path = dp.value.as_ref().and_then(|v| v.as_path().map(|p| {
+            if let Some(scope) = &self.current_scope {
+                format!("{}/{}", scope, p.trim_start_matches('/'))
+            } else {
+                p.to_string()
+            }
+        }));
+
+        let text_input = self.pool_text_input(cx, text_input_idx);
+        text_input.set_text(cx, &current_value);
+        text_input.set_empty_text(cx, placeholder.to_string());
+
+        let _ = text_input.draw_walk(cx, &mut Scope::empty(), Walk::new(Size::Fixed(200.0), Size::fit()));
+
+        self.text_input_meta.push((
+            component_id.to_string(),
+            binding_path,
+            current_value,
+        ));
+    }
+
+    // ============================================================================
+    // Dropdown Component (Raycast-style)
+    // ============================================================================
+
+    fn render_dropdown(
+        &mut self,
+        cx: &mut Cx2d,
+        scope: &mut Scope,
+        surface: &crate::a2ui::processor::Surface,
+        data_model: &DataModel,
+        dd: &DropdownComponent,
+    ) {
+        // Render as a button that opens a popover with options
+        // For now, render current value as text
+        let text_input_idx = self.text_input_meta.len();
+
+        let current_value = dd
+            .value
+            .as_ref()
+            .map(|v| resolve_string_value_scoped(v, data_model, self.current_scope.as_deref()))
+            .unwrap_or_else(|| {
+                dd.placeholder
+                    .as_ref()
+                    .map(|p| resolve_string_value_scoped(p, data_model, self.current_scope.as_deref()))
+                    .unwrap_or_default()
+            });
+
+        let placeholder = dd
+            .placeholder
+            .as_ref()
+            .map(|p| resolve_string_value_scoped(p, data_model, self.current_scope.as_deref()))
+            .unwrap_or_else(|| "Select...".to_string());
+
+        let binding_path = dd.value.as_ref().and_then(|v| v.as_path().map(|p| {
+            if let Some(scope) = &self.current_scope {
+                format!("{}/{}", scope, p.trim_start_matches('/'))
+            } else {
+                p.to_string()
+            }
+        }));
+
+        let text_input = self.pool_text_input(cx, text_input_idx);
+        text_input.set_text(cx, &current_value);
+        if current_value.is_empty() {
+            text_input.set_empty_text(cx, placeholder);
+        }
+
+        let _ = text_input.draw_walk(cx, &mut Scope::empty(), Walk::new(Size::Fixed(200.0), Size::fit()));
+
+        self.text_input_meta.push((
+            format!("{}_dropdown", dd.id),
+            binding_path,
+            current_value,
+        ));
+    }
+
+    // ============================================================================
+    // TagPicker Component (Raycast-style)
+    // ============================================================================
+
+    fn render_tag_picker(
+        &mut self,
+        cx: &mut Cx2d,
+        scope: &mut Scope,
+        surface: &crate::a2ui::processor::Surface,
+        data_model: &DataModel,
+        tp: &TagPickerComponent,
+    ) {
+        // Render selected tags as chips + add button
+        let text_input_idx = self.text_input_meta.len();
+
+        // Get selected values
+        let selected_values: Vec<String> = tp
+            .value
+            .as_ref()
+            .map(|values| {
+                values
+                    .iter()
+                    .map(|v| resolve_string_value_scoped(v, data_model, self.current_scope.as_deref()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let display_text = if selected_values.is_empty() {
+            tp.placeholder
+                .as_ref()
+                .map(|p| resolve_string_value_scoped(p, data_model, self.current_scope.as_deref()))
+                .unwrap_or_else(|| "Select tags...".to_string())
+        } else {
+            selected_values.join(", ")
+        };
+
+        let text_input = self.pool_text_input(cx, text_input_idx);
+        text_input.set_text(cx, &display_text);
+
+        let _ = text_input.draw_walk(cx, &mut Scope::empty(), Walk::new(Size::Fixed(300.0), Size::fit()));
+
+        // Store metadata (simplified - full implementation would handle tag array)
+        self.text_input_meta.push((
+            format!("{}_tagpicker", tp.id),
+            None,
+            display_text,
+        ));
+    }
+
+    // ============================================================================
+    // FilePicker Component (Raycast-style)
+    // ============================================================================
+
+    fn render_file_picker(
+        &mut self,
+        cx: &mut Cx2d,
+        fp: &FilePickerComponent,
+        data_model: &DataModel,
+        component_id: &str,
+    ) {
+        // Render as text input showing selected file path + browse button
+        let text_input_idx = self.text_input_meta.len();
+
+        let current_value = fp
+            .value
+            .as_ref()
+            .map(|values| {
+                values
+                    .iter()
+                    .map(|v| resolve_string_value_scoped(v, data_model, self.current_scope.as_deref()))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+            .unwrap_or_default();
+
+        let placeholder = "Select file...".to_string();
+
+        let text_input = self.pool_text_input(cx, text_input_idx);
+        text_input.set_text(cx, &current_value);
+        if current_value.is_empty() {
+            text_input.set_empty_text(cx, placeholder);
+        }
+
+        let _ = text_input.draw_walk(cx, &mut Scope::empty(), Walk::new(Size::Fixed(300.0), Size::fit()));
+
+        self.text_input_meta.push((
+            component_id.to_string(),
+            None,
+            current_value,
+        ));
+    }
+
+    // ============================================================================
+    // ListItem Component (Raycast-style)
+    // ============================================================================
+
+    fn render_list_item(
+        &mut self,
+        cx: &mut Cx2d,
+        scope: &mut Scope,
+        surface: &crate::a2ui::processor::Surface,
+        data_model: &DataModel,
+        item: &ListItemComponent,
+    ) {
+        let walk = Walk::fill_fit();
+        let layout = Layout {
+            flow: Flow::right(),
+            spacing: 12.0,
+            align: Align { x: 0.0, y: 0.5 },
+            padding: Padding {
+                left: 12.0,
+                right: 12.0,
+                top: 8.0,
+                bottom: 8.0,
+            },
+            ..Layout::default()
+        };
+
+        cx.begin_turtle(walk, layout);
+
+        // Render icon if present
+        if let Some(icon) = &item.icon {
+            let icon_name = resolve_string_value_scoped(
+                icon,
+                data_model,
+                self.current_scope.as_deref(),
+            );
+            // For now, render as text placeholder
+            let label_idx = self.label_count;
+            self.label_count += 1;
+            let label = self.pool_label(cx, label_idx);
+            label.set_text(&format!("[{}]", icon_name));
+            let _ = label.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+        }
+
+        // Render child content
+        let child = item.child.clone();
+        self.render_component(cx, scope, surface, data_model, &child);
+
+        // Render accessory if present
+        if let Some(accessory_id) = &item.accessory {
+            self.render_component(cx, scope, surface, data_model, accessory_id);
+        }
+
+        cx.end_turtle();
     }
 }

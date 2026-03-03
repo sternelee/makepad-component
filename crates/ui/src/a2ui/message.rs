@@ -170,6 +170,24 @@ pub enum ComponentType {
 
     // Shader visualization components
     ShaderStage(ShaderStageComponent),
+
+    // Raycast-style containers
+    Detail(DetailComponent),
+    Form(FormComponent),
+    ActionPanel(ActionPanelComponent),
+    Grid(GridComponent),
+
+    // Raycast-style form components
+    PasswordField(PasswordFieldComponent),
+    TextArea(TextAreaComponent),
+    DatePicker(DatePickerComponent),
+    Dropdown(DropdownComponent),
+    TagPicker(TagPickerComponent),
+    FilePicker(FilePickerComponent),
+    ListItem(ListItemComponent),
+    DropdownItem(DropdownItemComponent),
+    DropdownSection(DropdownSectionComponent),
+    TagPickerItem(TagPickerItemComponent),
 }
 
 /// Children reference - either explicit list or template-based
@@ -716,6 +734,432 @@ fn default_shader_stage_width() -> f64 {
 
 fn default_shader_stage_height() -> f64 {
     450.0
+}
+
+// ============================================================================
+// Raycast-style Container Components
+// ============================================================================
+
+/// Detail component - presents detailed information
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DetailComponent {
+    /// Shows a loading indicator when true
+    #[serde(default)]
+    pub is_loading: Option<bool>,
+
+    /// Markdown content to display
+    #[serde(default)]
+    pub markdown: Option<StringValue>,
+
+    /// Metadata key-value pairs
+    #[serde(default)]
+    pub metadata: Option<Vec<DetailMetadata>>,
+
+    /// Action panel with actions
+    #[serde(default)]
+    pub actions: Option<String>,
+}
+
+/// A metadata key-value pair for Detail component
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DetailMetadata {
+    /// Key label
+    pub key: StringValue,
+    /// Value content
+    pub value: StringValue,
+}
+
+/// Form component - creates new content with form items
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FormComponent {
+    /// Shows a loading indicator when true
+    #[serde(default)]
+    pub is_loading: Option<bool>,
+
+    /// Action panel with form actions
+    #[serde(default)]
+    pub actions: Option<String>,
+
+    /// Preserves values when user exits
+    #[serde(default)]
+    pub enable_drafts: Option<bool>,
+
+    /// Navigation title
+    #[serde(default)]
+    pub navigation_title: Option<StringValue>,
+
+    /// Search bar accessory
+    #[serde(default)]
+    pub search_bar_accessory: Option<SearchBarAccessory>,
+
+    /// Child component references (form items)
+    #[serde(default)]
+    pub children: ChildrenRef,
+}
+
+/// Search bar accessory for List/Form
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchBarAccessory {
+    /// Filter function
+    #[serde(default)]
+    pub filter: Option<String>,
+    /// Component reference
+    #[serde(default)]
+    pub component: Option<String>,
+}
+
+/// ActionPanel component - provides interaction through a panel of actions
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionPanelComponent {
+    /// Child component references (actions)
+    #[serde(default)]
+    pub children: ChildrenRef,
+}
+
+/// Grid component - displays items with images in a grid layout
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GridComponent {
+    /// Shows a loading indicator when true
+    #[serde(default)]
+    pub is_loading: Option<bool>,
+
+    /// Child component references (grid items)
+    #[serde(default)]
+    pub children: ChildrenRef,
+
+    /// Number of columns
+    #[serde(default)]
+    pub columns: Option<u32>,
+}
+
+// ============================================================================
+// Raycast-style Form Components
+// ============================================================================
+
+/// Password field component - secure text input
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PasswordFieldComponent {
+    /// Unique identifier (required)
+    pub id: String,
+
+    /// Label text
+    #[serde(default)]
+    pub title: Option<StringValue>,
+
+    /// Current value (path-bound)
+    #[serde(default)]
+    pub value: Option<StringValue>,
+
+    /// Default value
+    #[serde(default)]
+    pub default_value: Option<StringValue>,
+
+    /// Placeholder text
+    #[serde(default)]
+    pub placeholder: Option<StringValue>,
+
+    /// Error message
+    #[serde(default)]
+    pub error: Option<StringValue>,
+
+    /// Info message
+    #[serde(default)]
+    pub info: Option<StringValue>,
+
+    /// Persists after submit
+    #[serde(default)]
+    pub store_value: Option<bool>,
+
+    /// Auto-focus on mount
+    #[serde(default)]
+    pub auto_focus: Option<bool>,
+}
+
+/// Text area component - multiline text input
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextAreaComponent {
+    /// Unique identifier (required)
+    pub id: String,
+
+    /// Label text
+    #[serde(default)]
+    pub title: Option<StringValue>,
+
+    /// Current value (path-bound)
+    #[serde(default)]
+    pub value: Option<StringValue>,
+
+    /// Default value
+    #[serde(default)]
+    pub default_value: Option<StringValue>,
+
+    /// Placeholder text
+    #[serde(default)]
+    pub placeholder: Option<StringValue>,
+
+    /// Error message
+    #[serde(default)]
+    pub error: Option<StringValue>,
+
+    /// Info message
+    #[serde(default)]
+    pub info: Option<StringValue>,
+
+    /// Persists after submit
+    #[serde(default)]
+    pub store_value: Option<bool>,
+
+    /// Auto-focus on mount
+    #[serde(default)]
+    pub auto_focus: Option<bool>,
+
+    /// Enable markdown shortcuts
+    #[serde(default)]
+    pub enable_markdown: Option<bool>,
+}
+
+/// Date picker component - date/time selection
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatePickerComponent {
+    /// Unique identifier (required)
+    pub id: String,
+
+    /// Current value (path-bound)
+    #[serde(default)]
+    pub value: Option<StringValue>,
+
+    /// Default value
+    #[serde(default)]
+    pub default_value: Option<StringValue>,
+
+    /// Minimum date
+    #[serde(default)]
+    pub min: Option<StringValue>,
+
+    /// Maximum date
+    #[serde(default)]
+    pub max: Option<StringValue>,
+
+    /// Date picker type
+    #[serde(default)]
+    pub date_type: Option<DatePickerType>,
+
+    /// Label text
+    #[serde(default)]
+    pub title: Option<StringValue>,
+
+    /// Error message
+    #[serde(default)]
+    pub error: Option<StringValue>,
+
+    /// Info message
+    #[serde(default)]
+    pub info: Option<StringValue>,
+}
+
+/// Date picker type enum
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DatePickerType {
+    Date,
+    DateTime,
+    Time,
+}
+
+/// Dropdown component - dropdown selection menu
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DropdownComponent {
+    /// Unique identifier (required)
+    pub id: String,
+
+    /// Current value (path-bound)
+    #[serde(default)]
+    pub value: Option<StringValue>,
+
+    /// Default value
+    #[serde(default)]
+    pub default_value: Option<StringValue>,
+
+    /// Placeholder text
+    #[serde(default)]
+    pub placeholder: Option<StringValue>,
+
+    /// Enable filtering
+    #[serde(default)]
+    pub filtering: Option<DropdownFiltering>,
+
+    /// Shows loading indicator
+    #[serde(default)]
+    pub is_loading: Option<bool>,
+
+    /// Child items
+    #[serde(default)]
+    pub children: ChildrenRef,
+
+    /// Label text
+    #[serde(default)]
+    pub title: Option<StringValue>,
+}
+
+/// Dropdown filtering options
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DropdownFiltering {
+    /// Enable filtering
+    pub enabled: bool,
+
+    /// Keep section order when filtering
+    #[serde(default)]
+    pub keep_section_order: Option<bool>,
+}
+
+/// Dropdown item component
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DropdownItemComponent {
+    /// Display title (required)
+    pub title: StringValue,
+
+    /// Value (required)
+    pub value: String,
+
+    /// Icon
+    #[serde(default)]
+    pub icon: Option<StringValue>,
+
+    /// Keywords for filtering
+    #[serde(default)]
+    pub keywords: Option<Vec<String>>,
+}
+
+/// Dropdown section component
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DropdownSectionComponent {
+    /// Section title
+    #[serde(default)]
+    pub title: Option<StringValue>,
+
+    /// Child items
+    #[serde(default)]
+    pub children: ChildrenRef,
+}
+
+/// Tag picker component - multi-select tags
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagPickerComponent {
+    /// Unique identifier (required)
+    pub id: String,
+
+    /// Selected values (path-bound)
+    #[serde(default)]
+    pub value: Option<Vec<StringValue>>,
+
+    /// Default values
+    #[serde(default)]
+    pub default_value: Option<Vec<StringValue>>,
+
+    /// Placeholder text
+    #[serde(default)]
+    pub placeholder: Option<StringValue>,
+
+    /// Child items
+    #[serde(default)]
+    pub children: ChildrenRef,
+
+    /// Label text
+    #[serde(default)]
+    pub title: Option<StringValue>,
+}
+
+/// Tag picker item component
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagPickerItemComponent {
+    /// Display title (required)
+    pub title: StringValue,
+
+    /// Value (required)
+    pub value: String,
+
+    /// Icon
+    #[serde(default)]
+    pub icon: Option<StringValue>,
+}
+
+/// File picker component - select files/directories
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilePickerComponent {
+    /// Unique identifier (required)
+    pub id: String,
+
+    /// Allow multiple selection
+    #[serde(default)]
+    pub allow_multiple_selection: Option<bool>,
+
+    /// Allow directory selection
+    #[serde(default)]
+    pub can_choose_directories: Option<bool>,
+
+    /// Allow file selection (default: true)
+    #[serde(default)]
+    pub can_choose_files: Option<bool>,
+
+    /// Show hidden files
+    #[serde(default)]
+    pub show_hidden_files: Option<bool>,
+
+    /// Selected paths (path-bound)
+    #[serde(default)]
+    pub value: Option<Vec<StringValue>>,
+
+    /// Default paths
+    #[serde(default)]
+    pub default_value: Option<Vec<StringValue>>,
+
+    /// Label text
+    #[serde(default)]
+    pub title: Option<StringValue>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// List item component - for List and Grid
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListItemComponent {
+    /// Child component
+    pub child: String,
+
+    /// Optional icon
+    #[serde(default)]
+    pub icon: Option<StringValue>,
+
+    /// Optional accessory (secondary info)
+    #[serde(default)]
+    pub accessory: Option<String>,
+
+    /// Is this item focused
+    #[serde(default)]
+    pub focus: Option<bool>,
+
+    /// Action on selection
+    #[serde(default)]
+    pub action: Option<ActionDefinition>,
 }
 
 // ============================================================================

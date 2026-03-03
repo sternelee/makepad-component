@@ -37,6 +37,24 @@ pub enum A2uiComponentType {
     AudioPlayer,
     // Shader visualization
     ShaderStage,
+
+    // Raycast-style containers
+    Detail,
+    Form,
+    ActionPanel,
+    Grid,
+
+    // Raycast-style form components
+    PasswordField,
+    TextArea,
+    DatePicker,
+    Dropdown,
+    TagPicker,
+    FilePicker,
+    ListItem,
+    DropdownItem,
+    DropdownSection,
+    TagPickerItem,
 }
 
 impl A2uiComponentType {
@@ -62,6 +80,22 @@ impl A2uiComponentType {
             A2uiComponentType::Calendar => "Calendar",
             A2uiComponentType::AudioPlayer => "AudioPlayer",
             A2uiComponentType::ShaderStage => "ShaderStage",
+            // Raycast-style containers
+            A2uiComponentType::Detail => "Detail",
+            A2uiComponentType::Form => "Form",
+            A2uiComponentType::ActionPanel => "ActionPanel",
+            A2uiComponentType::Grid => "Grid",
+            // Raycast-style form components
+            A2uiComponentType::PasswordField => "PasswordField",
+            A2uiComponentType::TextArea => "TextArea",
+            A2uiComponentType::DatePicker => "DatePicker",
+            A2uiComponentType::Dropdown => "Dropdown",
+            A2uiComponentType::TagPicker => "TagPicker",
+            A2uiComponentType::FilePicker => "FilePicker",
+            A2uiComponentType::ListItem => "ListItem",
+            A2uiComponentType::DropdownItem => "DropdownItem",
+            A2uiComponentType::DropdownSection => "DropdownSection",
+            A2uiComponentType::TagPickerItem => "TagPickerItem",
         }
     }
 
@@ -87,6 +121,22 @@ impl A2uiComponentType {
             "Calendar" => Some(A2uiComponentType::Calendar),
             "AudioPlayer" => Some(A2uiComponentType::AudioPlayer),
             "ShaderStage" => Some(A2uiComponentType::ShaderStage),
+            // Raycast-style containers
+            "Detail" => Some(A2uiComponentType::Detail),
+            "Form" => Some(A2uiComponentType::Form),
+            "ActionPanel" => Some(A2uiComponentType::ActionPanel),
+            "Grid" => Some(A2uiComponentType::Grid),
+            // Raycast-style form components
+            "PasswordField" => Some(A2uiComponentType::PasswordField),
+            "TextArea" => Some(A2uiComponentType::TextArea),
+            "DatePicker" => Some(A2uiComponentType::DatePicker),
+            "Dropdown" => Some(A2uiComponentType::Dropdown),
+            "TagPicker" => Some(A2uiComponentType::TagPicker),
+            "FilePicker" => Some(A2uiComponentType::FilePicker),
+            "ListItem" => Some(A2uiComponentType::ListItem),
+            "DropdownItem" => Some(A2uiComponentType::DropdownItem),
+            "DropdownSection" => Some(A2uiComponentType::DropdownSection),
+            "TagPickerItem" => Some(A2uiComponentType::TagPickerItem),
             _ => None,
         }
     }
@@ -113,6 +163,22 @@ impl A2uiComponentType {
             A2uiComponentType::Calendar,
             A2uiComponentType::AudioPlayer,
             A2uiComponentType::ShaderStage,
+            // Raycast-style containers
+            A2uiComponentType::Detail,
+            A2uiComponentType::Form,
+            A2uiComponentType::ActionPanel,
+            A2uiComponentType::Grid,
+            // Raycast-style form components
+            A2uiComponentType::PasswordField,
+            A2uiComponentType::TextArea,
+            A2uiComponentType::DatePicker,
+            A2uiComponentType::Dropdown,
+            A2uiComponentType::TagPicker,
+            A2uiComponentType::FilePicker,
+            A2uiComponentType::ListItem,
+            A2uiComponentType::DropdownItem,
+            A2uiComponentType::DropdownSection,
+            A2uiComponentType::TagPickerItem,
         ]
     }
 }
@@ -386,6 +452,22 @@ pub fn component_type_of(component: &super::message::ComponentType) -> A2uiCompo
         ComponentType::Calendar(_) => A2uiComponentType::Calendar,
         ComponentType::AudioPlayer(_) => A2uiComponentType::AudioPlayer,
         ComponentType::ShaderStage(_) => A2uiComponentType::ShaderStage,
+        // Raycast-style containers
+        ComponentType::Detail(_) => A2uiComponentType::Detail,
+        ComponentType::Form(_) => A2uiComponentType::Form,
+        ComponentType::ActionPanel(_) => A2uiComponentType::ActionPanel,
+        ComponentType::Grid(_) => A2uiComponentType::Grid,
+        // Raycast-style form components
+        ComponentType::PasswordField(_) => A2uiComponentType::PasswordField,
+        ComponentType::TextArea(_) => A2uiComponentType::TextArea,
+        ComponentType::DatePicker(_) => A2uiComponentType::DatePicker,
+        ComponentType::Dropdown(_) => A2uiComponentType::Dropdown,
+        ComponentType::TagPicker(_) => A2uiComponentType::TagPicker,
+        ComponentType::FilePicker(_) => A2uiComponentType::FilePicker,
+        ComponentType::ListItem(_) => A2uiComponentType::ListItem,
+        ComponentType::DropdownItem(_) => A2uiComponentType::DropdownItem,
+        ComponentType::DropdownSection(_) => A2uiComponentType::DropdownSection,
+        ComponentType::TagPickerItem(_) => A2uiComponentType::TagPickerItem,
     }
 }
 
