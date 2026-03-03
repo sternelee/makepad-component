@@ -870,7 +870,8 @@ live_design! {
                         text: "Clear"
                     }
                     <View> { width: Fill }
-                    load_example_btn = <MpButtonSecondary> { text: "Load Example" }
+                    load_example_btn = <MpButtonSecondary> { text: "Basic Example" }
+                    load_raycast_btn = <MpButtonSecondary> { text: "Raycast Examples" }
                 }
             }
 
@@ -5222,6 +5223,29 @@ impl JsonRenderDemo {
   ]
 }"#
     }
+
+    /// Get Raycast-style example JSON (simplified format for Component Zoo)
+    fn get_raycast_example_json() -> &'static str {
+        r#"{"type":"VStack","props":{"spacing":16},"children":[
+{"type":"Card","props":{"title":"Create New User","description":"Raycast form"}},
+{"type":"Label","props":{"text":"Username"}},
+{"type":"TextInput","props":{"label":"Username","placeholder":"Enter username"}},
+{"type":"Label","props":{"text":"Password"}},
+{"type":"TextInput","props":{"label":"Password","placeholder":"Enter password"}},
+{"type":"HStack","props":{"spacing":12},"children":[
+{"type":"Switch","props":{"label":"Admin"}},
+{"type":"Switch","props":{"label":"Active"}}
+]},
+{"type":"Divider"},
+{"type":"HStack","props":{"spacing":12},"children":[
+{"type":"Button","props":{"text":"Create"}},
+{"type":"Button","props":{"text":"Cancel"}}
+]},
+{"type":"Progress","props":{"value":45,"label":"Progress: 45%"}},
+{"type":"Divider"},
+{"type":"Label","props":{"text":"Use A2UI Demo for full Raycast components"}}
+]}"#
+    }
 }
 
 impl Widget for JsonRenderDemo {
@@ -5263,7 +5287,15 @@ impl Widget for JsonRenderDemo {
         if self.view.mp_button(ids!(load_example_btn)).clicked(&actions) {
             self.view.text_input(ids!(json_input))
                 .set_text(cx, Self::get_example_json());
-            self.view.label(ids!(render_status)).set_text(cx, "Example loaded");
+            self.view.label(ids!(render_status)).set_text(cx, "Basic example loaded");
+            self.redraw(cx);
+        }
+
+        // Load Raycast example button clicked
+        if self.view.mp_button(ids!(load_raycast_btn)).clicked(&actions) {
+            self.view.text_input(ids!(json_input))
+                .set_text(cx, Self::get_raycast_example_json());
+            self.view.label(ids!(render_status)).set_text(cx, "Raycast example loaded");
             self.redraw(cx);
         }
     }

@@ -2,8 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
----
-
 ## Quick Commands
 
 ```bash
@@ -16,6 +14,13 @@ export SDKROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platf
 # Find the "clang" command in "macos" match block and add:
 #   .args(&["-target", &format!("{}-apple-macos", arch)])
 # where arch = "arm64" for aarch64 targets (Apple Silicon)
+
+# Run tests (core UI crate has unit tests in data_model, value, registry, processor, message)
+cargo test -p makepad-component   # Core UI crate tests
+cargo test                        # All workspace tests
+
+# Run linter
+cargo clippy -p makepad-component
 
 # Run demos (use --bin to specify which binary)
 cargo run -p component-zoo --bin component-zoo    # Widget showcase
@@ -31,11 +36,17 @@ LLM_API_KEY="nvapi-xxx" \
 LLM_PORT=8082 \
 ./target/debug/a2ui-bridge
 
-# Watch server (live file editing)
+# Watch server (live file editing) - requires mock-server feature
 cargo run --bin watch-server --features mock-server
 
-# Generate math charts
+# Math charts generator
 cargo run --bin math-charts
+
+# FFT demo
+cargo run --bin fft-demo
+
+# Mock A2A server (for testing A2A protocol)
+cargo run --bin mock-a2a-server --features mock-server
 
 # WebAssembly build
 cargo makepad wasm build -p component-zoo --release
@@ -53,6 +64,14 @@ Build an **A2UI (Agent-to-UI) Renderer for Makepad** that enables AI agents to g
 LLM → A2UI Bridge (tools→JSON) → Makepad App (A2uiHost → A2uiProcessor → A2uiSurface → Widgets)
 ```
 
+### Server Ports
+
+| Server | Port | Feature | Binary |
+|--------|------|---------|--------|
+| A2UI Bridge | 8082 | `a2ui-bridge` | a2ui-bridge |
+| Watch Server | 8080 | `mock-server` | watch-server |
+| Mock A2A Server | 8083 | `mock-server` | mock-a2a-server |
+
 ### Workspace Crates
 
 | Crate | Purpose |
@@ -66,15 +85,11 @@ LLM → A2UI Bridge (tools→JSON) → Makepad App (A2uiHost → A2uiProcessor �
 
 - `crates/ui/src/a2ui/message.rs` - Protocol types (serde)
 - `crates/ui/src/a2ui/processor.rs` - JSON → widget tree conversion
+- `crates/ui/src/a2ui/data_model.rs` - DataModel with JSON Pointer path access (has tests)
+- `crates/ui/src/a2ui/value.rs` - Value types for data binding (has tests)
+- `crates/ui/src/a2ui/registry.rs` - Component registry (has tests)
 - `crates/ui/src/a2ui/surface/` - Component rendering
 - `crates/a2ui-demo/src/a2ui_bridge.rs` - LLM → A2UI bridge server
-
-### Server Ports
-
-| Server | Port | Feature |
-|--------|------|---------|
-| A2UI Bridge | 8082 | `a2ui-bridge` |
-| Watch Server | 8080 | `mock-server` |
 
 ---
 
@@ -83,6 +98,38 @@ LLM → A2UI Bridge (tools→JSON) → Makepad App (A2uiHost → A2uiProcessor �
 Messages: `beginRendering`, `surfaceUpdate`, `dataModelUpdate`, `deleteSurface`, `userAction`
 
 Components map to Makepad widgets: Column→View, Row→View, Text→Label, Button→Button, List→PortalList, Chart→makepad-plot
+
+### LLM Bridge Configuration
+
+Environment variables for the A2UI bridge server:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LLM_API_URL` | `https://api.moonshot.ai/v1/chat/completions` | Chat completions endpoint |
+| `LLM_MODEL` | `kimi-k2.5` | Model name |
+| `LLM_API_KEY` | `not-needed` | API key (also reads `MOONSHOT_API_KEY`) |
+| `LLM_PORT` | `8081` | Bridge server port |
+
+**Tested LLM Providers:**
+
+| Provider | LLM_API_URL | LLM_MODEL |
+|----------|-------------|-----------|
+| NVIDIA NIM | `https://integrate.api.nvidia.com/v1/chat/completions` | `minimaxai/minimax-m2.1` |
+| NVIDIA NIM | `https://integrate.api.nvidia.com/v1/chat/completions` | `z-ai/glm4.7` |
+| Moonshot | `https://api.moonshot.ai/v1/chat/completions` | `kimi-k2.5` |
+
+> **Note:** The LLM must support **tool/function calling** for the bridge to work.
+
+### Bridge Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/chat` | POST | Send natural language `{"message": "..."}`, receive A2UI JSON |
+| `/rpc` | POST | A2A protocol endpoint (returns latest UI as SSE stream) |
+| `/live` | GET | Live updates via SSE (real-time push) |
+| `/reset` | POST | Clear conversation history |
+| `/status` | GET | Server health check |
+| `/inject` | POST | Inject raw A2UI JSON directly `{"a2ui": [...]}` |
 
 ---
 
@@ -585,3 +632,4 @@ For deeper reference, check these codebases:
 - **Makepad**: `https://github.com/makepad/makepad` - Framework source
 - **A2UI Protocol**: `https://github.com/ZhangHanDong/A2UI` - A2UI spec and renderers
 - **GenUI**: Flutter A2UI renderer reference
+- **Project Skills**: `./skills/` - Local skill definitions for Claude Code
