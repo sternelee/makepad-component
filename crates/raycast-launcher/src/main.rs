@@ -5,11 +5,19 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Arc, Mutex};
+
+mod chat;
+mod todo;
 
 live_design! {
     use link::theme::*;
     use link::shaders::*;
     use link::widgets::*;
+    use makepad_component::a2ui::surface::widget::*;
+    use makepad_component::widgets::button::*;
+    use makepad_component::widgets::checkbox::*;
+    use makepad_component::widgets::progress::*;
 
     pub LauncherPanel = {{LauncherPanel}} {
         width: 720,
@@ -28,15 +36,25 @@ live_design! {
             }
         }
 
-        <Label> {
-            text: "Launcher",
-            draw_text: {
-                text_style: <THEME_FONT_BOLD> {font_size: 18},
-                color: #xeff3ff
-            }
-        }
+        launcher_view = <View> {
+            width: Fill,
+            height: Fill,
+            flow: Down,
+            spacing: 10,
 
-        search_input = <TextInput> {
+            <View> {
+                width: Fill,
+                height: Fit,
+                <Label> {
+                    text: "Launcher",
+                    draw_text: {
+                        text_style: <THEME_FONT_BOLD> {font_size: 18},
+                        color: #xeff3ff
+                    }
+                }
+            }
+
+            search_input = <TextInput> {
             width: Fill,
             height: Fit,
             empty_text: "Search apps and commands...",
@@ -55,17 +73,17 @@ live_design! {
                 text_style: <THEME_FONT_REGULAR> {font_size: 13},
                 color: #xe2e8f0
             }
-        }
+            }
 
-        result_count = <Label> {
+            result_count = <Label> {
             text: "",
             draw_text: {
                 text_style: <THEME_FONT_REGULAR> {font_size: 11},
                 color: #x94a3b8
             }
-        }
+            }
 
-        results = <PortalList> {
+            results = <PortalList> {
             width: Fill,
             height: Fill,
             flow: Down,
@@ -150,13 +168,316 @@ live_design! {
                     }
                 }
             }
-        }
+            }
 
-        status_label = <Label> {
+            status_label = <Label> {
             text: "",
             draw_text: {
                 text_style: <THEME_FONT_REGULAR> {font_size: 11},
                 color: #x93c5fd
+            }
+            }
+        }
+
+        todo_view = <View> {
+            visible: false,
+            width: Fill,
+            height: Fill,
+            flow: Down,
+            spacing: 12,
+            padding: {left: 2, right: 2, top: 2, bottom: 2},
+
+            <View> {
+                width: Fill,
+                height: Fit,
+                flow: Right,
+                align: {y: 0.5},
+                spacing: 8,
+
+                todo_back_btn = <MpButtonSecondary> { text: "Back" }
+                <Label> {
+                    text: "Todo List",
+                    draw_text: {
+                        text_style: <THEME_FONT_BOLD> {font_size: 18},
+                        color: #xeff3ff
+                    }
+                }
+            }
+
+            <Label> {
+                text: "Capture quick tasks for this workspace",
+                draw_text: {
+                    text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                    color: #x8ea0b8
+                }
+            }
+
+            <View> {
+                width: Fill,
+                height: Fit,
+                flow: Right,
+                spacing: 8,
+
+                todo_input = <TextInput> {
+                    width: Fill,
+                    height: Fit,
+                    empty_text: "Add a todo and press Enter...",
+                    padding: {left: 12, right: 12, top: 10, bottom: 10},
+                    draw_bg: {
+                        instance border_color: #x334155,
+                        fn pixel(self) -> vec4 {
+                            let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 10.0);
+                            sdf.fill(#x0f1318);
+                            sdf.stroke(self.border_color, 1.0);
+                            return sdf.result;
+                        }
+                    }
+                    draw_text: {
+                        text_style: <THEME_FONT_REGULAR> {font_size: 12},
+                        color: #xe2e8f0
+                    }
+                }
+
+                todo_add_btn = <MpButtonPrimary> { text: "Add" }
+            }
+
+            stats_card = <View> {
+                width: Fill,
+                height: Fit,
+                flow: Down,
+                spacing: 8,
+                padding: {left: 10, right: 10, top: 10, bottom: 10},
+                show_bg: true,
+                draw_bg: {
+                    fn pixel(self) -> vec4 {
+                        let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                        sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
+                        sdf.fill(#x171d24);
+                        sdf.stroke(#x2a323d, 1.0);
+                        return sdf.result;
+                    }
+                }
+
+                todo_count_label = <Label> {
+                    text: "0 / 0 done",
+                    draw_text: {
+                        text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                        color: #x94a3b8
+                    }
+                }
+
+                todo_progress = <MpProgressSuccess> {
+                    width: Fill,
+                    height: 6,
+                    value: 0.0,
+                }
+            }
+
+            <View> { width: Fill, height: 1, show_bg: true, draw_bg: {color: #x2b313a} }
+
+            todo_rows = <View> {
+                width: Fill,
+                height: Fill,
+                flow: Down,
+                spacing: 6,
+
+                row_0 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    check_0 = <MpCheckbox> { text: "" }
+                    label_0 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
+                    del_0 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
+                }
+                row_1 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    check_1 = <MpCheckbox> { text: "" }
+                    label_1 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
+                    del_1 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
+                }
+                row_2 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    check_2 = <MpCheckbox> { text: "" }
+                    label_2 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
+                    del_2 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
+                }
+                row_3 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    check_3 = <MpCheckbox> { text: "" }
+                    label_3 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
+                    del_3 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
+                }
+                row_4 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    check_4 = <MpCheckbox> { text: "" }
+                    label_4 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
+                    del_4 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
+                }
+                row_5 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    check_5 = <MpCheckbox> { text: "" }
+                    label_5 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
+                    del_5 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
+                }
+                row_6 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    check_6 = <MpCheckbox> { text: "" }
+                    label_6 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
+                    del_6 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
+                }
+                row_7 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    check_7 = <MpCheckbox> { text: "" }
+                    label_7 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
+                    del_7 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
+                }
+            }
+        }
+
+        chat_view = <View> {
+            visible: false,
+            width: Fill,
+            height: Fill,
+            flow: Down,
+            spacing: 10,
+            padding: {left: 2, right: 2, top: 2, bottom: 2},
+
+            <View> {
+                width: Fill,
+                height: Fit,
+                flow: Right,
+                align: {y: 0.5},
+                spacing: 8,
+
+                chat_back_btn = <MpButtonSecondary> { text: "Back" }
+                <Label> {
+                    width: Fill,
+                    text: "A2UI Chat",
+                    draw_text: {
+                        text_style: <THEME_FONT_BOLD> {font_size: 18},
+                        color: #xeff3ff
+                    }
+                }
+                chat_reset_btn = <MpButtonGhost> { text: "Reset" }
+            }
+
+            <View> {
+                width: Fill,
+                height: Fit,
+                flow: Right,
+                align: {y: 0.5},
+                spacing: 8,
+                <Label> {
+                    text: "Bridge:",
+                    draw_text: {
+                        text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                        color: #x94a3b8
+                    }
+                }
+                chat_server_input = <TextInput> {
+                    width: 280,
+                    height: Fit,
+                    empty_text: "http://127.0.0.1:8081",
+                    padding: {left: 10, right: 10, top: 8, bottom: 8},
+                    draw_bg: {
+                        instance border_color: #x334155,
+                        fn pixel(self) -> vec4 {
+                            let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
+                            sdf.fill(#x0f1318);
+                            sdf.stroke(self.border_color, 1.0);
+                            return sdf.result;
+                        }
+                    }
+                    draw_text: {
+                        text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                        color: #xe2e8f0
+                    }
+                }
+            }
+
+            chat_history_scroll = <ScrollYView> {
+                width: Fill,
+                height: 120,
+                show_bg: true,
+                draw_bg: {
+                    fn pixel(self) -> vec4 {
+                        let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                        sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
+                        sdf.fill(#x171d24);
+                        sdf.stroke(#x2a323d, 1.0);
+                        return sdf.result;
+                    }
+                }
+                <View> {
+                    width: Fill,
+                    height: Fit,
+                    padding: {left: 10, right: 10, top: 10, bottom: 10}
+                    chat_history_label = <Label> {
+                        width: Fill,
+                        text: "",
+                        draw_text: {
+                            text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                            color: #xcbd5e1
+                            wrap: Word
+                        }
+                    }
+                }
+            }
+
+            <View> {
+                width: Fill,
+                height: Fit,
+                flow: Right,
+                spacing: 8,
+                chat_input = <TextInput> {
+                    width: Fill,
+                    height: Fit,
+                    empty_text: "Ask for UI, e.g. 'Create a task dashboard with charts'",
+                    padding: {left: 12, right: 12, top: 10, bottom: 10},
+                    draw_bg: {
+                        instance border_color: #x334155,
+                        fn pixel(self) -> vec4 {
+                            let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 10.0);
+                            sdf.fill(#x0f1318);
+                            sdf.stroke(self.border_color, 1.0);
+                            return sdf.result;
+                        }
+                    }
+                    draw_text: {
+                        text_style: <THEME_FONT_REGULAR> {font_size: 12},
+                        color: #xe2e8f0
+                    }
+                }
+                chat_send_btn = <MpButtonPrimary> { text: "Send" }
+            }
+
+            chat_status_label = <Label> {
+                text: "Ready",
+                draw_text: {
+                    text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                    color: #x93c5fd
+                }
+            }
+
+            chat_surface_wrap = <View> {
+                width: Fill,
+                height: Fill,
+                show_bg: true,
+                draw_bg: {
+                    fn pixel(self) -> vec4 {
+                        let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                        sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
+                        sdf.fill(#x11161c);
+                        sdf.stroke(#x2a323d, 1.0);
+                        return sdf.result;
+                    }
+                }
+                padding: {left: 10, right: 10, top: 10, bottom: 10}
+                chat_surface = <A2uiSurface> {
+                    width: Fill,
+                    height: Fill,
+                }
             }
         }
     }
@@ -195,6 +516,8 @@ app_main!(App);
 enum LaunchTarget {
     OpenPath(String),
     Command { program: String, args: Vec<String> },
+    OpenTodo,
+    OpenChat,
 }
 
 #[derive(Clone)]
@@ -222,6 +545,22 @@ pub struct LauncherPanel {
     selected_index: usize,
     #[rust]
     icon_cache: HashMap<usize, Option<String>>,
+    #[rust]
+    show_todo: bool,
+    #[rust]
+    todos: Vec<todo::TodoItem>,
+    #[rust]
+    show_chat: bool,
+    #[rust]
+    chat_messages: Vec<chat::ChatMessage>,
+    #[rust]
+    chat_loading: bool,
+    #[rust]
+    chat_server_url: String,
+    #[rust]
+    chat_signal: SignalToUI,
+    #[rust]
+    chat_results: Arc<Mutex<Vec<chat::ChatWorkerResult>>>,
 }
 
 impl LiveHook for LauncherPanel {
@@ -230,9 +569,20 @@ impl LiveHook for LauncherPanel {
         self.query.clear();
         self.selected_index = 0;
         self.icon_cache.clear();
-        self.prewarm_icons(48);
+        self.show_todo = false;
+        self.todos = todo::default_todos();
+        self.show_chat = false;
+        self.chat_messages = chat::default_chat_messages();
+        self.chat_loading = false;
+        self.chat_server_url = "http://127.0.0.1:8081".to_string();
+        self.chat_results = Arc::new(Mutex::new(Vec::new()));
         self.rebuild_filter();
         self.view.text_input(ids!(search_input)).set_key_focus(cx);
+        self.sync_todo_ui(cx);
+        self.sync_chat_ui(cx);
+        self.view
+            .text_input(ids!(chat_server_input))
+            .set_text(cx, &self.chat_server_url);
         self.update_labels(cx, "Ready");
     }
 }
@@ -304,6 +654,24 @@ fn command_items() -> Vec<LauncherItem> {
                 ],
             },
             "rust ci tests",
+        ),
+        launcher_item(
+            "Todo".to_string(),
+            "Open built-in todo list".to_string(),
+            "Command".to_string(),
+            None,
+            Some("T"),
+            LaunchTarget::OpenTodo,
+            "tasks checklist todos 待办 任务 清单",
+        ),
+        launcher_item(
+            "Chat".to_string(),
+            "Open A2UI conversation panel".to_string(),
+            "Command".to_string(),
+            None,
+            Some("C"),
+            LaunchTarget::OpenChat,
+            "a2ui chat llm assistant 对话",
         ),
     ]
 }
@@ -423,73 +791,10 @@ fn load_launcher_items() -> Vec<LauncherItem> {
 }
 
 impl LauncherPanel {
-    #[cfg(target_os = "macos")]
-    fn render_quicklook_icon(bundle_path: &str, out_png: &Path) -> bool {
-        let ql_dir = std::env::temp_dir().join("raycast-launcher-ql");
-        if fs::create_dir_all(&ql_dir).is_err() {
-            return false;
-        }
-
-        let status = Command::new("qlmanage")
-            .args([
-                "-t",
-                "-s",
-                "256",
-                "-o",
-                &ql_dir.to_string_lossy(),
-                bundle_path,
-            ])
-            .status();
-
-        let Ok(exit) = status else {
-            return false;
-        };
-        if !exit.success() {
-            return false;
-        }
-
-        let bundle_file = Path::new(bundle_path)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("app");
-
-        let expected_png = ql_dir.join(format!("{}.png", bundle_file));
-        let source_png = if expected_png.exists() {
-            expected_png
-        } else {
-            let mut candidate = None;
-            if let Ok(rd) = fs::read_dir(&ql_dir) {
-                for entry in rd.flatten() {
-                    let p = entry.path();
-                    let is_png = p
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .map(|e| e.eq_ignore_ascii_case("png"))
-                        .unwrap_or(false);
-                    if is_png {
-                        candidate = Some(p);
-                    }
-                }
-            }
-            let Some(p) = candidate else {
-                return false;
-            };
-            p
-        };
-
-        fs::copy(source_png, out_png).is_ok()
-    }
-
-    fn prewarm_icons(&mut self, max_items: usize) {
-        for idx in 0..self.all_items.len().min(max_items) {
-            let _ = self.resolve_icon_for_index(idx);
-        }
-    }
-
     fn icon_cache_path(icns_path: &Path) -> Option<PathBuf> {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         // Bump version when conversion params change to avoid stale cached icons.
-        "v3_quicklook_256".hash(&mut hasher);
+        "v4_sips_256".hash(&mut hasher);
         icns_path.to_string_lossy().hash(&mut hasher);
         let hash = hasher.finish();
 
@@ -540,24 +845,22 @@ impl LauncherPanel {
             if !png.exists() {
                 #[cfg(target_os = "macos")]
                 {
-                    if !Self::render_quicklook_icon(bundle_path, &png) {
-                        let icns = Self::find_icns(bundle_path)?;
-                        let status = Command::new("sips")
-                            .args([
-                                "-s",
-                                "format",
-                                "png",
-                                &icns.to_string_lossy(),
-                                "--resampleHeightWidthMax",
-                                "256",
-                                "--out",
-                                &png.to_string_lossy(),
-                            ])
-                            .status()
-                            .ok()?;
-                        if !status.success() || !png.exists() {
-                            return None;
-                        }
+                    let icns = Self::find_icns(bundle_path)?;
+                    let status = Command::new("sips")
+                        .args([
+                            "-s",
+                            "format",
+                            "png",
+                            &icns.to_string_lossy(),
+                            "--resampleHeightWidthMax",
+                            "256",
+                            "--out",
+                            &png.to_string_lossy(),
+                        ])
+                        .status()
+                        .ok()?;
+                    if !status.success() || !png.exists() {
+                        return None;
                     }
                 }
 
@@ -576,18 +879,54 @@ impl LauncherPanel {
 
     fn rebuild_filter(&mut self) {
         let q = self.query.trim().to_lowercase();
+        let q_norm = q.trim_start_matches('/').to_string();
         self.filtered_indices = self
             .all_items
             .iter()
             .enumerate()
             .filter_map(|(idx, item)| {
-                if q.is_empty() || item.search_key.contains(&q) {
+                if q.is_empty()
+                    || item.search_key.contains(&q)
+                    || (!q_norm.is_empty() && item.search_key.contains(&q_norm))
+                {
                     Some(idx)
                 } else {
                     None
                 }
             })
             .collect();
+
+        if q.contains("todo") || q.contains("待办") || q.contains("任务") {
+            if let Some(todo_idx) = self
+                .all_items
+                .iter()
+                .position(|it| matches!(it.launch, LaunchTarget::OpenTodo))
+            {
+                self.filtered_indices.retain(|idx| *idx != todo_idx);
+                self.filtered_indices.insert(0, todo_idx);
+            }
+        }
+
+        if q.contains("chat") || q.contains("对话") || q.contains("聊天") || q_norm == "chat" {
+            if let Some(chat_idx) = self
+                .all_items
+                .iter()
+                .position(|it| matches!(it.launch, LaunchTarget::OpenChat))
+            {
+                self.filtered_indices.retain(|idx| *idx != chat_idx);
+                self.filtered_indices.insert(0, chat_idx);
+            }
+        }
+
+        // Built-in modules are always shown first in search results.
+        self.filtered_indices.sort_by_key(|idx| {
+            let is_builtin = self
+                .all_items
+                .get(*idx)
+                .map(|it| matches!(it.launch, LaunchTarget::OpenTodo | LaunchTarget::OpenChat))
+                .unwrap_or(false);
+            if is_builtin { 0 } else { 1 }
+        });
 
         if self.filtered_indices.is_empty() {
             self.selected_index = 0;
@@ -663,6 +1002,14 @@ impl LauncherPanel {
                     Err(_) => self.update_labels(cx, &format!("Command failed: {}", program)),
                 }
             }
+            LaunchTarget::OpenTodo => {
+                self.set_todo_mode(cx, true);
+                self.update_labels(cx, "Opened");
+            }
+            LaunchTarget::OpenChat => {
+                self.set_chat_mode(cx, true);
+                self.update_labels(cx, "Opened");
+            }
         }
 
         self.redraw(cx);
@@ -675,6 +1022,22 @@ impl Widget for LauncherPanel {
             self.view.handle_event(cx, event, scope);
         });
 
+        if self.show_todo {
+            self.handle_todo_actions(cx, &actions);
+            if let Event::KeyDown(key) = event {
+                if key.key_code == KeyCode::Escape {
+                    self.set_todo_mode(cx, false);
+                    self.redraw(cx);
+                }
+            }
+            return;
+        }
+
+        if self.show_chat {
+            self.handle_chat_actions(cx, event, &actions);
+            return;
+        }
+
         if let Some(text) = self.view.text_input(ids!(search_input)).changed(&actions) {
             self.query = text;
             self.selected_index = 0;
@@ -685,6 +1048,17 @@ impl Widget for LauncherPanel {
 
         if let Some((text, _mods)) = self.view.text_input(ids!(search_input)).returned(&actions) {
             self.query = text;
+            let q = self.query.trim().to_lowercase();
+            if q == "todo" || q == "/todo" {
+                self.set_todo_mode(cx, true);
+                self.redraw(cx);
+                return;
+            }
+            if q == "chat" || q == "/chat" {
+                self.set_chat_mode(cx, true);
+                self.redraw(cx);
+                return;
+            }
             self.rebuild_filter();
             self.launch_selected(cx);
         }
@@ -775,6 +1149,7 @@ pub struct App {
 impl LiveRegister for App {
     fn live_register(cx: &mut Cx) {
         makepad_widgets::live_design(cx);
+        makepad_component::live_design(cx);
     }
 }
 
