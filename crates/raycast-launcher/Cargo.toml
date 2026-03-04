@@ -1,0 +1,12 @@
+[package]
+name = "raycast-launcher"
+version.workspace = true
+edition.workspace = true
+description = "Raycast-style app search launcher rendered with live_design"
+
+[[bin]]
+name = "raycast-launcher"
+path = "src/main.rs"
+
+[dependencies]
+makepad-widgets = { workspace = true }
