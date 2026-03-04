@@ -20,8 +20,8 @@ live_design! {
     use makepad_component::widgets::progress::*;
 
     pub LauncherPanel = {{LauncherPanel}} {
-        width: 720,
-        height: 540,
+        width: Fill,
+        height: Fill,
         flow: Down,
         spacing: 10,
         padding: {left: 16, right: 16, top: 16, bottom: 14},
@@ -520,8 +520,7 @@ live_design! {
                 body = <View> {
                     width: Fill,
                     height: Fill,
-                    flow: Overlay,
-                    align: {x: 0.5, y: 0.5},
+                    flow: Down,
 
                     launcher = <LauncherPanel> {}
                 }
