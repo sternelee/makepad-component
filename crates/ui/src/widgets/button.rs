@@ -20,9 +20,11 @@ live_design! {
             instance border_color: #0000
             instance hover: 0.0
             instance pressed: 0.0
+            instance disabled: 0.0
             instance color: (PRIMARY)
             instance color_hover: (PRIMARY_HOVER)
             instance color_pressed: (PRIMARY_ACTIVE)
+            instance color_disabled: #8f9bb3
 
             fn pixel(self) -> vec4 {
                 let sdf = Sdf2d::viewport(self.pos * self.rect_size);
@@ -38,8 +40,9 @@ live_design! {
                 let hover_color = mix(self.color, self.color_hover, self.hover * 0.6);
                 // Pressed: darken more noticeably
                 let pressed_color = mix(hover_color, self.color_pressed, self.pressed * 0.8);
+                let final_color = mix(pressed_color, self.color_disabled, self.disabled);
 
-                sdf.fill_keep(pressed_color);
+                sdf.fill_keep(final_color);
 
                 if self.border_width > 0.0 {
                     sdf.stroke(self.border_color, self.border_width);
@@ -52,6 +55,11 @@ live_design! {
         draw_text: {
             text_style: <THEME_FONT_REGULAR>{ font_size: 13.0 }
             color: (PRIMARY_FOREGROUND)
+            instance disabled: 0.0
+            instance color_disabled: #e6e9ef
+            fn get_color(self) -> vec4 {
+                return mix(self.color, self.color_disabled, self.disabled);
+            }
         }
 
         text: ""
@@ -262,6 +270,9 @@ impl Widget for MpButton {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        let disabled_f = if self.disabled { 1.0 } else { 0.0 };
+        self.draw_bg.apply_over(cx, live! { disabled: (disabled_f) });
+        self.draw_text.apply_over(cx, live! { disabled: (disabled_f) });
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), self.text.as_ref());
         self.draw_bg.end(cx);
@@ -290,6 +301,11 @@ impl MpButton {
     pub fn set_text(&mut self, text: &str) {
         self.text.as_mut_empty().push_str(text);
     }
+
+    pub fn set_disabled(&mut self, cx: &mut Cx, disabled: bool) {
+        self.disabled = disabled;
+        self.redraw(cx);
+    }
 }
 
 impl MpButtonRef {
@@ -304,6 +320,12 @@ impl MpButtonRef {
     pub fn set_text(&self, text: &str) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.set_text(text);
+        }
+    }
+
+    pub fn set_disabled(&self, cx: &mut Cx, disabled: bool) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_disabled(cx, disabled);
         }
     }
 }

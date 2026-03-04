@@ -5,9 +5,9 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::{Arc, Mutex};
 
 mod chat;
+mod a2ui_bridge_embed;
 mod todo;
 
 live_design! {
@@ -367,7 +367,7 @@ live_design! {
                 align: {y: 0.5},
                 spacing: 8,
                 <Label> {
-                    text: "Bridge:",
+                    text: "LLM API:",
                     draw_text: {
                         text_style: <THEME_FONT_REGULAR> {font_size: 11},
                         color: #x94a3b8
@@ -376,7 +376,27 @@ live_design! {
                 chat_server_input = <TextInput> {
                     width: 280,
                     height: Fit,
-                    empty_text: "http://127.0.0.1:8081",
+                    empty_text: "https://api.moonshot.ai/v1/chat/completions",
+                    padding: {left: 10, right: 10, top: 8, bottom: 8},
+                    draw_bg: {
+                        instance border_color: #x334155,
+                        fn pixel(self) -> vec4 {
+                            let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
+                            sdf.fill(#x0f1318);
+                            sdf.stroke(self.border_color, 1.0);
+                            return sdf.result;
+                        }
+                    }
+                    draw_text: {
+                        text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                        color: #xe2e8f0
+                    }
+                }
+                chat_model_input = <TextInput> {
+                    width: 160,
+                    height: Fit,
+                    empty_text: "kimi-k2.5",
                     padding: {left: 10, right: 10, top: 8, bottom: 8},
                     draw_bg: {
                         instance border_color: #x334155,
@@ -558,9 +578,9 @@ pub struct LauncherPanel {
     #[rust]
     chat_server_url: String,
     #[rust]
-    chat_signal: SignalToUI,
+    chat_model: String,
     #[rust]
-    chat_results: Arc<Mutex<Vec<chat::ChatWorkerResult>>>,
+    chat_api_key: String,
 }
 
 impl LiveHook for LauncherPanel {
@@ -574,8 +594,13 @@ impl LiveHook for LauncherPanel {
         self.show_chat = false;
         self.chat_messages = chat::default_chat_messages();
         self.chat_loading = false;
-        self.chat_server_url = "http://127.0.0.1:8081".to_string();
-        self.chat_results = Arc::new(Mutex::new(Vec::new()));
+        self.chat_server_url = std::env::var("LLM_API_URL")
+            .unwrap_or_else(|_| "https://api.moonshot.ai/v1/chat/completions".to_string());
+        self.chat_model = std::env::var("LLM_MODEL")
+            .unwrap_or_else(|_| "kimi-k2.5".to_string());
+        self.chat_api_key = std::env::var("LLM_API_KEY")
+            .or_else(|_| std::env::var("MOONSHOT_API_KEY"))
+            .unwrap_or_default();
         self.rebuild_filter();
         self.view.text_input(ids!(search_input)).set_key_focus(cx);
         self.sync_todo_ui(cx);
@@ -583,6 +608,9 @@ impl LiveHook for LauncherPanel {
         self.view
             .text_input(ids!(chat_server_input))
             .set_text(cx, &self.chat_server_url);
+        self.view
+            .text_input(ids!(chat_model_input))
+            .set_text(cx, &self.chat_model);
         self.update_labels(cx, "Ready");
     }
 }
@@ -1021,6 +1049,10 @@ impl Widget for LauncherPanel {
         let actions = cx.capture_actions(|cx| {
             self.view.handle_event(cx, event, scope);
         });
+
+        if let Event::NetworkResponses(responses) = event {
+            self.handle_chat_network_responses(cx, responses);
+        }
 
         if self.show_todo {
             self.handle_todo_actions(cx, &actions);
