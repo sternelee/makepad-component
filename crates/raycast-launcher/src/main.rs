@@ -6,8 +6,8 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-mod chat;
 mod a2ui_bridge_embed;
+mod chat;
 mod todo;
 
 live_design! {
@@ -376,7 +376,7 @@ live_design! {
                 chat_server_input = <TextInput> {
                     width: 280,
                     height: Fit,
-                    empty_text: "https://api.moonshot.ai/v1/chat/completions",
+                    empty_text: "https://api.moonshot.cn/v1/chat/completions",
                     padding: {left: 10, right: 10, top: 8, bottom: 8},
                     draw_bg: {
                         instance border_color: #x334155,
@@ -594,9 +594,8 @@ impl LiveHook for LauncherPanel {
         self.chat_messages = chat::default_chat_messages();
         self.chat_loading = false;
         self.chat_server_url = std::env::var("LLM_API_URL")
-            .unwrap_or_else(|_| "https://api.moonshot.ai/v1/chat/completions".to_string());
-        self.chat_model = std::env::var("LLM_MODEL")
-            .unwrap_or_else(|_| "kimi-k2.5".to_string());
+            .unwrap_or_else(|_| "https://api.moonshot.cn/v1/chat/completions".to_string());
+        self.chat_model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "kimi-k2.5".to_string());
         self.chat_api_key = std::env::var("LLM_API_KEY")
             .or_else(|_| std::env::var("MOONSHOT_API_KEY"))
             .unwrap_or_default();
@@ -952,7 +951,11 @@ impl LauncherPanel {
                 .get(*idx)
                 .map(|it| matches!(it.launch, LaunchTarget::OpenTodo | LaunchTarget::OpenChat))
                 .unwrap_or(false);
-            if is_builtin { 0 } else { 1 }
+            if is_builtin {
+                0
+            } else {
+                1
+            }
         });
 
         if self.filtered_indices.is_empty() {
