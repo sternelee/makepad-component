@@ -89,6 +89,14 @@ live_design! {
                     padding: {left: 12, right: 12, top: 7, bottom: 7}
                 }
             }
+
+            mode_hint_label = <Label> {
+                text: "",
+                draw_text: {
+                    text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                    color: #x8f9caf
+                }
+            }
         }
 
         launcher_view = <View> {
@@ -141,6 +149,39 @@ live_design! {
                     color: #xa7b0c1
                 }
             }
+            }
+
+            empty_state = <View> {
+                visible: false,
+                width: Fill,
+                height: Fit,
+                flow: Down,
+                spacing: 6,
+                padding: {left: 14, right: 14, top: 14, bottom: 14},
+                show_bg: true,
+                draw_bg: {
+                    fn pixel(self) -> vec4 {
+                        let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                        sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 9.0);
+                        sdf.fill(#x1b2028);
+                        sdf.stroke(#x303745, 1.0);
+                        return sdf.result;
+                    }
+                }
+                empty_title = <Label> {
+                    text: "No Results",
+                    draw_text: {
+                        text_style: <THEME_FONT_BOLD> {font_size: 13},
+                        color: #xe6ebf5
+                    }
+                }
+                empty_desc = <Label> {
+                    text: "Try another keyword, or use /todo and /chat",
+                    draw_text: {
+                        text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                        color: #x8f9caf
+                    }
+                }
             }
 
             results = <PortalList> {
@@ -248,6 +289,9 @@ live_design! {
             <View> {
             width: Fill,
             height: Fit,
+            flow: Right,
+            align: {y: 0.5},
+            spacing: 8,
             padding: {left: 10, right: 10, top: 6, bottom: 6},
             show_bg: true,
             draw_bg: {
@@ -260,10 +304,18 @@ live_design! {
                 }
             }
             status_label = <Label> {
+                width: Fill,
                 text: "",
                 draw_text: {
                     text_style: <THEME_FONT_REGULAR> {font_size: 10},
                     color: #x7fb9ff
+                }
+            }
+            status_keys_label = <Label> {
+                text: "Up/Down Select  |  Enter Open  |  Double Click Open",
+                draw_text: {
+                    text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                    color: #x8f9caf
                 }
             }
             }
@@ -527,6 +579,9 @@ live_design! {
             <View> {
                 width: Fill,
                 height: Fit,
+                flow: Right,
+                align: {y: 0.5},
+                spacing: 8,
                 padding: {left: 10, right: 10, top: 6, bottom: 6},
                 show_bg: true,
                 draw_bg: {
@@ -539,10 +594,18 @@ live_design! {
                     }
                 }
                 chat_status_label = <Label> {
+                    width: Fill,
                     text: "Ready",
                     draw_text: {
                         text_style: <THEME_FONT_REGULAR> {font_size: 10},
                         color: #x7fb9ff
+                    }
+                }
+                chat_keys_label = <Label> {
+                    text: "Enter Send  |  Esc Back",
+                    draw_text: {
+                        text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                        color: #x8f9caf
                     }
                 }
             }
@@ -916,6 +979,7 @@ impl LauncherPanel {
             action_text,
             action_disabled,
             row_spacing,
+            mode_hint_text,
         ) = if self.show_todo {
             (
                 "Add a todo and press Enter...",
@@ -926,6 +990,7 @@ impl LauncherPanel {
                 "Add",
                 false,
                 8.0,
+                "Enter Add  |  Esc Back",
             )
         } else if self.show_chat {
             (
@@ -941,6 +1006,11 @@ impl LauncherPanel {
                 },
                 self.chat_loading,
                 8.0,
+                if self.chat_loading {
+                    "Esc Back"
+                } else {
+                    "Enter Send  |  Esc Back"
+                },
             )
         } else {
             (
@@ -952,6 +1022,7 @@ impl LauncherPanel {
                 "Add",
                 false,
                 0.0,
+                "Up/Down Select  |  Enter Open",
             )
         };
 
@@ -980,6 +1051,9 @@ impl LauncherPanel {
             .set_visible(cx, show_action);
         action_btn.set_text(action_text);
         action_btn.set_disabled(cx, action_disabled);
+        self.view
+            .label(ids!(mode_hint_label))
+            .set_text(cx, mode_hint_text);
     }
 
     fn icon_cache_path(icns_path: &Path) -> Option<PathBuf> {
@@ -1148,13 +1222,47 @@ impl LauncherPanel {
     }
 
     fn update_labels(&mut self, cx: &mut Cx, status_hint: &str) {
-        let count_text = format!(
-            "{} result(s)  |  Up/Down to navigate  |  Enter to launch",
-            self.filtered_indices.len()
-        );
+        let has_results = !self.filtered_indices.is_empty();
+        self.view.widget(ids!(results)).set_visible(cx, has_results);
+        self.view.widget(ids!(empty_state)).set_visible(cx, !has_results);
+        let selected_text = if self.filtered_indices.is_empty() {
+            "0 selected".to_string()
+        } else {
+            format!(
+                "{} selected",
+                self.selected_index.saturating_add(1).min(self.filtered_indices.len())
+            )
+        };
+        let count_text = format!("{} result(s)  |  {}", self.filtered_indices.len(), selected_text);
         self.view
             .label(ids!(result_count))
             .set_text(cx, &count_text);
+        if has_results {
+            self.view
+                .label(ids!(empty_title))
+                .set_text(cx, "No Results");
+            self.view
+                .label(ids!(empty_desc))
+                .set_text(cx, "Try another keyword, or use /todo and /chat");
+        } else {
+            let q = self.query.trim();
+            if q.is_empty() {
+                self.view
+                    .label(ids!(empty_title))
+                    .set_text(cx, "Start Searching");
+                self.view
+                    .label(ids!(empty_desc))
+                    .set_text(cx, "Type app or command name. Try: todo, chat, terminal");
+            } else {
+                self.view
+                    .label(ids!(empty_title))
+                    .set_text(cx, "No Results");
+                self.view.label(ids!(empty_desc)).set_text(
+                    cx,
+                    &format!("No match for \"{}\". Try /todo or /chat", q),
+                );
+            }
+        }
 
         let status = if self.filtered_indices.is_empty() {
             "No results. Try another keyword.".to_string()
@@ -1164,6 +1272,9 @@ impl LauncherPanel {
             status_hint.to_string()
         };
         self.view.label(ids!(status_label)).set_text(cx, &status);
+        self.view
+            .label(ids!(status_keys_label))
+            .set_text(cx, "Up/Down Select  |  Enter Open  |  Double Click Open");
     }
 
     fn launch_selected(&mut self, cx: &mut Cx) {
@@ -1342,9 +1453,9 @@ impl Widget for LauncherPanel {
                 list.set_item_range(cx, 0, self.filtered_indices.len());
 
                 while let Some(item_id) = list.next_visible_item(cx) {
-                    if let Some(source_idx) = self.filtered_indices.get(item_id) {
-                        let source_idx = *source_idx;
-                        let (app_name, category, subtitle, fallback) =
+	                    if let Some(source_idx) = self.filtered_indices.get(item_id) {
+	                        let source_idx = *source_idx;
+	                        let (app_name, category, subtitle, fallback) =
                             if let Some(entry) = self.all_items.get(source_idx) {
                                 (
                                     entry.app_name.clone(),
@@ -1358,11 +1469,22 @@ impl Widget for LauncherPanel {
 
                         let icon_path = self.resolve_icon_for_index(source_idx);
 
-                        let row = list.item(cx, item_id, live_id!(ResultRow));
-                        row.label(ids!(app_name)).set_text(cx, &app_name);
-                        row.label(ids!(app_meta)).set_text(cx, &category);
-                        row.label(ids!(app_desc)).set_text(cx, &subtitle);
-                        row.label(ids!(app_icon_fallback)).set_text(cx, &fallback);
+	                        let row = list.item(cx, item_id, live_id!(ResultRow));
+	                        row.label(ids!(app_name)).set_text(cx, &app_name);
+	                        row.label(ids!(app_meta)).set_text(cx, &category);
+	                        row.label(ids!(app_desc)).set_text(cx, &subtitle);
+	                        row.label(ids!(app_icon_fallback)).set_text(cx, &fallback);
+	                        let meta_color = if category == "Command" {
+	                            vec4(0.96, 0.75, 0.44, 1.0)
+	                        } else {
+	                            vec4(0.65, 0.70, 0.78, 1.0)
+	                        };
+	                        row.label(ids!(app_meta)).apply_over(
+	                            cx,
+	                            live! {
+	                                draw_text: { color: (meta_color) }
+	                            },
+	                        );
 
                         if let Some(path) = icon_path {
                             let loaded = row

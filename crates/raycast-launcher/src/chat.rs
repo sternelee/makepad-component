@@ -52,6 +52,14 @@ impl LauncherPanel {
             .label(ids!(chat_history_label))
             .set_text(cx, &lines);
         self.sync_chat_controls(cx);
+        self.view.label(ids!(chat_keys_label)).set_text(
+            cx,
+            if self.chat_loading {
+                "Esc Back"
+            } else {
+                "Enter Send  |  Esc Back"
+            },
+        );
 
         if self.chat_loading {
             self.view
