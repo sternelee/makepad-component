@@ -173,11 +173,48 @@ pub(crate) fn parse_chat_response(
         .content
         .as_deref()
         .ok_or_else(|| "Missing assistant content and no tool calls".to_string())?;
-    let a2ui_json = extract_valid_a2ui_json(content)?;
-    Ok((
-        "Generated A2UI from direct JSON output.".to_string(),
-        a2ui_json,
-    ))
+    match extract_valid_a2ui_json(content) {
+        Ok(a2ui_json) => Ok((
+            "Generated A2UI from direct JSON output.".to_string(),
+            a2ui_json,
+        )),
+        Err(_parse_err) => {
+            let plain_text = content.trim();
+            if plain_text.is_empty() {
+                return Err("Assistant returned empty content".to_string());
+            }
+            let a2ui_json = build_plain_text_a2ui_json(plain_text)?;
+            Ok((plain_text.to_string(), a2ui_json))
+        }
+    }
+}
+
+fn build_plain_text_a2ui_json(text: &str) -> Result<String, String> {
+    let mut builder = A2uiBuilder::new();
+    builder.process_tool_call(
+        "create_text",
+        &json!({
+            "id": "assistant_plain_text",
+            "text": text,
+            "style": "body"
+        }),
+    );
+    builder.process_tool_call(
+        "create_column",
+        &json!({
+            "id": "assistant_plain_root",
+            "children": ["assistant_plain_text"]
+        }),
+    );
+    builder.process_tool_call(
+        "render_ui",
+        &json!({
+            "rootId": "assistant_plain_root"
+        }),
+    );
+
+    serde_json::to_string(&builder.build_a2ui_json())
+        .map_err(|e| format!("Failed to build plain-text A2UI JSON: {}", e))
 }
 
 fn extract_json_array_block(text: &str) -> Option<String> {
