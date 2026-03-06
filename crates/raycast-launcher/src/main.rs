@@ -24,15 +24,15 @@ live_design! {
         width: Fill,
         height: Fill,
         flow: Down,
-        spacing: 10,
-        padding: {left: 16, right: 16, top: 16, bottom: 14},
+        spacing: 12,
+        padding: {left: 16, right: 16, top: 14, bottom: 14},
         show_bg: true,
         draw_bg: {
             fn pixel(self) -> vec4 {
                 let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 14.0);
-                sdf.fill(#x14181d);
-                sdf.stroke(#x2a313b, 1.0);
+                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 13.0);
+                sdf.fill(#x1b1d21);
+                sdf.stroke(#x353941, 1.0);
                 return sdf.result;
             }
         }
@@ -43,7 +43,7 @@ live_design! {
             flow: Right,
             align: {y: 0.5},
             spacing: 8,
-            margin: {top: 12},
+            margin: {top: 10},
 
             mode_back_wrap = <View> {
                 visible: false,
@@ -57,21 +57,21 @@ live_design! {
             mode_input = <TextInput> {
             width: Fill,
             height: Fit,
-            empty_text: "Search apps and commands...",
-            padding: {left: 12, right: 12, top: 11, bottom: 11},
+            empty_text: "Search applications and commands…",
+            padding: {left: 12, right: 12, top: 10, bottom: 10},
             draw_bg: {
-                instance border_color: #x334155,
+                instance border_color: #x4b5563,
                 fn pixel(self) -> vec4 {
                     let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 10.0);
-                    sdf.fill(#x0f1318);
+                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 9.0);
+                    sdf.fill(#x252930);
                     sdf.stroke(self.border_color, 1.0);
                     return sdf.result;
                 }
             }
             draw_text: {
                 text_style: <THEME_FONT_REGULAR> {font_size: 13},
-                color: #xe2e8f0
+                color: #xf4f6fb
             }
             }
 
@@ -98,7 +98,7 @@ live_design! {
                     text: "Launcher",
                     draw_text: {
                         text_style: <THEME_FONT_BOLD> {font_size: 18},
-                        color: #xeff3ff
+                        color: #xf9fbff
                     }
                 }
             }
@@ -107,7 +107,7 @@ live_design! {
             text: "",
             draw_text: {
                 text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                color: #x94a3b8
+                color: #xa7b0c1
             }
             }
 
@@ -133,10 +133,11 @@ live_design! {
                         instance selected: 0.0
                         fn pixel(self) -> vec4 {
                             let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 9.0);
-                            let base = #x1a2028;
-                            let active = #x2c66dd;
+                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
+                            let base = #x272c34;
+                            let active = #x3b82f6;
                             sdf.fill(mix(base, active, self.selected));
+                            sdf.stroke(mix(#x3a404a, #x6aa6ff, self.selected), 1.0);
                             return sdf.result;
                         }
                     }
@@ -153,6 +154,16 @@ live_design! {
                             height: 26,
                             flow: Overlay,
                             align: {x: 0.5, y: 0.5},
+                            show_bg: true,
+                            draw_bg: {
+                                fn pixel(self) -> vec4 {
+                                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 6.0);
+                                    sdf.fill(#x1f232a);
+                                    sdf.stroke(#x3b424d, 1.0);
+                                    return sdf.result;
+                                }
+                            }
 
                             app_icon = <Image> {
                                 width: 24,
@@ -164,7 +175,7 @@ live_design! {
                                 text: "A",
                                 draw_text: {
                                     text_style: <THEME_FONT_BOLD> {font_size: 12},
-                                    color: #xe2e8f0
+                                    color: #xdce3ee
                                 }
                             }
                         }
@@ -174,7 +185,7 @@ live_design! {
                             text: "App",
                             draw_text: {
                                 text_style: <THEME_FONT_BOLD> {font_size: 14},
-                                color: #xf8fafc
+                                color: #xfffdff
                             }
                         }
 
@@ -182,7 +193,7 @@ live_design! {
                             text: "Category",
                             draw_text: {
                                 text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                                color: #xcbd5e1
+                                color: #xbcc5d4
                             }
                         }
                     }
@@ -191,7 +202,7 @@ live_design! {
                         text: "Description",
                         draw_text: {
                             text_style: <THEME_FONT_REGULAR> {font_size: 10},
-                            color: #xb8c2d3
+                            color: #x9ea8b7
                         }
                     }
                 }
@@ -202,7 +213,7 @@ live_design! {
             text: "",
             draw_text: {
                 text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                color: #x93c5fd
+                color: #x8ec8ff
             }
             }
         }
@@ -226,7 +237,7 @@ live_design! {
                     text: "Todo List",
                     draw_text: {
                         text_style: <THEME_FONT_BOLD> {font_size: 18},
-                        color: #xeff3ff
+                        color: #xf9fbff
                     }
                 }
             }
@@ -235,7 +246,7 @@ live_design! {
                 text: "Capture quick tasks for this workspace",
                 draw_text: {
                     text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                    color: #x8ea0b8
+                    color: #xa3adbc
                 }
             }
 
@@ -250,8 +261,8 @@ live_design! {
                     fn pixel(self) -> vec4 {
                         let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                         sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                        sdf.fill(#x171d24);
-                        sdf.stroke(#x2a323d, 1.0);
+                        sdf.fill(#x232830);
+                        sdf.stroke(#x3b424d, 1.0);
                         return sdf.result;
                     }
                 }
@@ -260,7 +271,7 @@ live_design! {
                     text: "0 / 0 done",
                     draw_text: {
                         text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                        color: #x94a3b8
+                        color: #xa7b0c1
                     }
                 }
 
@@ -271,7 +282,7 @@ live_design! {
                 }
             }
 
-            <View> { width: Fill, height: 1, show_bg: true, draw_bg: {color: #x2b313a} }
+            <View> { width: Fill, height: 1, show_bg: true, draw_bg: {color: #x3a4049} }
 
             todo_rows = <View> {
                 width: Fill,
@@ -280,43 +291,43 @@ live_design! {
                 spacing: 6,
 
                 row_0 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
                     check_0 = <MpCheckbox> { text: "" }
                     label_0 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
                     del_0 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
                 }
                 row_1 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
                     check_1 = <MpCheckbox> { text: "" }
                     label_1 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
                     del_1 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
                 }
                 row_2 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
                     check_2 = <MpCheckbox> { text: "" }
                     label_2 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
                     del_2 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
                 }
                 row_3 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
                     check_3 = <MpCheckbox> { text: "" }
                     label_3 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
                     del_3 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
                 }
                 row_4 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
                     check_4 = <MpCheckbox> { text: "" }
                     label_4 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
                     del_4 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
                 }
                 row_5 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
                     check_5 = <MpCheckbox> { text: "" }
                     label_5 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
                     del_5 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
                 }
                 row_6 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
                     check_6 = <MpCheckbox> { text: "" }
                     label_6 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
                     del_6 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
@@ -350,7 +361,7 @@ live_design! {
                     text: "A2UI Chat",
                     draw_text: {
                         text_style: <THEME_FONT_BOLD> {font_size: 18},
-                        color: #xeff3ff
+                        color: #xf9fbff
                     }
                 }
                 chat_reset_btn = <MpButtonGhost> { text: "Reset" }
@@ -366,20 +377,20 @@ live_design! {
                     text: "LLM API:",
                     draw_text: {
                         text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                        color: #x94a3b8
+                        color: #xa7b0c1
                     }
                 }
                 chat_server_input = <TextInput> {
                     width: 280,
                     height: Fit,
                     empty_text: "https://openrouter.ai/api/v1/chat/completions",
-                    padding: {left: 10, right: 10, top: 8, bottom: 8},
+                    padding: {left: 10, right: 10, top: 7, bottom: 7},
                     draw_bg: {
-                        instance border_color: #x334155,
+                        instance border_color: #x4b5563,
                         fn pixel(self) -> vec4 {
                             let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                             sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                            sdf.fill(#x0f1318);
+                            sdf.fill(#x252930);
                             sdf.stroke(self.border_color, 1.0);
                             return sdf.result;
                         }
@@ -393,13 +404,13 @@ live_design! {
                     width: 160,
                     height: Fit,
                     empty_text: "kimi-k2.5",
-                    padding: {left: 10, right: 10, top: 8, bottom: 8},
+                    padding: {left: 10, right: 10, top: 7, bottom: 7},
                     draw_bg: {
-                        instance border_color: #x334155,
+                        instance border_color: #x4b5563,
                         fn pixel(self) -> vec4 {
                             let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                             sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                            sdf.fill(#x0f1318);
+                            sdf.fill(#x252930);
                             sdf.stroke(self.border_color, 1.0);
                             return sdf.result;
                         }
@@ -419,8 +430,8 @@ live_design! {
                     fn pixel(self) -> vec4 {
                         let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                         sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                        sdf.fill(#x171d24);
-                        sdf.stroke(#x2a323d, 1.0);
+                        sdf.fill(#x232830);
+                        sdf.stroke(#x3b424d, 1.0);
                         return sdf.result;
                     }
                 }
@@ -433,7 +444,7 @@ live_design! {
                         text: "",
                         draw_text: {
                             text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                            color: #xcbd5e1
+                            color: #xd3d9e6
                             wrap: Word
                         }
                     }
@@ -444,7 +455,7 @@ live_design! {
                 text: "Ready",
                 draw_text: {
                     text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                    color: #x93c5fd
+                    color: #x8ec8ff
                 }
             }
 
@@ -456,8 +467,8 @@ live_design! {
                     fn pixel(self) -> vec4 {
                         let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                         sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                        sdf.fill(#x11161c);
-                        sdf.stroke(#x2a323d, 1.0);
+                        sdf.fill(#x20252d);
+                        sdf.stroke(#x3b424d, 1.0);
                         return sdf.result;
                     }
                 }
@@ -485,7 +496,7 @@ live_design! {
                         let center = vec2(0.5, 0.5);
                         let d = distance(self.pos, center);
                         let t = clamp(d * 1.35, 0.0, 1.0);
-                        return mix(#x101215, #x1c2127, t);
+                        return mix(#x13161a, #x262b33, t);
                     }
                 }
 
