@@ -50,7 +50,8 @@ live_design! {
                 width: Fit,
                 height: Fit,
                 mode_back_btn = <MpButtonSecondary> {
-                    text: "Back"
+                    text: "‹ Back"
+                    padding: {left: 10, right: 10, top: 7, bottom: 7}
                 }
             }
 
@@ -85,6 +86,7 @@ live_design! {
                 height: Fit,
                 mode_action_btn = <MpButtonPrimary> {
                     text: "Add"
+                    padding: {left: 12, right: 12, top: 7, bottom: 7}
                 }
             }
         }
@@ -145,7 +147,7 @@ live_design! {
             width: Fill,
             height: Fill,
             flow: Down,
-            spacing: 0,
+            spacing: 1,
 
             ResultRow = <View> {
                 width: Fill,
@@ -337,7 +339,7 @@ live_design! {
                 width: Fill,
                 height: Fill,
                 flow: Down,
-                spacing: 6,
+                spacing: 5,
 
                 row_0 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
                     draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
@@ -413,7 +415,10 @@ live_design! {
                         color: #xf9fbff
                     }
                 }
-                chat_reset_btn = <MpButtonGhost> { text: "Reset" }
+                chat_reset_btn = <MpButtonGhost> {
+                    text: "Clear"
+                    padding: {left: 10, right: 10, top: 7, bottom: 7}
+                }
             }
 
             <Label> {
@@ -519,11 +524,26 @@ live_design! {
                 }
             }
 
-            chat_status_label = <Label> {
-                text: "Ready",
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> {font_size: 10},
-                    color: #x7fb9ff
+            <View> {
+                width: Fill,
+                height: Fit,
+                padding: {left: 10, right: 10, top: 6, bottom: 6},
+                show_bg: true,
+                draw_bg: {
+                    fn pixel(self) -> vec4 {
+                        let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                        sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 7.0);
+                        sdf.fill(#x1b2028);
+                        sdf.stroke(#x303745, 1.0);
+                        return sdf.result;
+                    }
+                }
+                chat_status_label = <Label> {
+                    text: "Ready",
+                    draw_text: {
+                        text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                        color: #x7fb9ff
+                    }
                 }
             }
 
