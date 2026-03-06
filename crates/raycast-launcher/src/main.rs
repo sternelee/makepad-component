@@ -205,12 +205,12 @@ live_design! {
                 height: Fit,
                 margin: {top: 2, bottom: 2},
 
-                row_bg = <View> {
-                    width: Fill,
-                    height: Fit,
-                    flow: Down,
-                    spacing: 3,
-                    padding: {left: 11, right: 11, top: 9, bottom: 9},
+	                row_bg = <View> {
+	                    width: Fill,
+	                    height: Fit,
+	                    flow: Down,
+	                    spacing: 2,
+	                    padding: {left: 11, right: 11, top: 8, bottom: 8},
                     show_bg: true,
                     draw_bg: {
                         instance selected: 0.0
@@ -247,12 +247,12 @@ live_design! {
                         }
                     }
 
-                    <View> {
-                        width: Fill,
-                        height: Fit,
-                        flow: Right,
-                        align: {y: 0.5},
-                        spacing: 10,
+	                    <View> {
+	                        width: Fill,
+	                        height: Fit,
+	                        flow: Right,
+	                        align: {y: 0.5},
+	                        spacing: 9,
 
                         icon_wrap = <View> {
                             width: 24,
@@ -294,10 +294,10 @@ live_design! {
                             }
                         }
 
-                        app_meta_chip = <View> {
-                            width: Fit,
-                            height: Fit,
-                            padding: {left: 7, right: 7, top: 2, bottom: 2},
+	                        app_meta_chip = <View> {
+	                            width: Fit,
+	                            height: Fit,
+	                            padding: {left: 7, right: 7, top: 2, bottom: 2},
                             show_bg: true,
                             draw_bg: {
                                 instance color: #x202733
@@ -316,13 +316,22 @@ live_design! {
                                     text_style: <THEME_FONT_REGULAR> {font_size: 9},
                                     color: #xa7b2c5
                                 }
-                            }
-                        }
-                    }
+	                            }
+	                        }
 
-                    app_desc = <Label> {
-                        width: Fill,
-                        text: "Description",
+	                        action_hint = <Label> {
+	                            visible: false,
+	                            text: "Open ↩",
+	                            draw_text: {
+	                                text_style: <THEME_FONT_REGULAR> {font_size: 9},
+	                                color: #x9fb2cd
+	                            }
+	                        }
+	                    }
+
+	                    app_desc = <Label> {
+	                        width: Fill,
+	                        text: "Description",
                         draw_text: {
                             text_style: <THEME_FONT_REGULAR> {font_size: 10},
                             color: #x8d9bae
@@ -1576,6 +1585,8 @@ impl Widget for LauncherPanel {
 	                        row.label(ids!(app_meta)).set_text(cx, &category);
 	                        row.label(ids!(app_desc)).set_text(cx, &subtitle);
 	                        row.label(ids!(app_icon_fallback)).set_text(cx, &fallback);
+	                        let action_text = if is_command { "Run ↩" } else { "Open ↩" };
+	                        row.label(ids!(action_hint)).set_text(cx, action_text);
 	                        let meta_color = if category == "Command" {
 	                            vec4(0.96, 0.75, 0.44, 1.0)
 	                        } else {
@@ -1625,6 +1636,8 @@ impl Widget for LauncherPanel {
 	                        } else {
 	                            0.0
 	                        };
+	                        row.widget(ids!(action_hint))
+	                            .set_visible(cx, selected > 0.5 || hovered > 0.5);
 	                        let title_color = if selected > 0.5 {
 	                            vec4(0.98, 0.99, 1.0, 1.0)
 	                        } else {
