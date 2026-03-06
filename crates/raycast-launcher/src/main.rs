@@ -231,7 +231,6 @@ live_design! {
 	                    }
 
 	                    group_label = <Label> {
-	                        visible: false,
 	                        text: "Applications",
 	                        margin: {bottom: 2},
 	                        draw_text: {
@@ -295,12 +294,12 @@ live_design! {
 	                            padding: {left: 7, right: 7, top: 2, bottom: 2},
                             show_bg: true,
                             draw_bg: {
-                                instance color: #x202733
+                                instance fill_color: #x202733
                                 instance border_color: #x3b4658
                                 fn pixel(self) -> vec4 {
                                     let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                                     sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 5.0);
-                                    sdf.fill(self.color);
+                                    sdf.fill(self.fill_color);
                                     sdf.stroke(self.border_color, 1.0);
                                     return sdf.result;
                                 }
@@ -321,12 +320,12 @@ live_design! {
 	                            padding: {left: 7, right: 7, top: 2, bottom: 2},
 	                            show_bg: true,
 	                            draw_bg: {
-	                                instance color: #x253043
+	                                instance fill_color: #x253043
 	                                instance border_color: #x435a7f
 	                                fn pixel(self) -> vec4 {
 	                                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
 	                                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 5.0);
-	                                    sdf.fill(self.color);
+	                                    sdf.fill(self.fill_color);
 	                                    sdf.stroke(self.border_color, 1.0);
 	                                    return sdf.result;
 	                                }
@@ -1289,6 +1288,22 @@ impl LauncherPanel {
             .and_then(|idx| self.all_items.get(*idx))
     }
 
+    fn ensure_selection_visible(&self) {
+        if self.filtered_indices.is_empty() {
+            return;
+        }
+        let target = self.selected_index.min(self.filtered_indices.len().saturating_sub(1));
+        let list = self.view.portal_list(ids!(results));
+        let first = list.first_id();
+        let visible = list.visible_items().max(1);
+        let last = first.saturating_add(visible.saturating_sub(1));
+        if target < first {
+            list.set_first_id(target);
+        } else if target > last {
+            list.set_first_id(target.saturating_sub(visible.saturating_sub(1)));
+        }
+    }
+
     fn group_name_for(item: &LauncherItem) -> &'static str {
         match item.launch {
             LaunchTarget::OpenTodo | LaunchTarget::OpenChat => "Built-in",
@@ -1512,11 +1527,13 @@ impl Widget for LauncherPanel {
             match key.key_code {
                 KeyCode::ArrowDown => {
                     self.step_selection(1);
+                    self.ensure_selection_visible();
                     self.update_labels(cx, "Selected");
                     self.redraw(cx);
                 }
                 KeyCode::ArrowUp => {
                     self.step_selection(-1);
+                    self.ensure_selection_visible();
                     self.update_labels(cx, "Selected");
                     self.redraw(cx);
                 }
@@ -1616,7 +1633,7 @@ impl Widget for LauncherPanel {
 	                            cx,
 	                            live! {
 	                                draw_bg: {
-	                                    color: (meta_chip_fill),
+	                                    fill_color: (meta_chip_fill),
 	                                    border_color: (meta_chip_stroke)
 	                                }
 	                            },
@@ -1680,7 +1697,7 @@ impl Widget for LauncherPanel {
 	                        row.view(ids!(action_hint_chip)).apply_over(
 	                            cx,
 	                            live! {
-	                                draw_bg: { color: (hint_bg), border_color: (hint_stroke) }
+	                                draw_bg: { fill_color: (hint_bg), border_color: (hint_stroke) }
 	                            },
 	                        );
 	                        let title_color = if selected > 0.5 {
