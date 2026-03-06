@@ -235,14 +235,6 @@ live_design! {
                             let stroke_color = mix(stroke_color, #x6177a1, self.builtin * 0.6);
                             sdf.stroke(mix(stroke_color, #x79adff, self.selected), 1.0);
 
-                            // Draw a subtle left accent bar for quick type scanning.
-                            let accent = mix(#x5d6a80, #xf1ba63, self.command);
-                            let accent = mix(accent, #x7ca9ff, self.builtin);
-                            let accent_alpha = max(self.hovered * 0.18, self.selected * 0.95);
-                            if accent_alpha > 0.0 {
-                                sdf.box(0.0, 0.0, 2.0, self.rect_size.y, 1.0);
-                                sdf.fill(vec4(accent.xyz, accent_alpha));
-                            }
                             return sdf.result;
                         }
                     }
@@ -254,18 +246,20 @@ live_design! {
 	                        align: {y: 0.5},
 	                        spacing: 9,
 
-                        icon_wrap = <View> {
-                            width: 24,
-                            height: 24,
-                            flow: Overlay,
-                            align: {x: 0.5, y: 0.5},
-                            show_bg: true,
-                            draw_bg: {
+	                        icon_wrap = <View> {
+	                            width: 24,
+	                            height: 24,
+	                            flow: Overlay,
+	                            align: {x: 0.5, y: 0.5},
+	                            show_bg: true,
+	                            draw_bg: {
+	                                instance bg_color: #x1a1f26
+	                                instance border_color: #x323a45
                                 fn pixel(self) -> vec4 {
                                     let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                                     sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 6.0);
-                                    sdf.fill(#x1a1f26);
-                                    sdf.stroke(#x323a45, 1.0);
+                                    sdf.fill(self.bg_color);
+                                    sdf.stroke(self.border_color, 1.0);
                                     return sdf.result;
                                 }
                             }
@@ -1618,17 +1612,42 @@ impl Widget for LauncherPanel {
 	                            },
 	                        );
 
-                        if let Some(path) = icon_path {
-                            let loaded = row
-                                .image(ids!(app_icon))
-                                .load_image_file_by_path(cx, Path::new(&path))
-                                .is_ok();
-                            row.widget(ids!(app_icon)).set_visible(cx, loaded);
-                            row.widget(ids!(app_icon_fallback)).set_visible(cx, !loaded);
-                        } else {
-                            row.widget(ids!(app_icon)).set_visible(cx, false);
-                            row.widget(ids!(app_icon_fallback)).set_visible(cx, true);
-                        }
+	                        if let Some(path) = icon_path {
+	                            let loaded = row
+	                                .image(ids!(app_icon))
+	                                .load_image_file_by_path(cx, Path::new(&path))
+	                                .is_ok();
+	                            row.widget(ids!(app_icon)).set_visible(cx, loaded);
+	                            row.widget(ids!(app_icon_fallback)).set_visible(cx, !loaded);
+	                            let icon_bg = if loaded {
+	                                vec4(0.0, 0.0, 0.0, 0.0)
+	                            } else {
+	                                vec4(0.102, 0.122, 0.149, 1.0)
+	                            };
+	                            let icon_stroke = if loaded {
+	                                vec4(0.0, 0.0, 0.0, 0.0)
+	                            } else {
+	                                vec4(0.196, 0.227, 0.271, 1.0)
+	                            };
+	                            row.view(ids!(icon_wrap)).apply_over(
+	                                cx,
+	                                live! {
+	                                    draw_bg: { bg_color: (icon_bg), border_color: (icon_stroke) }
+	                                },
+	                            );
+	                        } else {
+	                            row.widget(ids!(app_icon)).set_visible(cx, false);
+	                            row.widget(ids!(app_icon_fallback)).set_visible(cx, true);
+	                            row.view(ids!(icon_wrap)).apply_over(
+	                                cx,
+	                                live! {
+	                                    draw_bg: {
+	                                        bg_color: (vec4(0.102, 0.122, 0.149, 1.0)),
+	                                        border_color: (vec4(0.196, 0.227, 0.271, 1.0))
+	                                    }
+	                                },
+	                            );
+	                        }
 
 	                        let selected = if item_id == self.selected_index { 1.0 } else { 0.0 };
 	                        let hovered = if Some(item_id) == self.hovered_index {
