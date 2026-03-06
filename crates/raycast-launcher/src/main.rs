@@ -126,23 +126,14 @@ live_design! {
 	                        }
 	                    }
 
-	                    group_label = <Label> {
+	            top_count_row = <View> {
 	                        visible: false,
-	                        text: "Applications",
-	                        margin: {bottom: 2},
-	                        draw_text: {
-	                            text_style: <THEME_FONT_BOLD> {font_size: 9},
-	                            color: #x8fa0ba
-	                        }
-	                    }
-
-	                    <View> {
 	                        width: Fill,
 	                        height: Fit,
-	            flow: Right,
-            align: {y: 0.5},
-            padding: {left: 10, right: 10, top: 6, bottom: 6},
-            show_bg: true,
+		            flow: Right,
+	            align: {y: 0.5},
+	            padding: {left: 10, right: 10, top: 6, bottom: 6},
+	            show_bg: true,
             draw_bg: {
                 fn pixel(self) -> vec4 {
                     let sdf = Sdf2d::viewport(self.pos * self.rect_size);
@@ -152,14 +143,14 @@ live_design! {
                     return sdf.result;
                 }
             }
-            result_count = <Label> {
-                text: "",
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                    color: #xa7b0c1
-                }
-            }
-            }
+	            result_count = <Label> {
+	                text: "",
+	                draw_text: {
+	                    text_style: <THEME_FONT_REGULAR> {font_size: 11},
+	                    color: #xa7b0c1
+	                }
+	            }
+	            }
 
             empty_state = <View> {
                 visible: false,
@@ -236,8 +227,18 @@ live_design! {
                             sdf.stroke(mix(stroke_color, #x79adff, self.selected), 1.0);
 
                             return sdf.result;
-                        }
-                    }
+	                        }
+	                    }
+
+	                    group_label = <Label> {
+	                        visible: false,
+	                        text: "Applications",
+	                        margin: {bottom: 2},
+	                        draw_text: {
+	                            text_style: <THEME_FONT_BOLD> {font_size: 9},
+	                            color: #x8fa0ba
+	                        }
+	                    }
 
 	                    <View> {
 	                        width: Fill,
@@ -313,12 +314,29 @@ live_design! {
 	                            }
 	                        }
 
-	                        action_hint = <Label> {
+	                        action_hint_chip = <View> {
 	                            visible: false,
-	                            text: "Open ↩",
-	                            draw_text: {
-	                                text_style: <THEME_FONT_REGULAR> {font_size: 9},
-	                                color: #x9fb2cd
+	                            width: Fit,
+	                            height: Fit,
+	                            padding: {left: 7, right: 7, top: 2, bottom: 2},
+	                            show_bg: true,
+	                            draw_bg: {
+	                                instance color: #x253043
+	                                instance border_color: #x435a7f
+	                                fn pixel(self) -> vec4 {
+	                                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+	                                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 5.0);
+	                                    sdf.fill(self.color);
+	                                    sdf.stroke(self.border_color, 1.0);
+	                                    return sdf.result;
+	                                }
+	                            }
+	                            action_hint_text = <Label> {
+	                                text: "Open ↩",
+	                                draw_text: {
+	                                    text_style: <THEME_FONT_REGULAR> {font_size: 9},
+	                                    color: #xbfd2ef
+	                                }
 	                            }
 	                        }
 	                    }
@@ -336,6 +354,7 @@ live_design! {
             }
 
             <View> {
+            visible: true,
             width: Fill,
             height: Fit,
             flow: Right,
@@ -1278,7 +1297,7 @@ impl LauncherPanel {
         }
     }
 
-    fn update_labels(&mut self, cx: &mut Cx, status_hint: &str) {
+    fn update_labels(&mut self, cx: &mut Cx, _status_hint: &str) {
         let has_results = !self.filtered_indices.is_empty();
         self.view.widget(ids!(results)).set_visible(cx, has_results);
         self.view.widget(ids!(empty_state)).set_visible(cx, !has_results);
@@ -1308,9 +1327,7 @@ impl LauncherPanel {
             app_count,
             command_count
         );
-        self.view
-            .label(ids!(result_count))
-            .set_text(cx, &count_text);
+        self.view.label(ids!(result_count)).set_text(cx, "");
         if has_results {
             self.view
                 .label(ids!(empty_title))
@@ -1338,14 +1355,7 @@ impl LauncherPanel {
             }
         }
 
-        let status = if self.filtered_indices.is_empty() {
-            "No results. Try another keyword.".to_string()
-        } else if let Some(item) = self.selected_item() {
-            format!("{}  ->  {}", status_hint, item.app_name)
-        } else {
-            status_hint.to_string()
-        };
-        self.view.label(ids!(status_label)).set_text(cx, &status);
+        self.view.label(ids!(status_label)).set_text(cx, &count_text);
         self.view
             .label(ids!(status_keys_label))
             .set_text(cx, "Up/Down Select  |  Enter Open  |  Double Click Open");
@@ -1580,7 +1590,7 @@ impl Widget for LauncherPanel {
 	                        row.label(ids!(app_desc)).set_text(cx, &subtitle);
 	                        row.label(ids!(app_icon_fallback)).set_text(cx, &fallback);
 	                        let action_text = if is_command { "Run ↩" } else { "Open ↩" };
-	                        row.label(ids!(action_hint)).set_text(cx, action_text);
+	                        row.label(ids!(action_hint_text)).set_text(cx, action_text);
 	                        let meta_color = if category == "Command" {
 	                            vec4(0.96, 0.75, 0.44, 1.0)
 	                        } else {
@@ -1655,8 +1665,24 @@ impl Widget for LauncherPanel {
 	                        } else {
 	                            0.0
 	                        };
-	                        row.widget(ids!(action_hint))
+	                        row.widget(ids!(action_hint_chip))
 	                            .set_visible(cx, selected > 0.5 || hovered > 0.5);
+	                        let hint_bg = if selected > 0.5 {
+	                            vec4(0.20, 0.30, 0.44, 1.0)
+	                        } else {
+	                            vec4(0.15, 0.20, 0.28, 1.0)
+	                        };
+	                        let hint_stroke = if selected > 0.5 {
+	                            vec4(0.45, 0.60, 0.82, 1.0)
+	                        } else {
+	                            vec4(0.27, 0.35, 0.49, 1.0)
+	                        };
+	                        row.view(ids!(action_hint_chip)).apply_over(
+	                            cx,
+	                            live! {
+	                                draw_bg: { color: (hint_bg), border_color: (hint_stroke) }
+	                            },
+	                        );
 	                        let title_color = if selected > 0.5 {
 	                            vec4(0.98, 0.99, 1.0, 1.0)
 	                        } else {
@@ -1666,6 +1692,19 @@ impl Widget for LauncherPanel {
 	                            cx,
 	                            live! {
 	                                draw_text: { color: (title_color) }
+	                            },
+	                        );
+	                        let desc_color = if selected > 0.5 {
+	                            vec4(0.86, 0.91, 0.98, 1.0)
+	                        } else if hovered > 0.5 {
+	                            vec4(0.67, 0.74, 0.85, 1.0)
+	                        } else {
+	                            vec4(0.55, 0.61, 0.68, 1.0)
+	                        };
+	                        row.label(ids!(app_desc)).apply_over(
+	                            cx,
+	                            live! {
+	                                draw_text: { color: (desc_color) }
 	                            },
 	                        );
 	                        let command = if is_command { 1.0 } else { 0.0 };
