@@ -272,7 +272,7 @@ live_design! {
             width: Fill,
             height: Fill,
             flow: Down,
-            spacing: 12,
+            spacing: 10,
             padding: {left: 2, right: 2, top: 2, bottom: 2},
 
             <View> {
@@ -285,7 +285,7 @@ live_design! {
                 <Label> {
                     text: "Todo List",
                     draw_text: {
-                        text_style: <THEME_FONT_BOLD> {font_size: 18},
+                        text_style: <THEME_FONT_BOLD> {font_size: 17},
                         color: #xf9fbff
                     }
                 }
@@ -294,8 +294,8 @@ live_design! {
             <Label> {
                 text: "Capture quick tasks for this workspace",
                 draw_text: {
-                    text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                    color: #xa3adbc
+                    text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                    color: #x8f9caf
                 }
             }
 
@@ -310,8 +310,8 @@ live_design! {
                     fn pixel(self) -> vec4 {
                         let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                         sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                        sdf.fill(#x232830);
-                        sdf.stroke(#x3b424d, 1.0);
+                        sdf.fill(#x1b2028);
+                        sdf.stroke(#x303745, 1.0);
                         return sdf.result;
                     }
                 }
@@ -319,8 +319,8 @@ live_design! {
                 todo_count_label = <Label> {
                     text: "0 / 0 done",
                     draw_text: {
-                        text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                        color: #xa7b0c1
+                        text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                        color: #xa7b4c8
                     }
                 }
 
@@ -331,7 +331,7 @@ live_design! {
                 }
             }
 
-            <View> { width: Fill, height: 1, show_bg: true, draw_bg: {color: #x3a4049} }
+            <View> { width: Fill, height: 1, show_bg: true, draw_bg: {color: #x2e3541} }
 
             todo_rows = <View> {
                 width: Fill,
@@ -382,7 +382,7 @@ live_design! {
                     del_6 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
                 }
                 row_7 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x1a2028, #x14211a, self.done)); sdf.stroke(#x2c3540, 1.0); return sdf.result; } }
+                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
                     check_7 = <MpCheckbox> { text: "" }
                     label_7 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
                     del_7 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
@@ -409,11 +409,19 @@ live_design! {
                     width: Fill,
                     text: "A2UI Chat",
                     draw_text: {
-                        text_style: <THEME_FONT_BOLD> {font_size: 18},
+                        text_style: <THEME_FONT_BOLD> {font_size: 17},
                         color: #xf9fbff
                     }
                 }
                 chat_reset_btn = <MpButtonGhost> { text: "Reset" }
+            }
+
+            <Label> {
+                text: "Ask naturally or render A2UI UI from responses",
+                draw_text: {
+                    text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                    color: #x8f9caf
+                }
             }
 
             <View> {
@@ -422,11 +430,22 @@ live_design! {
                 flow: Right,
                 align: {y: 0.5},
                 spacing: 8,
+                padding: {left: 10, right: 10, top: 8, bottom: 8},
+                show_bg: true,
+                draw_bg: {
+                    fn pixel(self) -> vec4 {
+                        let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                        sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
+                        sdf.fill(#x1b2028);
+                        sdf.stroke(#x303745, 1.0);
+                        return sdf.result;
+                    }
+                }
                 <Label> {
                     text: "LLM API:",
                     draw_text: {
-                        text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                        color: #xa7b0c1
+                        text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                        color: #xa7b4c8
                     }
                 }
                 chat_server_input = <TextInput> {
@@ -435,11 +454,11 @@ live_design! {
                     empty_text: "https://openrouter.ai/api/v1/chat/completions",
                     padding: {left: 10, right: 10, top: 7, bottom: 7},
                     draw_bg: {
-                        instance border_color: #x4b5563,
+                        instance border_color: #x3e4653,
                         fn pixel(self) -> vec4 {
                             let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                             sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                            sdf.fill(#x252930);
+                            sdf.fill(#x1f2329);
                             sdf.stroke(self.border_color, 1.0);
                             return sdf.result;
                         }
@@ -455,11 +474,11 @@ live_design! {
                     empty_text: "kimi-k2.5",
                     padding: {left: 10, right: 10, top: 7, bottom: 7},
                     draw_bg: {
-                        instance border_color: #x4b5563,
+                        instance border_color: #x3e4653,
                         fn pixel(self) -> vec4 {
                             let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                             sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                            sdf.fill(#x252930);
+                            sdf.fill(#x1f2329);
                             sdf.stroke(self.border_color, 1.0);
                             return sdf.result;
                         }
@@ -479,8 +498,8 @@ live_design! {
                     fn pixel(self) -> vec4 {
                         let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                         sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                        sdf.fill(#x232830);
-                        sdf.stroke(#x3b424d, 1.0);
+                        sdf.fill(#x1b2028);
+                        sdf.stroke(#x303745, 1.0);
                         return sdf.result;
                     }
                 }
@@ -503,8 +522,8 @@ live_design! {
             chat_status_label = <Label> {
                 text: "Ready",
                 draw_text: {
-                    text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                    color: #x8ec8ff
+                    text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                    color: #x7fb9ff
                 }
             }
 
@@ -516,8 +535,8 @@ live_design! {
                     fn pixel(self) -> vec4 {
                         let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                         sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                        sdf.fill(#x20252d);
-                        sdf.stroke(#x3b424d, 1.0);
+                        sdf.fill(#x1b2028);
+                        sdf.stroke(#x303745, 1.0);
                         return sdf.result;
                     }
                 }
