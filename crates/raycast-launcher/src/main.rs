@@ -27,7 +27,7 @@ live_design! {
         spacing: 12,
         padding: {left: 16, right: 16, top: 14, bottom: 14},
         show_bg: true,
-        draw_bg: {
+	                    draw_bg: {
             fn pixel(self) -> vec4 {
                 let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                 sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 13.0);
@@ -123,13 +123,23 @@ live_design! {
                         text_style: <THEME_FONT_REGULAR> {font_size: 10},
                         color: #x8f9caf
                     }
-                }
-            }
+	                        }
+	                    }
 
-            <View> {
-            width: Fill,
-            height: Fit,
-            flow: Right,
+	                    group_label = <Label> {
+	                        visible: false,
+	                        text: "Applications",
+	                        margin: {bottom: 2},
+	                        draw_text: {
+	                            text_style: <THEME_FONT_BOLD> {font_size: 9},
+	                            color: #x8fa0ba
+	                        }
+	                    }
+
+	                    <View> {
+	                        width: Fill,
+	                        height: Fit,
+	            flow: Right,
             align: {y: 0.5},
             padding: {left: 10, right: 10, top: 6, bottom: 6},
             show_bg: true,
@@ -1257,6 +1267,14 @@ impl LauncherPanel {
             .and_then(|idx| self.all_items.get(*idx))
     }
 
+    fn group_name_for(item: &LauncherItem) -> &'static str {
+        match item.launch {
+            LaunchTarget::OpenTodo | LaunchTarget::OpenChat => "Built-in",
+            LaunchTarget::Command { .. } => "Commands",
+            LaunchTarget::OpenPath(_) => "Applications",
+        }
+    }
+
     fn update_labels(&mut self, cx: &mut Cx, status_hint: &str) {
         let has_results = !self.filtered_indices.is_empty();
         self.view.widget(ids!(results)).set_visible(cx, has_results);
@@ -1508,7 +1526,7 @@ impl Widget for LauncherPanel {
                 while let Some(item_id) = list.next_visible_item(cx) {
 	                    if let Some(source_idx) = self.filtered_indices.get(item_id) {
 	                        let source_idx = *source_idx;
-                        let (app_name, category, subtitle, fallback, is_command, is_builtin) =
+	                        let (app_name, category, subtitle, fallback, is_command, is_builtin, group_name) =
                             if let Some(entry) = self.all_items.get(source_idx) {
                                 let is_builtin = matches!(
                                     entry.launch,
@@ -1521,6 +1539,7 @@ impl Widget for LauncherPanel {
                                     entry.icon_fallback.clone(),
                                     entry.category == "Command",
                                     is_builtin,
+                                    Self::group_name_for(entry),
                                 )
                             } else {
                                 continue;
@@ -1529,6 +1548,30 @@ impl Widget for LauncherPanel {
                         let icon_path = self.resolve_icon_for_index(source_idx);
 
 	                        let row = list.item(cx, item_id, live_id!(ResultRow));
+	                        let show_group = if item_id == 0 {
+	                            true
+	                        } else if let Some(prev_source_idx) = self.filtered_indices.get(item_id - 1) {
+	                            if let Some(prev_entry) = self.all_items.get(*prev_source_idx) {
+	                                Self::group_name_for(prev_entry) != group_name
+	                            } else {
+	                                false
+	                            }
+	                        } else {
+	                            false
+	                        };
+	                        row.widget(ids!(group_label)).set_visible(cx, show_group);
+	                        row.label(ids!(group_label)).set_text(cx, group_name);
+	                        let group_color = match group_name {
+	                            "Built-in" => vec4(0.52, 0.69, 1.0, 1.0),
+	                            "Commands" => vec4(0.95, 0.75, 0.46, 1.0),
+	                            _ => vec4(0.56, 0.63, 0.73, 1.0),
+	                        };
+	                        row.label(ids!(group_label)).apply_over(
+	                            cx,
+	                            live! {
+	                                draw_text: { color: (group_color) }
+	                            },
+	                        );
 	                        row.label(ids!(app_name)).set_text(cx, &app_name);
 	                        row.label(ids!(app_meta)).set_text(cx, &category);
 	                        row.label(ids!(app_desc)).set_text(cx, &subtitle);
