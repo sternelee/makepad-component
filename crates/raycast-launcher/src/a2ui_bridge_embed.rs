@@ -131,7 +131,10 @@ fn infer_scenario_hint(user_message: &str) -> &'static str {
     "Default to a productivity plugin layout: list view plus an action panel, keep hierarchy shallow and actionable."
 }
 
-pub(crate) fn parse_chat_response(status_code: u16, body: &str) -> Result<(String, String), String> {
+pub(crate) fn parse_chat_response(
+    status_code: u16,
+    body: &str,
+) -> Result<(String, String), String> {
     if !(200..=299).contains(&status_code) {
         let msg = serde_json::from_str::<Value>(body)
             .ok()
@@ -171,7 +174,10 @@ pub(crate) fn parse_chat_response(status_code: u16, body: &str) -> Result<(Strin
         .as_deref()
         .ok_or_else(|| "Missing assistant content and no tool calls".to_string())?;
     let a2ui_json = extract_valid_a2ui_json(content)?;
-    Ok(("Generated A2UI from direct JSON output.".to_string(), a2ui_json))
+    Ok((
+        "Generated A2UI from direct JSON output.".to_string(),
+        a2ui_json,
+    ))
 }
 
 fn extract_json_array_block(text: &str) -> Option<String> {
@@ -293,9 +299,7 @@ fn string_value(value: &str) -> Value {
 }
 
 fn optional_string_value(args: &Value, key: &str) -> Option<Value> {
-    args.get(key)
-        .and_then(|v| v.as_str())
-        .map(string_value)
+    args.get(key).and_then(|v| v.as_str()).map(string_value)
 }
 
 fn optional_path_value(args: &Value, key: &str) -> Option<Value> {
@@ -458,7 +462,11 @@ impl A2uiBuilder {
         let id = args["id"].as_str().unwrap_or("column");
         let children: Vec<String> = args["children"]
             .as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(ToString::to_string)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(ToString::to_string))
+                    .collect()
+            })
             .unwrap_or_default();
         self.components.push(json!({
             "id": id,
@@ -677,8 +685,14 @@ impl A2uiBuilder {
 
     fn create_dropdown_item(&mut self, args: &Value) {
         let id = args["id"].as_str().unwrap_or("dropdown-item");
-        let title = args.get("title").and_then(|v| v.as_str()).unwrap_or("Option");
-        let value = args.get("value").and_then(|v| v.as_str()).unwrap_or("value");
+        let title = args
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Option");
+        let value = args
+            .get("value")
+            .and_then(|v| v.as_str())
+            .unwrap_or("value");
         let mut item = json!({
             "title": {"literalString": title},
             "value": value
@@ -1140,7 +1154,8 @@ impl A2uiBuilder {
         if let Some(a) = artist {
             audio["artist"] = json!({"literalString": a});
         }
-        self.components.push(json!({"id": id, "component": {"AudioPlayer": audio}}));
+        self.components
+            .push(json!({"id": id, "component": {"AudioPlayer": audio}}));
     }
 
     fn set_data(&mut self, args: &Value) {
@@ -1290,7 +1305,9 @@ impl A2uiBuilder {
             .iter()
             .position(|c| c["key"].as_str() == Some(&key))
         {
-            if content.get("valueMap").is_some() && self.data_contents[idx].get("valueMap").is_some() {
+            if content.get("valueMap").is_some()
+                && self.data_contents[idx].get("valueMap").is_some()
+            {
                 let source = content;
                 Self::deep_merge_value_map(&mut self.data_contents[idx], &source);
                 return;

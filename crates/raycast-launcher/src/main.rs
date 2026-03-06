@@ -1,5 +1,5 @@
-use makepad_widgets::*;
 use makepad_component::widgets::button::*;
+use makepad_widgets::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
@@ -372,7 +372,7 @@ live_design! {
                 chat_server_input = <TextInput> {
                     width: 280,
                     height: Fit,
-                    empty_text: "https://api.moonshot.cn/v1/chat/completions",
+                    empty_text: "https://openrouter.ai/api/v1/chat/completions",
                     padding: {left: 10, right: 10, top: 8, bottom: 8},
                     draw_bg: {
                         instance border_color: #x334155,
@@ -568,11 +568,10 @@ impl LiveHook for LauncherPanel {
         self.chat_messages = chat::default_chat_messages();
         self.chat_loading = false;
         self.chat_server_url = std::env::var("LLM_API_URL")
-            .unwrap_or_else(|_| "https://api.moonshot.cn/v1/chat/completions".to_string());
-        self.chat_model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "kimi-k2.5".to_string());
-        self.chat_api_key = std::env::var("LLM_API_KEY")
-            .or_else(|_| std::env::var("MOONSHOT_API_KEY"))
-            .unwrap_or_default();
+            .unwrap_or_else(|_| "https://openrouter.ai/api/v1/chat/completions".to_string());
+        self.chat_model =
+            std::env::var("LLM_MODEL").unwrap_or_else(|_| "openrouter/auto".to_string());
+        self.chat_api_key = std::env::var("LLM_API_KEY").unwrap_or_default();
         self.rebuild_filter();
         self.sync_mode_input(cx);
         self.view.text_input(ids!(mode_input)).set_key_focus(cx);
@@ -803,43 +802,43 @@ impl LauncherPanel {
             action_disabled,
             row_spacing,
         ) = if self.show_todo {
-                (
-                    "Add a todo and press Enter...",
-                    self.todo_draft.as_str(),
-                    false,
-                    true,
-                    true,
-                    "Add",
-                    false,
-                    8.0,
-                )
-            } else if self.show_chat {
-                (
-                    "Ask for UI, e.g. 'Create a task dashboard with charts'",
-                    self.chat_draft.as_str(),
-                    self.chat_loading,
-                    true,
-                    true,
-                    if self.chat_loading {
-                        "Sending..."
-                    } else {
-                        "Send"
-                    },
-                    self.chat_loading,
-                    8.0,
-                )
-            } else {
-                (
-                    "Search apps and commands...",
-                    self.query.as_str(),
-                    false,
-                    false,
-                    false,
-                    "Add",
-                    false,
-                    0.0,
-                )
-            };
+            (
+                "Add a todo and press Enter...",
+                self.todo_draft.as_str(),
+                false,
+                true,
+                true,
+                "Add",
+                false,
+                8.0,
+            )
+        } else if self.show_chat {
+            (
+                "Ask for UI, e.g. 'Create a task dashboard with charts'",
+                self.chat_draft.as_str(),
+                self.chat_loading,
+                true,
+                true,
+                if self.chat_loading {
+                    "Sending..."
+                } else {
+                    "Send"
+                },
+                self.chat_loading,
+                8.0,
+            )
+        } else {
+            (
+                "Search apps and commands...",
+                self.query.as_str(),
+                false,
+                false,
+                false,
+                "Add",
+                false,
+                0.0,
+            )
+        };
 
         self.view
             .view(ids!(mode_input_row))
@@ -854,7 +853,9 @@ impl LauncherPanel {
         self.view
             .widget(ids!(mode_back_wrap))
             .set_visible(cx, show_back);
-        self.view.widget(ids!(mode_back_btn)).set_visible(cx, show_back);
+        self.view
+            .widget(ids!(mode_back_btn))
+            .set_visible(cx, show_back);
         let action_btn = self.view.mp_button(ids!(mode_action_btn));
         self.view
             .widget(ids!(mode_action_wrap))
