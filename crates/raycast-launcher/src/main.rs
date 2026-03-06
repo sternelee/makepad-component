@@ -448,7 +448,7 @@ live_design! {
                 }
             }
 
-            chat_surface_wrap = <View> {
+            chat_surface_wrap = <ScrollYView> {
                 width: Fill,
                 height: Fill,
                 show_bg: true,
@@ -461,10 +461,14 @@ live_design! {
                         return sdf.result;
                     }
                 }
-                padding: {left: 10, right: 10, top: 10, bottom: 10}
-                chat_surface = <A2uiSurface> {
+                <View> {
                     width: Fill,
-                    height: Fill,
+                    height: Fit,
+                    padding: {left: 10, right: 10, top: 10, bottom: 10}
+                    chat_surface = <A2uiSurface> {
+                        width: Fill,
+                        height: Fit,
+                    }
                 }
             }
         }
