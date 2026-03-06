@@ -31,8 +31,8 @@ live_design! {
             fn pixel(self) -> vec4 {
                 let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                 sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 13.0);
-                sdf.fill(#x1b1d21);
-                sdf.stroke(#x353941, 1.0);
+                sdf.fill(#x181a1f);
+                sdf.stroke(#x2f343d, 1.0);
                 return sdf.result;
             }
         }
@@ -60,12 +60,16 @@ live_design! {
             empty_text: "Search applications and commands…",
             padding: {left: 12, right: 12, top: 10, bottom: 10},
             draw_bg: {
-                instance border_color: #x4b5563,
+                instance border_color: #x3e4653,
+                instance focus: 0.0,
                 fn pixel(self) -> vec4 {
                     let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 9.0);
-                    sdf.fill(#x252930);
-                    sdf.stroke(self.border_color, 1.0);
+                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 10.0);
+                    let fill_base = #x1f2329;
+                    let fill_focus = #x242a33;
+                    let border_focus = #x6ea9ff;
+                    sdf.fill(mix(fill_base, fill_focus, self.focus * 0.65));
+                    sdf.stroke(mix(self.border_color, border_focus, self.focus), 1.0);
                     return sdf.result;
                 }
             }
@@ -94,20 +98,46 @@ live_design! {
             <View> {
                 width: Fill,
                 height: Fit,
+                flow: Down,
+                spacing: 2,
                 <Label> {
                     text: "Launcher",
                     draw_text: {
-                        text_style: <THEME_FONT_BOLD> {font_size: 18},
+                        text_style: <THEME_FONT_BOLD> {font_size: 17},
                         color: #xf9fbff
+                    }
+                }
+                <Label> {
+                    text: "Quickly open apps and run commands",
+                    draw_text: {
+                        text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                        color: #x8f9caf
                     }
                 }
             }
 
+            <View> {
+            width: Fill,
+            height: Fit,
+            flow: Right,
+            align: {y: 0.5},
+            padding: {left: 10, right: 10, top: 6, bottom: 6},
+            show_bg: true,
+            draw_bg: {
+                fn pixel(self) -> vec4 {
+                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 7.0);
+                    sdf.fill(#x1b2028);
+                    sdf.stroke(#x303745, 1.0);
+                    return sdf.result;
+                }
+            }
             result_count = <Label> {
-            text: "",
-            draw_text: {
-                text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                color: #xa7b0c1
+                text: "",
+                draw_text: {
+                    text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                    color: #xa7b0c1
+                }
             }
             }
 
@@ -120,24 +150,28 @@ live_design! {
             ResultRow = <View> {
                 width: Fill,
                 height: Fit,
-                margin: {top: 3, bottom: 3},
+                margin: {top: 2, bottom: 2},
 
                 row_bg = <View> {
                     width: Fill,
                     height: Fit,
                     flow: Down,
-                    spacing: 4,
-                    padding: {left: 12, right: 12, top: 10, bottom: 10},
+                    spacing: 3,
+                    padding: {left: 11, right: 11, top: 9, bottom: 9},
                     show_bg: true,
                     draw_bg: {
                         instance selected: 0.0
+                        instance hovered: 0.0
                         fn pixel(self) -> vec4 {
                             let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                            let base = #x272c34;
-                            let active = #x3b82f6;
-                            sdf.fill(mix(base, active, self.selected));
-                            sdf.stroke(mix(#x3a404a, #x6aa6ff, self.selected), 1.0);
+                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 7.0);
+                            let base = #x242a32;
+                            let hover = #x2b333f;
+                            let active = #x3a79de;
+                            let hovered_mix = mix(base, hover, self.hovered);
+                            sdf.fill(mix(hovered_mix, active, self.selected));
+                            let stroke_color = mix(#x323a45, #x4b5d78, self.hovered);
+                            sdf.stroke(mix(stroke_color, #x79adff, self.selected), 1.0);
                             return sdf.result;
                         }
                     }
@@ -150,8 +184,8 @@ live_design! {
                         spacing: 10,
 
                         icon_wrap = <View> {
-                            width: 26,
-                            height: 26,
+                            width: 24,
+                            height: 24,
                             flow: Overlay,
                             align: {x: 0.5, y: 0.5},
                             show_bg: true,
@@ -159,15 +193,15 @@ live_design! {
                                 fn pixel(self) -> vec4 {
                                     let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                                     sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 6.0);
-                                    sdf.fill(#x1f232a);
-                                    sdf.stroke(#x3b424d, 1.0);
+                                    sdf.fill(#x1a1f26);
+                                    sdf.stroke(#x323a45, 1.0);
                                     return sdf.result;
                                 }
                             }
 
                             app_icon = <Image> {
-                                width: 24,
-                                height: 24,
+                                width: 22,
+                                height: 22,
                                 fit: Smallest,
                             }
 
@@ -184,7 +218,7 @@ live_design! {
                             width: Fill,
                             text: "App",
                             draw_text: {
-                                text_style: <THEME_FONT_BOLD> {font_size: 14},
+                                text_style: <THEME_FONT_BOLD> {font_size: 13},
                                 color: #xfffdff
                             }
                         }
@@ -192,8 +226,8 @@ live_design! {
                         app_meta = <Label> {
                             text: "Category",
                             draw_text: {
-                                text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                                color: #xbcc5d4
+                                text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                                color: #xa7b2c5
                             }
                         }
                     }
@@ -201,22 +235,37 @@ live_design! {
                     app_desc = <Label> {
                         text: "Description",
                         draw_text: {
-                            text_style: <THEME_FONT_REGULAR> {font_size: 10},
-                            color: #x9ea8b7
+                            text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                            color: #x93a0b3
                         }
                     }
                 }
             }
             }
 
+            <View> {
+            width: Fill,
+            height: Fit,
+            padding: {left: 10, right: 10, top: 6, bottom: 6},
+            show_bg: true,
+            draw_bg: {
+                fn pixel(self) -> vec4 {
+                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 7.0);
+                    sdf.fill(#x1b2028);
+                    sdf.stroke(#x303745, 1.0);
+                    return sdf.result;
+                }
+            }
             status_label = <Label> {
-            text: "",
-            draw_text: {
-                text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                color: #x8ec8ff
+                text: "",
+                draw_text: {
+                    text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                    color: #x7fb9ff
+                }
             }
             }
-        }
+            }
 
         todo_view = <View> {
             visible: false,
@@ -496,7 +545,7 @@ live_design! {
                         let center = vec2(0.5, 0.5);
                         let d = distance(self.pos, center);
                         let t = clamp(d * 1.35, 0.0, 1.0);
-                        return mix(#x13161a, #x262b33, t);
+                        return mix(#x0f1115, #x20242b, t);
                     }
                 }
 
@@ -554,6 +603,8 @@ pub struct LauncherPanel {
     #[rust]
     row_hit_rects: Vec<(usize, Rect)>,
     #[rust]
+    hovered_index: Option<usize>,
+    #[rust]
     last_click_item: Option<usize>,
     #[rust]
     last_click_time: f64,
@@ -584,6 +635,7 @@ impl LiveHook for LauncherPanel {
         self.selected_index = 0;
         self.icon_cache.clear();
         self.row_hit_rects.clear();
+        self.hovered_index = None;
         self.last_click_item = None;
         self.last_click_time = 0.0;
         self.show_todo = false;
@@ -1184,6 +1236,25 @@ impl Widget for LauncherPanel {
             }
         }
 
+        if let Event::MouseMove(me) = event {
+            let next_hover = self
+                .row_hit_rects
+                .iter()
+                .find(|(_, rect)| rect.contains(me.abs))
+                .map(|(item_id, _)| *item_id);
+            if next_hover != self.hovered_index {
+                self.hovered_index = next_hover;
+                self.redraw(cx);
+            }
+        }
+
+        if let Event::MouseLeave(_) = event {
+            if self.hovered_index.is_some() {
+                self.hovered_index = None;
+                self.redraw(cx);
+            }
+        }
+
         let mut handled_enter = false;
         if let Some((text, _mods)) = self.view.text_input(ids!(mode_input)).returned(&actions) {
             handled_enter = true;
@@ -1266,7 +1337,8 @@ impl Widget for LauncherPanel {
                             row.widget(ids!(app_icon_fallback)).set_visible(cx, true);
                         }
 
-                        let selected = if item_id == self.selected_index {
+                        let selected = if item_id == self.selected_index { 1.0 } else { 0.0 };
+                        let hovered = if Some(item_id) == self.hovered_index {
                             1.0
                         } else {
                             0.0
@@ -1274,7 +1346,7 @@ impl Widget for LauncherPanel {
                         row.view(ids!(row_bg)).apply_over(
                             cx,
                             live! {
-                                draw_bg: {selected: (selected)}
+                                draw_bg: {selected: (selected), hovered: (hovered)}
                             },
                         );
                         row.draw_all(cx, &mut Scope::empty());
