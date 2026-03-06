@@ -205,16 +205,34 @@ live_design! {
                     draw_bg: {
                         instance selected: 0.0
                         instance hovered: 0.0
+                        instance command: 0.0
+                        instance builtin: 0.0
                         fn pixel(self) -> vec4 {
                             let sdf = Sdf2d::viewport(self.pos * self.rect_size);
                             sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 7.0);
                             let base = #x242a32;
                             let hover = #x2b333f;
-                            let active = #x3a79de;
+                            let command_tint = #x3a3530;
+                            let builtin_tint = #x2d3240;
+                            let tinted = mix(base, command_tint, self.command * 0.42);
+                            let tinted = mix(tinted, builtin_tint, self.builtin * 0.62);
+                            let active = mix(#x3a79de, #x4f7de0, self.builtin);
                             let hovered_mix = mix(base, hover, self.hovered);
-                            sdf.fill(mix(hovered_mix, active, self.selected));
+                            let hover_tinted = mix(hovered_mix, tinted, max(self.command, self.builtin) * 0.32);
+                            sdf.fill(mix(hover_tinted, active, self.selected));
                             let stroke_color = mix(#x323a45, #x4b5d78, self.hovered);
+                            let stroke_color = mix(stroke_color, #x8f7044, self.command * 0.5);
+                            let stroke_color = mix(stroke_color, #x6177a1, self.builtin * 0.6);
                             sdf.stroke(mix(stroke_color, #x79adff, self.selected), 1.0);
+
+                            // Draw a subtle left accent bar for quick type scanning.
+                            let accent = mix(#x5d6a80, #xf1ba63, self.command);
+                            let accent = mix(accent, #x7ca9ff, self.builtin);
+                            let accent_alpha = max(self.hovered * 0.18, self.selected * 0.95);
+                            if accent_alpha > 0.0 {
+                                sdf.box(0.0, 0.0, 2.0, self.rect_size.y, 1.0);
+                                sdf.fill(vec4(accent.xyz, accent_alpha));
+                            }
                             return sdf.result;
                         }
                     }
@@ -1225,6 +1243,17 @@ impl LauncherPanel {
         let has_results = !self.filtered_indices.is_empty();
         self.view.widget(ids!(results)).set_visible(cx, has_results);
         self.view.widget(ids!(empty_state)).set_visible(cx, !has_results);
+        let mut command_count = 0usize;
+        let mut app_count = 0usize;
+        for idx in &self.filtered_indices {
+            if let Some(item) = self.all_items.get(*idx) {
+                if item.category == "Command" {
+                    command_count += 1;
+                } else {
+                    app_count += 1;
+                }
+            }
+        }
         let selected_text = if self.filtered_indices.is_empty() {
             "0 selected".to_string()
         } else {
@@ -1233,7 +1262,13 @@ impl LauncherPanel {
                 self.selected_index.saturating_add(1).min(self.filtered_indices.len())
             )
         };
-        let count_text = format!("{} result(s)  |  {}", self.filtered_indices.len(), selected_text);
+        let count_text = format!(
+            "{} result(s)  |  {}  |  {} app / {} cmd",
+            self.filtered_indices.len(),
+            selected_text,
+            app_count,
+            command_count
+        );
         self.view
             .label(ids!(result_count))
             .set_text(cx, &count_text);
@@ -1455,13 +1490,19 @@ impl Widget for LauncherPanel {
                 while let Some(item_id) = list.next_visible_item(cx) {
 	                    if let Some(source_idx) = self.filtered_indices.get(item_id) {
 	                        let source_idx = *source_idx;
-	                        let (app_name, category, subtitle, fallback) =
+                        let (app_name, category, subtitle, fallback, is_command, is_builtin) =
                             if let Some(entry) = self.all_items.get(source_idx) {
+                                let is_builtin = matches!(
+                                    entry.launch,
+                                    LaunchTarget::OpenTodo | LaunchTarget::OpenChat
+                                );
                                 (
                                     entry.app_name.clone(),
                                     entry.category.clone(),
                                     entry.subtitle.clone(),
                                     entry.icon_fallback.clone(),
+                                    entry.category == "Command",
+                                    is_builtin,
                                 )
                             } else {
                                 continue;
@@ -1498,18 +1539,20 @@ impl Widget for LauncherPanel {
                             row.widget(ids!(app_icon_fallback)).set_visible(cx, true);
                         }
 
-                        let selected = if item_id == self.selected_index { 1.0 } else { 0.0 };
-                        let hovered = if Some(item_id) == self.hovered_index {
-                            1.0
-                        } else {
-                            0.0
-                        };
-                        row.view(ids!(row_bg)).apply_over(
-                            cx,
-                            live! {
-                                draw_bg: {selected: (selected), hovered: (hovered)}
-                            },
-                        );
+	                        let selected = if item_id == self.selected_index { 1.0 } else { 0.0 };
+	                        let hovered = if Some(item_id) == self.hovered_index {
+	                            1.0
+	                        } else {
+	                            0.0
+	                        };
+	                        let command = if is_command { 1.0 } else { 0.0 };
+	                        let builtin = if is_builtin { 1.0 } else { 0.0 };
+	                        row.view(ids!(row_bg)).apply_over(
+	                            cx,
+	                            live! {
+	                                draw_bg: {selected: (selected), hovered: (hovered), command: (command), builtin: (builtin)}
+	                            },
+	                        );
                         row.draw_all(cx, &mut Scope::empty());
                         self.row_hit_rects
                             .push((item_id, row.view(ids!(row_bg)).area().rect(cx)));
