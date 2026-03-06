@@ -284,20 +284,38 @@ live_design! {
                             }
                         }
 
-                        app_meta = <Label> {
-                            text: "Category",
-                            draw_text: {
-                                text_style: <THEME_FONT_REGULAR> {font_size: 10},
-                                color: #xa7b2c5
+                        app_meta_chip = <View> {
+                            width: Fit,
+                            height: Fit,
+                            padding: {left: 7, right: 7, top: 2, bottom: 2},
+                            show_bg: true,
+                            draw_bg: {
+                                instance color: #x202733
+                                instance border_color: #x3b4658
+                                fn pixel(self) -> vec4 {
+                                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 5.0);
+                                    sdf.fill(self.color);
+                                    sdf.stroke(self.border_color, 1.0);
+                                    return sdf.result;
+                                }
+                            }
+                            app_meta = <Label> {
+                                text: "Category",
+                                draw_text: {
+                                    text_style: <THEME_FONT_REGULAR> {font_size: 9},
+                                    color: #xa7b2c5
+                                }
                             }
                         }
                     }
 
                     app_desc = <Label> {
+                        width: Fill,
                         text: "Description",
                         draw_text: {
-                            text_style: <THEME_FONT_REGULAR> {font_size: 11},
-                            color: #x93a0b3
+                            text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                            color: #x8d9bae
                         }
                     }
                 }
@@ -1520,10 +1538,29 @@ impl Widget for LauncherPanel {
 	                        } else {
 	                            vec4(0.65, 0.70, 0.78, 1.0)
 	                        };
+	                        let meta_chip_fill = if category == "Command" {
+	                            vec4(0.28, 0.23, 0.17, 1.0)
+	                        } else {
+	                            vec4(0.13, 0.16, 0.20, 1.0)
+	                        };
+	                        let meta_chip_stroke = if category == "Command" {
+	                            vec4(0.55, 0.44, 0.27, 1.0)
+	                        } else {
+	                            vec4(0.23, 0.29, 0.36, 1.0)
+	                        };
 	                        row.label(ids!(app_meta)).apply_over(
 	                            cx,
 	                            live! {
 	                                draw_text: { color: (meta_color) }
+	                            },
+	                        );
+	                        row.view(ids!(app_meta_chip)).apply_over(
+	                            cx,
+	                            live! {
+	                                draw_bg: {
+	                                    color: (meta_chip_fill),
+	                                    border_color: (meta_chip_stroke)
+	                                }
 	                            },
 	                        );
 
@@ -1545,6 +1582,17 @@ impl Widget for LauncherPanel {
 	                        } else {
 	                            0.0
 	                        };
+	                        let title_color = if selected > 0.5 {
+	                            vec4(0.98, 0.99, 1.0, 1.0)
+	                        } else {
+	                            vec4(0.92, 0.94, 0.98, 1.0)
+	                        };
+	                        row.label(ids!(app_name)).apply_over(
+	                            cx,
+	                            live! {
+	                                draw_text: { color: (title_color) }
+	                            },
+	                        );
 	                        let command = if is_command { 1.0 } else { 0.0 };
 	                        let builtin = if is_builtin { 1.0 } else { 0.0 };
 	                        row.view(ids!(row_bg)).apply_over(
