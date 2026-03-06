@@ -541,6 +541,12 @@ pub struct LauncherPanel {
     #[rust]
     icon_cache: HashMap<usize, Option<String>>,
     #[rust]
+    row_hit_rects: Vec<(usize, Rect)>,
+    #[rust]
+    last_click_item: Option<usize>,
+    #[rust]
+    last_click_time: f64,
+    #[rust]
     show_todo: bool,
     #[rust]
     todos: Vec<todo::TodoItem>,
@@ -566,6 +572,9 @@ impl LiveHook for LauncherPanel {
         self.chat_draft.clear();
         self.selected_index = 0;
         self.icon_cache.clear();
+        self.row_hit_rects.clear();
+        self.last_click_item = None;
+        self.last_click_time = 0.0;
         self.show_todo = false;
         self.todos = todo::default_todos();
         self.show_chat = false;
@@ -1140,7 +1149,33 @@ impl Widget for LauncherPanel {
             return;
         }
 
+        if let Event::MouseDown(me) = event {
+            if me.button.is_primary() {
+                let hit_item = self
+                    .row_hit_rects
+                    .iter()
+                    .find(|(_, rect)| rect.contains(me.abs))
+                    .map(|(item_id, _)| *item_id);
+                if let Some(item_id) = hit_item {
+                    self.selected_index = item_id;
+                    self.update_labels(cx, "Selected");
+                    let is_double_click = self.last_click_item == Some(item_id)
+                        && (me.time - self.last_click_time) <= 0.35;
+                    self.last_click_item = Some(item_id);
+                    self.last_click_time = me.time;
+                    if is_double_click {
+                        self.launch_selected(cx);
+                    } else {
+                        self.redraw(cx);
+                    }
+                    return;
+                }
+            }
+        }
+
+        let mut handled_enter = false;
         if let Some((text, _mods)) = self.view.text_input(ids!(mode_input)).returned(&actions) {
+            handled_enter = true;
             self.query = text;
             let q = self.query.trim().to_lowercase();
             if q == "todo" || q == "/todo" {
@@ -1169,12 +1204,18 @@ impl Widget for LauncherPanel {
                     self.update_labels(cx, "Selected");
                     self.redraw(cx);
                 }
+                KeyCode::ReturnKey => {
+                    if !handled_enter {
+                        self.launch_selected(cx);
+                    }
+                }
                 _ => {}
             }
         }
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        self.row_hit_rects.clear();
         while let Some(item) = self.view.draw_walk(cx, scope, walk).step() {
             if let Some(mut list) = item.as_portal_list().borrow_mut() {
                 list.set_item_range(cx, 0, self.filtered_indices.len());
@@ -1226,6 +1267,8 @@ impl Widget for LauncherPanel {
                             },
                         );
                         row.draw_all(cx, &mut Scope::empty());
+                        self.row_hit_rects
+                            .push((item_id, row.view(ids!(row_bg)).area().rect(cx)));
                     }
                 }
             }
