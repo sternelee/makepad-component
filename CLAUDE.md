@@ -19,12 +19,21 @@ export SDKROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platf
 cargo test -p makepad-component   # Core UI crate tests
 cargo test                        # All workspace tests
 
+# Run a single test
+cargo test -p <crate_name> -- <test_name_substring>
+# Example: cargo test -p makepad-component -- test_process_surface_update
+
 # Run linter
 cargo clippy -p makepad-component
+cargo clippy --workspace -- -D warnings  # Strict lint pass across all crates
+
+# Format code
+cargo fmt --all
 
 # Run demos (use --bin to specify which binary)
 cargo run -p component-zoo --bin component-zoo    # Widget showcase
 cargo run -p a2ui-demo --bin a2ui-demo           # A2UI demo GUI
+cargo run -p raycast-launcher --bin raycast-launcher  # Raycast-style launcher
 
 # Build bridge server (LLM-powered UI) - requires a2ui-bridge feature
 cargo build --bin a2ui-bridge --features a2ui-bridge
@@ -50,6 +59,9 @@ cargo run --bin mock-a2a-server --features mock-server
 
 # WebAssembly build
 cargo makepad wasm build -p component-zoo --release
+
+# Code simplification - review changed code for reuse, quality, and efficiency
+# Use the /simplify skill after making changes
 ```
 
 ---
@@ -80,6 +92,7 @@ LLM → A2UI Bridge (tools→JSON) → Makepad App (A2uiHost → A2uiProcessor �
 | `crates/a2ui-demo` | Demo app with bridge server, watch server, math charts |
 | `crates/component-zoo` | Widget showcase (Button, Checkbox, Slider, etc.) |
 | `crates/makepad-plot` | Chart library (29 2D/3D chart types) |
+| `crates/raycast-launcher` | Raycast-style launcher app using A2UI |
 
 ### Key Files
 
@@ -400,37 +413,6 @@ impl A2uiText {
 }
 ```
 
-### Implementation Phases
-
-#### Phase 1: Core Infrastructure
-- [ ] `A2uiMessage` enum (Rust types for protocol messages)
-- [ ] `DataModel` with JSON Pointer path access
-- [ ] `A2uiMessageProcessor` to update DataModel and component tree
-- [ ] `ComponentRegistry` for A2UI → Makepad widget mapping
-
-#### Phase 2: Standard Components
-- [ ] Layout: Column, Row, List, Card
-- [ ] Display: Text, Image, Icon, Divider
-- [ ] Interactive: Button, TextField, Checkbox, Slider
-- [ ] Container: Modal, Tabs
-
-#### Phase 3: Data Binding
-- [ ] `StringValue` resolver (literalString | path)
-- [ ] `NumberValue` resolver
-- [ ] `BooleanValue` resolver
-- [ ] Two-way binding for input widgets
-- [ ] Template-based children (dynamic lists)
-
-#### Phase 4: Actions & Events
-- [ ] `userAction` message generation
-- [ ] Action context with data model values
-- [ ] Button click, form submit, etc.
-
-#### Phase 5: Integration
-- [ ] SSE/WebSocket streaming support
-- [ ] A2A server connection
-- [ ] Example demo application
-
 ### Reference Implementations
 
 | Platform | Package | Location |
@@ -588,6 +570,19 @@ pub struct MyWidget {
     #[animator] animator: Animator,
 }
 ```
+
+### Makepad Widget Conventions
+
+- **Stable IDs**: Keep IDs in `live_design!` stable and descriptive (e.g., `save_button`, `user_input`)
+- **Registration**: All widgets and themes must be registered via `live_design(cx)` calls in their respective modules
+- **SDF Drawing**: When modifying widget shaders, maintain the SDF (Signed Distance Field) patterns used in existing widgets
+
+### Error Handling Guidelines
+
+- Use `Option` and `Result` for expected failure paths
+- Prefer `?` for error propagation in fallible operations (e.g., JSON parsing)
+- Use `makepad_widgets::log!` for runtime debugging and error reporting in GUI paths
+- Avoid `unwrap()` in production library code (`crates/ui`); use `expect("description")` if a failure truly represents an impossible state
 
 ### Robius Async Pattern
 ```rust
