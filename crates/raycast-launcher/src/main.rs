@@ -7,8 +7,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 mod a2ui_bridge_embed;
+mod adk_integration;
+mod adk_ui_renderer;
 mod chat;
 mod todo;
+
+use std::sync::Arc;
 
 live_design! {
     use link::theme::*;
@@ -376,7 +380,7 @@ live_design! {
                 chat_server_input = <TextInput> {
                     width: 280,
                     height: Fit,
-                    empty_text: "https://api.moonshot.cn/v1/chat/completions",
+                    empty_text: "https://openrouter.ai/api/v1/chat/completions",
                     padding: {left: 10, right: 10, top: 8, bottom: 8},
                     draw_bg: {
                         instance border_color: #x334155,
@@ -396,7 +400,7 @@ live_design! {
                 chat_model_input = <TextInput> {
                     width: 160,
                     height: Fit,
-                    empty_text: "kimi-k2.5",
+                    empty_text: "openrouter/auto",
                     padding: {left: 10, right: 10, top: 8, bottom: 8},
                     draw_bg: {
                         instance border_color: #x334155,
@@ -580,6 +584,12 @@ pub struct LauncherPanel {
     chat_model: String,
     #[rust]
     chat_api_key: String,
+    // ADK Agent for LLM-powered chat
+    #[rust]
+    adk_agent: Option<Arc<adk_integration::AgentWrapper>>,
+    // Use ADK mode for chat
+    #[rust]
+    use_adk: bool,
 }
 
 impl LiveHook for LauncherPanel {
@@ -594,11 +604,18 @@ impl LiveHook for LauncherPanel {
         self.chat_messages = chat::default_chat_messages();
         self.chat_loading = false;
         self.chat_server_url = std::env::var("LLM_API_URL")
-            .unwrap_or_else(|_| "https://api.moonshot.cn/v1/chat/completions".to_string());
-        self.chat_model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "kimi-k2.5".to_string());
+            .unwrap_or_else(|_| "https://openrouter.ai/api/v1/chat/completions".to_string());
+        self.chat_model =
+            std::env::var("LLM_MODEL").unwrap_or_else(|_| "openrouter/auto".to_string());
         self.chat_api_key = std::env::var("LLM_API_KEY")
             .or_else(|_| std::env::var("MOONSHOT_API_KEY"))
             .unwrap_or_default();
+        // Initialize ADK agent (lazy, will be created on first use)
+        self.adk_agent = None;
+        // Use ADK mode by default
+        self.use_adk = std::env::var("A2UI_USE_ADK")
+            .map(|v| v == "1" || v.to_lowercase() == "true")
+            .unwrap_or(true); // Default to ADK mode
         self.rebuild_filter();
         self.view.text_input(ids!(search_input)).set_key_focus(cx);
         self.sync_todo_ui(cx);

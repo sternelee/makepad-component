@@ -30,9 +30,15 @@ struct LlmFunctionCall {
     arguments: String,
 }
 
-pub(crate) fn build_chat_request_body(model: &str, user_message: &str) -> String {
-    let scenario_hint = infer_scenario_hint(user_message);
-    let template_hint = infer_template_hint(user_message);
+pub(crate) fn build_chat_request_body(model: &str, conversation: &[(String, String)]) -> String {
+    let latest_user_message = conversation
+        .iter()
+        .rev()
+        .find(|(role, _)| role.eq_ignore_ascii_case("user"))
+        .map(|(_, text)| text.as_str())
+        .unwrap_or("");
+    let scenario_hint = infer_scenario_hint(latest_user_message);
+    let template_hint = infer_template_hint(latest_user_message);
     let system_prompt = r#"You are an A2UI generator assistant for Raycast-style plugins. Create UI by calling provided tools.
 Rules:
 1) Use tools to build component trees; do NOT invent unsupported component names.
@@ -46,18 +52,37 @@ Rules:
         system_prompt, scenario_hint, template_hint
     );
 
+    let mut messages = vec![json!({"role": "system", "content": merged_prompt})];
+    for (role, content) in conversation {
+        if let Some(openai_role) = normalize_role(role) {
+            messages.push(json!({
+                "role": openai_role,
+                "content": content
+            }));
+        }
+    }
+
     json!({
         "model": model,
-        "messages": [
-            {"role": "system", "content": merged_prompt},
-            {"role": "user", "content": user_message}
-        ],
+        "messages": messages,
         "tools": get_a2ui_tools(),
         "temperature": 1,
         "max_tokens": 8192,
         "stream": false
     })
     .to_string()
+}
+
+fn normalize_role(role: &str) -> Option<&'static str> {
+    if role.eq_ignore_ascii_case("user") || role.eq_ignore_ascii_case("you") {
+        Some("user")
+    } else if role.eq_ignore_ascii_case("assistant") {
+        Some("assistant")
+    } else if role.eq_ignore_ascii_case("system") {
+        Some("system")
+    } else {
+        None
+    }
 }
 
 fn infer_template_hint(user_message: &str) -> &'static str {
