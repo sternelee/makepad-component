@@ -1,4 +1,5 @@
 use makepad_widgets::*;
+use makepad_component::widgets::button::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
@@ -36,25 +37,24 @@ live_design! {
             }
         }
 
-        launcher_view = <View> {
+        mode_input_row = <View> {
             width: Fill,
-            height: Fill,
-            flow: Down,
-            spacing: 10,
+            height: Fit,
+            flow: Right,
+            align: {y: 0.5},
+            spacing: 8,
+            margin: {top: 12},
 
-            <View> {
-                width: Fill,
+            mode_back_wrap = <View> {
+                visible: false,
+                width: Fit,
                 height: Fit,
-                <Label> {
-                    text: "Launcher",
-                    draw_text: {
-                        text_style: <THEME_FONT_BOLD> {font_size: 18},
-                        color: #xeff3ff
-                    }
+                mode_back_btn = <MpButtonSecondary> {
+                    text: "Back"
                 }
             }
 
-            search_input = <TextInput> {
+            mode_input = <TextInput> {
             width: Fill,
             height: Fit,
             empty_text: "Search apps and commands...",
@@ -73,6 +73,34 @@ live_design! {
                 text_style: <THEME_FONT_REGULAR> {font_size: 13},
                 color: #xe2e8f0
             }
+            }
+
+            mode_action_wrap = <View> {
+                visible: false,
+                width: Fit,
+                height: Fit,
+                mode_action_btn = <MpButtonPrimary> {
+                    text: "Add"
+                }
+            }
+        }
+
+        launcher_view = <View> {
+            width: Fill,
+            height: Fill,
+            flow: Down,
+            spacing: 10,
+
+            <View> {
+                width: Fill,
+                height: Fit,
+                <Label> {
+                    text: "Launcher",
+                    draw_text: {
+                        text_style: <THEME_FONT_BOLD> {font_size: 18},
+                        color: #xeff3ff
+                    }
+                }
             }
 
             result_count = <Label> {
@@ -194,7 +222,6 @@ live_design! {
                 align: {y: 0.5},
                 spacing: 8,
 
-                todo_back_btn = <MpButtonSecondary> { text: "Back" }
                 <Label> {
                     text: "Todo List",
                     draw_text: {
@@ -210,36 +237,6 @@ live_design! {
                     text_style: <THEME_FONT_REGULAR> {font_size: 11},
                     color: #x8ea0b8
                 }
-            }
-
-            <View> {
-                width: Fill,
-                height: Fit,
-                flow: Right,
-                spacing: 8,
-
-                todo_input = <TextInput> {
-                    width: Fill,
-                    height: Fit,
-                    empty_text: "Add a todo and press Enter...",
-                    padding: {left: 12, right: 12, top: 10, bottom: 10},
-                    draw_bg: {
-                        instance border_color: #x334155,
-                        fn pixel(self) -> vec4 {
-                            let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 10.0);
-                            sdf.fill(#x0f1318);
-                            sdf.stroke(self.border_color, 1.0);
-                            return sdf.result;
-                        }
-                    }
-                    draw_text: {
-                        text_style: <THEME_FONT_REGULAR> {font_size: 12},
-                        color: #xe2e8f0
-                    }
-                }
-
-                todo_add_btn = <MpButtonPrimary> { text: "Add" }
             }
 
             stats_card = <View> {
@@ -348,7 +345,6 @@ live_design! {
                 align: {y: 0.5},
                 spacing: 8,
 
-                chat_back_btn = <MpButtonSecondary> { text: "Back" }
                 <Label> {
                     width: Fill,
                     text: "A2UI Chat",
@@ -444,34 +440,6 @@ live_design! {
                 }
             }
 
-            <View> {
-                width: Fill,
-                height: Fit,
-                flow: Right,
-                spacing: 8,
-                chat_input = <TextInput> {
-                    width: Fill,
-                    height: Fit,
-                    empty_text: "Ask for UI, e.g. 'Create a task dashboard with charts'",
-                    padding: {left: 12, right: 12, top: 10, bottom: 10},
-                    draw_bg: {
-                        instance border_color: #x334155,
-                        fn pixel(self) -> vec4 {
-                            let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 10.0);
-                            sdf.fill(#x0f1318);
-                            sdf.stroke(self.border_color, 1.0);
-                            return sdf.result;
-                        }
-                    }
-                    draw_text: {
-                        text_style: <THEME_FONT_REGULAR> {font_size: 12},
-                        color: #xe2e8f0
-                    }
-                }
-                chat_send_btn = <MpButtonPrimary> { text: "Send" }
-            }
-
             chat_status_label = <Label> {
                 text: "Ready",
                 draw_text: {
@@ -561,6 +529,10 @@ pub struct LauncherPanel {
     #[rust]
     query: String,
     #[rust]
+    todo_draft: String,
+    #[rust]
+    chat_draft: String,
+    #[rust]
     selected_index: usize,
     #[rust]
     icon_cache: HashMap<usize, Option<String>>,
@@ -586,6 +558,8 @@ impl LiveHook for LauncherPanel {
     fn after_new_from_doc(&mut self, cx: &mut Cx) {
         self.all_items = load_launcher_items();
         self.query.clear();
+        self.todo_draft.clear();
+        self.chat_draft.clear();
         self.selected_index = 0;
         self.icon_cache.clear();
         self.show_todo = false;
@@ -600,7 +574,8 @@ impl LiveHook for LauncherPanel {
             .or_else(|_| std::env::var("MOONSHOT_API_KEY"))
             .unwrap_or_default();
         self.rebuild_filter();
-        self.view.text_input(ids!(search_input)).set_key_focus(cx);
+        self.sync_mode_input(cx);
+        self.view.text_input(ids!(mode_input)).set_key_focus(cx);
         self.sync_todo_ui(cx);
         self.sync_chat_ui(cx);
         self.view
@@ -817,6 +792,80 @@ fn load_launcher_items() -> Vec<LauncherItem> {
 }
 
 impl LauncherPanel {
+    pub(crate) fn sync_mode_input(&mut self, cx: &mut Cx) {
+        let (
+            empty_text,
+            text,
+            read_only,
+            show_back,
+            show_action,
+            action_text,
+            action_disabled,
+            row_spacing,
+        ) = if self.show_todo {
+                (
+                    "Add a todo and press Enter...",
+                    self.todo_draft.as_str(),
+                    false,
+                    true,
+                    true,
+                    "Add",
+                    false,
+                    8.0,
+                )
+            } else if self.show_chat {
+                (
+                    "Ask for UI, e.g. 'Create a task dashboard with charts'",
+                    self.chat_draft.as_str(),
+                    self.chat_loading,
+                    true,
+                    true,
+                    if self.chat_loading {
+                        "Sending..."
+                    } else {
+                        "Send"
+                    },
+                    self.chat_loading,
+                    8.0,
+                )
+            } else {
+                (
+                    "Search apps and commands...",
+                    self.query.as_str(),
+                    false,
+                    false,
+                    false,
+                    "Add",
+                    false,
+                    0.0,
+                )
+            };
+
+        self.view
+            .view(ids!(mode_input_row))
+            .apply_over(cx, live! { spacing: (row_spacing) });
+        self.view
+            .text_input(ids!(mode_input))
+            .apply_over(cx, live! { empty_text: (empty_text) });
+        self.view.text_input(ids!(mode_input)).set_text(cx, text);
+        self.view
+            .text_input(ids!(mode_input))
+            .set_is_read_only(cx, read_only);
+        self.view
+            .widget(ids!(mode_back_wrap))
+            .set_visible(cx, show_back);
+        self.view.widget(ids!(mode_back_btn)).set_visible(cx, show_back);
+        let action_btn = self.view.mp_button(ids!(mode_action_btn));
+        self.view
+            .widget(ids!(mode_action_wrap))
+            .set_visible(cx, show_action);
+        self.view
+            .widget(ids!(mode_action_btn))
+            .set_visible(cx, show_action);
+        action_btn.set_text(action_text);
+        action_btn.set_disabled(cx, action_disabled);
+    }
+
     fn icon_cache_path(icns_path: &Path) -> Option<PathBuf> {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         // Bump version when conversion params change to avoid stale cached icons.
@@ -1056,6 +1105,20 @@ impl Widget for LauncherPanel {
             self.handle_chat_network_responses(cx, responses);
         }
 
+        if let Some(text) = self.view.text_input(ids!(mode_input)).changed(&actions) {
+            if self.show_todo {
+                self.todo_draft = text;
+            } else if self.show_chat {
+                self.chat_draft = text;
+            } else {
+                self.query = text;
+                self.selected_index = 0;
+                self.rebuild_filter();
+                self.update_labels(cx, "Filtered");
+            }
+            self.redraw(cx);
+        }
+
         if self.show_todo {
             self.handle_todo_actions(cx, &actions);
             if let Event::KeyDown(key) = event {
@@ -1072,15 +1135,7 @@ impl Widget for LauncherPanel {
             return;
         }
 
-        if let Some(text) = self.view.text_input(ids!(search_input)).changed(&actions) {
-            self.query = text;
-            self.selected_index = 0;
-            self.rebuild_filter();
-            self.update_labels(cx, "Filtered");
-            self.redraw(cx);
-        }
-
-        if let Some((text, _mods)) = self.view.text_input(ids!(search_input)).returned(&actions) {
+        if let Some((text, _mods)) = self.view.text_input(ids!(mode_input)).returned(&actions) {
             self.query = text;
             let q = self.query.trim().to_lowercase();
             if q == "todo" || q == "/todo" {
@@ -1191,7 +1246,7 @@ impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
         if let Event::Startup = event {
             self.ui
-                .text_input(ids!(launcher.search_input))
+                .text_input(ids!(launcher.mode_input))
                 .set_key_focus(cx);
         }
 

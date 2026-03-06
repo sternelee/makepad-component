@@ -33,16 +33,15 @@ impl LauncherPanel {
         self.view.view(ids!(launcher_view)).set_visible(cx, !show);
         self.view.view(ids!(todo_view)).set_visible(cx, show);
         self.view.view(ids!(chat_view)).set_visible(cx, false);
+        self.sync_mode_input(cx);
         if show {
             self.sync_todo_ui(cx);
-            self.view.text_input(ids!(todo_input)).set_key_focus(cx);
-        } else {
-            self.view.text_input(ids!(search_input)).set_key_focus(cx);
         }
+        self.view.text_input(ids!(mode_input)).set_key_focus(cx);
     }
 
     fn add_todo_from_input(&mut self, cx: &mut Cx) {
-        let text = self.view.text_input(ids!(todo_input)).text();
+        let text = self.view.text_input(ids!(mode_input)).text();
         let text = text.trim();
         if text.is_empty() {
             return;
@@ -54,7 +53,8 @@ impl LauncherPanel {
                 done: false,
             },
         );
-        self.view.text_input(ids!(todo_input)).set_text(cx, "");
+        self.todo_draft.clear();
+        self.sync_mode_input(cx);
         self.sync_todo_ui(cx);
         self.redraw(cx);
     }
@@ -206,17 +206,17 @@ impl LauncherPanel {
     }
 
     pub(crate) fn handle_todo_actions(&mut self, cx: &mut Cx, actions: &Actions) {
-        if self.view.mp_button(ids!(todo_back_btn)).clicked(actions) {
+        if self.view.mp_button(ids!(mode_back_btn)).clicked(actions) {
             self.set_todo_mode(cx, false);
             self.redraw(cx);
             return;
         }
 
-        if self.view.mp_button(ids!(todo_add_btn)).clicked(actions) {
+        if self.view.mp_button(ids!(mode_action_btn)).clicked(actions) {
             self.add_todo_from_input(cx);
         }
 
-        if let Some((_text, _mods)) = self.view.text_input(ids!(todo_input)).returned(actions) {
+        if let Some((_text, _mods)) = self.view.text_input(ids!(mode_input)).returned(actions) {
             self.add_todo_from_input(cx);
         }
 

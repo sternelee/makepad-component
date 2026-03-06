@@ -19,13 +19,7 @@ pub(crate) fn default_chat_messages() -> Vec<ChatMessage> {
 
 impl LauncherPanel {
     fn sync_chat_controls(&mut self, cx: &mut Cx) {
-        self.view
-            .text_input(ids!(chat_input))
-            .set_is_read_only(cx, self.chat_loading);
-        let send_text = if self.chat_loading { "Sending..." } else { "Send" };
-        let send_btn = self.view.mp_button(ids!(chat_send_btn));
-        send_btn.set_text(send_text);
-        send_btn.set_disabled(cx, self.chat_loading);
+        self.sync_mode_input(cx);
     }
 
     pub(crate) fn set_chat_mode(&mut self, cx: &mut Cx, show: bool) {
@@ -36,12 +30,11 @@ impl LauncherPanel {
         self.view.view(ids!(launcher_view)).set_visible(cx, !show);
         self.view.view(ids!(todo_view)).set_visible(cx, false);
         self.view.view(ids!(chat_view)).set_visible(cx, show);
+        self.sync_mode_input(cx);
         if show {
             self.sync_chat_ui(cx);
-            self.view.text_input(ids!(chat_input)).set_key_focus(cx);
-        } else {
-            self.view.text_input(ids!(search_input)).set_key_focus(cx);
         }
+        self.view.text_input(ids!(mode_input)).set_key_focus(cx);
     }
 
     pub(crate) fn sync_chat_ui(&mut self, cx: &mut Cx) {
@@ -87,7 +80,7 @@ impl LauncherPanel {
             return;
         }
 
-        let text = self.view.text_input(ids!(chat_input)).text();
+        let text = self.view.text_input(ids!(mode_input)).text();
         let text = text.trim();
         if text.is_empty() {
             return;
@@ -102,7 +95,7 @@ impl LauncherPanel {
             text: user_msg.clone(),
         });
         self.chat_loading = true;
-        self.view.text_input(ids!(chat_input)).set_text(cx, "");
+        self.chat_draft.clear();
         self.sync_chat_ui(cx);
         self.view
             .label(ids!(chat_status_label))
@@ -162,16 +155,16 @@ impl LauncherPanel {
                             });
                             let render_status = {
                                 let surface_ref = self.view.widget(ids!(chat_surface));
-                                let status =
-                                    if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>()
-                                    {
-                                        match surface.process_json(&a2ui_json) {
-                                            Ok(events) => format!("Rendered {} events", events.len()),
-                                            Err(e) => format!("A2UI parse error: {}", e),
-                                        }
-                                    } else {
-                                        "A2UI surface not found".to_string()
-                                    };
+                                let status = if let Some(mut surface) =
+                                    surface_ref.borrow_mut::<A2uiSurface>()
+                                {
+                                    match surface.process_json(&a2ui_json) {
+                                        Ok(events) => format!("Rendered {} events", events.len()),
+                                        Err(e) => format!("A2UI parse error: {}", e),
+                                    }
+                                } else {
+                                    "A2UI surface not found".to_string()
+                                };
                                 status
                             };
                             self.view
@@ -210,7 +203,7 @@ impl LauncherPanel {
     }
 
     pub(crate) fn handle_chat_actions(&mut self, cx: &mut Cx, event: &Event, actions: &Actions) {
-        if self.view.mp_button(ids!(chat_back_btn)).clicked(actions) {
+        if self.view.mp_button(ids!(mode_back_btn)).clicked(actions) {
             self.set_chat_mode(cx, false);
             self.redraw(cx);
             return;
@@ -221,12 +214,12 @@ impl LauncherPanel {
             return;
         }
 
-        if self.view.mp_button(ids!(chat_send_btn)).clicked(actions) {
+        if self.view.mp_button(ids!(mode_action_btn)).clicked(actions) {
             self.send_chat_from_input(cx);
             return;
         }
 
-        if let Some((_, _)) = self.view.text_input(ids!(chat_input)).returned(actions) {
+        if let Some((_, _)) = self.view.text_input(ids!(mode_input)).returned(actions) {
             self.send_chat_from_input(cx);
             return;
         }
