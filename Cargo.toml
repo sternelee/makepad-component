@@ -1,10 +1,11 @@
 [workspace]
 members = [
-    "crates/ui",
-    "crates/component-zoo",
-    "crates/a2ui-demo",
-    "crates/makepad-plot",
-    "crates/raycast-launcher",
+  "crates/ui",
+  "crates/component-zoo",
+  "crates/a2ui-demo",
+  "crates/makepad-plot",
+  "crates/raycast-launcher",
+  "crates/makepad-clipboard",
 ]
 resolver = "2"
 
