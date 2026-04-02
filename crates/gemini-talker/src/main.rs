@@ -49,13 +49,15 @@ script_mod! {
             main_window := Window{
                 window.inner_size: vec2(900, 700)
                 window.title: "Gemini Garden"
+                window.transparent: true
+                pass +: { clear_color: vec4(0.0, 0.0, 0.0, 0.96) }
                 body +: {
                     main_view := View{
                         width: Fill
                         height: Fill
                         flow: Down
                         show_bg: true
-                        draw_bg +: { color: vec4(0.04, 0.04, 0.07, 1.0) }
+                        draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
 
                         nav_bar := View{
                             width: Fill
@@ -64,7 +66,7 @@ script_mod! {
                             spacing: 8
                             padding: Inset{left: 24 right: 24 top: 8 bottom: 8}
                             show_bg: true
-                            draw_bg +: { color: vec4(0.06, 0.06, 0.1, 0.9) }
+                            draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
 
                             tab_garden := Button{text: "THE GARDEN"}
                             tab_memory := Button{text: "MEMORY"}
@@ -77,7 +79,7 @@ script_mod! {
                             height: Fill
                             flow: Down
                             show_bg: true
-                            draw_bg +: { color: vec4(0.04, 0.04, 0.07, 1.0) }
+                            draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
 
                             status_bar := View{
                                 width: Fill
@@ -96,7 +98,7 @@ script_mod! {
                                 height: Fill
                                 align: Center
                                 show_bg: true
-                                draw_bg +: { color: vec4(0.03, 0.03, 0.06, 1.0) }
+                                draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
                                 speech_label := Label{text: ""}
                             }
 
@@ -107,7 +109,7 @@ script_mod! {
                                 spacing: 10
                                 padding: Inset{left: 20 right: 20 top: 8 bottom: 8}
                                 show_bg: true
-                                draw_bg +: { color: vec4(0.06, 0.06, 0.1, 0.9) }
+                                draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
                                 msg_input := TextInput{width: Fill}
                                 send_btn := Button{text: "Send"}
                                 mic_btn := Button{text: "Mic"}
@@ -121,7 +123,7 @@ script_mod! {
                                 spacing: 10
                                 padding: Inset{left: 20 right: 20 top: 0 bottom: 0}
                                 show_bg: true
-                                draw_bg +: { color: vec4(0.05, 0.05, 0.08, 0.8) }
+                                draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
                                 save_btn := Button{text: "Save Memory"}
                                 upload_btn := Button{text: "Upload"}
                                 stop_btn := Button{text: "Stop"}
@@ -136,7 +138,7 @@ script_mod! {
                             padding: 24
                             visible: false
                             show_bg: true
-                            draw_bg +: { color: vec4(0.04, 0.04, 0.07, 1.0) }
+                            draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
                             Label{text: "Memory"}
                             memory_count := Label{text: "0 saved memories"}
                             memory_list := Label{text: "No memories."}
@@ -159,7 +161,7 @@ script_mod! {
                             align: Center
                             visible: false
                             show_bg: true
-                            draw_bg +: { color: vec4(0.03, 0.03, 0.05, 1.0) }
+                            draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
                             Label{text: "Ambient"}
                             Label{text: "No track playing"}
                             prev_btn := Button{text: "Prev"}
@@ -175,7 +177,7 @@ script_mod! {
                             padding: 24
                             visible: false
                             show_bg: true
-                            draw_bg +: { color: vec4(0.04, 0.04, 0.07, 1.0) }
+                            draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
 
                             Label{text: "Info & Settings"}
 
@@ -186,7 +188,7 @@ script_mod! {
                                 spacing: 12
                                 padding: 20
                                 show_bg: true
-                                draw_bg +: { color: vec4(0.08, 0.08, 0.12, 0.6) }
+                                draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
                                 Label{text: "API Configuration"}
                             View{width: Fill height: Fit flow: Right spacing: 10
                                     Label{text: "API Key:"}
@@ -204,7 +206,7 @@ script_mod! {
                                 spacing: 8
                                 padding: 20
                                 show_bg: true
-                                draw_bg +: { color: vec4(0.08, 0.08, 0.12, 0.6) }
+                                draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
                                 Label{text: "Session"}
                                 Label{text: "Model: gemini-2.0-flash-exp"}
                                 Label{text: "Status: Idle"}
