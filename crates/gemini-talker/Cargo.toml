@@ -1,0 +1,32 @@
+[package]
+name = "gemini-talker"
+version = "0.1.0"
+edition = "2021"
+description = "Gemini AI Chat Application for Makepad - Garden UI"
+
+[[bin]]
+name = "gemini-talker"
+path = "src/main.rs"
+
+[dependencies]
+makepad-widgets = { path = "/Users/sternelee/www/github/makepad/widgets", version = "2.0.0" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+env_logger = "0.11"
+
+# Gemini Live API integration
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "0.21"
+futures-util = "0.3"
+base64 = "0.22"
+url = "2.5"
+
+# Native file dialog
+rfd = "0.15"
+
+# Data directory
+dirs = "5"
+
+# Async runtime
+once_cell = "1.19"

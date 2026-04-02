@@ -6,6 +6,7 @@ members = [
   "crates/makepad-plot",
   "crates/raycast-launcher",
   "crates/makepad-clipboard",
+  "crates/gemini-talker",
 ]
 resolver = "2"
 
@@ -16,9 +17,9 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [workspace.dependencies]
+makepad-widgets = { path = "/Users/sternelee/www/github/makepad/widgets" }
 makepad-component = { path = "crates/ui" }
 makepad-plot = { path = "crates/makepad-plot" }
-makepad-widgets = { git = "https://github.com/makepad/makepad", branch = "dev" }
 
 # Optimize audio decoder even in debug builds (symphonia does heavy float math)
 [profile.dev.package.symphonia-core]
