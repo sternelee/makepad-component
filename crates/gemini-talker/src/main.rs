@@ -4,13 +4,13 @@ use makepad_widgets::*;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-mod gemini_live;
 mod audio_input;
 mod audio_output;
+mod gemini_live;
 mod memory;
 
-use gemini_live::{GeminiEvent, GeminiLiveClient, Part, ServerContent, ModelTurn};
-use memory::{Message, MemoryManager, MemorySummary, create_memory};
+use gemini_live::{GeminiEvent, GeminiLiveClient, ModelTurn, Part, ServerContent};
+use memory::{create_memory, MemoryManager, MemorySummary, Message};
 
 #[derive(Debug, Clone)]
 enum GeminiAction {
@@ -24,7 +24,11 @@ enum GeminiAction {
 #[derive(Debug, Clone)]
 enum UiToGemini {
     Text(String),
-    Image { mime_type: String, data: String, caption: Option<String> },
+    Image {
+        mime_type: String,
+        data: String,
+        caption: Option<String>,
+    },
     Disconnect,
 }
 
@@ -50,7 +54,7 @@ script_mod! {
                 window.inner_size: vec2(900, 700)
                 window.title: "Gemini Garden"
                 window.transparent: true
-                pass +: { clear_color: vec4(0.0, 0.0, 0.0, 0.96) }
+                pass +: { clear_color: vec4(0.0, 0.0, 0.0, 0.94) }
                 body +: {
                     main_view := View{
                         width: Fill
@@ -208,7 +212,7 @@ script_mod! {
                                 show_bg: true
                                 draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
                                 Label{text: "Session"}
-                                Label{text: "Model: gemini-2.0-flash-exp"}
+                                Label{text: "Model: gemini-3.1-flash-lite-preview"}
                                 Label{text: "Status: Idle"}
                             }
                         }
@@ -238,6 +242,8 @@ pub struct App {
     #[rust]
     current_page: usize,
     #[rust]
+    is_recording: bool,
+    #[rust]
     confirm_delete_selected: bool,
     #[rust]
     confirm_clear_all: bool,
@@ -246,15 +252,22 @@ pub struct App {
 impl MatchEvent for App {
     fn handle_startup(&mut self, cx: &mut Cx) {
         self.current_page = 0;
+        self.is_recording = false;
         self.confirm_delete_selected = false;
         self.confirm_clear_all = false;
         self.ui.text_input(cx, ids!(msg_input)).set_key_focus(cx);
         self.update_memory_action_button_labels(cx);
         if let Ok(api_key) = std::env::var("GEMINI_API_KEY") {
             if !api_key.trim().is_empty() {
-                self.ui.text_input(cx, ids!(api_input)).set_text(cx, &api_key);
-                self.ui.label(cx, ids!(conn_status)).set_text(cx, "API key loaded from env");
-                self.ui.label(cx, ids!(status_label)).set_text(cx, "Ready to connect");
+                self.ui
+                    .text_input(cx, ids!(api_input))
+                    .set_text(cx, &api_key);
+                self.ui
+                    .label(cx, ids!(conn_status))
+                    .set_text(cx, "API key loaded from env");
+                self.ui
+                    .label(cx, ids!(status_label))
+                    .set_text(cx, "Ready to connect");
             }
         }
     }
@@ -264,51 +277,79 @@ impl MatchEvent for App {
             if let Some(ga) = action.downcast_ref::<GeminiAction>() {
                 match ga {
                     GeminiAction::Connected => {
-                        script_eval!(cx, {
-                            mod.state.connection_status = "Connected"
-                            mod.state.is_connected = true
-                            ui.status_label.set_text(cx, "Connected")
-                            ui.conn_status.set_text(cx, "Connected")
-                        });
+                        self.ui
+                            .label(cx, ids!(status_label))
+                            .set_text(cx, "Connected");
+                        self.ui
+                            .label(cx, ids!(conn_status))
+                            .set_text(cx, "Connected");
                         self.ui.button(cx, ids!(connect_btn)).set_visible(cx, false);
-                        self.ui.button(cx, ids!(disconnect_btn)).set_visible(cx, true);
+                        self.ui
+                            .button(cx, ids!(disconnect_btn))
+                            .set_visible(cx, true);
                     }
                     GeminiAction::TextReceived(text) => {
                         self.pending_response.push_str(text);
-                        self.ui.label(cx, ids!(speech_label)).set_text(cx, &format!("AI: {}", self.pending_response));
+                        self.ui
+                            .label(cx, ids!(speech_label))
+                            .set_text(cx, &format!("AI: {}", self.pending_response));
                     }
                     GeminiAction::TurnComplete => {
                         if !self.pending_response.is_empty() {
                             self.conversation.push(Message {
                                 role: "assistant".to_string(),
                                 content: self.pending_response.clone(),
-                                timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64(),
+                                timestamp: std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .unwrap()
+                                    .as_secs_f64(),
                             });
                             self.pending_response.clear();
                         }
                         self.ui.label(cx, ids!(status_label)).set_text(cx, "Ready");
                     }
                     GeminiAction::Error(e) => {
-                        self.ui.label(cx, ids!(speech_label)).set_text(cx, &format!("Error: {}", e));
-                        self.ui.label(cx, ids!(status_label)).set_text(cx, "Error");
-                        self.ui.label(cx, ids!(conn_status)).set_text(cx, "Error");
+                        let short = format!("Error: {}", e);
+                        eprintln!("{}", short);
+                        self.ui.label(cx, ids!(speech_label)).set_text(cx, &short);
+                        self.ui.label(cx, ids!(status_label)).set_text(cx, &short);
+                        self.ui.label(cx, ids!(conn_status)).set_text(cx, &short);
                         self.ui.button(cx, ids!(connect_btn)).set_visible(cx, true);
-                        self.ui.button(cx, ids!(disconnect_btn)).set_visible(cx, false);
+                        self.ui
+                            .button(cx, ids!(disconnect_btn))
+                            .set_visible(cx, false);
                     }
                     GeminiAction::Disconnected => {
-                        self.ui.label(cx, ids!(status_label)).set_text(cx, "Disconnected");
-                        self.ui.label(cx, ids!(conn_status)).set_text(cx, "Disconnected");
+                        let status = self.ui.label(cx, ids!(status_label)).text();
+                        if !status.starts_with("Error:") {
+                            self.ui
+                                .label(cx, ids!(status_label))
+                                .set_text(cx, "Disconnected");
+                            self.ui
+                                .label(cx, ids!(conn_status))
+                                .set_text(cx, "Disconnected");
+                        }
                         self.ui.button(cx, ids!(connect_btn)).set_visible(cx, true);
-                        self.ui.button(cx, ids!(disconnect_btn)).set_visible(cx, false);
+                        self.ui
+                            .button(cx, ids!(disconnect_btn))
+                            .set_visible(cx, false);
                     }
                 }
             }
         }
 
-        if self.ui.button(cx, ids!(tab_garden)).clicked(actions) { self.show_page(cx, "garden"); }
-        if self.ui.button(cx, ids!(tab_memory)).clicked(actions) { self.show_page(cx, "memory"); }
-        if self.ui.button(cx, ids!(tab_music)).clicked(actions) { self.show_page(cx, "music"); }
-        if self.ui.button(cx, ids!(tab_info)).clicked(actions) { self.show_page(cx, "info"); }
+        if self.ui.button(cx, ids!(tab_garden)).clicked(actions) {
+            self.show_page(cx, "garden");
+        }
+        if self.ui.button(cx, ids!(tab_memory)).clicked(actions) {
+            self.show_page(cx, "memory");
+        }
+        if self.ui.button(cx, ids!(tab_music)).clicked(actions) {
+            self.show_page(cx, "music");
+        }
+        if self.ui.button(cx, ids!(tab_info)).clicked(actions) {
+            self.show_page(cx, "info");
+        }
 
         if self.ui.button(cx, ids!(disconnect_btn)).clicked(actions) {
             let mut guard = self.text_sender.lock().unwrap();
@@ -318,21 +359,27 @@ impl MatchEvent for App {
             *guard = None;
             self.pending_response.clear();
             self.ui.label(cx, ids!(speech_label)).set_text(cx, "");
-            script_eval!(cx, {
-                mod.state.connection_status = "Disconnected"
-                mod.state.is_connected = false
-                ui.status_label.set_text(cx, "Disconnected")
-                ui.conn_status.set_text(cx, "Disconnected")
-            });
+            self.ui
+                .label(cx, ids!(status_label))
+                .set_text(cx, "Disconnected");
+            self.ui
+                .label(cx, ids!(conn_status))
+                .set_text(cx, "Disconnected");
             self.ui.button(cx, ids!(connect_btn)).set_visible(cx, true);
-            self.ui.button(cx, ids!(disconnect_btn)).set_visible(cx, false);
+            self.ui
+                .button(cx, ids!(disconnect_btn))
+                .set_visible(cx, false);
         }
 
         if self.ui.button(cx, ids!(connect_btn)).clicked(actions) {
             let api_key = self.ui.text_input(cx, ids!(api_input)).text();
-            if !api_key.is_empty() {
-                self.ui.label(cx, ids!(status_label)).set_text(cx, "Connecting...");
-                self.ui.label(cx, ids!(conn_status)).set_text(cx, "Connecting...");
+            if !api_key.trim().is_empty() {
+                self.ui
+                    .label(cx, ids!(status_label))
+                    .set_text(cx, "Connecting...");
+                self.ui
+                    .label(cx, ids!(conn_status))
+                    .set_text(cx, "Connecting...");
                 let text_sender = self.text_sender.clone();
                 std::thread::spawn(move || {
                     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -340,7 +387,10 @@ impl MatchEvent for App {
                         let (event_tx, mut event_rx) = tokio::sync::mpsc::channel(32);
                         let mut client = GeminiLiveClient::new(api_key.clone(), event_tx);
                         if let Err(e) = client.connect().await {
-                            Cx::post_action(GeminiAction::Error(format!("Connection failed: {}", e)));
+                            Cx::post_action(GeminiAction::Error(format!(
+                                "Connection failed: {}",
+                                e
+                            )));
                             return;
                         }
                         let (ui_tx, mut ui_rx) = tokio::sync::mpsc::channel::<UiToGemini>(32);
@@ -350,21 +400,39 @@ impl MatchEvent for App {
                             while let Some(msg) = ui_rx.recv().await {
                                 let result = match msg {
                                     UiToGemini::Text(t) => client_sender.send_text(&t).await,
-                                    UiToGemini::Image { mime_type, data, caption } => client_sender.send_image(&mime_type, &data, caption.as_deref()).await,
+                                    UiToGemini::Image {
+                                        mime_type,
+                                        data,
+                                        caption,
+                                    } => {
+                                        client_sender
+                                            .send_image(&mime_type, &data, caption.as_deref())
+                                            .await
+                                    }
                                     UiToGemini::Disconnect => break,
                                 };
-                                if let Err(e) = result { eprintln!("Send error: {}", e); }
+                                if let Err(e) = result {
+                                    eprintln!("Send error: {}", e);
+                                }
                             }
                         });
                         while let Some(event) = event_rx.recv().await {
                             match event {
                                 GeminiEvent::Connected => Cx::post_action(GeminiAction::Connected),
-                                GeminiEvent::Content(ServerContent::ModelTurn(ModelTurn { model_turn: Some(turn) })) => {
+                                GeminiEvent::Content(ServerContent::ModelTurn(ModelTurn {
+                                    model_turn: Some(turn),
+                                })) => {
                                     for part in &turn.parts {
-                                        if let Part::Text { text } = part { Cx::post_action(GeminiAction::TextReceived(text.clone())); }
+                                        if let Part::Text { text } = part {
+                                            Cx::post_action(GeminiAction::TextReceived(
+                                                text.clone(),
+                                            ));
+                                        }
                                     }
                                 }
-                                GeminiEvent::TurnComplete => Cx::post_action(GeminiAction::TurnComplete),
+                                GeminiEvent::TurnComplete => {
+                                    Cx::post_action(GeminiAction::TurnComplete)
+                                }
                                 GeminiEvent::Error(e) => Cx::post_action(GeminiAction::Error(e)),
                                 GeminiEvent::Disconnected => {
                                     *text_sender.lock().unwrap() = None;
@@ -376,6 +444,16 @@ impl MatchEvent for App {
                         }
                     });
                 });
+            } else {
+                self.ui
+                    .label(cx, ids!(status_label))
+                    .set_text(cx, "Missing API key");
+                self.ui
+                    .label(cx, ids!(conn_status))
+                    .set_text(cx, "Missing API key");
+                self.ui
+                    .label(cx, ids!(speech_label))
+                    .set_text(cx, "Please enter GEMINI_API_KEY in Info tab.");
             }
         }
 
@@ -383,7 +461,12 @@ impl MatchEvent for App {
             self.send_current_input(cx);
         }
 
-        if self.ui.text_input(cx, ids!(msg_input)).returned(actions).is_some() {
+        if self
+            .ui
+            .text_input(cx, ids!(msg_input))
+            .returned(actions)
+            .is_some()
+        {
             self.send_current_input(cx);
         }
 
@@ -392,39 +475,81 @@ impl MatchEvent for App {
         }
 
         if self.ui.button(cx, ids!(mic_btn)).clicked(actions) {
-            script_eval!(cx, {
-                mod.state.is_recording = !mod.state.is_recording
-                ui.mic_btn.set_text(cx, if mod.state.is_recording {"Stop"} else {"Mic"})
-                ui.status_label.set_text(cx, if mod.state.is_recording {"Recording..."} else {"Ready"})
-                ui.conn_status.set_text(cx, if mod.state.is_recording {"Recording"} else {mod.state.connection_status})
-            });
+            self.is_recording = !self.is_recording;
+            self.ui
+                .button(cx, ids!(mic_btn))
+                .set_text(cx, if self.is_recording { "Stop" } else { "Mic" });
+            self.ui.label(cx, ids!(status_label)).set_text(
+                cx,
+                if self.is_recording {
+                    "Recording..."
+                } else {
+                    "Ready"
+                },
+            );
+            self.ui.label(cx, ids!(conn_status)).set_text(
+                cx,
+                if self.is_recording {
+                    "Recording"
+                } else {
+                    "Connected"
+                },
+            );
         }
 
         if self.ui.button(cx, ids!(save_btn)).clicked(actions) {
             if self.conversation.is_empty() {
-                self.ui.label(cx, ids!(speech_label)).set_text(cx, "No conversation to save.");
+                self.ui
+                    .label(cx, ids!(speech_label))
+                    .set_text(cx, "No conversation to save.");
                 return;
             }
-            let data_dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from("/tmp")).join("gemini-talker");
+            let data_dir = dirs::data_dir()
+                .unwrap_or_else(|| PathBuf::from("/tmp"))
+                .join("gemini-talker");
             let mm = MemoryManager::new(data_dir);
             let _ = mm.init();
-            let mem = create_memory(&self.conversation, self.current_image.as_ref().map(|(_, d)| d.clone()));
+            let mem = create_memory(
+                &self.conversation,
+                self.current_image.as_ref().map(|(_, d)| d.clone()),
+            );
             if mm.save_memory(&mem).is_ok() {
                 self.conversation.clear();
-                self.ui.label(cx, ids!(status_label)).set_text(cx, "Memory Saved!");
+                self.ui
+                    .label(cx, ids!(status_label))
+                    .set_text(cx, "Memory Saved!");
                 self.refresh_memory_list(cx);
             }
         }
 
         if self.ui.button(cx, ids!(upload_btn)).clicked(actions) {
-            if let Some(path) = rfd::FileDialog::new().add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp"]).pick_file() {
+            if let Some(path) = rfd::FileDialog::new()
+                .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp"])
+                .pick_file()
+            {
                 if let Ok(bytes) = std::fs::read(&path) {
-                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("png").to_lowercase();
-                    let mime_type = match ext.as_str() { "jpg"|"jpeg" => "image/jpeg", "png" => "image/png", "gif" => "image/gif", "webp" => "image/webp", _ => "image/png" }.to_string();
-                    let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &bytes);
+                    let ext = path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .unwrap_or("png")
+                        .to_lowercase();
+                    let mime_type = match ext.as_str() {
+                        "jpg" | "jpeg" => "image/jpeg",
+                        "png" => "image/png",
+                        "gif" => "image/gif",
+                        "webp" => "image/webp",
+                        _ => "image/png",
+                    }
+                    .to_string();
+                    let b64 =
+                        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &bytes);
                     self.current_image = Some((mime_type, b64));
-                    self.ui.label(cx, ids!(speech_label)).set_text(cx, "Image ready. Type a message.");
-                    self.ui.label(cx, ids!(status_label)).set_text(cx, "Image loaded");
+                    self.ui
+                        .label(cx, ids!(speech_label))
+                        .set_text(cx, "Image ready. Type a message.");
+                    self.ui
+                        .label(cx, ids!(status_label))
+                        .set_text(cx, "Image loaded");
                 }
             }
         }
@@ -432,12 +557,12 @@ impl MatchEvent for App {
         if self.ui.button(cx, ids!(stop_btn)).clicked(actions) {
             self.pending_response.clear();
             self.current_image = None;
+            self.is_recording = false;
             self.ui.label(cx, ids!(speech_label)).set_text(cx, "");
-            script_eval!(cx, {
-                mod.state.is_recording = false
-                ui.mic_btn.set_text(cx, "Mic")
-                ui.status_label.set_text(cx, "Stopped")
-            });
+            self.ui.button(cx, ids!(mic_btn)).set_text(cx, "Mic");
+            self.ui
+                .label(cx, ids!(status_label))
+                .set_text(cx, "Stopped");
         }
 
         if self.ui.button(cx, ids!(prev_memory_btn)).clicked(actions) {
@@ -449,7 +574,8 @@ impl MatchEvent for App {
 
         if self.ui.button(cx, ids!(next_memory_btn)).clicked(actions) {
             if !self.memory_summaries.is_empty() {
-                self.selected_memory_index = (self.selected_memory_index + 1).min(self.memory_summaries.len() - 1);
+                self.selected_memory_index =
+                    (self.selected_memory_index + 1).min(self.memory_summaries.len() - 1);
                 self.refresh_memory_list(cx);
             }
         }
@@ -462,7 +588,11 @@ impl MatchEvent for App {
             self.open_selected_memory_detail(cx);
         }
 
-        if self.ui.button(cx, ids!(delete_selected_btn)).clicked(actions) {
+        if self
+            .ui
+            .button(cx, ids!(delete_selected_btn))
+            .clicked(actions)
+        {
             self.request_delete_selected(cx);
         }
 
@@ -504,12 +634,16 @@ impl App {
                 sender.try_send(UiToGemini::Text(text))
             };
             if send_result.is_ok() {
-                self.ui.label(cx, ids!(status_label)).set_text(cx, "Thinking...");
+                self.ui
+                    .label(cx, ids!(status_label))
+                    .set_text(cx, "Thinking...");
             } else {
                 self.ui
                     .label(cx, ids!(speech_label))
                     .set_text(cx, "Send queue is busy. Please retry.");
-                self.ui.label(cx, ids!(status_label)).set_text(cx, "Queue busy");
+                self.ui
+                    .label(cx, ids!(status_label))
+                    .set_text(cx, "Queue busy");
             }
         } else {
             self.ui
@@ -526,13 +660,25 @@ impl App {
             "info" => 3,
             _ => 0,
         };
-        self.ui.view(cx, ids!(garden_page)).set_visible(cx, page == "garden");
-        self.ui.view(cx, ids!(memory_page)).set_visible(cx, page == "memory");
-        self.ui.view(cx, ids!(music_page)).set_visible(cx, page == "music");
-        self.ui.view(cx, ids!(info_page)).set_visible(cx, page == "info");
+        self.ui
+            .view(cx, ids!(garden_page))
+            .set_visible(cx, page == "garden");
+        self.ui
+            .view(cx, ids!(memory_page))
+            .set_visible(cx, page == "memory");
+        self.ui
+            .view(cx, ids!(music_page))
+            .set_visible(cx, page == "music");
+        self.ui
+            .view(cx, ids!(info_page))
+            .set_visible(cx, page == "info");
         self.ui.redraw(cx);
-        if page == "memory" { self.refresh_memory_list(cx); }
-        if page == "garden" { self.ui.text_input(cx, ids!(msg_input)).set_key_focus(cx); }
+        if page == "memory" {
+            self.refresh_memory_list(cx);
+        }
+        if page == "garden" {
+            self.ui.text_input(cx, ids!(msg_input)).set_key_focus(cx);
+        }
     }
 
     fn refresh_memory_list(&mut self, cx: &mut Cx) {
@@ -540,7 +686,9 @@ impl App {
         self.confirm_clear_all = false;
         self.update_memory_action_button_labels(cx);
 
-        let data_dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from("/tmp")).join("gemini-talker");
+        let data_dir = dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
+            .join("gemini-talker");
         let mm = MemoryManager::new(data_dir);
         let _ = mm.init();
         match mm.list_memories() {
@@ -577,7 +725,8 @@ impl App {
                     chunks.push(format!("... {} older memories above ...", start));
                 }
 
-                let visible = self.memory_summaries
+                let visible = self
+                    .memory_summaries
                     .iter()
                     .enumerate()
                     .skip(start)
@@ -590,7 +739,14 @@ impl App {
                         } else {
                             m.title.clone()
                         };
-                        format!("{} #{} [{}]\n{}\n{}", marker, i + 1, m.date, title, m.summary)
+                        format!(
+                            "{} #{} [{}]\n{}\n{}",
+                            marker,
+                            i + 1,
+                            m.date,
+                            title,
+                            m.summary
+                        )
                     })
                     .collect::<Vec<_>>()
                     .join("\n\n");
@@ -603,19 +759,29 @@ impl App {
                 let list = chunks.join("\n\n");
                 self.ui.label(cx, ids!(memory_list)).set_text(cx, &list);
                 self.update_memory_detail(cx);
-                self.ui.label(
+                self.ui.label(cx, ids!(status_label)).set_text(
                     cx,
-                    ids!(status_label),
-                ).set_text(cx, &format!("Selected {}/{}", self.selected_memory_index + 1, len));
+                    &format!("Selected {}/{}", self.selected_memory_index + 1, len),
+                );
             }
             _ => {
                 self.memory_summaries.clear();
                 self.selected_memory_index = 0;
-                self.ui.view(cx, ids!(memory_actions)).set_visible(cx, false);
-                self.ui.label(cx, ids!(memory_count)).set_text(cx, "0 saved memories");
-                self.ui.label(cx, ids!(memory_list)).set_text(cx, "No memories.");
-                self.ui.label(cx, ids!(memory_detail)).set_text(cx, "Memory detail will appear here.");
-                self.ui.label(cx, ids!(status_label)).set_text(cx, "No memories.");
+                self.ui
+                    .view(cx, ids!(memory_actions))
+                    .set_visible(cx, false);
+                self.ui
+                    .label(cx, ids!(memory_count))
+                    .set_text(cx, "0 saved memories");
+                self.ui
+                    .label(cx, ids!(memory_list))
+                    .set_text(cx, "No memories.");
+                self.ui
+                    .label(cx, ids!(memory_detail))
+                    .set_text(cx, "Memory detail will appear here.");
+                self.ui
+                    .label(cx, ids!(status_label))
+                    .set_text(cx, "No memories.");
             }
         }
     }
@@ -644,7 +810,9 @@ impl App {
             self.ui
                 .label(cx, ids!(memory_detail))
                 .set_text(cx, "Delete unavailable: no memory selected.");
-            self.ui.label(cx, ids!(status_label)).set_text(cx, "Delete unavailable.");
+            self.ui
+                .label(cx, ids!(status_label))
+                .set_text(cx, "Delete unavailable.");
             return;
         }
 
@@ -659,7 +827,9 @@ impl App {
         self.ui
             .label(cx, ids!(memory_detail))
             .set_text(cx, "[CONFIRM] Press Delete again to confirm.");
-        self.ui.label(cx, ids!(status_label)).set_text(cx, "Confirm delete.");
+        self.ui
+            .label(cx, ids!(status_label))
+            .set_text(cx, "Confirm delete.");
     }
 
     fn request_clear_all(&mut self, cx: &mut Cx) {
@@ -667,12 +837,16 @@ impl App {
             self.ui
                 .label(cx, ids!(memory_detail))
                 .set_text(cx, "Clear unavailable: no memories.");
-            self.ui.label(cx, ids!(status_label)).set_text(cx, "Clear unavailable.");
+            self.ui
+                .label(cx, ids!(status_label))
+                .set_text(cx, "Clear unavailable.");
             return;
         }
 
         if self.confirm_clear_all {
-            let data_dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from("/tmp")).join("gemini-talker");
+            let data_dir = dirs::data_dir()
+                .unwrap_or_else(|| PathBuf::from("/tmp"))
+                .join("gemini-talker");
             let mm = MemoryManager::new(data_dir);
             if let Ok(memories) = mm.list_memories() {
                 for m in &memories {
@@ -680,7 +854,9 @@ impl App {
                 }
             }
             self.refresh_memory_list(cx);
-            self.ui.label(cx, ids!(status_label)).set_text(cx, "All memories cleared.");
+            self.ui
+                .label(cx, ids!(status_label))
+                .set_text(cx, "All memories cleared.");
             return;
         }
 
@@ -690,7 +866,9 @@ impl App {
         self.ui
             .label(cx, ids!(memory_detail))
             .set_text(cx, "[CONFIRM] Press Clear again to confirm.");
-        self.ui.label(cx, ids!(status_label)).set_text(cx, "Confirm clear.");
+        self.ui
+            .label(cx, ids!(status_label))
+            .set_text(cx, "Confirm clear.");
     }
 
     fn cancel_memory_confirmations(&mut self, cx: &mut Cx) {
@@ -708,7 +886,9 @@ impl App {
             self.ui
                 .label(cx, ids!(memory_detail))
                 .set_text(cx, "Confirmation canceled.");
-            self.ui.label(cx, ids!(status_label)).set_text(cx, "Confirmation canceled.");
+            self.ui
+                .label(cx, ids!(status_label))
+                .set_text(cx, "Confirmation canceled.");
         }
     }
 
@@ -717,29 +897,37 @@ impl App {
             return;
         }
         let selected_id = self.memory_summaries[self.selected_memory_index].id.clone();
-        let data_dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from("/tmp")).join("gemini-talker");
+        let data_dir = dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
+            .join("gemini-talker");
         let mm = MemoryManager::new(data_dir);
         let _ = mm.delete_memory(&selected_id);
         if self.selected_memory_index > 0 {
             self.selected_memory_index -= 1;
         }
         self.refresh_memory_list(cx);
-        self.ui.label(cx, ids!(status_label)).set_text(cx, "Memory deleted.");
+        self.ui
+            .label(cx, ids!(status_label))
+            .set_text(cx, "Memory deleted.");
     }
 
     fn show_selected_id_feedback(&mut self, cx: &mut Cx) {
         self.cancel_memory_confirmations(cx);
         if let Some(selected) = self.memory_summaries.get(self.selected_memory_index) {
-            self.ui.label(
+            self.ui.label(cx, ids!(memory_detail)).set_text(
                 cx,
-                ids!(memory_detail),
-            ).set_text(cx, &format!("ID: {}\nPress Enter to reopen full detail.", selected.id));
-            self.ui.label(cx, ids!(status_label)).set_text(cx, "ID shown.");
+                &format!("ID: {}\nPress Enter to reopen full detail.", selected.id),
+            );
+            self.ui
+                .label(cx, ids!(status_label))
+                .set_text(cx, "ID shown.");
         } else {
             self.ui
                 .label(cx, ids!(memory_detail))
                 .set_text(cx, "Show ID unavailable: no memory selected.");
-            self.ui.label(cx, ids!(status_label)).set_text(cx, "Show ID unavailable.");
+            self.ui
+                .label(cx, ids!(status_label))
+                .set_text(cx, "Show ID unavailable.");
         }
     }
 
@@ -749,21 +937,29 @@ impl App {
             self.ui
                 .label(cx, ids!(memory_detail))
                 .set_text(cx, "Open unavailable: no memory selected.");
-            self.ui.label(cx, ids!(status_label)).set_text(cx, "Open unavailable.");
+            self.ui
+                .label(cx, ids!(status_label))
+                .set_text(cx, "Open unavailable.");
             return;
         }
         self.update_memory_detail(cx);
-        self.ui.label(cx, ids!(status_label)).set_text(cx, "Detail opened.");
+        self.ui
+            .label(cx, ids!(status_label))
+            .set_text(cx, "Detail opened.");
     }
 
     fn update_memory_detail(&mut self, cx: &mut Cx) {
         if self.memory_summaries.is_empty() {
-            self.ui.label(cx, ids!(memory_detail)).set_text(cx, "Memory detail will appear here.");
+            self.ui
+                .label(cx, ids!(memory_detail))
+                .set_text(cx, "Memory detail will appear here.");
             return;
         }
 
         let selected = &self.memory_summaries[self.selected_memory_index];
-        let data_dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from("/tmp")).join("gemini-talker");
+        let data_dir = dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
+            .join("gemini-talker");
         let mm = MemoryManager::new(data_dir);
         let detail_text = match mm.load_memory(&selected.id) {
             Ok(memory) => {
@@ -784,7 +980,9 @@ impl App {
             }
             Err(e) => format!("Failed to load memory detail: {}", e),
         };
-        self.ui.label(cx, ids!(memory_detail)).set_text(cx, &detail_text);
+        self.ui
+            .label(cx, ids!(memory_detail))
+            .set_text(cx, &detail_text);
     }
 }
 
@@ -809,14 +1007,16 @@ impl AppMain for App {
                     KeyCode::ArrowUp => {
                         self.cancel_memory_confirmations(cx);
                         if !self.memory_summaries.is_empty() {
-                            self.selected_memory_index = self.selected_memory_index.saturating_sub(1);
+                            self.selected_memory_index =
+                                self.selected_memory_index.saturating_sub(1);
                             self.refresh_memory_list(cx);
                         }
                     }
                     KeyCode::ArrowDown => {
                         self.cancel_memory_confirmations(cx);
                         if !self.memory_summaries.is_empty() {
-                            self.selected_memory_index = (self.selected_memory_index + 1).min(self.memory_summaries.len() - 1);
+                            self.selected_memory_index = (self.selected_memory_index + 1)
+                                .min(self.memory_summaries.len() - 1);
                             self.refresh_memory_list(cx);
                         }
                     }
@@ -851,14 +1051,16 @@ impl AppMain for App {
                     KeyCode::PageUp => {
                         self.cancel_memory_confirmations(cx);
                         if !self.memory_summaries.is_empty() {
-                            self.selected_memory_index = self.selected_memory_index.saturating_sub(5);
+                            self.selected_memory_index =
+                                self.selected_memory_index.saturating_sub(5);
                             self.refresh_memory_list(cx);
                         }
                     }
                     KeyCode::PageDown => {
                         self.cancel_memory_confirmations(cx);
                         if !self.memory_summaries.is_empty() {
-                            self.selected_memory_index = (self.selected_memory_index + 5).min(self.memory_summaries.len() - 1);
+                            self.selected_memory_index = (self.selected_memory_index + 5)
+                                .min(self.memory_summaries.len() - 1);
                             self.refresh_memory_list(cx);
                         }
                     }
@@ -868,12 +1070,18 @@ impl AppMain for App {
                     KeyCode::KeyR => {
                         self.refresh_memory_list(cx);
                         if self.memory_summaries.is_empty() {
-                            self.ui.label(cx, ids!(status_label)).set_text(cx, "No memories.");
+                            self.ui
+                                .label(cx, ids!(status_label))
+                                .set_text(cx, "No memories.");
                         } else {
-                            self.ui.label(
+                            self.ui.label(cx, ids!(status_label)).set_text(
                                 cx,
-                                ids!(status_label),
-                            ).set_text(cx, &format!("Refreshed ({}/{})", self.selected_memory_index + 1, self.memory_summaries.len()));
+                                &format!(
+                                    "Refreshed ({}/{})",
+                                    self.selected_memory_index + 1,
+                                    self.memory_summaries.len()
+                                ),
+                            );
                         }
                     }
                     KeyCode::KeyC => {

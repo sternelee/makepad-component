@@ -9,9 +9,9 @@ use std::path::PathBuf;
 /// A single conversation message
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
-    pub role: String,      // "user" or "model"
-    pub content: String,   // Message text
-    pub timestamp: f64,    // Unix timestamp
+    pub role: String,    // "user" or "model"
+    pub content: String, // Message text
+    pub timestamp: f64,  // Unix timestamp
 }
 
 /// A saved memory/ conversation
@@ -21,8 +21,8 @@ pub struct Memory {
     pub title: String,
     pub summary: String,
     pub timestamp: f64,
-    pub date: String,           // "04/12/25 10:49AM"
-    pub image_cover: Option<String>,  // Base64 encoded image or file path
+    pub date: String,                // "04/12/25 10:49AM"
+    pub image_cover: Option<String>, // Base64 encoded image or file path
     pub messages: Vec<Message>,
 }
 
@@ -57,8 +57,7 @@ impl MemoryManager {
         let json = serde_json::to_string_pretty(memory)
             .map_err(|e| format!("Failed to serialize memory: {}", e))?;
 
-        fs::write(&path, json)
-            .map_err(|e| format!("Failed to write memory file: {}", e))?;
+        fs::write(&path, json).map_err(|e| format!("Failed to write memory file: {}", e))?;
 
         log::info!("Saved memory: {}", memory.id);
         Ok(())
@@ -69,8 +68,8 @@ impl MemoryManager {
         let filename = format!("{}.json", id);
         let path = self.storage_dir.join(&filename);
 
-        let json = fs::read_to_string(&path)
-            .map_err(|e| format!("Failed to read memory file: {}", e))?;
+        let json =
+            fs::read_to_string(&path).map_err(|e| format!("Failed to read memory file: {}", e))?;
 
         let memory: Memory = serde_json::from_str(&json)
             .map_err(|e| format!("Failed to parse memory file: {}", e))?;
@@ -108,7 +107,11 @@ impl MemoryManager {
         }
 
         // Sort by timestamp, newest first
-        memories.sort_by(|a, b| b.timestamp.partial_cmp(&a.timestamp).unwrap_or(std::cmp::Ordering::Equal));
+        memories.sort_by(|a, b| {
+            b.timestamp
+                .partial_cmp(&a.timestamp)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         Ok(memories)
     }
@@ -118,8 +121,7 @@ impl MemoryManager {
         let filename = format!("{}.json", id);
         let path = self.storage_dir.join(&filename);
 
-        fs::remove_file(&path)
-            .map_err(|e| format!("Failed to delete memory: {}", e))?;
+        fs::remove_file(&path).map_err(|e| format!("Failed to delete memory: {}", e))?;
 
         log::info!("Deleted memory: {}", id);
         Ok(())
@@ -128,7 +130,10 @@ impl MemoryManager {
     /// Get memories for a specific date
     pub fn get_memories_by_date(&self, date: &str) -> Result<Vec<MemorySummary>, String> {
         let all = self.list_memories()?;
-        Ok(all.into_iter().filter(|m| m.date.starts_with(date)).collect())
+        Ok(all
+            .into_iter()
+            .filter(|m| m.date.starts_with(date))
+            .collect())
     }
 
     /// Get all dates that have memories (for calendar view)
@@ -158,10 +163,7 @@ pub struct MemorySummary {
 }
 
 /// Helper to create a new memory from conversation messages
-pub fn create_memory(
-    messages: &[Message],
-    image_cover: Option<String>,
-) -> Memory {
+pub fn create_memory(messages: &[Message], image_cover: Option<String>) -> Memory {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -222,7 +224,8 @@ pub fn format_timestamp(timestamp: f64) -> String {
     };
     let am_pm = if hours >= 12 { "PM" } else { "AM" };
 
-    format!("{:02}/{:02}/{:02} {:02}:{:02}{}",
+    format!(
+        "{:02}/{:02}/{:02} {:02}:{:02}{}",
         (total_seconds / 86400 / 30) % 12 + 1,
         (total_seconds / 86400) % 30 + 1,
         (total_seconds / 86400 / 365) % 100,
@@ -242,3 +245,4 @@ mod tests {
         assert!(result.contains("AM"));
     }
 }
+

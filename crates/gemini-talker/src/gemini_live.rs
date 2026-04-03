@@ -1,19 +1,22 @@
 //! Gemini Live API Client
 //!
-//! Provides WebSocket-based real-time communication with Google's Gemini Live API
-//! for bidirectional voice and text interaction.
+//! Provides real-time communication with Gemini Live via the `gemini-live` crate.
 
-use futures_util::{SinkExt, StreamExt};
+use ::gemini_live::prelude::{
+    connect, recv_event, Content as LiveContent, GeminiModel as LiveGeminiModel,
+    Part as LivePart, Role as LiveRole, SessionConfig, SessionEvent, SessionHandle,
+    SessionPhase, TransportConfig,
+};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::{mpsc, RwLock};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
-
-/// WebSocket endpoint for Gemini Live API
-const GEMINI_LIVE_ENDPOINT: &str = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent";
 
 /// Default model for Gemini Live
-const DEFAULT_MODEL: &str = "gemini-2.0-flash-exp";
+const DEFAULT_MODEL: &str = "gemini-3.1-flash-lite-preview";
 
 /// Connection state
 #[derive(Debug, Clone, PartialEq)]
@@ -35,7 +38,7 @@ pub enum GeminiEvent {
     TurnComplete,
     /// Input was interrupted
     Interrupted,
-    /// Setup error
+    /// Setup or runtime error
     Error(String),
     /// Disconnected
     Disconnected,
@@ -63,113 +66,19 @@ pub struct Turn {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Part {
-    Text { text: String },
-    InlineData { #[serde(rename = "inlineData")] inline_data: InlineData },
+    Text {
+        text: String,
+    },
+    InlineData {
+        #[serde(rename = "inlineData")]
+        inline_data: InlineData,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InlineData {
     pub mime_type: String,
     pub data: String, // base64 encoded
-}
-
-/// Client configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LiveConfig {
-    pub model: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub system_instruction: Option<SystemInstruction>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "generationConfig")]
-    pub generation_config: Option<GenerationConfig>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Tool>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SystemInstruction {
-    pub parts: Vec<Part>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenerationConfig {
-    #[serde(rename = "responseModalities")]
-    pub response_modalities: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "speechConfig")]
-    pub speech_config: Option<SpeechConfig>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SpeechConfig {
-    #[serde(rename = "voiceConfig")]
-    pub voice_config: Option<VoiceConfig>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VoiceConfig {
-    #[serde(rename = "prebuiltVoiceConfig")]
-    pub prebuilt_voice_config: Option<PrebuiltVoiceConfig>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PrebuiltVoiceConfig {
-    #[serde(rename = "voiceName")]
-    pub voice_name: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Tool {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub function_declarations: Option<Vec<FunctionDeclaration>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FunctionDeclaration {
-    pub name: String,
-    pub description: String,
-    pub parameters: Option<serde_json::Value>,
-}
-
-/// Setup message sent to server
-#[derive(Debug, Serialize)]
-struct SetupMessage {
-    #[serde(rename = "setup")]
-    config: LiveConfig,
-}
-
-/// Client content message
-#[derive(Debug, Serialize)]
-struct ClientContentMessage {
-    #[serde(rename = "clientContent")]
-    client_content: ClientContent,
-}
-
-#[derive(Debug, Serialize)]
-struct ClientContent {
-    turns: Vec<Turn>,
-    #[serde(rename = "turnComplete")]
-    turn_complete: bool,
-}
-
-/// Realtime input message (audio/video)
-#[derive(Debug, Serialize)]
-struct RealtimeInputMessage {
-    #[serde(rename = "realtimeInput")]
-    realtime_input: RealtimeInput,
-}
-
-#[derive(Debug, Serialize)]
-struct RealtimeInput {
-    #[serde(rename = "mediaChunks")]
-    media_chunks: Vec<MediaChunk>,
-}
-
-#[derive(Debug, Serialize)]
-struct MediaChunk {
-    #[serde(rename = "mimeType")]
-    mime_type: String,
-    data: String, // base64 encoded
 }
 
 /// Gemini Live Client
@@ -180,12 +89,16 @@ pub struct GeminiLiveClient {
     event_tx: mpsc::Sender<GeminiEvent>,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone)]
 enum OutgoingMessage {
-    Setup(SetupMessage),
-    ClientContent(ClientContentMessage),
-    RealtimeInput(RealtimeInputMessage),
+    Text(String),
+    Image {
+        mime_type: String,
+        data: String,
+        caption: Option<String>,
+    },
+    Audio(String),
+    Disconnect,
 }
 
 impl GeminiLiveClient {
@@ -206,178 +119,239 @@ impl GeminiLiveClient {
 
     /// Connect to Gemini Live API
     pub async fn connect(&mut self) -> Result<(), String> {
-        // Update state to connecting
         *self.state.write().await = ConnectionState::Connecting;
 
-        let url = format!("{}?key={}", GEMINI_LIVE_ENDPOINT, self.api_key);
+        let config = SessionConfig::new(&self.api_key)
+            .model(LiveGeminiModel::Custom(DEFAULT_MODEL.to_string()))
+            .text_only()
+            .system_instruction("You are a warm, empathetic AI companion. Have natural, flowing conversations about images, emotions, and memories. Be conversational and engaging.");
 
-        // Connect to WebSocket
-        let (ws_stream, _) = connect_async(&url)
+        let session = connect(config, TransportConfig::default())
             .await
-            .map_err(|e| format!("WebSocket connection failed: {}", e))?;
+            .map_err(|e| format!("Gemini Live connect failed: {}", e))?;
 
-        let (write, mut read) = ws_stream.split();
+        let mut startup_events = session.subscribe();
+        let startup_deadline = Duration::from_secs(15);
+        let startup_started = Instant::now();
+        loop {
+            if startup_started.elapsed() >= startup_deadline {
+                let _ = session.disconnect().await;
+                return Err(format!(
+                    "Gemini Live connection timeout (phase: {})",
+                    session.phase()
+                ));
+            }
 
-        // Create channel for outgoing messages
+            let remaining = startup_deadline
+                .checked_sub(startup_started.elapsed())
+                .unwrap_or_else(|| Duration::from_millis(0));
+
+            let next = tokio::time::timeout(remaining, startup_events.recv()).await;
+            match next {
+                Ok(Ok(SessionEvent::Connected))
+                | Ok(Ok(SessionEvent::PhaseChanged(SessionPhase::Active))) => {
+                    break;
+                }
+                Ok(Ok(SessionEvent::Error(e))) => {
+                    let _ = session.disconnect().await;
+                    return Err(format!("Gemini Live setup rejected: {}", e));
+                }
+                Ok(Ok(SessionEvent::Disconnected(reason))) => {
+                    let _ = session.disconnect().await;
+                    let message = reason
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or_else(|| "Gemini Live disconnected before setupComplete".to_string());
+                    return Err(message);
+                }
+                Ok(Ok(SessionEvent::PhaseChanged(SessionPhase::Disconnected))) => {
+                    let _ = session.disconnect().await;
+                    return Err("Gemini Live disconnected before setupComplete".to_string());
+                }
+                Ok(Ok(_)) => {}
+                Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => {}
+                Ok(Err(tokio::sync::broadcast::error::RecvError::Closed)) => {
+                    let _ = session.disconnect().await;
+                    return Err("Gemini Live event channel closed during setup".to_string());
+                }
+                Err(_) => {
+                    let _ = session.disconnect().await;
+                    return Err(format!(
+                        "Gemini Live connection timeout (phase: {})",
+                        session.phase()
+                    ));
+                }
+            }
+        }
+
         let (tx, mut rx) = mpsc::channel::<OutgoingMessage>(32);
+        self.sender = Some(tx.clone());
 
-        // Spawn task to handle incoming messages
+        let mut events = session.subscribe();
         let event_tx = self.event_tx.clone();
         let state = self.state.clone();
         tokio::spawn(async move {
-            while let Some(msg) = read.next().await {
-                match msg {
-                    Ok(Message::Text(text)) => {
-                        if let Ok(event) = parse_server_message(&text) {
-                            let _ = event_tx.send(event).await;
+            let mut saw_delta_this_turn = false;
+            while let Some(event) = recv_event(&mut events).await {
+                match event {
+                    SessionEvent::Connected | SessionEvent::PhaseChanged(SessionPhase::Active) => {
+                        *state.write().await = ConnectionState::Connected;
+                        let _ = event_tx.send(GeminiEvent::Connected).await;
+                    }
+                    SessionEvent::TextDelta(text) => {
+                        saw_delta_this_turn = true;
+                        let _ = event_tx
+                            .send(GeminiEvent::Content(ServerContent::ModelTurn(ModelTurn {
+                                model_turn: Some(Turn {
+                                    parts: vec![Part::Text { text }],
+                                }),
+                            })))
+                            .await;
+                    }
+                    SessionEvent::TextComplete(text) => {
+                        if !saw_delta_this_turn && !text.is_empty() {
+                            let _ = event_tx
+                                .send(GeminiEvent::Content(ServerContent::ModelTurn(ModelTurn {
+                                    model_turn: Some(Turn {
+                                        parts: vec![Part::Text { text }],
+                                    }),
+                                })))
+                                .await;
                         }
                     }
-                    Ok(Message::Close(_)) => {
+                    SessionEvent::TurnComplete => {
+                        saw_delta_this_turn = false;
+                        let _ = event_tx.send(GeminiEvent::TurnComplete).await;
+                    }
+                    SessionEvent::Interrupted => {
+                        let _ = event_tx.send(GeminiEvent::Interrupted).await;
+                    }
+                    SessionEvent::Error(e) => {
+                        *state.write().await = ConnectionState::Error(e.clone());
+                        let _ = event_tx.send(GeminiEvent::Error(e)).await;
+                    }
+                    SessionEvent::Disconnected(reason) => {
+                        if let Some(reason) = reason {
+                            if !reason.is_empty() {
+                                let _ = event_tx.send(GeminiEvent::Error(reason)).await;
+                            }
+                        }
                         *state.write().await = ConnectionState::Disconnected;
                         let _ = event_tx.send(GeminiEvent::Disconnected).await;
                         break;
                     }
-                    Err(e) => {
-                        *state.write().await = ConnectionState::Error(e.to_string());
-                        let _ = event_tx.send(GeminiEvent::Error(e.to_string())).await;
+                    SessionEvent::PhaseChanged(SessionPhase::Disconnected) => {
+                        *state.write().await = ConnectionState::Disconnected;
+                        let _ = event_tx.send(GeminiEvent::Disconnected).await;
+                        break;
                     }
                     _ => {}
                 }
             }
         });
 
-        // Spawn task to handle outgoing messages
-        let write = Arc::new(RwLock::new(write));
-        let write_clone = write.clone();
+        let state = self.state.clone();
+        let event_tx = self.event_tx.clone();
+        let session_for_send: SessionHandle = session.clone();
         tokio::spawn(async move {
             while let Some(msg) = rx.recv().await {
-                if let Ok(json) = serde_json::to_string(&msg) {
-                    let mut w = write_clone.write().await;
-                    if let Err(e) = w.send(Message::Text(json)).await {
-                        log::error!("Failed to send message: {}", e);
+                let result = match msg {
+                    OutgoingMessage::Text(text) => session_for_send.send_text(text).await,
+                    OutgoingMessage::Image {
+                        mime_type,
+                        data,
+                        caption,
+                    } => {
+                        let mut parts = Vec::new();
+                        if let Some(caption_text) = caption {
+                            if !caption_text.is_empty() {
+                                parts.push(LivePart::text(caption_text));
+                            }
+                        }
+                        parts.push(LivePart::inline_data(mime_type, data));
+                        let turn = LiveContent::from_parts(LiveRole::User, parts);
+                        session_for_send.send_client_content(vec![turn], true).await
+                    }
+                    OutgoingMessage::Audio(base64_pcm) => match BASE64.decode(base64_pcm) {
+                        Ok(bytes) => session_for_send.send_audio(bytes).await,
+                        Err(e) => {
+                            let _ = event_tx
+                                .send(GeminiEvent::Error(format!(
+                                    "Invalid base64 audio: {}",
+                                    e
+                                )))
+                                .await;
+                            continue;
+                        }
+                    }
+                    OutgoingMessage::Disconnect => {
+                        let _ = session_for_send.disconnect().await;
                         break;
                     }
+                };
+
+                if let Err(e) = result {
+                    let msg = format!("Gemini send failed: {}", e);
+                    *state.write().await = ConnectionState::Error(msg.clone());
+                    let _ = event_tx.send(GeminiEvent::Error(msg)).await;
                 }
             }
         });
-
-        self.sender = Some(tx);
-        *self.state.write().await = ConnectionState::Connected;
-
-        // Send setup message
-        self.send_setup().await?;
-
-        // Notify connected
-        let _ = self.event_tx.send(GeminiEvent::Connected).await;
-
-        Ok(())
-    }
-
-    /// Send setup configuration
-    async fn send_setup(&self) -> Result<(), String> {
-        let config = LiveConfig {
-            model: DEFAULT_MODEL.to_string(),
-            system_instruction: Some(SystemInstruction {
-                parts: vec![Part::Text {
-                    text: "You are a warm, empathetic AI companion. Have natural, flowing conversations about images, emotions, and memories. Be conversational and engaging.".to_string(),
-                }],
-            }),
-            generation_config: Some(GenerationConfig {
-                response_modalities: vec!["TEXT".to_string(), "AUDIO".to_string()],
-                speech_config: Some(SpeechConfig {
-                    voice_config: Some(VoiceConfig {
-                        prebuilt_voice_config: Some(PrebuiltVoiceConfig {
-                            voice_name: "Aoede".to_string(),
-                        }),
-                    }),
-                }),
-            }),
-            tools: None,
-        };
-
-        let msg = OutgoingMessage::Setup(SetupMessage { config });
-        if let Some(sender) = &self.sender {
-            sender.send(msg).await.map_err(|e| e.to_string())?;
-        }
 
         Ok(())
     }
 
     /// Send text content
     pub async fn send_text(&self, text: &str) -> Result<(), String> {
-        let msg = OutgoingMessage::ClientContent(ClientContentMessage {
-            client_content: ClientContent {
-                turns: vec![Turn {
-                    parts: vec![Part::Text {
-                        text: text.to_string(),
-                    }],
-                }],
-                turn_complete: true,
-            },
-        });
-
         if let Some(sender) = &self.sender {
-            sender.send(msg).await.map_err(|e| e.to_string())?;
+            sender
+                .send(OutgoingMessage::Text(text.to_string()))
+                .await
+                .map_err(|e| e.to_string())?;
         }
-
         Ok(())
     }
 
     /// Send image (base64 encoded)
-    pub async fn send_image(&self, mime_type: &str, data: &str, caption: Option<&str>) -> Result<(), String> {
-        let mut parts = vec![Part::InlineData {
-            inline_data: InlineData {
-                mime_type: mime_type.to_string(),
-                data: data.to_string(),
-            },
-        }];
-
-        if let Some(caption_text) = caption {
-            parts.insert(0, Part::Text {
-                text: caption_text.to_string(),
-            });
-        }
-
-        let msg = OutgoingMessage::ClientContent(ClientContentMessage {
-            client_content: ClientContent {
-                turns: vec![Turn { parts }],
-                turn_complete: true,
-            },
-        });
-
+    pub async fn send_image(
+        &self,
+        mime_type: &str,
+        data: &str,
+        caption: Option<&str>,
+    ) -> Result<(), String> {
         if let Some(sender) = &self.sender {
-            sender.send(msg).await.map_err(|e| e.to_string())?;
+            sender
+                .send(OutgoingMessage::Image {
+                    mime_type: mime_type.to_string(),
+                    data: data.to_string(),
+                    caption: caption.map(|s| s.to_string()),
+                })
+                .await
+                .map_err(|e| e.to_string())?;
         }
-
         Ok(())
     }
 
     /// Send audio chunk (PCM data, base64 encoded)
     pub async fn send_audio_chunk(&self, data: &str) -> Result<(), String> {
-        let msg = OutgoingMessage::RealtimeInput(RealtimeInputMessage {
-            realtime_input: RealtimeInput {
-                media_chunks: vec![MediaChunk {
-                    mime_type: "audio/pcm".to_string(),
-                    data: data.to_string(),
-                }],
-            },
-        });
-
         if let Some(sender) = &self.sender {
-            sender.send(msg).await.map_err(|e| e.to_string())?;
+            sender
+                .send(OutgoingMessage::Audio(data.to_string()))
+                .await
+                .map_err(|e| e.to_string())?;
         }
-
         Ok(())
     }
 
     /// Disconnect from the API
     pub async fn disconnect(&mut self) {
+        if let Some(sender) = self.sender.take() {
+            let _ = sender.send(OutgoingMessage::Disconnect).await;
+        }
         *self.state.write().await = ConnectionState::Disconnected;
-        self.sender = None;
         let _ = self.event_tx.send(GeminiEvent::Disconnected).await;
     }
 
-    /// Get a lightweight handle for sending text from another task
+    /// Get a lightweight handle for sending messages from another task
     pub fn sender_clone(&self) -> ClientHandle {
         ClientHandle {
             sender: self.sender.clone(),
@@ -392,90 +366,49 @@ pub struct ClientHandle {
 
 impl ClientHandle {
     pub async fn send_text(&self, text: &str) -> Result<(), String> {
-        let msg = OutgoingMessage::ClientContent(ClientContentMessage {
-            client_content: ClientContent {
-                turns: vec![Turn {
-                    parts: vec![Part::Text {
-                        text: text.to_string(),
-                    }],
-                }],
-                turn_complete: true,
-            },
-        });
         if let Some(sender) = &self.sender {
-            sender.send(msg).await.map_err(|e| e.to_string())?;
+            sender
+                .send(OutgoingMessage::Text(text.to_string()))
+                .await
+                .map_err(|e| e.to_string())?;
         }
         Ok(())
     }
 
-    pub async fn send_image(&self, mime_type: &str, data: &str, caption: Option<&str>) -> Result<(), String> {
-        let mut parts = vec![Part::InlineData {
-            inline_data: InlineData {
-                mime_type: mime_type.to_string(),
-                data: data.to_string(),
-            },
-        }];
-        if let Some(text) = caption {
-            parts.insert(0, Part::Text { text: text.to_string() });
-        }
-        let msg = OutgoingMessage::ClientContent(ClientContentMessage {
-            client_content: ClientContent {
-                turns: vec![Turn { parts }],
-                turn_complete: true,
-            },
-        });
+    pub async fn send_image(
+        &self,
+        mime_type: &str,
+        data: &str,
+        caption: Option<&str>,
+    ) -> Result<(), String> {
         if let Some(sender) = &self.sender {
-            sender.send(msg).await.map_err(|e| e.to_string())?;
+            sender
+                .send(OutgoingMessage::Image {
+                    mime_type: mime_type.to_string(),
+                    data: data.to_string(),
+                    caption: caption.map(|s| s.to_string()),
+                })
+                .await
+                .map_err(|e| e.to_string())?;
         }
         Ok(())
     }
-}
 
-/// Parse incoming server message
-fn parse_server_message(text: &str) -> Result<GeminiEvent, serde_json::Error> {
-    // Try to parse as JSON and determine message type
-    let value: serde_json::Value = serde_json::from_str(text)?;
-
-    // Check for setup complete
-    if value.get("setupComplete").is_some() {
-        return Ok(GeminiEvent::Connected);
-    }
-
-    // Check for server content
-    if let Some(model_turn) = value.get("serverContent").and_then(|sc| sc.get("modelTurn")) {
-        let parts: Vec<Part> = model_turn
-            .get("parts")
-            .and_then(|p| p.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|p| serde_json::from_value(p.clone()).ok())
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        if !parts.is_empty() {
-            return Ok(GeminiEvent::Content(ServerContent::ModelTurn(ModelTurn {
-                model_turn: Some(Turn { parts }),
-            })));
+    pub async fn disconnect(&self) -> Result<(), String> {
+        if let Some(sender) = &self.sender {
+            sender
+                .send(OutgoingMessage::Disconnect)
+                .await
+                .map_err(|e| e.to_string())?;
         }
+        Ok(())
     }
-
-    // Check for turn complete
-    if value.get("serverContent").and_then(|sc| sc.get("turnComplete")).and_then(|tc| tc.as_bool()) == Some(true) {
-        return Ok(GeminiEvent::TurnComplete);
-    }
-
-    // Check for interrupted
-    if value.get("interrupted").is_some() {
-        return Ok(GeminiEvent::Interrupted);
-    }
-
-    // Unknown message type - store as other
-    Ok(GeminiEvent::Content(ServerContent::Other(value)))
 }
 
 /// Helper to create a client with default settings
-pub async fn create_gemini_client(api_key: &str) -> Result<(GeminiLiveClient, mpsc::Receiver<GeminiEvent>), String> {
+pub async fn create_gemini_client(
+    api_key: &str,
+) -> Result<(GeminiLiveClient, mpsc::Receiver<GeminiEvent>), String> {
     let (event_tx, event_rx) = mpsc::channel(32);
     let client = GeminiLiveClient::new(api_key.to_string(), event_tx);
     Ok((client, event_rx))
