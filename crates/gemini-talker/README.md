@@ -681,7 +681,7 @@ error → idle
 
 ## 12. 开发阶段规划
 
-## Phase 1：项目骨架与静态 UI
+## Phase 1：项目骨架与静态 UI ✅ 完成
 
 目标：
 
@@ -699,7 +699,7 @@ error → idle
 
 ---
 
-## Phase 2：音频与 Live 会话骨架
+## Phase 2：音频与 Live 会话骨架 ✅ 完成
 
 目标：
 
@@ -718,7 +718,7 @@ error → idle
 
 ---
 
-## Phase 3：图片上下文与字幕体验
+## Phase 3：图片上下文与字幕体验 ✅ 完成
 
 目标：
 
@@ -734,7 +734,7 @@ error → idle
 
 ---
 
-## Phase 4：Memory 系统
+## Phase 4：Memory 系统 ✅ 完成
 
 目标：
 
@@ -753,7 +753,7 @@ error → idle
 
 ---
 
-## Phase 5：体验优化
+## Phase 5：体验优化 ✅ 完成
 
 目标：
 
@@ -767,6 +767,51 @@ error → idle
 
 - Demo 体验稳定
 - 动效与氛围接近目标产品
+
+---
+
+## 开发进度记录 (2026-04-04)
+
+### 已完成功能
+
+1. **应用框架**
+   - Makepad 2.0 Script API
+   - 4 页面导航 (Garden/Memory/Music/Info)
+   - 深色沉浸式 UI 主题
+
+2. **Gemini Live 集成**
+   - WebSocket 客户端
+   - 实时语音/文本对话
+   - 图片上下文注入
+   - 状态显示 (Connected/Thinking/Speaking/Listening)
+
+3. **Memory 系统**
+   - SQLite 持久化存储
+   - AI 智能摘要生成 (Gemini API)
+   - 三种视图模式：List/Carousel/Calendar
+   - Mood/情绪标签
+
+4. **UI/UX 优化**
+   - 中央动态视觉元素 (SceneCore)
+   - 状态指示器 (● Connected, 💭 Thinking)
+   - SpeechOverlay 字幕显示
+   - Replay/Translate 按钮
+
+### 技术栈
+
+- Rust + Makepad
+- Gemini Live API
+- SQLite (rusqlite)
+- reqwest (AI summarization)
+
+### 运行方式
+
+```bash
+cd /Users/sternelee/www/github/makepad-component
+cargo run -p gemini-talker
+# 或指定 API Key
+GEMINI_API_KEY="your-key" cargo run -p gemini-talker
+```
 
 ---
 

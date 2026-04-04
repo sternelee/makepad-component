@@ -50,5 +50,5 @@ src/
 - Phase 1: App shell + 4-page static UI (complete)
 - Phase 2: Gemini Live WebSocket integration + text chat (complete)
 - Phase 3: Image context + speech overlay (complete)
-- Phase 4: Memory system + SQLite persistence
-- Phase 5: Polish + shader animations
+- Phase 4: Memory system + SQLite persistence (complete)
+- Phase 5: Polish + shader animations (complete)

@@ -100,6 +100,7 @@ impl MemoryManager {
                             summary: memory.summary.clone(),
                             date: memory.date.clone(),
                             timestamp: memory.timestamp,
+                            mood: None,
                         });
                     }
                 }
@@ -160,6 +161,7 @@ pub struct MemorySummary {
     pub summary: String,
     pub date: String,
     pub timestamp: f64,
+    pub mood: Option<String>,
 }
 
 /// Helper to create a new memory from conversation messages
@@ -245,4 +247,3 @@ mod tests {
         assert!(result.contains("AM"));
     }
 }
-

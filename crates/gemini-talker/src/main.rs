@@ -1,16 +1,36 @@
 pub use makepad_widgets;
 
+fn format_timestamp(timestamp: f64) -> String {
+    let total_seconds = timestamp as u64;
+    let hours = (total_seconds % 86400) / 3600;
+    let minutes = (total_seconds % 3600) / 60;
+    let hour_12 = if hours == 0 { 12 } else if hours > 12 { hours - 12 } else { hours };
+    let am_pm = if hours >= 12 { "PM" } else { "AM" };
+    format!(
+        "{:02}/{:02}/{:02} {:02}:{:02}{}",
+        (total_seconds / 86400 / 30) % 12 + 1,
+        (total_seconds / 86400) % 30 + 1,
+        (total_seconds / 86400 / 365) % 100,
+        hour_12,
+        minutes,
+        am_pm
+    )
+}
+
 use makepad_widgets::*;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 mod audio_input;
 mod audio_output;
+mod dithering;
 mod gemini_live;
 mod memory;
+mod storage;
 
 use gemini_live::{GeminiEvent, GeminiLiveClient, ModelTurn, Part, ServerContent};
-use memory::{create_memory, MemoryManager, MemorySummary, Message};
+use memory::{create_memory, MemorySummary, Message};
+use storage::Storage;
 
 #[derive(Debug, Clone)]
 enum GeminiAction {
@@ -83,7 +103,7 @@ script_mod! {
                             height: Fill
                             flow: Down
                             show_bg: true
-                            draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
+                            draw_bg +: { color: vec4(0.02, 0.02, 0.05, 1.0) }
 
                             status_bar := View{
                                 width: Fill
@@ -91,10 +111,10 @@ script_mod! {
                                 flow: Right
                                 spacing: 12
                                 padding: Inset{left: 24 right: 24 top: 0 bottom: 0}
-                                gemini_label := Label{text: "Gemini"}
-                                status_label := Label{text: "Offline"}
+                                gemini_label := Label{text: "✨ Gemini" font_size: 14}
+                                status_label := Label{text: "Offline" font_size: 12}
                                 Filler{}
-                                duration_label := Label{text: "00:00"}
+                                duration_label := Label{text: "00:00" font_size: 12}
                             }
 
                             scene_area := View{
@@ -102,8 +122,23 @@ script_mod! {
                                 height: Fill
                                 align: Center
                                 show_bg: true
-                                draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
-                                speech_label := Label{text: ""}
+                                draw_bg +: { color: vec4(0.05, 0.08, 0.15, 0.95) }
+                                scene_background := Image{width: Fill height: Fill align: Center visible: false}
+                                scene_visual := View{width: 200 height: 200 align: Center show_bg: true
+                                    draw_bg +: { color: vec4(0.2, 0.4, 0.8, 0.3) }
+                                    inner_glow := View{width: 160 height: 160 align: Center show_bg: true
+                                        draw_bg +: { color: vec4(0.3, 0.6, 1.0, 0.5) }
+                                    }
+                                }
+                                speech_overlay := View{width: Fill height: Fit flow: Down align: Center spacing: 8 padding: 24
+                                    show_bg: true
+                                    draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.6) }
+                                    speech_label := Label{text: "" font_size: 18 text_style: {align: Center} }
+                                    speech_actions := View{width: Fit height: 32 flow: Right spacing: 12
+                                        replay_btn := Button{text: "↺ Replay" visible: false}
+                                        translate_btn := Button{text: "🌐 Translate" visible: false}
+                                    }
+                                }
                             }
 
                             input_dock := View{
@@ -113,10 +148,10 @@ script_mod! {
                                 spacing: 10
                                 padding: Inset{left: 20 right: 20 top: 8 bottom: 8}
                                 show_bg: true
-                                draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
+                                draw_bg +: { color: vec4(0.1, 0.1, 0.15, 0.9) }
                                 msg_input := TextInput{width: Fill}
                                 send_btn := Button{text: "Send"}
-                                mic_btn := Button{text: "Mic"}
+                                mic_btn := Button{text: "🎤 Mic"}
                                 time_label := Label{text: "00:00"}
                             }
 
@@ -127,7 +162,7 @@ script_mod! {
                                 spacing: 10
                                 padding: Inset{left: 20 right: 20 top: 0 bottom: 0}
                                 show_bg: true
-                                draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
+                                draw_bg +: { color: vec4(0.1, 0.1, 0.15, 0.9) }
                                 save_btn := Button{text: "Save Memory"}
                                 upload_btn := Button{text: "Upload"}
                                 stop_btn := Button{text: "Stop"}
@@ -143,9 +178,50 @@ script_mod! {
                             visible: false
                             show_bg: true
                             draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
+                            memory_tabs := View{width: Fill height: 32 flow: Right spacing: 8
+                                list_view_btn := Button{text: "List View"}
+                                carousel_view_btn := Button{text: "Carousel"}
+                                calendar_view_btn := Button{text: "Calendar"}
+                            }
                             Label{text: "Memory"}
                             memory_count := Label{text: "0 saved memories"}
                             memory_list := Label{text: "No memories."}
+                            carousel_view := View{width: Fill height: Fill flow: Down spacing: 16 visible: false
+                                carousel_header := View{width: Fill height: 48 flow: Right spacing: 12
+                                    prev_card_btn := Button{text: "<"}
+                                    carousel_card := View{width: Fill height: Fill flow: Down spacing: 8
+                                        show_bg: true
+                                        draw_bg +: { color: vec4(0.15, 0.15, 0.2, 0.9) }
+                                        padding: 16
+                                        card_title := Label{text: "Title" font_size: 20}
+                                        card_mood := Label{text: "mood" font_size: 14}
+                                        card_summary := Label{text: "Summary..." font_size: 14}
+                                        card_date := Label{text: "Date" font_size: 12}
+                                    }
+                                    next_card_btn := Button{text: ">"}
+                                }
+                                carousel_indicators := View{width: Fill height: 24 flow: Center}
+                            }
+                            calendar_view := View{width: Fill height: Fit flow: Down spacing: 4 visible: false
+                                calendar_header := View{width: Fill height: 32 flow: Right spacing: 8
+                                    prev_month_btn := Button{text: "<"}
+                                    month_label := Label{text: "MM/YYYY"}
+                                    next_month_btn := Button{text: ">"}
+                                }
+                                calendar_grid := View{width: Fill height: Fit flow: Right spacing: 2
+                                    day_labels := View{width: Fill height: 20 flow: Right spacing: 2
+                                        Label{text: "S"}
+                                        Label{text: "M"}
+                                        Label{text: "T"}
+                                        Label{text: "W"}
+                                        Label{text: "T"}
+                                        Label{text: "F"}
+                                        Label{text: "S"}
+                                    }
+                                    calendar_days := View{width: Fill height: Fill flow: Grid 7}
+                                }
+                                selected_date_label := Label{text: "Select a date"}
+                            }
                             memory_actions := View{width: Fill height: Fit flow: Right spacing: 8 visible: false
                                 open_detail_btn := Button{text: "Open"}
                                 copy_id_btn := Button{text: "Show ID"}
@@ -247,6 +323,20 @@ pub struct App {
     confirm_delete_selected: bool,
     #[rust]
     confirm_clear_all: bool,
+    #[rust]
+    calendar_view_visible: bool,
+    #[rust]
+    calendar_year: i32,
+    #[rust]
+    calendar_month: u32,
+    #[rust]
+    calendar_dates_with_memory: Vec<String>,
+    #[rust]
+    carousel_view_visible: bool,
+    #[rust]
+    session_state: String,
+    #[rust]
+    current_dithered_image: Option<String>,
 }
 
 impl MatchEvent for App {
@@ -255,6 +345,18 @@ impl MatchEvent for App {
         self.is_recording = false;
         self.confirm_delete_selected = false;
         self.confirm_clear_all = false;
+        self.calendar_view_visible = false;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs_f64();
+        let total_seconds = now as u64;
+        self.calendar_year = (total_seconds / 86400 / 365 + 2000) as i32;
+        self.calendar_month = ((total_seconds / 86400 / 30) % 12 + 1) as u32;
+        self.calendar_dates_with_memory = Vec::new();
+        self.carousel_view_visible = false;
+        self.session_state = "idle".to_string();
+        self.current_dithered_image = None;
         self.ui.text_input(cx, ids!(msg_input)).set_key_focus(cx);
         self.update_memory_action_button_labels(cx);
         if let Ok(api_key) = std::env::var("GEMINI_API_KEY") {
@@ -277,9 +379,10 @@ impl MatchEvent for App {
             if let Some(ga) = action.downcast_ref::<GeminiAction>() {
                 match ga {
                     GeminiAction::Connected => {
+                        self.session_state = "connected".to_string();
                         self.ui
                             .label(cx, ids!(status_label))
-                            .set_text(cx, "Connected");
+                            .set_text(cx, "● Connected");
                         self.ui
                             .label(cx, ids!(conn_status))
                             .set_text(cx, "Connected");
@@ -289,12 +392,17 @@ impl MatchEvent for App {
                             .set_visible(cx, true);
                     }
                     GeminiAction::TextReceived(text) => {
+                        self.session_state = "speaking".to_string();
                         self.pending_response.push_str(text);
                         self.ui
                             .label(cx, ids!(speech_label))
-                            .set_text(cx, &format!("AI: {}", self.pending_response));
+                            .set_text(cx, &self.pending_response);
+                        self.ui.label(cx, ids!(status_label)).set_text(cx, "● Speaking");
+                        self.ui.button(cx, ids!(replay_btn)).set_visible(cx, true);
+                        self.ui.button(cx, ids!(translate_btn)).set_visible(cx, true);
                     }
                     GeminiAction::TurnComplete => {
+                        self.session_state = "idle".to_string();
                         if !self.pending_response.is_empty() {
                             self.conversation.push(Message {
                                 role: "assistant".to_string(),
@@ -309,10 +417,11 @@ impl MatchEvent for App {
                         self.ui.label(cx, ids!(status_label)).set_text(cx, "Ready");
                     }
                     GeminiAction::Error(e) => {
+                        self.session_state = "error".to_string();
                         let short = format!("Error: {}", e);
                         eprintln!("{}", short);
                         self.ui.label(cx, ids!(speech_label)).set_text(cx, &short);
-                        self.ui.label(cx, ids!(status_label)).set_text(cx, &short);
+                        self.ui.label(cx, ids!(status_label)).set_text(cx, &format!("⚠ {}", short));
                         self.ui.label(cx, ids!(conn_status)).set_text(cx, &short);
                         self.ui.button(cx, ids!(connect_btn)).set_visible(cx, true);
                         self.ui
@@ -320,6 +429,7 @@ impl MatchEvent for App {
                             .set_visible(cx, false);
                     }
                     GeminiAction::Disconnected => {
+                        self.session_state = "disconnected".to_string();
                         let status = self.ui.label(cx, ids!(status_label)).text();
                         if !status.starts_with("Error:") {
                             self.ui
@@ -476,25 +586,17 @@ impl MatchEvent for App {
 
         if self.ui.button(cx, ids!(mic_btn)).clicked(actions) {
             self.is_recording = !self.is_recording;
-            self.ui
-                .button(cx, ids!(mic_btn))
-                .set_text(cx, if self.is_recording { "Stop" } else { "Mic" });
-            self.ui.label(cx, ids!(status_label)).set_text(
-                cx,
-                if self.is_recording {
-                    "Recording..."
-                } else {
-                    "Ready"
-                },
-            );
-            self.ui.label(cx, ids!(conn_status)).set_text(
-                cx,
-                if self.is_recording {
-                    "Recording"
-                } else {
-                    "Connected"
-                },
-            );
+            if self.is_recording {
+                self.session_state = "listening".to_string();
+                self.ui.button(cx, ids!(mic_btn)).set_text(cx, "⏹ Stop");
+                self.ui.label(cx, ids!(status_label)).set_text(cx, "● Listening...");
+                self.ui.label(cx, ids!(conn_status)).set_text(cx, "Listening");
+            } else {
+                self.session_state = "idle".to_string();
+                self.ui.button(cx, ids!(mic_btn)).set_text(cx, "🎤 Mic");
+                self.ui.label(cx, ids!(status_label)).set_text(cx, "Ready");
+                self.ui.label(cx, ids!(conn_status)).set_text(cx, "Connected");
+            }
         }
 
         if self.ui.button(cx, ids!(save_btn)).clicked(actions) {
@@ -507,13 +609,56 @@ impl MatchEvent for App {
             let data_dir = dirs::data_dir()
                 .unwrap_or_else(|| PathBuf::from("/tmp"))
                 .join("gemini-talker");
-            let mm = MemoryManager::new(data_dir);
-            let _ = mm.init();
-            let mem = create_memory(
-                &self.conversation,
-                self.current_image.as_ref().map(|(_, d)| d.clone()),
-            );
-            if mm.save_memory(&mem).is_ok() {
+            if let Ok(ref storage) = Storage::new(data_dir) {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs_f64();
+                let id = format!("memory_{}", now as u64);
+                let api_key = std::env::var("GEMINI_API_KEY").unwrap_or_default();
+                let messages_for_ai: Vec<storage::Message> = self.conversation.iter().map(|m| storage::Message {
+                    role: m.role.clone(),
+                    content: m.content.clone(),
+                    timestamp: m.timestamp,
+                }).collect();
+                let (title, summary, mood) = if !api_key.is_empty() && !messages_for_ai.is_empty() {
+                    storage.summarize_with_ai(&messages_for_ai, &api_key).unwrap_or_else(|_| {
+                        let title = messages_for_ai.iter()
+                            .find(|m| m.role == "user")
+                            .map(|m| m.content.chars().take(25).collect::<String>())
+                            .unwrap_or_else(|| "Conversation".to_string());
+                        let summary = messages_for_ai.iter().take(3)
+                            .map(|m| m.content.chars().take(40).collect::<String>())
+                            .collect::<Vec<_>>()
+                            .join(" | ");
+                        (title, summary, None)
+                    })
+                } else {
+                    let title = self.conversation.iter()
+                        .find(|m| m.role == "user")
+                        .map(|m| {
+                            let text = m.content.chars().take(30).collect::<String>();
+                            if m.content.len() > 30 { format!("{}...", text) } else { text }
+                        })
+                        .unwrap_or_else(|| "Conversation".to_string());
+                    let summary = self.conversation.iter().take(3)
+                        .map(|m| m.content.chars().take(50).collect::<String>())
+                        .collect::<Vec<_>>()
+                        .join(" | ");
+                    (title, summary, None)
+                };
+                let date = format_timestamp(now);
+                let mem = storage::Memory {
+                    id,
+                    title,
+                    summary,
+                    mood,
+                    timestamp: now,
+                    date,
+                    image_cover: self.current_image.as_ref().map(|(_, d)| d.clone()),
+                    messages: messages_for_ai,
+                };
+                let _ = storage.save_memory(&mem);
                 self.conversation.clear();
                 self.ui
                     .label(cx, ids!(status_label))
@@ -541,15 +686,35 @@ impl MatchEvent for App {
                         _ => "image/png",
                     }
                     .to_string();
+
+                    let dithered = if mime_type != "image/gif" {
+                        use std::io::Cursor;
+                        use ::image::ImageReader;
+                        let img = ImageReader::new(Cursor::new(&bytes)).with_guessed_format().ok().and_then(|r| r.decode().ok());
+                        if let Some(img) = img {
+                            let dithered_img = dithering::apply_floyd_steinberg(&img);
+                            let mut buf = Vec::new();
+                            dithered_img.write_to(&mut Cursor::new(&mut buf), ::image::ImageFormat::Png).ok();
+                            buf
+                        } else {
+                            bytes.clone()
+                        }
+                    } else {
+                        bytes.clone()
+                    };
+
                     let b64 =
-                        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &bytes);
-                    self.current_image = Some((mime_type, b64));
+                        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &dithered);
+                    self.current_image = Some(("image/png".to_string(), b64.clone()));
+                    self.current_dithered_image = Some(b64);
+                    self.ui.image(cx, ids!(scene_background)).load_png_from_data(cx, &dithered);
+                    self.ui.view(cx, ids!(scene_background)).set_visible(cx, true);
                     self.ui
                         .label(cx, ids!(speech_label))
-                        .set_text(cx, "Image ready. Type a message.");
+                        .set_text(cx, "Dithered ✓ Type a message.");
                     self.ui
                         .label(cx, ids!(status_label))
-                        .set_text(cx, "Image loaded");
+                        .set_text(cx, "Dithered image loaded");
                 }
             }
         }
@@ -557,9 +722,11 @@ impl MatchEvent for App {
         if self.ui.button(cx, ids!(stop_btn)).clicked(actions) {
             self.pending_response.clear();
             self.current_image = None;
+            self.current_dithered_image = None;
             self.is_recording = false;
             self.ui.label(cx, ids!(speech_label)).set_text(cx, "");
-            self.ui.button(cx, ids!(mic_btn)).set_text(cx, "Mic");
+            self.ui.button(cx, ids!(mic_btn)).set_text(cx, "🎤 Mic");
+            self.ui.view(cx, ids!(scene_background)).set_visible(cx, false);
             self.ui
                 .label(cx, ids!(status_label))
                 .set_text(cx, "Stopped");
@@ -599,6 +766,40 @@ impl MatchEvent for App {
         if self.ui.button(cx, ids!(delete_all_btn)).clicked(actions) {
             self.request_clear_all(cx);
         }
+
+        if self.ui.button(cx, ids!(list_view_btn)).clicked(actions) {
+            self.toggle_calendar_view(cx, false);
+        }
+        if self.ui.button(cx, ids!(calendar_view_btn)).clicked(actions) {
+            self.toggle_calendar_view(cx, true);
+        }
+        if self.ui.button(cx, ids!(prev_month_btn)).clicked(actions) {
+            self.prev_month();
+            self.update_calendar_view(cx);
+        }
+        if self.ui.button(cx, ids!(next_month_btn)).clicked(actions) {
+            self.next_month();
+            self.update_calendar_view(cx);
+        }
+
+        if self.ui.button(cx, ids!(carousel_view_btn)).clicked(actions) {
+            self.toggle_view(cx, "carousel");
+        }
+        if self.ui.button(cx, ids!(list_view_btn)).clicked(actions) {
+            self.toggle_view(cx, "list");
+        }
+        if self.ui.button(cx, ids!(prev_card_btn)).clicked(actions) {
+            if !self.memory_summaries.is_empty() {
+                self.selected_memory_index = self.selected_memory_index.saturating_sub(1);
+                self.update_carousel(cx);
+            }
+        }
+        if self.ui.button(cx, ids!(next_card_btn)).clicked(actions) {
+            if !self.memory_summaries.is_empty() {
+                self.selected_memory_index = (self.selected_memory_index + 1).min(self.memory_summaries.len() - 1);
+                self.update_carousel(cx);
+            }
+        }
     }
 }
 
@@ -634,9 +835,10 @@ impl App {
                 sender.try_send(UiToGemini::Text(text))
             };
             if send_result.is_ok() {
+                self.session_state = "thinking".to_string();
                 self.ui
                     .label(cx, ids!(status_label))
-                    .set_text(cx, "Thinking...");
+                    .set_text(cx, "💭 Thinking...");
             } else {
                 self.ui
                     .label(cx, ids!(speech_label))
@@ -675,6 +877,7 @@ impl App {
         self.ui.redraw(cx);
         if page == "memory" {
             self.refresh_memory_list(cx);
+            self.update_calendar_view(cx);
         }
         if page == "garden" {
             self.ui.text_input(cx, ids!(msg_input)).set_key_focus(cx);
@@ -689,101 +892,167 @@ impl App {
         let data_dir = dirs::data_dir()
             .unwrap_or_else(|| PathBuf::from("/tmp"))
             .join("gemini-talker");
-        let mm = MemoryManager::new(data_dir);
-        let _ = mm.init();
-        match mm.list_memories() {
-            Ok(memories) if !memories.is_empty() => {
-                self.memory_summaries = memories;
-                self.ui.view(cx, ids!(memory_actions)).set_visible(cx, true);
-                if self.selected_memory_index >= self.memory_summaries.len() {
-                    self.selected_memory_index = self.memory_summaries.len() - 1;
-                }
-                let window_size = 12usize;
-                let len = self.memory_summaries.len();
-                let half = window_size / 2;
-                let mut start = self.selected_memory_index.saturating_sub(half);
-                if len > window_size && start + window_size > len {
-                    start = len - window_size;
-                }
-                let end = (start + window_size).min(len);
+        let storage = Storage::new(data_dir);
+        let memories = match storage {
+            Ok(ref s) => s.list_memories().unwrap_or_default(),
+            Err(_) => Vec::new(),
+        };
 
-                self.ui.label(cx, ids!(memory_count)).set_text(
-                    cx,
-                    &format!(
-                        "{} saved memories (selected {}/{}) · showing {}-{} of {}",
-                        len,
-                        self.selected_memory_index + 1,
-                        len,
-                        start + 1,
-                        end,
-                        len
-                    ),
-                );
-
-                let mut chunks = Vec::new();
-                if start > 0 {
-                    chunks.push(format!("... {} older memories above ...", start));
-                }
-
-                let visible = self
-                    .memory_summaries
-                    .iter()
-                    .enumerate()
-                    .skip(start)
-                    .take(end - start)
-                    .map(|(i, m)| {
-                        let selected = i == self.selected_memory_index;
-                        let marker = if selected { ">>" } else { "  " };
-                        let title = if selected {
-                            format!("[SELECTED] {}", m.title)
-                        } else {
-                            m.title.clone()
-                        };
-                        format!(
-                            "{} #{} [{}]\n{}\n{}",
-                            marker,
-                            i + 1,
-                            m.date,
-                            title,
-                            m.summary
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n\n");
-                chunks.push(visible);
-
-                if end < len {
-                    chunks.push(format!("... {} newer memories below ...", len - end));
-                }
-
-                let list = chunks.join("\n\n");
-                self.ui.label(cx, ids!(memory_list)).set_text(cx, &list);
-                self.update_memory_detail(cx);
-                self.ui.label(cx, ids!(status_label)).set_text(
-                    cx,
-                    &format!("Selected {}/{}", self.selected_memory_index + 1, len),
-                );
+        if !memories.is_empty() {
+            self.memory_summaries = memories;
+            self.ui.view(cx, ids!(memory_actions)).set_visible(cx, true);
+            if self.selected_memory_index >= self.memory_summaries.len() {
+                self.selected_memory_index = self.memory_summaries.len() - 1;
             }
-            _ => {
-                self.memory_summaries.clear();
-                self.selected_memory_index = 0;
-                self.ui
-                    .view(cx, ids!(memory_actions))
-                    .set_visible(cx, false);
-                self.ui
-                    .label(cx, ids!(memory_count))
-                    .set_text(cx, "0 saved memories");
-                self.ui
-                    .label(cx, ids!(memory_list))
-                    .set_text(cx, "No memories.");
-                self.ui
-                    .label(cx, ids!(memory_detail))
-                    .set_text(cx, "Memory detail will appear here.");
-                self.ui
-                    .label(cx, ids!(status_label))
-                    .set_text(cx, "No memories.");
+            let window_size = 12usize;
+            let len = self.memory_summaries.len();
+            let half = window_size / 2;
+            let mut start = self.selected_memory_index.saturating_sub(half);
+            if len > window_size && start + window_size > len {
+                start = len - window_size;
             }
+            let end = (start + window_size).min(len);
+
+            self.ui.label(cx, ids!(memory_count)).set_text(
+                cx,
+                &format!(
+                    "{} saved memories (selected {}/{}) · showing {}-{} of {}",
+                    len,
+                    self.selected_memory_index + 1,
+                    len,
+                    start + 1,
+                    end,
+                    len
+                ),
+            );
+
+            let mut chunks = Vec::new();
+            if start > 0 {
+                chunks.push(format!("... {} older memories above ...", start));
+            }
+
+            let visible = self
+                .memory_summaries
+                .iter()
+                .enumerate()
+                .skip(start)
+                .take(end - start)
+                .map(|(i, m)| {
+                    let selected = i == self.selected_memory_index;
+                    let marker = if selected { ">>" } else { "  " };
+                    let title = if selected {
+                        format!("[SELECTED] {}", m.title)
+                    } else {
+                        m.title.clone()
+                    };
+                    let mood_tag = m.mood.as_ref().map(|m| format!("[{}]", m)).unwrap_or_default();
+                    format!(
+                        "{} #{} [{}] {}\n{}\n{}",
+                        marker,
+                        i + 1,
+                        m.date,
+                        mood_tag,
+                        title,
+                        m.summary
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            chunks.push(visible);
+
+            if end < len {
+                chunks.push(format!("... {} newer memories below ...", len - end));
+            }
+
+            let list = chunks.join("\n\n");
+            self.ui.label(cx, ids!(memory_list)).set_text(cx, &list);
+            self.update_memory_detail(cx);
+            self.ui.label(cx, ids!(status_label)).set_text(
+                cx,
+                &format!("Selected {}/{}", self.selected_memory_index + 1, len),
+            );
+        } else {
+            self.memory_summaries.clear();
+            self.selected_memory_index = 0;
+            self.ui
+                .view(cx, ids!(memory_actions))
+                .set_visible(cx, false);
+            self.ui
+                .label(cx, ids!(memory_count))
+                .set_text(cx, "0 saved memories");
+            self.ui
+                .label(cx, ids!(memory_list))
+                .set_text(cx, "No memories.");
+            self.ui
+                .label(cx, ids!(memory_detail))
+                .set_text(cx, "Memory detail will appear here.");
+            self.ui
+                .label(cx, ids!(status_label))
+                .set_text(cx, "No memories.");
         }
+    }
+
+    fn update_calendar_view(&mut self, cx: &mut Cx) {
+        self.ui.label(cx, ids!(month_label)).set_text(
+            cx,
+            &format!("{:02}/{}", self.calendar_month, self.calendar_year),
+        );
+        let data_dir = dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
+            .join("gemini-talker");
+        if let Ok(ref storage) = Storage::new(data_dir) {
+            self.calendar_dates_with_memory = storage.get_calendar_dates().unwrap_or_default();
+        }
+    }
+
+    fn prev_month(&mut self) {
+        if self.calendar_month == 1 {
+            self.calendar_month = 12;
+            self.calendar_year -= 1;
+        } else {
+            self.calendar_month -= 1;
+        }
+    }
+
+    fn next_month(&mut self) {
+        if self.calendar_month == 12 {
+            self.calendar_month = 1;
+            self.calendar_year += 1;
+        } else {
+            self.calendar_month += 1;
+        }
+    }
+
+    fn toggle_calendar_view(&mut self, cx: &mut Cx, show_calendar: bool) {
+        self.calendar_view_visible = show_calendar;
+        self.ui.view(cx, ids!(memory_list)).set_visible(cx, !show_calendar);
+        self.ui.view(cx, ids!(calendar_view)).set_visible(cx, show_calendar);
+        self.update_calendar_view(cx);
+    }
+
+    fn toggle_view(&mut self, cx: &mut Cx, view_type: &str) {
+        let show_list = view_type == "list";
+        let show_carousel = view_type == "carousel";
+        let show_calendar = view_type == "calendar";
+
+        self.ui.view(cx, ids!(memory_list)).set_visible(cx, show_list);
+        self.ui.view(cx, ids!(carousel_view)).set_visible(cx, show_carousel);
+        self.ui.view(cx, ids!(calendar_view)).set_visible(cx, show_calendar);
+
+        if show_carousel {
+            self.update_carousel(cx);
+        }
+    }
+
+    fn update_carousel(&mut self, cx: &mut Cx) {
+        if self.memory_summaries.is_empty() {
+            return;
+        }
+        let selected = &self.memory_summaries[self.selected_memory_index];
+        self.ui.label(cx, ids!(card_title)).set_text(cx, &selected.title);
+        self.ui.label(cx, ids!(card_summary)).set_text(cx, &selected.summary);
+        self.ui.label(cx, ids!(card_date)).set_text(cx, &selected.date);
+        self.ui.label(cx, ids!(card_mood)).set_text(cx, "Tap for details");
     }
 
     fn update_memory_action_button_labels(&mut self, cx: &mut Cx) {
@@ -847,10 +1116,11 @@ impl App {
             let data_dir = dirs::data_dir()
                 .unwrap_or_else(|| PathBuf::from("/tmp"))
                 .join("gemini-talker");
-            let mm = MemoryManager::new(data_dir);
-            if let Ok(memories) = mm.list_memories() {
-                for m in &memories {
-                    let _ = mm.delete_memory(&m.id);
+            if let Ok(ref storage) = Storage::new(data_dir) {
+                if let Ok(memories) = storage.list_memories() {
+                    for m in &memories {
+                        let _ = storage.delete_memory(&m.id);
+                    }
                 }
             }
             self.refresh_memory_list(cx);
@@ -900,8 +1170,9 @@ impl App {
         let data_dir = dirs::data_dir()
             .unwrap_or_else(|| PathBuf::from("/tmp"))
             .join("gemini-talker");
-        let mm = MemoryManager::new(data_dir);
-        let _ = mm.delete_memory(&selected_id);
+        if let Ok(ref storage) = Storage::new(data_dir) {
+            let _ = storage.delete_memory(&selected_id);
+        }
         if self.selected_memory_index > 0 {
             self.selected_memory_index -= 1;
         }
@@ -960,25 +1231,27 @@ impl App {
         let data_dir = dirs::data_dir()
             .unwrap_or_else(|| PathBuf::from("/tmp"))
             .join("gemini-talker");
-        let mm = MemoryManager::new(data_dir);
-        let detail_text = match mm.load_memory(&selected.id) {
-            Ok(memory) => {
-                let mut lines = vec![
-                    format!("=== MEMORY {} OF {} ===", self.selected_memory_index + 1, self.memory_summaries.len()),
-                    format!("ID: {}", selected.id),
-                    "Keys: ↑/↓ PgUp/PgDn Home/End | Enter/O/Open | C show ID | Del/Bksp (Shift=Clear) | Esc cancel | R".to_string(),
-                    format!("Date: {}", memory.date),
-                    format!("Title: {}", memory.title),
-                    format!("Summary: {}", selected.summary),
-                    "".to_string(),
-                    "--- Messages ---".to_string(),
-                ];
-                for msg in memory.messages.iter().take(20) {
-                    lines.push(format!("{}: {}", msg.role, msg.content));
+        let detail_text = match Storage::new(data_dir) {
+            Ok(ref storage) => match storage.load_memory(&selected.id) {
+                Ok(memory) => {
+                    let mut lines = vec![
+                        format!("=== MEMORY {} OF {} ===", self.selected_memory_index + 1, self.memory_summaries.len()),
+                        format!("ID: {}", selected.id),
+                        "Keys: ↑/↓ PgUp/PgDn Home/End | Enter/O/Open | C show ID | Del/Bksp (Shift=Clear) | Esc cancel | R".to_string(),
+                        format!("Date: {}", memory.date),
+                        format!("Title: {}", memory.title),
+                        format!("Summary: {}", selected.summary),
+                        "".to_string(),
+                        "--- Messages ---".to_string(),
+                    ];
+                    for msg in memory.messages.iter().take(20) {
+                        lines.push(format!("{}: {}", msg.role, msg.content));
+                    }
+                    lines.join("\n")
                 }
-                lines.join("\n")
-            }
-            Err(e) => format!("Failed to load memory detail: {}", e),
+                Err(e) => format!("Failed to load memory detail: {}", e),
+            },
+            Err(_) => "Storage unavailable".to_string(),
         };
         self.ui
             .label(cx, ids!(memory_detail))
