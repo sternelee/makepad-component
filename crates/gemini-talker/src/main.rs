@@ -28,6 +28,9 @@ mod gemini_live;
 mod memory;
 mod storage;
 
+use audio_input::MicCapture;
+use audio_output::AudioPlayer;
+
 use gemini_live::{GeminiEvent, GeminiLiveClient, ModelTurn, Part, ServerContent};
 use memory::{create_memory, MemorySummary, Message};
 use storage::Storage;
@@ -43,6 +46,7 @@ enum SceneContent {
 enum GeminiAction {
     Connected,
     TextReceived(String),
+    AudioReceived(Vec<u8>),
     TurnComplete,
     Error(String),
     Disconnected,
@@ -354,6 +358,10 @@ pub struct App {
     current_dithered_image: Option<String>,
     #[rust]
     scene_content: Option<SceneContent>,
+    #[rust]
+    mic_capture: Option<MicCapture>,
+    #[rust]
+    audio_player: Option<AudioPlayer>,
 }
 
 impl MatchEvent for App {
@@ -375,6 +383,8 @@ impl MatchEvent for App {
         self.session_state = "idle".to_string();
         self.current_dithered_image = None;
         self.scene_content = None;
+        self.mic_capture = Some(MicCapture::new());
+        self.audio_player = Some(AudioPlayer::new());
         self.ui.text_input(cx, ids!(msg_input)).set_key_focus(cx);
         self.update_memory_action_button_labels(cx);
         if let Ok(api_key) = std::env::var("GEMINI_API_KEY") {
@@ -433,6 +443,11 @@ impl MatchEvent for App {
                             self.pending_response.clear();
                         }
                         self.ui.label(cx, ids!(status_label)).set_text(cx, "Ready");
+                    }
+                    GeminiAction::AudioReceived(pcm_data) => {
+                        if let Some(ref mut player) = self.audio_player {
+                            let _ = player.play_audio(pcm_data.to_vec());
+                        }
                     }
                     GeminiAction::Error(e) => {
                         self.session_state = "error".to_string();
@@ -562,10 +577,19 @@ impl MatchEvent for App {
                                     model_turn: Some(turn),
                                 })) => {
                                     for part in &turn.parts {
-                                        if let Part::Text { text } = part {
-                                            Cx::post_action(GeminiAction::TextReceived(
-                                                text.clone(),
-                                            ));
+                                        match part {
+                                            Part::Text { text } => {
+                                                Cx::post_action(GeminiAction::TextReceived(
+                                                    text.clone(),
+                                                ));
+                                            }
+                                            Part::InlineData { inline_data } => {
+                                                if inline_data.mime_type.contains("audio") {
+                                                    if let Ok(pcm) = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &inline_data.data) {
+                                                        Cx::post_action(GeminiAction::AudioReceived(pcm));
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -616,11 +640,21 @@ impl MatchEvent for App {
         if self.ui.button(cx, ids!(mic_btn)).clicked(actions) {
             self.is_recording = !self.is_recording;
             if self.is_recording {
-                self.session_state = "listening".to_string();
-                self.ui.button(cx, ids!(mic_btn)).set_text(cx, "⏹ Stop");
-                self.ui.label(cx, ids!(status_label)).set_text(cx, "● Listening...");
-                self.ui.label(cx, ids!(conn_status)).set_text(cx, "Listening");
+                if let Some(ref mut mic) = self.mic_capture {
+                    if mic.has_microphone() {
+                        self.session_state = "listening".to_string();
+                        self.ui.button(cx, ids!(mic_btn)).set_text(cx, "⏹ Stop");
+                        self.ui.label(cx, ids!(status_label)).set_text(cx, "● Listening... (Voice input active)");
+                        self.ui.label(cx, ids!(conn_status)).set_text(cx, "Listening + Voice");
+                    } else {
+                        self.is_recording = false;
+                        self.ui.label(cx, ids!(status_label)).set_text(cx, "No microphone detected");
+                    }
+                }
             } else {
+                if let Some(ref mut mic) = self.mic_capture {
+                    mic.stop_capture();
+                }
                 self.session_state = "idle".to_string();
                 self.ui.button(cx, ids!(mic_btn)).set_text(cx, "🎤 Mic");
                 self.ui.label(cx, ids!(status_label)).set_text(cx, "Ready");

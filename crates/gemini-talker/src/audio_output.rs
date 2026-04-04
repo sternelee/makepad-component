@@ -1,141 +1,111 @@
-//! Audio Output Module - Playback of AI audio responses
-//!
-//! Handles receiving audio from Gemini Live and playing it back
-
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::{Device, Host, SampleFormat, Stream};
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use std::sync::Mutex;
 
-/// Audio playback state
-#[derive(Debug, Clone, PartialEq)]
-pub enum AudioPlaybackState {
-    Idle,
-    Playing,
-    Paused,
-    Error(String),
-}
-
-/// Audio data received from Gemini
-#[derive(Debug, Clone)]
-pub struct GeminiAudio {
-    /// PCM audio data (base64 encoded originally)
-    pub data: Vec<u8>,
-    /// MIME type (e.g., "audio/pcm")
-    pub mime_type: String,
-    /// Whether this is the final chunk
-    pub is_final: bool,
-}
-
-/// Audio player controller
 pub struct AudioPlayer {
-    state: Arc<RwLock<AudioPlaybackState>>,
-    current_audio: Arc<RwLock<Option<GeminiAudio>>>,
-    position: Arc<RwLock<usize>>,
+    host: Host,
+    output_device: Option<Device>,
+    stream: Option<Stream>,
+    is_playing: Arc<Mutex<bool>>,
+    audio_buffer: Arc<Mutex<Vec<u8>>>,
+    sample_rate: u32,
 }
 
 impl AudioPlayer {
-    /// Create a new audio player instance
     pub fn new() -> Self {
+        let host = cpal::default_host();
+        let output_device = host.default_output_device();
+
         Self {
-            state: Arc::new(RwLock::new(AudioPlaybackState::Idle)),
-            current_audio: Arc::new(RwLock::new(None)),
-            position: Arc::new(RwLock::new(0)),
+            host,
+            output_device,
+            stream: None,
+            is_playing: Arc::new(Mutex::new(false)),
+            audio_buffer: Arc::new(Mutex::new(Vec::new())),
+            sample_rate: 16000,
         }
     }
 
-    /// Get current playback state
-    pub async fn state(&self) -> AudioPlaybackState {
-        self.state.read().await.clone()
+    pub fn has_speaker(&self) -> bool {
+        self.output_device.is_some()
     }
 
-    /// Queue audio data for playback
-    pub async fn queue_audio(&self, audio: GeminiAudio) {
-        let data_len = audio.data.len();
-        *self.current_audio.write().await = Some(audio);
-        *self.position.write().await = 0;
-        *self.state.write().await = AudioPlaybackState::Playing;
-
-        // Note: Full implementation would use platform audio output APIs
-        // For now, this is a placeholder that prepares the audio for playback
-        println!("Audio queued for playback: {} bytes", data_len);
+    pub fn list_devices(&self) -> Vec<String> {
+        self.host
+            .output_devices()
+            .map(|devices| devices.filter_map(|d| d.name().ok()).collect())
+            .unwrap_or_default()
     }
 
-    /// Play audio from base64 encoded data
-    pub async fn play_from_base64(&self, base64_data: &str) -> Result<(), String> {
-        use base64::Engine;
+    pub fn play_audio(&mut self, pcm_data: Vec<u8>) -> Result<(), String> {
+        if self.stream.is_some() {
+            self.stop();
+        }
 
-        let data = base64::engine::general_purpose::STANDARD
-            .decode(base64_data)
-            .map_err(|e| format!("Failed to decode base64: {}", e))?;
+        let device = self
+            .output_device
+            .as_ref()
+            .ok_or("No output device available")?;
 
-        let audio = GeminiAudio {
-            data,
-            mime_type: "audio/pcm".to_string(),
-            is_final: true,
+        let config = cpal::StreamConfig {
+            channels: 1,
+            sample_rate: cpal::SampleRate(self.sample_rate),
+            buffer_size: cpal::BufferSize::Default,
         };
 
-        self.queue_audio(audio).await;
+        let is_playing = self.is_playing.clone();
+        let audio_buf = self.audio_buffer.clone();
+
+        *audio_buf.lock().unwrap() = pcm_data.clone();
+        *is_playing.lock().unwrap() = true;
+
+        let err_fn = |err| eprintln!("Audio playback error: {}", err);
+
+        let stream = device
+            .build_output_stream(
+                &config,
+                move |data: &mut [i16], _: &cpal::OutputCallbackInfo| {
+                    let playing = *is_playing.lock().unwrap();
+                    let mut buf = audio_buf.lock().unwrap();
+
+                    if playing && buf.len() >= 2 {
+                        for sample in data.iter_mut() {
+                            if buf.len() >= 2 {
+                                let b0 = buf.remove(0);
+                                let b1 = buf.remove(0);
+                                *sample = i16::from_le_bytes([b0, b1]);
+                            } else {
+                                break;
+                            }
+                        }
+                    } else {
+                        for sample in data.iter_mut() {
+                            *sample = 0;
+                        }
+                    }
+                },
+                err_fn,
+                None,
+            )
+            .map_err(|e| format!("Failed to build output stream: {}", e))?;
+
+        stream
+            .play()
+            .map_err(|e| format!("Failed to play: {}", e))?;
+        self.stream = Some(stream);
+
         Ok(())
     }
 
-    /// Start playback
-    pub async fn play(&mut self) {
-        if self.current_audio.read().await.is_some() {
-            *self.state.write().await = AudioPlaybackState::Playing;
-            // Note: Platform audio output would be triggered here
-        }
+    pub fn stop(&mut self) {
+        *self.is_playing.lock().unwrap() = false;
+        self.audio_buffer.lock().unwrap().clear();
+        self.stream = None;
     }
 
-    /// Pause playback
-    pub async fn pause(&self) {
-        if let AudioPlaybackState::Playing = *self.state.read().await {
-            *self.state.write().await = AudioPlaybackState::Paused;
-        }
-    }
-
-    /// Stop playback
-    pub async fn stop(&self) {
-        *self.state.write().await = AudioPlaybackState::Idle;
-        *self.current_audio.write().await = None;
-        *self.position.write().await = 0;
-    }
-
-    /// Get playback progress (0.0 to 1.0)
-    pub async fn progress(&self) -> f32 {
-        let audio = self.current_audio.read().await;
-        let pos = *self.position.read().await;
-
-        if let Some(a) = audio.as_ref() {
-            if a.data.is_empty() {
-                return 0.0;
-            }
-            (pos as f32 / a.data.len() as f32).min(1.0)
-        } else {
-            0.0
-        }
-    }
-
-    /// Get current position in milliseconds
-    pub async fn position_ms(&self) -> u64 {
-        let pos = *self.position.read().await;
-        // Assuming 16kHz, 16-bit mono: bytes / 2 = samples, samples / 16000 = seconds
-        let samples = pos / 2;
-        (samples as u64 * 1000) / 16000
-    }
-
-    /// Get total duration in milliseconds
-    pub async fn duration_ms(&self) -> u64 {
-        let audio = self.current_audio.read().await;
-        if let Some(a) = audio.as_ref() {
-            let samples = a.data.len() / 2;
-            (samples as u64 * 1000) / 16000
-        } else {
-            0
-        }
-    }
-
-    /// Check if currently playing
-    pub async fn is_playing(&self) -> bool {
-        matches!(*self.state.read().await, AudioPlaybackState::Playing)
+    pub fn is_playing(&self) -> bool {
+        *self.is_playing.lock().unwrap()
     }
 }
 
@@ -144,62 +114,3 @@ impl Default for AudioPlayer {
         Self::new()
     }
 }
-
-/// PCM audio utilities
-pub mod pcm {
-    /// Convert stereo PCM to mono (interleaved stereo)
-    pub fn stereo_to_mono(stereo_data: &[u8]) -> Vec<u8> {
-        if stereo_data.len() < 4 {
-            return stereo_data.to_vec();
-        }
-
-        let num_samples = stereo_data.len() / 4; // 2 channels * 2 bytes per sample
-        let mut mono = Vec::with_capacity(num_samples * 2);
-
-        for i in 0..num_samples {
-            // Average the left and right channels
-            let left = i16::from_le_bytes([stereo_data[i * 4], stereo_data[i * 4 + 1]]);
-            let right = i16::from_le_bytes([stereo_data[i * 4 + 2], stereo_data[i * 4 + 3]]);
-            let avg = ((left as i32 + right as i32) / 2) as i16;
-            mono.extend_from_slice(&avg.to_le_bytes());
-        }
-
-        mono
-    }
-
-    /// Convert 32-bit float PCM to 16-bit integer PCM
-    pub fn float_to_int16(float_data: &[u8]) -> Vec<u8> {
-        let num_samples = float_data.len() / 4; // 4 bytes per float
-        let mut int16 = Vec::with_capacity(num_samples * 2);
-
-        for i in 0..num_samples {
-            let float_val = f32::from_le_bytes([
-                float_data[i * 4],
-                float_data[i * 4 + 1],
-                float_data[i * 4 + 2],
-                float_data[i * 4 + 3],
-            ]);
-            // Clamp to [-1.0, 1.0] and convert to i16
-            let clamped = float_val.max(-1.0).min(1.0);
-            let int_val = (clamped * 32767.0) as i16;
-            int16.extend_from_slice(&int_val.to_le_bytes());
-        }
-
-        int16
-    }
-
-    /// Convert 16-bit PCM to base64
-    pub fn to_base64(pcm_data: &[u8]) -> String {
-        use base64::Engine;
-        base64::engine::general_purpose::STANDARD.encode(pcm_data)
-    }
-
-    /// Convert base64 to 16-bit PCM
-    pub fn from_base64(base64_data: &str) -> Result<Vec<u8>, String> {
-        use base64::Engine;
-        base64::engine::general_purpose::STANDARD
-            .decode(base64_data)
-            .map_err(|e| format!("Failed to decode base64: {}", e))
-    }
-}
-

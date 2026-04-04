@@ -1,163 +1,112 @@
-//! Audio Input Module - Microphone capture for Gemini Live
-//!
-//! Handles microphone audio capture and streaming to Gemini Live API
-
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::{Device, Host, SampleFormat, Stream};
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
+use std::sync::Mutex;
+use tokio::sync::mpsc;
 
-/// Audio capture state
-#[derive(Debug, Clone, PartialEq)]
-pub enum AudioCaptureState {
-    Idle,
-    Recording,
-    Paused,
-    Error(String),
+pub struct MicCapture {
+    host: Host,
+    input_device: Option<Device>,
+    stream: Option<Stream>,
+    is_recording: Arc<Mutex<bool>>,
 }
 
-/// Audio chunk captured from microphone
-#[derive(Debug, Clone)]
-pub struct AudioChunk {
-    /// PCM audio data (16kHz, mono, 16-bit)
-    pub data: Vec<u8>,
-    /// Timestamp in milliseconds
-    pub timestamp: u64,
-}
+impl MicCapture {
+    pub fn new() -> Self {
+        let host = cpal::default_host();
+        let input_device = host.default_input_device();
 
-/// Audio capture configuration
-#[derive(Debug, Clone)]
-pub struct AudioConfig {
-    pub sample_rate: u32,
-    pub channel_count: u16,
-    pub bits_per_sample: u16,
-}
-
-impl Default for AudioConfig {
-    fn default() -> Self {
         Self {
-            sample_rate: 16000, // Gemini expects 16kHz
-            channel_count: 1,
-            bits_per_sample: 16,
-        }
-    }
-}
-
-/// Audio capture controller
-pub struct AudioCapture {
-    state: Arc<RwLock<AudioCaptureState>>,
-    config: AudioConfig,
-    sender: Option<mpsc::Sender<AudioChunk>>,
-}
-
-impl AudioCapture {
-    /// Create a new audio capture instance
-    pub fn new(config: AudioConfig) -> Self {
-        Self {
-            state: Arc::new(RwLock::new(AudioCaptureState::Idle)),
-            config,
-            sender: None,
+            host,
+            input_device,
+            stream: None,
+            is_recording: Arc::new(Mutex::new(false)),
         }
     }
 
-    /// Get current capture state
-    pub async fn state(&self) -> AudioCaptureState {
-        self.state.read().await.clone()
+    pub fn has_microphone(&self) -> bool {
+        self.input_device.is_some()
     }
 
-    /// Start recording audio
-    pub async fn start_recording(&mut self) -> Result<mpsc::Receiver<AudioChunk>, String> {
-        *self.state.write().await = AudioCaptureState::Recording;
-
-        let (tx, rx) = mpsc::channel(100);
-        self.sender = Some(tx);
-
-        // Note: Full implementation would use platform-specific audio APIs
-        // For now, this is a placeholder that simulates audio capture
-        // In production, you'd use platform audio APIs here
-
-        Ok(rx)
+    pub fn list_devices(&self) -> Vec<String> {
+        self.host
+            .input_devices()
+            .map(|devices| devices.filter_map(|d| d.name().ok()).collect())
+            .unwrap_or_default()
     }
 
-    /// Stop recording audio
-    pub async fn stop_recording(&mut self) {
-        *self.state.write().await = AudioCaptureState::Idle;
-        self.sender = None;
-    }
-
-    /// Pause recording
-    pub async fn pause_recording(&mut self) {
-        if let AudioCaptureState::Recording = *self.state.read().await {
-            *self.state.write().await = AudioCaptureState::Paused;
+    pub fn start_capture(&mut self, sender: mpsc::Sender<Vec<u8>>) -> Result<(), String> {
+        if self.stream.is_some() {
+            self.stop_capture();
         }
-    }
 
-    /// Resume recording
-    pub async fn resume_recording(&mut self) {
-        if let AudioCaptureState::Paused = *self.state.read().await {
-            *self.state.write().await = AudioCaptureState::Recording;
-        }
-    }
+        let device = self
+            .input_device
+            .as_ref()
+            .ok_or("No input device available")?;
 
-    /// Get audio configuration
-    pub fn config(&self) -> &AudioConfig {
-        &self.config
-    }
+        let config = device
+            .default_input_config()
+            .map_err(|e| format!("Failed to get default config: {}", e))?;
 
-    /// Convert audio chunk to base64 for Gemini API
-    pub fn chunk_to_base64(chunk: &AudioChunk) -> String {
-        use base64::Engine;
-        base64::engine::general_purpose::STANDARD.encode(&chunk.data)
-    }
-}
+        let is_recording = self.is_recording.clone();
+        *is_recording.lock().unwrap() = true;
 
-/// Simulated audio capture (placeholder for platform-specific implementation)
-pub mod simulated {
-    use super::*;
+        let err_fn = |err| eprintln!("Audio capture error: {}", err);
 
-    /// Generate a test audio chunk (silent)
-    pub fn generate_silent_chunk(duration_ms: u64) -> AudioChunk {
-        let sample_rate = 16000u32;
-        let bytes_per_sample = 2u16;
-        let channel_count = 1u16;
-
-        let num_samples = ((sample_rate as u64 * duration_ms) / 1000) as usize;
-        let data_size = num_samples * (bytes_per_sample as usize) * (channel_count as usize);
-
-        AudioChunk {
-            data: vec![0u8; data_size],
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
-        }
-    }
-
-    /// Generate a test audio chunk with simple tone
-    pub fn generate_tone_chunk(duration_ms: u64, frequency_hz: f64) -> AudioChunk {
-        let sample_rate = 16000f64;
-        let num_samples = ((sample_rate * duration_ms as f64) / 1000.0) as usize;
-
-        let mut data = Vec::with_capacity(num_samples * 2);
-        let mut phase = 0.0;
-        let phase_increment = frequency_hz / sample_rate;
-
-        for _ in 0..num_samples {
-            let sample = (phase * std::f64::consts::TAU).sin() * 0.5;
-            let sample_i16 = (sample * 32767.0) as i16;
-            data.push((sample_i16 & 0xFF) as u8);
-            data.push(((sample_i16 >> 8) & 0xFF) as u8);
-            phase += phase_increment;
-            if phase > 1.0 {
-                phase -= 1.0;
+        let stream = match config.sample_format() {
+            SampleFormat::I16 => {
+                let is_rec = is_recording.clone();
+                device.build_input_stream(
+                    &config.into(),
+                    move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                        if *is_rec.lock().unwrap() {
+                            let bytes: Vec<u8> =
+                                data.iter().flat_map(|&s| s.to_le_bytes()).collect();
+                            let _ = sender.try_send(bytes);
+                        }
+                    },
+                    err_fn,
+                    None,
+                )
             }
+            SampleFormat::F32 => {
+                let is_rec = is_recording.clone();
+                device.build_input_stream(
+                    &config.into(),
+                    move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                        if *is_rec.lock().unwrap() {
+                            let samples: Vec<i16> =
+                                data.iter().map(|&s| (s * i16::MAX as f32) as i16).collect();
+                            let bytes: Vec<u8> =
+                                samples.iter().flat_map(|&s| s.to_le_bytes()).collect();
+                            let _ = sender.try_send(bytes);
+                        }
+                    },
+                    err_fn,
+                    None,
+                )
+            }
+            _ => return Err("Unsupported sample format".to_string()),
         }
+        .map_err(|e| format!("Failed to build stream: {}", e))?;
 
-        AudioChunk {
-            data,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
-        }
+        stream
+            .play()
+            .map_err(|e| format!("Failed to play stream: {}", e))?;
+        self.stream = Some(stream);
+
+        Ok(())
+    }
+
+    pub fn stop_capture(&mut self) {
+        *self.is_recording.lock().unwrap() = false;
+        self.stream = None;
     }
 }
 
+impl Default for MicCapture {
+    fn default() -> Self {
+        Self::new()
+    }
+}
