@@ -33,6 +33,13 @@ use memory::{create_memory, MemorySummary, Message};
 use storage::Storage;
 
 #[derive(Debug, Clone)]
+enum SceneContent {
+    Url { url: String, title: String },
+    Pdf { data: Vec<u8>, title: String },
+    Text { content: String, title: String },
+}
+
+#[derive(Debug, Clone)]
 enum GeminiAction {
     Connected,
     TextReceived(String),
@@ -46,6 +53,11 @@ enum UiToGemini {
     Text(String),
     Image {
         mime_type: String,
+        data: String,
+        caption: Option<String>,
+    },
+    SceneContent {
+        content_type: String,
         data: String,
         caption: Option<String>,
     },
@@ -164,7 +176,10 @@ script_mod! {
                                 show_bg: true
                                 draw_bg +: { color: vec4(0.1, 0.1, 0.15, 0.9) }
                                 save_btn := Button{text: "Save Memory"}
-                                upload_btn := Button{text: "Upload"}
+                                upload_btn := Button{text: "📷 Img"}
+                                scene_url_btn := Button{text: "🔗 URL"}
+                                scene_file_btn := Button{text: "📄 File"}
+                                scene_paste_btn := Button{text: "📋 Paste"}
                                 stop_btn := Button{text: "Stop"}
                             }
                         }
@@ -337,6 +352,8 @@ pub struct App {
     session_state: String,
     #[rust]
     current_dithered_image: Option<String>,
+    #[rust]
+    scene_content: Option<SceneContent>,
 }
 
 impl MatchEvent for App {
@@ -357,6 +374,7 @@ impl MatchEvent for App {
         self.carousel_view_visible = false;
         self.session_state = "idle".to_string();
         self.current_dithered_image = None;
+        self.scene_content = None;
         self.ui.text_input(cx, ids!(msg_input)).set_key_focus(cx);
         self.update_memory_action_button_labels(cx);
         if let Ok(api_key) = std::env::var("GEMINI_API_KEY") {
@@ -518,6 +536,17 @@ impl MatchEvent for App {
                                         client_sender
                                             .send_image(&mime_type, &data, caption.as_deref())
                                             .await
+                                    }
+                                    UiToGemini::SceneContent {
+                                        content_type,
+                                        data,
+                                        caption,
+                                    } => {
+                                        if content_type == "pdf" {
+                                            client_sender.send_image("application/pdf", &data, caption.as_deref()).await
+                                        } else {
+                                            client_sender.send_text(&format!("[Context from {}]:\n{}", content_type, data)).await
+                                        }
                                     }
                                     UiToGemini::Disconnect => break,
                                 };
@@ -723,6 +752,7 @@ impl MatchEvent for App {
             self.pending_response.clear();
             self.current_image = None;
             self.current_dithered_image = None;
+            self.scene_content = None;
             self.is_recording = false;
             self.ui.label(cx, ids!(speech_label)).set_text(cx, "");
             self.ui.button(cx, ids!(mic_btn)).set_text(cx, "🎤 Mic");
@@ -730,6 +760,54 @@ impl MatchEvent for App {
             self.ui
                 .label(cx, ids!(status_label))
                 .set_text(cx, "Stopped");
+        }
+
+        if self.ui.button(cx, ids!(scene_url_btn)).clicked(actions) {
+            let url = self.ui.text_input(cx, ids!(msg_input)).text();
+            if !url.is_empty() {
+                self.scene_content = Some(SceneContent::Url {
+                    url: url.clone(),
+                    title: url.chars().take(30).collect(),
+                });
+                self.ui.label(cx, ids!(speech_label)).set_text(cx, &format!("🔗 URL: {}", url));
+                self.ui.label(cx, ids!(status_label)).set_text(cx, "URL scene ready");
+            }
+        }
+
+        if self.ui.button(cx, ids!(scene_file_btn)).clicked(actions) {
+            if let Some(path) = rfd::FileDialog::new()
+                .add_filter("Documents", &["pdf", "txt", "md"])
+                .add_filter("All", &["*"])
+                .pick_file()
+            {
+                if let Ok(bytes) = std::fs::read(&path) {
+                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                    let filename = path.file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("document")
+                        .to_string();
+                    
+                    self.scene_content = Some(match ext.to_lowercase().as_str() {
+                        "pdf" => SceneContent::Pdf { data: bytes, title: filename.clone() },
+                        _ => SceneContent::Text { content: String::from_utf8_lossy(&bytes).to_string(), title: filename.clone() },
+                    });
+                    
+                    self.ui.label(cx, ids!(speech_label)).set_text(cx, &format!("📄 Loaded: {}", filename));
+                    self.ui.label(cx, ids!(status_label)).set_text(cx, "Document scene ready");
+                }
+            }
+        }
+
+        if self.ui.button(cx, ids!(scene_paste_btn)).clicked(actions) {
+            let text = self.ui.text_input(cx, ids!(msg_input)).text();
+            if !text.is_empty() {
+                self.scene_content = Some(SceneContent::Text {
+                    content: text.clone(),
+                    title: text.chars().take(30).collect(),
+                });
+                self.ui.label(cx, ids!(speech_label)).set_text(cx, "📋 Text scene ready - speak or type to discuss");
+                self.ui.label(cx, ids!(status_label)).set_text(cx, "Text scene ready");
+            }
         }
 
         if self.ui.button(cx, ids!(prev_memory_btn)).clicked(actions) {
@@ -806,15 +884,17 @@ impl MatchEvent for App {
 impl App {
     fn send_current_input(&mut self, cx: &mut Cx) {
         let text = self.ui.text_input(cx, ids!(msg_input)).text();
-        if text.is_empty() {
+        if text.is_empty() && self.scene_content.is_none() {
             return;
         }
 
+        let user_msg = if text.is_empty() { "Setting scene context".to_string() } else { text.clone() };
+        
         self.ui.text_input(cx, ids!(msg_input)).set_text(cx, "");
         self.ui.text_input(cx, ids!(msg_input)).set_key_focus(cx);
         self.conversation.push(Message {
             role: "user".to_string(),
-            content: text.clone(),
+            content: user_msg.clone(),
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -822,9 +902,36 @@ impl App {
         });
         self.ui
             .label(cx, ids!(speech_label))
-            .set_text(cx, &format!("You: {}", text));
+            .set_text(cx, &format!("You: {}", user_msg));
 
         if let Some(sender) = self.text_sender.lock().unwrap().as_ref() {
+            if let Some(scene) = self.scene_content.take() {
+                match scene {
+                    SceneContent::Url { url, title: _ } => {
+                        let _ = sender.try_send(UiToGemini::SceneContent {
+                            content_type: "url".to_string(),
+                            data: url,
+                            caption: Some(text.clone()),
+                        });
+                    }
+                    SceneContent::Pdf { data, title: _ } => {
+                        let b64_data = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &data);
+                        let _ = sender.try_send(UiToGemini::SceneContent {
+                            content_type: "pdf".to_string(),
+                            data: b64_data,
+                            caption: Some(text.clone()),
+                        });
+                    }
+                    SceneContent::Text { content, title: _ } => {
+                        let _ = sender.try_send(UiToGemini::SceneContent {
+                            content_type: "text".to_string(),
+                            data: content,
+                            caption: Some(text.clone()),
+                        });
+                    }
+                }
+            }
+
             let send_result = if let Some((mime_type, data)) = self.current_image.take() {
                 sender.try_send(UiToGemini::Image {
                     mime_type,
