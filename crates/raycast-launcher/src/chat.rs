@@ -43,15 +43,44 @@ pub(crate) static CHAT_DATA: std::sync::RwLock<ChatData> = std::sync::RwLock::ne
     messages: Vec::new(),
 });
 
+const WELCOME_MESSAGE: &str = r#"Welcome! I can answer questions or generate **Splash UI apps** that render live in chat.
+
+Try asking me:
+- "Create a calculator with dark theme"
+- "Build a pomodoro timer app"
+- "Design a task dashboard with checkboxes"
+
+The UI will appear below my response. Click **Save as App** to add it to your launcher. Chat history is saved automatically."#;
+
 pub(crate) fn default_chat_messages() -> Vec<ChatMessage> {
     vec![ChatMessage {
         role: ChatRole::Assistant,
-        text: "Hello! I can help you with questions and generate Splash UI apps. Just ask me to create something!".to_string(),
+        text: WELCOME_MESSAGE.to_string(),
     }]
 }
 
 pub(crate) fn default_or_history() -> Vec<ChatMessage> {
     load_chat_history()
+}
+
+/// Extract app name suggested by AI from response text.
+/// Looks for "**App Name:** Name" or "App Name: Name" pattern.
+pub(crate) fn extract_app_name(text: &str) -> Option<String> {
+    for prefix in &["**App Name:**", "App Name:", "**Suggested Name:**", "Suggested Name:"] {
+        if let Some(start) = text.find(prefix) {
+            let after = start + prefix.len();
+            let rest = text[after..].trim_start();
+            // Take until end of line or markdown formatting
+            let end = rest.find('\n').unwrap_or(rest.len());
+            let name = rest[..end].trim();
+            // Remove trailing markdown like ** or *
+            let name = name.trim_end_matches("**").trim_end_matches('*').trim();
+            if !name.is_empty() {
+                return Some(name.to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Extract runsplash code block from markdown text.
@@ -125,6 +154,9 @@ impl LauncherPanel {
         self.view
             .widget(cx, ids!(save_app_wrap))
             .set_visible(cx, last_has_runsplash);
+        self.view
+            .widget(cx, ids!(open_app_wrap))
+            .set_visible(cx, self.last_saved_app_path.is_some());
 
         if self.chat_loading {
             self.view
@@ -161,14 +193,15 @@ impl LauncherPanel {
             return;
         };
 
-        // Use the mode_input text as the app name (if user typed one), otherwise default
-        let name = self.view.text_input(cx, ids!(mode_input)).text();
-        let name = name.trim();
-        let name = if name.is_empty() {
-            "generated-app"
-        } else {
-            name
-        };
+        // Name priority: 1) AI suggested name, 2) user input, 3) default
+        let ai_name = extract_app_name(&last_msg.text);
+        let input_name = self.view.text_input(cx, ids!(mode_input)).text();
+        let input_name = input_name.trim();
+        let name = ai_name
+            .as_deref()
+            .filter(|n| !n.is_empty())
+            .or_else(|| if input_name.is_empty() { None } else { Some(input_name) })
+            .unwrap_or("generated-app");
         // Sanitize name for filename
         let safe_name: String = name
             .chars()
@@ -194,9 +227,17 @@ impl LauncherPanel {
                         .set_text(cx, &format!("Save failed: {}", e));
                 } else {
                     log!("Saved app descriptor to {}", path);
+                    // Refresh launcher items so the new app appears immediately
+                    self.all_items = crate::load_launcher_items();
+                    self.rebuild_filter();
+                    self.last_saved_app_path = Some(path.clone());
                     self.view
                         .label(cx, ids!(chat_status_label))
-                        .set_text(cx, &format!("Saved as {}", path));
+                        .set_text(cx, &format!(
+                        "Saved '{}'. Click 'Open App' to launch it.",
+                        name
+                    ));
+                    self.sync_chat_ui(cx);
                     // Clear input after save
                     self.chat_draft.clear();
                     self.sync_mode_input(cx);
@@ -359,6 +400,20 @@ impl LauncherPanel {
 
         if self.view.button(cx, ids!(save_app_btn)).clicked(actions) {
             self.save_chat_app(cx);
+            return;
+        }
+
+        if self.view.button(cx, ids!(open_app_btn)).clicked(actions) {
+            if let Some(path) = self.last_saved_app_path.clone() {
+                self.set_chat_mode(cx, false);
+                self.show_todo = true;
+                self.view.view(cx, ids!(launcher_view)).set_visible(cx, false);
+                self.view.view(cx, ids!(todo_view)).set_visible(cx, true);
+                self.view.view(cx, ids!(chat_view)).set_visible(cx, false);
+                self.sync_mode_input(cx);
+                self.load_splash_app(cx, &path);
+                self.redraw(cx);
+            }
             return;
         }
 

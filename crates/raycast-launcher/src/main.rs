@@ -685,6 +685,15 @@ script_mod! {
                         padding: Inset{left: 10 right: 10 top: 6 bottom: 6}
                     }
                 }
+                open_app_wrap := View{
+                    visible: false
+                    width: Fit
+                    height: Fit
+                    open_app_btn := Button{
+                        text: "Open App"
+                        padding: Inset{left: 10 right: 10 top: 6 bottom: 6}
+                    }
+                }
                 chat_keys_label := Label{
                     text: "Enter Send  |  Esc Back"
                     draw_text +: {
@@ -806,6 +815,8 @@ pub struct LauncherPanel {
     stream_buffer: String,
     #[rust]
     stream_msg_index: usize,
+    #[rust]
+    last_saved_app_path: Option<String>,
 }
 
 impl ScriptHook for LauncherPanel {
@@ -829,6 +840,7 @@ impl ScriptHook for LauncherPanel {
             self.show_chat = false;
             self.chat_messages = chat::default_or_history();
             self.chat_loading = false;
+            self.last_saved_app_path = None;
             self.chat_server_url = std::env::var("LLM_API_URL")
                 .unwrap_or_else(|_| "https://openrouter.ai/api/v1/chat/completions".to_string());
             self.chat_model =
@@ -1139,7 +1151,7 @@ impl LauncherPanel {
             )
         } else if self.show_chat {
             (
-                "Ask for UI, e.g. 'Create a task dashboard with charts'",
+                "Describe a UI to create, e.g. 'Build a dark calculator' or 'Design a music player'",
                 self.chat_draft.as_str(),
                 self.chat_loading,
                 true,

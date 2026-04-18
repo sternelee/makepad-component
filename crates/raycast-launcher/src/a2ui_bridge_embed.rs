@@ -18,33 +18,84 @@ struct LlmMessage {
     content: Option<String>,
 }
 
-pub(crate) fn build_chat_request_body(model: &str, messages: &[ChatMessage]) -> String {
-    let system_prompt = r#"You are a helpful assistant with expertise in UI design and Makepad's Splash scripting language.
+/// Keywords that indicate the user wants to generate a UI/app.
+const UI_GEN_KEYWORDS: &[&str] = &[
+    "create", "make", "build", "generate", "design", "app", "ui", "widget",
+    "界面", "应用", "创建", "生成", "设计", "组件", "页面", "布局",
+];
 
-You can answer questions normally using markdown formatting (bold, lists, code blocks, etc.).
-
-When the user asks you to create a UI, widget, app, or any visual component, you should generate Splash script code and wrap it in a ```runsplash fenced code block. The content inside the runsplash block will be rendered as live interactive UI in the chat.
-
-Example of a runsplash block:
-```runsplash
-View {
-    width: Fill
-    height: Fit
-    flow: Down
-    spacing: 10
-    padding: Inset{left: 20 right: 20 top: 20 bottom: 20}
-    show_bg: true
-    draw_bg +: { color: #x1a1a2e }
-    Label { text: "Hello from Splash!" }
-    Button { text: "Click me" }
+/// Detect if a user message is requesting UI generation.
+pub(crate) fn is_ui_generation_request(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    UI_GEN_KEYWORDS.iter().any(|kw| lower.contains(kw))
 }
+
+/// Full Splash API reference injected as user context when UI generation is detected.
+const SPLASH_API_REFERENCE: &str = r#"
+## Splash UI API Reference (for code generation)
+
+Splash is Makepad 2.0's declarative UI scripting language.
+
+### Syntax Rules
+- NO commas or semicolons — space-separated only
+- `:` for assignment: `width: Fill`
+- `:=` for named widgets: `my_btn := Button{text: "OK"}`
+- `+:` for merge: `draw_bg +: {color: #x1e293b}`
+- `#x` prefix for hex colors: `#x0f172a`, `#x3b82f6`
+- Space-separated function args: `vec2(800 600)`
+- Trailing `.` for floats: `12.0`
+
+### Layout Properties
+- `width: Fill|Fit|<number>`, `height: Fill|Fit|<number>`
+- `flow: Down|Right|Overlay`
+- `spacing: <number>`, `padding: Inset{left: N right: N top: N bottom: N}`
+- `margin: Inset{...}`, `align: VCenter|HCenter|Center|TopLeft|BottomRight`
+
+### Common Widgets
+- `View` — container. Props: `show_bg`, `draw_bg +:{color: #xRRGGBB radius: N}`, custom `pixel:` with Sdf2d
+- `Label` — text. Props: `text: "..."`, `draw_text +:{text_style: theme.font_regular{font_size: N} color: #xRRGGBB}`
+- `Button` — clickable. Props: `text: "..."`, `padding: Inset{...}`
+- `TextInput` — input field. Props: `empty_text: "..."`, `padding: Inset{...}`
+- `CheckBox` — toggle. Props: `text: "..."`
+- `Slider` — numeric slider. Props: `min: 0.0`, `max: 100.0`, `step: 1.0`
+- `PortalList` — virtualized list. Props: `drag_scrolling: false`, `auto_tail: true`
+- `Image` — image display. Props: `source: "path"`, `width: Fill`, `height: Fit`
+- `Markdown` — rich text. Props: `body: "..."`, `selectable: true`
+- `Splash` — inline Splash renderer. Props: `body: "..."`
+
+### State Management
+Store app state in `mod.state.app`:
+```
+mod.state.app.counter = 0
+mod.state.app.items = []
 ```
 
-Keep your explanations concise and place the runsplash code block at the end of your response."#;
+### runsplash Block Rules
+1. Define widget templates with `mod.widgets.MyWidget = View{...}`
+2. Create main UI tree at the end
+3. Use dark theme: bg `#x0f172a`, card `#x1e293b`, accent `#x3b82f6`, text `#xf1f5f9`
+4. Root View should use `width: Fill height: Fill`
+5. Include the app name suggestion at the start of your response like: **App Name:** MyApp
+"#;
 
+const SYSTEM_PROMPT: &str = r#"You are a Splash UI expert assistant. Makepad's Splash is a declarative UI scripting language.
+
+You can answer general questions using markdown. When the user asks you to create a UI, app, widget, or visual component, generate Splash script code inside a ```runsplash fenced code block.
+
+The runsplash code will be evaluated live and rendered as interactive UI in the chat. The user can save it as a standalone app.
+
+Guidelines:
+- Keep explanations concise (1-2 sentences before the code block)
+- Suggest an app name at the very start of your response: **App Name:** <name>
+- Place the ```runsplash code block at the END of your response
+- Generate COMPLETE, self-contained code that renders immediately
+- Use a polished dark theme with consistent spacing
+- If the user asks for modifications, regenerate the FULL code block with all changes"#;
+
+pub(crate) fn build_chat_request_body(model: &str, messages: &[ChatMessage]) -> String {
     let mut msgs = vec![json!({
         "role": "system",
-        "content": system_prompt
+        "content": SYSTEM_PROMPT
     })];
 
     for msg in messages {
@@ -52,9 +103,14 @@ Keep your explanations concise and place the runsplash code block at the end of 
             ChatRole::User => "user",
             ChatRole::Assistant => "assistant",
         };
+        let content = if msg.role == ChatRole::User && is_ui_generation_request(&msg.text) {
+            format!("{}\n\n{}", msg.text, SPLASH_API_REFERENCE)
+        } else {
+            msg.text.clone()
+        };
         msgs.push(json!({
             "role": role,
-            "content": msg.text
+            "content": content
         }));
     }
 
