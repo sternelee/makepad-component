@@ -71,7 +71,12 @@ mod.state.app.items = []
 ```
 
 ### runsplash Block Rules
-1. Define widget templates with `mod.widgets.MyWidget = View{...}`
+1. Define templates as inline variables, NOT with `mod.widgets` (runtime eval does not support `mod.widgets` references):
+   ```
+   Item := View{...}
+   Empty := View{...}
+   { Item := Item Empty := Empty }
+   ```
 2. Create main UI tree at the end
 3. Use dark theme: bg `#x0f172a`, card `#x1e293b`, accent `#x3b82f6`, text `#xf1f5f9`
 4. Root View should use `width: Fill height: Fill`

@@ -30,19 +30,18 @@ pub fn load_app_descriptor(path: &str) -> Option<AppDescriptor> {
 }
 
 /// Construct a ScriptMod from a Splash code string.
-/// Wraps with imports that are implicitly available in `script_mod!` blocks
-/// but missing in runtime `vm.eval()` context.
+///
+/// Runtime `vm.eval()` uses the crate-root module context (same as `main.rs`
+/// `script_mod!`) so that `mod.prelude.widgets.*` resolves identically.
+/// The `use` statement is prepended because eval'd code does not inherit
+/// imports from the calling site.
 pub fn script_mod_from_code(code: &str) -> ScriptMod {
-    // Prepend imports so widget types (View, Button, Fill, etc.), draw/shader
-    // types (uniform, instance, Sdf2d), and theme are in scope — matching the
-    // compile-time `script_mod!` environment where the code was authored.
-    let wrapped = format!(
-        "use mod.prelude.widgets.*\nuse mod.prelude.draw.*\ntheme = mod.prelude.theme\n\n{}",
-        code
-    );
+    let wrapped = format!("use mod.prelude.widgets.*\n{}", code);
     ScriptMod {
         cargo_manifest_path: env!("CARGO_MANIFEST_DIR").to_string(),
-        module_path: module_path!().to_string(),
+        // must match the crate root so `mod.prelude` resolves to the same
+        // prelude object that `main.rs script_mod!` sees
+        module_path: "raycast_launcher".to_string(),
         file: file!().to_string(),
         line: 0,
         column: 0,

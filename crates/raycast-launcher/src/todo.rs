@@ -327,9 +327,10 @@ impl Widget for TodoList {
                         item.view(cx, ids!(tag))
                             .set_visible(cx, !todo.tag.is_empty());
 
-                        if let Some(mut row_view) = item.view(cx, ids!(row)).borrow_mut() {
+                        // Set shader uniforms on the item's root View draw_bg
+                        if let Some(mut item_view) = item.borrow_mut::<View>() {
                             let done_value = if todo.done { 1.0 } else { 0.0 };
-                            row_view.draw_bg.draw_vars.set_dyn_instance(
+                            item_view.draw_bg.draw_vars.set_dyn_instance(
                                 cx,
                                 live_id!(done),
                                 &[done_value],
@@ -337,17 +338,17 @@ impl Widget for TodoList {
                             let bg_normal = hex_to_vec4(&theme.row_bg_normal);
                             let bg_done = hex_to_vec4(&theme.row_bg_done);
                             let stroke = hex_to_vec4(&theme.row_stroke);
-                            row_view.draw_bg.draw_vars.set_uniform(
+                            item_view.draw_bg.draw_vars.set_uniform(
                                 cx,
                                 live_id!(bg_normal),
                                 &[bg_normal.x, bg_normal.y, bg_normal.z, bg_normal.w],
                             );
-                            row_view.draw_bg.draw_vars.set_uniform(
+                            item_view.draw_bg.draw_vars.set_uniform(
                                 cx,
                                 live_id!(bg_done),
                                 &[bg_done.x, bg_done.y, bg_done.z, bg_done.w],
                             );
-                            row_view.draw_bg.draw_vars.set_uniform(
+                            item_view.draw_bg.draw_vars.set_uniform(
                                 cx,
                                 live_id!(stroke_color),
                                 &[stroke.x, stroke.y, stroke.z, stroke.w],
