@@ -707,19 +707,6 @@ script_mod! {
                         return sdf.result
                     }
                 }
-                View{
-                    width: Fill
-                    height: Fit
-                    padding: Inset{left: 10 right: 10 top: 10 bottom: 10}
-                    chat_output_label := Label{
-                        width: Fill
-                        text: ""
-                        draw_text +: {
-                            text_style: theme.font_regular {font_size: 11}
-                            color: #xd3d9e6
-                        }
-                    }
-                }
             }
         }
     }
@@ -813,6 +800,12 @@ pub struct LauncherPanel {
     chat_model: String,
     #[rust]
     chat_api_key: String,
+    #[rust]
+    stream_timer: Option<Timer>,
+    #[rust]
+    stream_buffer: String,
+    #[rust]
+    stream_msg_index: usize,
 }
 
 impl ScriptHook for LauncherPanel {
@@ -834,7 +827,7 @@ impl ScriptHook for LauncherPanel {
             self.show_todo = false;
             *todo::TODOS.write().unwrap() = todo::initial_todos();
             self.show_chat = false;
-            self.chat_messages = chat::default_chat_messages();
+            self.chat_messages = chat::default_or_history();
             self.chat_loading = false;
             self.chat_server_url = std::env::var("LLM_API_URL")
                 .unwrap_or_else(|_| "https://openrouter.ai/api/v1/chat/completions".to_string());
@@ -1663,6 +1656,40 @@ impl Widget for LauncherPanel {
 
         if let Event::NetworkResponses(responses) = event {
             self.handle_chat_network_responses(cx, responses);
+        }
+
+        if let Event::Timer(te) = event {
+            if let Some(timer) = self.stream_timer {
+                if timer.is_timer(te).is_some() {
+                    if let Some(msg) = self.chat_messages.get_mut(self.stream_msg_index) {
+                        let current_len = msg.text.len();
+                        let target_len = self.stream_buffer.len();
+                        if current_len < target_len {
+                            // Append next char(s) — batch a few for speed
+                            let batch = (target_len - current_len).min(3);
+                            msg.text.push_str(&self.stream_buffer[current_len..current_len + batch]);
+                            {
+                                let mut data = chat::CHAT_DATA.write().unwrap();
+                                if let Some(dm) = data.messages.get_mut(self.stream_msg_index) {
+                                    dm.text.clone_from(&msg.text);
+                                }
+                            }
+                            self.redraw(cx);
+                        } else {
+                            // Streaming complete
+                            self.stream_timer = None;
+                            self.stream_buffer.clear();
+                            chat::save_chat_history(&self.chat_messages);
+                            self.view
+                                .label(cx, ids!(chat_status_label))
+                                .set_text(cx, "Response received");
+                            self.sync_chat_ui(cx);
+                        }
+                    } else {
+                        self.stream_timer = None;
+                    }
+                }
+            }
         }
 
         if let Some(text) = self.view.text_input(cx, ids!(mode_input)).changed(&actions) {

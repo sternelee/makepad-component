@@ -1,17 +1,38 @@
 use makepad_widgets::*;
+use serde::{Deserialize, Serialize};
 
 use crate::{a2ui_bridge_embed, app_loader, LauncherPanel};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum ChatRole {
     User,
     Assistant,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct ChatMessage {
     pub(crate) role: ChatRole,
     pub(crate) text: String,
+}
+
+const CHAT_HISTORY_PATH: &str = ".chat-history.json";
+
+pub(crate) fn load_chat_history() -> Vec<ChatMessage> {
+    match std::fs::read_to_string(CHAT_HISTORY_PATH) {
+        Ok(json) => match serde_json::from_str::<Vec<ChatMessage>>(&json) {
+            Ok(messages) if !messages.is_empty() => messages,
+            _ => default_chat_messages(),
+        },
+        Err(_) => default_chat_messages(),
+    }
+}
+
+pub(crate) fn save_chat_history(messages: &[ChatMessage]) {
+    if let Ok(json) = serde_json::to_string_pretty(messages) {
+        if let Err(e) = std::fs::write(CHAT_HISTORY_PATH, json) {
+            log!("Failed to save chat history: {}", e);
+        }
+    }
 }
 
 pub(crate) struct ChatData {
@@ -27,6 +48,10 @@ pub(crate) fn default_chat_messages() -> Vec<ChatMessage> {
         role: ChatRole::Assistant,
         text: "Hello! I can help you with questions and generate Splash UI apps. Just ask me to create something!".to_string(),
     }]
+}
+
+pub(crate) fn default_or_history() -> Vec<ChatMessage> {
+    load_chat_history()
 }
 
 /// Extract runsplash code block from markdown text.
@@ -59,6 +84,10 @@ impl LauncherPanel {
         self.show_chat = show;
         if show {
             self.show_todo = false;
+        } else {
+            // Stop any active stream when leaving chat
+            self.stream_timer = None;
+            self.stream_buffer.clear();
         }
         self.view.view(cx, ids!(launcher_view)).set_visible(cx, !show);
         self.view.view(cx, ids!(todo_view)).set_visible(cx, false);
@@ -106,10 +135,10 @@ impl LauncherPanel {
 
     fn reset_chat(&mut self, cx: &mut Cx) {
         cx.cancel_http_request(live_id!(ChatCompletionRequest));
+        self.stream_timer = None;
+        self.stream_buffer.clear();
         self.chat_messages = default_chat_messages();
-        self.view
-            .label(cx, ids!(chat_output_label))
-            .set_text(cx, "");
+        save_chat_history(&self.chat_messages);
         self.chat_loading = false;
         self.view
             .label(cx, ids!(chat_status_label))
@@ -198,6 +227,7 @@ impl LauncherPanel {
             role: ChatRole::User,
             text: user_msg.clone(),
         });
+        save_chat_history(&self.chat_messages);
         self.chat_loading = true;
         self.chat_draft.clear();
         self.sync_chat_ui(cx);
@@ -259,22 +289,24 @@ impl LauncherPanel {
                     let body = response.get_string_body().unwrap_or_default();
                     match a2ui_bridge_embed::parse_chat_response(response.status_code, &body) {
                         Ok(assistant_text) => {
+                            // Start typewriter stream: push empty message, then drip chars via timer
                             self.chat_messages.push(ChatMessage {
                                 role: ChatRole::Assistant,
-                                text: assistant_text.clone(),
+                                text: String::new(),
                             });
-                            self.view
-                                .label(cx, ids!(chat_output_label))
-                                .set_text(cx, &assistant_text);
+                            self.stream_msg_index = self.chat_messages.len() - 1;
+                            self.stream_buffer = assistant_text;
+                            self.stream_timer = Some(cx.start_interval(0.015));
                             self.view
                                 .label(cx, ids!(chat_status_label))
-                                .set_text(cx, "Response received");
+                                .set_text(cx, "Receiving...");
                         }
                         Err(err) => {
                             self.chat_messages.push(ChatMessage {
                                 role: ChatRole::Assistant,
                                 text: err,
                             });
+                            save_chat_history(&self.chat_messages);
                             self.view
                                 .label(cx, ids!(chat_status_label))
                                 .set_text(cx, "Request failed");
@@ -295,6 +327,7 @@ impl LauncherPanel {
                         role: ChatRole::Assistant,
                         text: format!("Network error: {}", error.message),
                     });
+                    save_chat_history(&self.chat_messages);
                     self.chat_loading = false;
                     self.view
                         .label(cx, ids!(chat_status_label))
