@@ -8,6 +8,7 @@ This is a **Makepad UI component library** with a full **A2UI (Agent-to-UI) prot
 - Native Makepad widgets (buttons, sliders, charts, etc.)
 - A2UI protocol implementation for AI-generated UIs
 - Demo applications and LLM bridge servers
+- **Gemini Talker** — an immersive AI companion app (Makepad 2.0 Script API)
 
 ## Build, Test, and Run Commands
 
@@ -15,10 +16,12 @@ This is a **Makepad UI component library** with a full **A2UI (Agent-to-UI) prot
 # Build
 cargo build --workspace                    # Full workspace build
 cargo check -p makepad-component           # Fast check for core library
+cargo check -p gemini-talker               # Fast check for gemini-talker
 
 # Run demos
 cargo run -p component-zoo --bin component-zoo    # Widget showcase
 cargo run -p a2ui-demo --bin a2ui-demo            # A2UI demo app
+cargo run -p gemini-talker                        # Gemini Live voice companion app
 
 # Run LLM bridge server (requires feature flag)
 cargo build --bin a2ui-bridge --features a2ui-bridge
@@ -26,6 +29,13 @@ LLM_API_URL="https://integrate.api.nvidia.com/v1/chat/completions" \
 LLM_MODEL="minimaxai/minimax-m2.1" \
 LLM_API_KEY="nvapi-your-key" \
 ./target/debug/a2ui-bridge
+
+# Other a2ui-demo binaries
+cargo run --bin a2ui-streaming                    # Streaming A2UI demo
+cargo run --bin math-charts                       # Generate math chart JSON
+cargo run --bin fft-demo                          # FFT visualization demo
+cargo run --bin watch-server --features mock-server     # File watcher SSE server
+cargo run --bin mock-a2a-server --features mock-server  # Mock A2A server
 
 # Testing
 cargo test --workspace                     # All tests
@@ -54,8 +64,18 @@ crates/
 ├── makepad-plot/         # Chart library (29 types + 3D)
 ├── component-zoo/        # Widget demo app
 ├── a2ui-demo/           # A2UI demo + bridge servers
+│   └── src/
+│       ├── main.rs              # A2UI demo GUI app
+│       ├── streaming_main.rs    # Streaming demo
+│       ├── a2ui_bridge.rs       # LLM → A2UI bridge server
+│       ├── a2ui_bridge_impl/    # Bridge impl (server, builder, tools)
+│       ├── mock_server.rs       # Mock A2A server
+│       ├── watch_server.rs      # File-watching SSE server
+│       ├── math_charts.rs       # Math chart generator
+│       └── fft_demo.rs          # FFT visualization
 ├── raycast-launcher/     # Raycast-style launcher
-└── makepad-clipboard/    # Clipboard utilities
+├── makepad-clipboard/    # Clipboard utilities
+└── gemini-talker/        # Gemini Live voice companion (Makepad 2.0)
 ```
 
 ### Key Concepts
@@ -66,10 +86,21 @@ crates/
 
 **Widget Pattern**: Action enum + `Widget` trait impl + `handle_event` for interactions + `draw_walk` for rendering. See AGENTS.md for full pattern.
 
+**Gemini Talker Exception**: This crate uses Makepad 2.0's `script_mod!` API instead of `live_design!`, with `#[derive(Script, ScriptHook)]` and `AppMain::script_mod()`. It has its own `crates/gemini-talker/CLAUDE.md` with specific guidance.
+
 ### Dependency Notes
 
-- `makepad-widgets`: External Makepad framework, pinned to git branch in `Cargo.toml`
+- `makepad-widgets`: External Makepad framework, referenced by **absolute local path** (`/Users/sternelee/www/github/makepad/widgets`)
 - Changes to `makepad-widgets` may require workspace-wide updates
+- `gemini-talker` does **not** depend on `makepad-component`; it uses `makepad-widgets` directly
+
+### Feature Flags (a2ui-demo crate)
+
+| Feature | Description |
+|---------|-------------|
+| `mock-server` | Enables `watch-server` and `mock-a2a-server` binaries |
+| `a2ui-bridge` | Enables LLM bridge server with HTTP/Tokio deps |
+| `mureka` | AI music generation (extends `a2ui-bridge`, requires `MUREKA_API_KEY`) |
 
 ## Development Workflow
 
@@ -151,4 +182,5 @@ Messages are parsed in `message.rs`, processed in `processor.rs`, rendered by `s
 
 - **AGENTS.md**: Detailed coding style, commit guidelines, and implementation patterns
 - **README.md**: User-facing documentation, A2UI protocol details, demo instructions
+- **crates/gemini-talker/CLAUDE.md**: Guidance specific to the Gemini Talker app
 - **crates/ui/src/a2ui/**: A2UI protocol implementation with inline documentation

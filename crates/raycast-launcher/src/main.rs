@@ -1,4 +1,4 @@
-use makepad_component::widgets::button::*;
+pub use makepad_widgets;
 use makepad_widgets::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -11,719 +11,902 @@ mod a2ui_bridge_embed;
 mod chat;
 mod todo;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use makepad_component::a2ui::surface::widget::*;
-    use makepad_component::widgets::button::*;
-    use makepad_component::widgets::checkbox::*;
-    use makepad_component::widgets::progress::*;
+script_mod! {
+    use mod.prelude.widgets.*
 
-    pub LauncherPanel = {{LauncherPanel}} {
-        width: Fill,
-        height: Fill,
-        flow: Down,
-        spacing: 12,
-        padding: {left: 16, right: 16, top: 14, bottom: 14},
-        show_bg: true,
-	                    draw_bg: {
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 13.0);
-                sdf.fill(#x181a1f);
-                sdf.stroke(#x2f343d, 1.0);
-                return sdf.result;
+    mod.widgets.LauncherPanelBase = #(LauncherPanel::register_widget(vm))
+    mod.widgets.LauncherPanel = set_type_default() do mod.widgets.LauncherPanelBase{
+        width: Fill
+        height: Fill
+        flow: Down
+        spacing: 12
+        padding: Inset{left: 16 right: 16 top: 14 bottom: 14}
+        show_bg: true
+        draw_bg +: {
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 13.0)
+                sdf.fill(#x181a1f)
+                sdf.stroke(#x2f343d 1.0)
+                return sdf.result
             }
         }
 
-        mode_input_row = <View> {
-            width: Fill,
-            height: Fit,
-            flow: Right,
-            align: {y: 0.5},
-            spacing: 8,
-            margin: {top: 10},
+        mode_input_row := View{
+            width: Fill
+            height: Fit
+            flow: Right
+            align: VCenter
+            spacing: 8
+            margin: Inset{top: 10}
 
-            mode_back_wrap = <View> {
-                visible: false,
-                width: Fit,
-                height: Fit,
-                mode_back_btn = <MpButtonSecondary> {
+            mode_back_wrap := View{
+                visible: false
+                width: Fit
+                height: Fit
+                mode_back_btn := Button{
                     text: "‹ Back"
-                    padding: {left: 10, right: 10, top: 7, bottom: 7}
+                    padding: Inset{left: 10 right: 10 top: 7 bottom: 7}
                 }
             }
 
-            mode_input = <TextInput> {
-            width: Fill,
-            height: Fit,
-            empty_text: "Search applications and commands…",
-            padding: {left: 12, right: 12, top: 10, bottom: 10},
-            draw_bg: {
-                instance border_color: #x3e4653,
-                instance focus: 0.0,
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 10.0);
-                    let fill_base = #x1f2329;
-                    let fill_focus = #x242a33;
-                    let border_focus = #x6ea9ff;
-                    sdf.fill(mix(fill_base, fill_focus, self.focus * 0.65));
-                    sdf.stroke(mix(self.border_color, border_focus, self.focus), 1.0);
-                    return sdf.result;
+            mode_input := TextInput{
+                width: Fill
+                height: Fit
+                empty_text: "Search applications and commands…"
+                padding: Inset{left: 12 right: 12 top: 10 bottom: 10}
+                draw_bg +: {
+                    border_color: instance(#x3e4653)
+                    focus: instance(0.0)
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 10.0)
+                        let fill_base = #x1f2329
+                        let fill_focus = #x242a33
+                        let border_focus = #x6ea9ff
+                        sdf.fill(mix(fill_base fill_focus self.focus * 0.65))
+                        sdf.stroke(mix(self.border_color border_focus self.focus) 1.0)
+                        return sdf.result
+                    }
+                }
+                draw_text +: {
+                    text_style: theme.font_bold {font_size: 13}
+                    color: #xf4f6fb
                 }
             }
-            draw_text: {
-                text_style: <THEME_FONT_REGULAR> {font_size: 13},
-                color: #xf4f6fb
-            }
-            }
 
-            mode_action_wrap = <View> {
-                visible: false,
-                width: Fit,
-                height: Fit,
-                mode_action_btn = <MpButtonPrimary> {
+            mode_action_wrap := View{
+                visible: false
+                width: Fit
+                height: Fit
+                mode_action_btn := Button{
                     text: "Add"
-                    padding: {left: 12, right: 12, top: 7, bottom: 7}
+                    padding: Inset{left: 12 right: 12 top: 7 bottom: 7}
                 }
             }
 
-            mode_hint_label = <Label> {
-                text: "",
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> {font_size: 10},
+            mode_hint_label := Label{
+                text: ""
+                draw_text +: {
+                    text_style: theme.font_regular {font_size: 10}
                     color: #x8f9caf
                 }
             }
         }
 
-        launcher_view = <View> {
-            width: Fill,
-            height: Fill,
-            flow: Down,
-            spacing: 10,
+        launcher_view := View{
+            width: Fill
+            height: Fill
+            flow: Down
+            spacing: 10
 
-            <View> {
-                width: Fill,
-                height: Fit,
-                flow: Down,
-                spacing: 2,
-                <Label> {
-                    text: "Launcher",
-                    draw_text: {
-                        text_style: <THEME_FONT_BOLD> {font_size: 17},
+            View{
+                width: Fill
+                height: Fit
+                flow: Down
+                spacing: 2
+                Label{
+                    text: "Launcher"
+                    draw_text +: {
+                        text_style: theme.font_bold {font_size: 17}
                         color: #xf9fbff
                     }
                 }
-                <Label> {
-                    text: "Quickly open apps and run commands",
-                    draw_text: {
-                        text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                Label{
+                    text: "Quickly open apps and run commands"
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 10}
                         color: #x8f9caf
                     }
-	                        }
-	                    }
-
-	            top_count_row = <View> {
-	                        visible: false,
-	                        width: Fill,
-	                        height: Fit,
-		            flow: Right,
-	            align: {y: 0.5},
-	            padding: {left: 10, right: 10, top: 6, bottom: 6},
-	            show_bg: true,
-            draw_bg: {
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 7.0);
-                    sdf.fill(#x1b2028);
-                    sdf.stroke(#x303745, 1.0);
-                    return sdf.result;
                 }
             }
-	            result_count = <Label> {
-	                text: "",
-	                draw_text: {
-	                    text_style: <THEME_FONT_REGULAR> {font_size: 11},
-	                    color: #xa7b0c1
-	                }
-	            }
-	            }
 
-            empty_state = <View> {
-                visible: false,
-                width: Fill,
-                height: Fit,
-                flow: Down,
-                spacing: 6,
-                padding: {left: 14, right: 14, top: 14, bottom: 14},
-                show_bg: true,
-                draw_bg: {
-                    fn pixel(self) -> vec4 {
-                        let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                        sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 9.0);
-                        sdf.fill(#x1b2028);
-                        sdf.stroke(#x303745, 1.0);
-                        return sdf.result;
+            top_count_row := View{
+                visible: false
+                width: Fill
+                height: Fit
+                flow: Right
+                align: VCenter
+                padding: Inset{left: 10 right: 10 top: 6 bottom: 6}
+                show_bg: true
+                draw_bg +: {
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 7.0)
+                        sdf.fill(#x1b2028)
+                        sdf.stroke(#x303745 1.0)
+                        return sdf.result
                     }
                 }
-                empty_title = <Label> {
-                    text: "No Results",
-                    draw_text: {
-                        text_style: <THEME_FONT_BOLD> {font_size: 13},
+                result_count := Label{
+                    text: ""
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 11}
+                        color: #xa7b0c1
+                    }
+                }
+            }
+
+            empty_state := View{
+                visible: false
+                width: Fill
+                height: Fit
+                flow: Down
+                spacing: 6
+                padding: Inset{left: 14 right: 14 top: 14 bottom: 14}
+                show_bg: true
+                draw_bg +: {
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 9.0)
+                        sdf.fill(#x1b2028)
+                        sdf.stroke(#x303745 1.0)
+                        return sdf.result
+                    }
+                }
+                empty_title := Label{
+                    text: "No Results"
+                    draw_text +: {
+                        text_style: theme.font_bold {font_size: 13}
                         color: #xe6ebf5
                     }
                 }
-                empty_desc = <Label> {
-                    text: "Try another keyword, or use /todo and /chat",
-                    draw_text: {
-                        text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                empty_desc := Label{
+                    text: "Try another keyword, or use /todo and /chat"
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 11}
                         color: #x8f9caf
                     }
                 }
             }
 
-            results = <PortalList> {
-            width: Fill,
-            height: Fill,
-            flow: Down,
-            spacing: 1,
+            results := PortalList{
+                width: Fill
+                height: Fill
+                flow: Down
+                spacing: 1
 
-            ResultRow = <View> {
-                width: Fill,
-                height: Fit,
-                margin: {top: 2, bottom: 2},
+                ResultRow := View{
+                    width: Fill
+                    height: Fit
+                    margin: Inset{top: 2 bottom: 2}
 
-	                row_bg = <View> {
-	                    width: Fill,
-	                    height: Fit,
-	                    flow: Down,
-	                    spacing: 2,
-	                    padding: {left: 11, right: 11, top: 8, bottom: 8},
-                    show_bg: true,
-                    draw_bg: {
-                        instance selected: 0.0
-                        instance hovered: 0.0
-                        instance command: 0.0
-                        instance builtin: 0.0
-                        fn pixel(self) -> vec4 {
-                            let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 7.0);
-                            let base = #x242a32;
-                            let hover = #x2b333f;
-                            let command_tint = #x3a3530;
-                            let builtin_tint = #x2d3240;
-                            let tinted = mix(base, command_tint, self.command * 0.42);
-                            let tinted = mix(tinted, builtin_tint, self.builtin * 0.62);
-                            let active = mix(#x3a79de, #x4f7de0, self.builtin);
-                            let hovered_mix = mix(base, hover, self.hovered);
-                            let hover_tinted = mix(hovered_mix, tinted, max(self.command, self.builtin) * 0.32);
-                            sdf.fill(mix(hover_tinted, active, self.selected));
-                            let stroke_color = mix(#x323a45, #x4b5d78, self.hovered);
-                            let stroke_color = mix(stroke_color, #x8f7044, self.command * 0.5);
-                            let stroke_color = mix(stroke_color, #x6177a1, self.builtin * 0.6);
-                            sdf.stroke(mix(stroke_color, #x79adff, self.selected), 1.0);
+                    row_bg := View{
+                        width: Fill
+                        height: Fit
+                        flow: Down
+                        spacing: 2
+                        padding: Inset{left: 11 right: 11 top: 8 bottom: 8}
+                        show_bg: true
+                        draw_bg +: {
+                            selected: instance(0.0)
+                            hovered: instance(0.0)
+                            command: instance(0.0)
+                            builtin: instance(0.0)
+                            pixel: fn() {
+                                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                                sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 7.0)
+                                let base = #x242a32
+                                let hover = #x2b333f
+                                let command_tint = #x3a3530
+                                let builtin_tint = #x2d3240
+                                let tinted = mix(base command_tint self.command * 0.42)
+                                let tinted = mix(tinted builtin_tint self.builtin * 0.62)
+                                let active = mix(#x3a79de #x4f7de0 self.builtin)
+                                let hovered_mix = mix(base hover self.hovered)
+                                let hover_tinted = mix(hovered_mix tinted max(self.command self.builtin) * 0.32)
+                                sdf.fill(mix(hover_tinted active self.selected))
+                                let stroke_color = mix(#x323a45 #x4b5d78 self.hovered)
+                                let stroke_color = mix(stroke_color #x8f7044 self.command * 0.5)
+                                let stroke_color = mix(stroke_color #x6177a1 self.builtin * 0.6)
+                                sdf.stroke(mix(stroke_color #x79adff self.selected) 1.0)
+                                return sdf.result
+                            }
+                        }
 
-                            return sdf.result;
-	                        }
-	                    }
+                        group_label := Label{
+                            text: "Applications"
+                            margin: Inset{bottom: 2}
+                            draw_text +: {
+                                text_style: theme.font_bold {font_size: 9}
+                                color: #x8fa0ba
+                            }
+                        }
 
-	                    group_label = <Label> {
-	                        text: "Applications",
-	                        margin: {bottom: 2},
-	                        draw_text: {
-	                            text_style: <THEME_FONT_BOLD> {font_size: 9},
-	                            color: #x8fa0ba
-	                        }
-	                    }
+                        View{
+                            width: Fill
+                            height: Fit
+                            flow: Right
+                            align: VCenter
+                            spacing: 9
 
-	                    <View> {
-	                        width: Fill,
-	                        height: Fit,
-	                        flow: Right,
-	                        align: {y: 0.5},
-	                        spacing: 9,
+                            icon_wrap := View{
+                                width: 24
+                                height: 24
+                                flow: Overlay
+                                align: Center
+                                show_bg: true
+                                draw_bg +: {
+                                    bg_color: instance(#x1a1f26)
+                                    border_color: instance(#x323a45)
+                                    pixel: fn() {
+                                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 6.0)
+                                        sdf.fill(self.bg_color)
+                                        sdf.stroke(self.border_color 1.0)
+                                        return sdf.result
+                                    }
+                                }
 
-	                        icon_wrap = <View> {
-	                            width: 24,
-	                            height: 24,
-	                            flow: Overlay,
-	                            align: {x: 0.5, y: 0.5},
-	                            show_bg: true,
-	                            draw_bg: {
-	                                instance bg_color: #x1a1f26
-	                                instance border_color: #x323a45
-                                fn pixel(self) -> vec4 {
-                                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 6.0);
-                                    sdf.fill(self.bg_color);
-                                    sdf.stroke(self.border_color, 1.0);
-                                    return sdf.result;
+                                app_icon := Image{
+                                    width: 22
+                                    height: 22
+                                    fit: ImageFit.Smallest
+                                }
+
+                                app_icon_fallback := Label{
+                                    text: "A"
+                                    draw_text +: {
+                                        text_style: theme.font_bold {font_size: 12}
+                                        color: #xdce3ee
+                                    }
                                 }
                             }
 
-                            app_icon = <Image> {
-                                width: 22,
-                                height: 22,
-                                fit: Smallest,
+                            app_name := Label{
+                                width: Fill
+                                text: "App"
+                                draw_text +: {
+                                    text_style: theme.font_bold {font_size: 13}
+                                    color: #xfffdff
+                                }
                             }
 
-                            app_icon_fallback = <Label> {
-                                text: "A",
-                                draw_text: {
-                                    text_style: <THEME_FONT_BOLD> {font_size: 12},
-                                    color: #xdce3ee
+                            app_meta_chip := View{
+                                width: Fit
+                                height: Fit
+                                padding: Inset{left: 7 right: 7 top: 2 bottom: 2}
+                                show_bg: true
+                                draw_bg +: {
+                                    fill_color: instance(#x202733)
+                                    border_color: instance(#x3b4658)
+                                    pixel: fn() {
+                                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 5.0)
+                                        sdf.fill(self.fill_color)
+                                        sdf.stroke(self.border_color 1.0)
+                                        return sdf.result
+                                    }
+                                }
+                                app_meta := Label{
+                                    text: "Category"
+                                    draw_text +: {
+                                        text_style: theme.font_regular {font_size: 9}
+                                        color: #xa7b2c5
+                                    }
+                                }
+                            }
+
+                            action_hint_chip := View{
+                                visible: false
+                                width: Fit
+                                height: Fit
+                                padding: Inset{left: 7 right: 7 top: 2 bottom: 2}
+                                show_bg: true
+                                draw_bg +: {
+                                    fill_color: instance(#x253043)
+                                    border_color: instance(#x435a7f)
+                                    pixel: fn() {
+                                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 5.0)
+                                        sdf.fill(self.fill_color)
+                                        sdf.stroke(self.border_color 1.0)
+                                        return sdf.result
+                                    }
+                                }
+                                action_hint_text := Label{
+                                    text: "Open ↩"
+                                    draw_text +: {
+                                        text_style: theme.font_regular {font_size: 9}
+                                        color: #xbfd2ef
+                                    }
                                 }
                             }
                         }
 
-                        app_name = <Label> {
-                            width: Fill,
-                            text: "App",
-                            draw_text: {
-                                text_style: <THEME_FONT_BOLD> {font_size: 13},
-                                color: #xfffdff
+                        app_desc := Label{
+                            width: Fill
+                            text: "Description"
+                            draw_text +: {
+                                text_style: theme.font_regular {font_size: 10}
+                                color: #x8d9bae
                             }
                         }
-
-	                        app_meta_chip = <View> {
-	                            width: Fit,
-	                            height: Fit,
-	                            padding: {left: 7, right: 7, top: 2, bottom: 2},
-                            show_bg: true,
-                            draw_bg: {
-                                instance fill_color: #x202733
-                                instance border_color: #x3b4658
-                                fn pixel(self) -> vec4 {
-                                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 5.0);
-                                    sdf.fill(self.fill_color);
-                                    sdf.stroke(self.border_color, 1.0);
-                                    return sdf.result;
-                                }
-                            }
-                            app_meta = <Label> {
-                                text: "Category",
-                                draw_text: {
-                                    text_style: <THEME_FONT_REGULAR> {font_size: 9},
-                                    color: #xa7b2c5
-                                }
-	                            }
-	                        }
-
-	                        action_hint_chip = <View> {
-	                            visible: false,
-	                            width: Fit,
-	                            height: Fit,
-	                            padding: {left: 7, right: 7, top: 2, bottom: 2},
-	                            show_bg: true,
-	                            draw_bg: {
-	                                instance fill_color: #x253043
-	                                instance border_color: #x435a7f
-	                                fn pixel(self) -> vec4 {
-	                                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-	                                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 5.0);
-	                                    sdf.fill(self.fill_color);
-	                                    sdf.stroke(self.border_color, 1.0);
-	                                    return sdf.result;
-	                                }
-	                            }
-	                            action_hint_text = <Label> {
-	                                text: "Open ↩",
-	                                draw_text: {
-	                                    text_style: <THEME_FONT_REGULAR> {font_size: 9},
-	                                    color: #xbfd2ef
-	                                }
-	                            }
-	                        }
-	                    }
-
-	                    app_desc = <Label> {
-	                        width: Fill,
-	                        text: "Description",
-                        draw_text: {
-                            text_style: <THEME_FONT_REGULAR> {font_size: 10},
-                            color: #x8d9bae
-                        }
-                    }
-                }
-            }
-            }
-
-            <View> {
-            visible: true,
-            width: Fill,
-            height: Fit,
-            flow: Right,
-            align: {y: 0.5},
-            spacing: 8,
-            padding: {left: 10, right: 10, top: 6, bottom: 6},
-            show_bg: true,
-            draw_bg: {
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 7.0);
-                    sdf.fill(#x1b2028);
-                    sdf.stroke(#x303745, 1.0);
-                    return sdf.result;
-                }
-            }
-            status_label = <Label> {
-                width: Fill,
-                text: "",
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> {font_size: 10},
-                    color: #x7fb9ff
-                }
-            }
-            status_keys_label = <Label> {
-                text: "Up/Down Select  |  Enter Open  |  Double Click Open",
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> {font_size: 10},
-                    color: #x8f9caf
-                }
-            }
-            }
-            }
-
-        todo_view = <View> {
-            visible: false,
-            width: Fill,
-            height: Fill,
-            flow: Down,
-            spacing: 10,
-            padding: {left: 2, right: 2, top: 2, bottom: 2},
-
-            <View> {
-                width: Fill,
-                height: Fit,
-                flow: Right,
-                align: {y: 0.5},
-                spacing: 8,
-
-                <Label> {
-                    text: "Todo List",
-                    draw_text: {
-                        text_style: <THEME_FONT_BOLD> {font_size: 17},
-                        color: #xf9fbff
                     }
                 }
             }
 
-            <Label> {
-                text: "Capture quick tasks for this workspace",
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> {font_size: 10},
-                    color: #x8f9caf
-                }
-            }
-
-            stats_card = <View> {
-                width: Fill,
-                height: Fit,
-                flow: Down,
-                spacing: 8,
-                padding: {left: 10, right: 10, top: 10, bottom: 10},
-                show_bg: true,
-                draw_bg: {
-                    fn pixel(self) -> vec4 {
-                        let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                        sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                        sdf.fill(#x1b2028);
-                        sdf.stroke(#x303745, 1.0);
-                        return sdf.result;
+            View{
+                visible: true
+                width: Fill
+                height: Fit
+                flow: Right
+                align: VCenter
+                spacing: 8
+                padding: Inset{left: 10 right: 10 top: 6 bottom: 6}
+                show_bg: true
+                draw_bg +: {
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 7.0)
+                        sdf.fill(#x1b2028)
+                        sdf.stroke(#x303745 1.0)
+                        return sdf.result
                     }
                 }
-
-                todo_count_label = <Label> {
-                    text: "0 / 0 done",
-                    draw_text: {
-                        text_style: <THEME_FONT_REGULAR> {font_size: 10},
-                        color: #xa7b4c8
+                status_label := Label{
+                    width: Fill
+                    text: ""
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 10}
+                        color: #x7fb9ff
                     }
                 }
-
-                todo_progress = <MpProgressSuccess> {
-                    width: Fill,
-                    height: 6,
-                    value: 0.0,
-                }
-            }
-
-            <View> { width: Fill, height: 1, show_bg: true, draw_bg: {color: #x2e3541} }
-
-            todo_rows = <View> {
-                width: Fill,
-                height: Fill,
-                flow: Down,
-                spacing: 5,
-
-                row_0 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
-                    check_0 = <MpCheckbox> { text: "" }
-                    label_0 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
-                    del_0 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
-                }
-                row_1 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
-                    check_1 = <MpCheckbox> { text: "" }
-                    label_1 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
-                    del_1 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
-                }
-                row_2 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
-                    check_2 = <MpCheckbox> { text: "" }
-                    label_2 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
-                    del_2 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
-                }
-                row_3 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
-                    check_3 = <MpCheckbox> { text: "" }
-                    label_3 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
-                    del_3 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
-                }
-                row_4 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
-                    check_4 = <MpCheckbox> { text: "" }
-                    label_4 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
-                    del_4 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
-                }
-                row_5 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
-                    check_5 = <MpCheckbox> { text: "" }
-                    label_5 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
-                    del_5 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
-                }
-                row_6 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
-                    check_6 = <MpCheckbox> { text: "" }
-                    label_6 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
-                    del_6 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
-                }
-                row_7 = <View> { width: Fill, height: Fit, flow: Right, spacing: 8, align: {y: 0.5}, visible: false, padding: {left: 8, right: 8, top: 8, bottom: 8}, show_bg: true,
-                    draw_bg: { instance done: 0.0 fn pixel(self) -> vec4 { let sdf = Sdf2d::viewport(self.pos * self.rect_size); sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0); sdf.fill(mix(#x272c34, #x1f3a2a, self.done)); sdf.stroke(#x3b424d, 1.0); return sdf.result; } }
-                    check_7 = <MpCheckbox> { text: "" }
-                    label_7 = <Label> { width: Fill, text: "", draw_text: { text_style: <THEME_FONT_REGULAR> {font_size: 12}, color: #xe2e8f0 } }
-                    del_7 = <MpButtonGhost> { text: "Remove", padding: {left: 8, right: 8, top: 6, bottom: 6} }
+                status_keys_label := Label{
+                    text: "Up/Down Select  |  Enter Open  |  Double Click Open"
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 10}
+                        color: #x8f9caf
+                    }
                 }
             }
         }
 
-        chat_view = <View> {
-            visible: false,
-            width: Fill,
-            height: Fill,
-            flow: Down,
-            spacing: 10,
-            padding: {left: 2, right: 2, top: 2, bottom: 2},
+        todo_view := View{
+            visible: false
+            width: Fill
+            height: Fill
+            flow: Down
+            spacing: 10
+            padding: Inset{left: 2 right: 2 top: 2 bottom: 2}
 
-            <View> {
-                width: Fill,
-                height: Fit,
-                flow: Right,
-                align: {y: 0.5},
-                spacing: 8,
+            View{
+                width: Fill
+                height: Fit
+                flow: Right
+                align: VCenter
+                spacing: 8
 
-                <Label> {
-                    width: Fill,
-                    text: "A2UI Chat",
-                    draw_text: {
-                        text_style: <THEME_FONT_BOLD> {font_size: 17},
+                Label{
+                    text: "Todo List"
+                    draw_text +: {
+                        text_style: theme.font_bold {font_size: 17}
                         color: #xf9fbff
                     }
                 }
-                chat_reset_btn = <MpButtonGhost> {
-                    text: "Clear"
-                    padding: {left: 10, right: 10, top: 7, bottom: 7}
-                }
             }
 
-            <Label> {
-                text: "Ask naturally or render A2UI UI from responses",
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> {font_size: 10},
+            Label{
+                text: "Capture quick tasks for this workspace"
+                draw_text +: {
+                    text_style: theme.font_regular {font_size: 10}
                     color: #x8f9caf
                 }
             }
 
-            <View> {
-                width: Fill,
-                height: Fit,
-                flow: Right,
-                align: {y: 0.5},
-                spacing: 8,
-                padding: {left: 10, right: 10, top: 8, bottom: 8},
-                show_bg: true,
-                draw_bg: {
-                    fn pixel(self) -> vec4 {
-                        let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                        sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                        sdf.fill(#x1b2028);
-                        sdf.stroke(#x303745, 1.0);
-                        return sdf.result;
+            stats_card := View{
+                width: Fill
+                height: Fit
+                flow: Down
+                spacing: 8
+                padding: Inset{left: 10 right: 10 top: 10 bottom: 10}
+                show_bg: true
+                draw_bg +: {
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                        sdf.fill(#x1b2028)
+                        sdf.stroke(#x303745 1.0)
+                        return sdf.result
                     }
                 }
-                <Label> {
-                    text: "LLM API:",
-                    draw_text: {
-                        text_style: <THEME_FONT_REGULAR> {font_size: 10},
+
+                todo_count_label := Label{
+                    text: "0 / 0 done"
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 10}
                         color: #xa7b4c8
                     }
                 }
-                chat_server_input = <TextInput> {
-                    width: 280,
-                    height: Fit,
-                    empty_text: "https://openrouter.ai/api/v1/chat/completions",
-                    padding: {left: 10, right: 10, top: 7, bottom: 7},
-                    draw_bg: {
-                        instance border_color: #x3e4653,
-                        fn pixel(self) -> vec4 {
-                            let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                            sdf.fill(#x1f2329);
-                            sdf.stroke(self.border_color, 1.0);
-                            return sdf.result;
+            }
+
+            View{width: Fill height: 1 show_bg: true draw_bg +: {color: #x2e3541}}
+
+            todo_rows := View{
+                width: Fill
+                height: Fill
+                flow: Down
+                spacing: 5
+
+                row_0 := View{
+                    width: Fill
+                    height: Fit
+                    flow: Right
+                    spacing: 8
+                    align: VCenter
+                    visible: false
+                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
+                    show_bg: true
+                    draw_bg +: {
+                        done: instance(0.0)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
+                            sdf.stroke(#x3b424d 1.0)
+                            return sdf.result
                         }
                     }
-                    draw_text: {
-                        text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                    check_0 := CheckBox{text: ""}
+                    label_0 := Label{
+                        width: Fill
+                        text: ""
+                        draw_text +: {
+                            text_style: theme.font_regular {font_size: 12}
+                            color: #xe2e8f0
+                        }
+                    }
+                    del_0 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
+                }
+                row_1 := View{
+                    width: Fill
+                    height: Fit
+                    flow: Right
+                    spacing: 8
+                    align: VCenter
+                    visible: false
+                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
+                    show_bg: true
+                    draw_bg +: {
+                        done: instance(0.0)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
+                            sdf.stroke(#x3b424d 1.0)
+                            return sdf.result
+                        }
+                    }
+                    check_1 := CheckBox{text: ""}
+                    label_1 := Label{
+                        width: Fill
+                        text: ""
+                        draw_text +: {
+                            text_style: theme.font_regular {font_size: 12}
+                            color: #xe2e8f0
+                        }
+                    }
+                    del_1 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
+                }
+                row_2 := View{
+                    width: Fill
+                    height: Fit
+                    flow: Right
+                    spacing: 8
+                    align: VCenter
+                    visible: false
+                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
+                    show_bg: true
+                    draw_bg +: {
+                        done: instance(0.0)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
+                            sdf.stroke(#x3b424d 1.0)
+                            return sdf.result
+                        }
+                    }
+                    check_2 := CheckBox{text: ""}
+                    label_2 := Label{
+                        width: Fill
+                        text: ""
+                        draw_text +: {
+                            text_style: theme.font_regular {font_size: 12}
+                            color: #xe2e8f0
+                        }
+                    }
+                    del_2 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
+                }
+                row_3 := View{
+                    width: Fill
+                    height: Fit
+                    flow: Right
+                    spacing: 8
+                    align: VCenter
+                    visible: false
+                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
+                    show_bg: true
+                    draw_bg +: {
+                        done: instance(0.0)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
+                            sdf.stroke(#x3b424d 1.0)
+                            return sdf.result
+                        }
+                    }
+                    check_3 := CheckBox{text: ""}
+                    label_3 := Label{
+                        width: Fill
+                        text: ""
+                        draw_text +: {
+                            text_style: theme.font_regular {font_size: 12}
+                            color: #xe2e8f0
+                        }
+                    }
+                    del_3 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
+                }
+                row_4 := View{
+                    width: Fill
+                    height: Fit
+                    flow: Right
+                    spacing: 8
+                    align: VCenter
+                    visible: false
+                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
+                    show_bg: true
+                    draw_bg +: {
+                        done: instance(0.0)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
+                            sdf.stroke(#x3b424d 1.0)
+                            return sdf.result
+                        }
+                    }
+                    check_4 := CheckBox{text: ""}
+                    label_4 := Label{
+                        width: Fill
+                        text: ""
+                        draw_text +: {
+                            text_style: theme.font_regular {font_size: 12}
+                            color: #xe2e8f0
+                        }
+                    }
+                    del_4 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
+                }
+                row_5 := View{
+                    width: Fill
+                    height: Fit
+                    flow: Right
+                    spacing: 8
+                    align: VCenter
+                    visible: false
+                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
+                    show_bg: true
+                    draw_bg +: {
+                        done: instance(0.0)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
+                            sdf.stroke(#x3b424d 1.0)
+                            return sdf.result
+                        }
+                    }
+                    check_5 := CheckBox{text: ""}
+                    label_5 := Label{
+                        width: Fill
+                        text: ""
+                        draw_text +: {
+                            text_style: theme.font_regular {font_size: 12}
+                            color: #xe2e8f0
+                        }
+                    }
+                    del_5 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
+                }
+                row_6 := View{
+                    width: Fill
+                    height: Fit
+                    flow: Right
+                    spacing: 8
+                    align: VCenter
+                    visible: false
+                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
+                    show_bg: true
+                    draw_bg +: {
+                        done: instance(0.0)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
+                            sdf.stroke(#x3b424d 1.0)
+                            return sdf.result
+                        }
+                    }
+                    check_6 := CheckBox{text: ""}
+                    label_6 := Label{
+                        width: Fill
+                        text: ""
+                        draw_text +: {
+                            text_style: theme.font_regular {font_size: 12}
+                            color: #xe2e8f0
+                        }
+                    }
+                    del_6 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
+                }
+                row_7 := View{
+                    width: Fill
+                    height: Fit
+                    flow: Right
+                    spacing: 8
+                    align: VCenter
+                    visible: false
+                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
+                    show_bg: true
+                    draw_bg +: {
+                        done: instance(0.0)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
+                            sdf.stroke(#x3b424d 1.0)
+                            return sdf.result
+                        }
+                    }
+                    check_7 := CheckBox{text: ""}
+                    label_7 := Label{
+                        width: Fill
+                        text: ""
+                        draw_text +: {
+                            text_style: theme.font_regular {font_size: 12}
+                            color: #xe2e8f0
+                        }
+                    }
+                    del_7 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
+                }
+            }
+        }
+
+        chat_view := View{
+            visible: false
+            width: Fill
+            height: Fill
+            flow: Down
+            spacing: 10
+            padding: Inset{left: 2 right: 2 top: 2 bottom: 2}
+
+            View{
+                width: Fill
+                height: Fit
+                flow: Right
+                align: VCenter
+                spacing: 8
+
+                Label{
+                    width: Fill
+                    text: "Chat"
+                    draw_text +: {
+                        text_style: theme.font_bold {font_size: 17}
+                        color: #xf9fbff
+                    }
+                }
+                chat_reset_btn := Button{
+                    text: "Clear"
+                    padding: Inset{left: 10 right: 10 top: 7 bottom: 7}
+                }
+            }
+
+            Label{
+                text: "Ask naturally or chat with LLM"
+                draw_text +: {
+                    text_style: theme.font_regular {font_size: 10}
+                    color: #x8f9caf
+                }
+            }
+
+            View{
+                width: Fill
+                height: Fit
+                flow: Right
+                align: VCenter
+                spacing: 8
+                padding: Inset{left: 10 right: 10 top: 8 bottom: 8}
+                show_bg: true
+                draw_bg +: {
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                        sdf.fill(#x1b2028)
+                        sdf.stroke(#x303745 1.0)
+                        return sdf.result
+                    }
+                }
+                Label{
+                    text: "LLM API:"
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 10}
+                        color: #xa7b4c8
+                    }
+                }
+                chat_server_input := TextInput{
+                    width: 280
+                    height: Fit
+                    empty_text: "https://openrouter.ai/api/v1/chat/completions"
+                    padding: Inset{left: 10 right: 10 top: 7 bottom: 7}
+                    draw_bg +: {
+                        border_color: instance(#x3e4653)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                            sdf.fill(#x1f2329)
+                            sdf.stroke(self.border_color 1.0)
+                            return sdf.result
+                        }
+                    }
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 11}
                         color: #xe2e8f0
                     }
                 }
-                chat_model_input = <TextInput> {
-                    width: 160,
-                    height: Fit,
-                    empty_text: "kimi-k2.5",
-                    padding: {left: 10, right: 10, top: 7, bottom: 7},
-                    draw_bg: {
-                        instance border_color: #x3e4653,
-                        fn pixel(self) -> vec4 {
-                            let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                            sdf.fill(#x1f2329);
-                            sdf.stroke(self.border_color, 1.0);
-                            return sdf.result;
+                chat_model_input := TextInput{
+                    width: 160
+                    height: Fit
+                    empty_text: "openrouter/auto"
+                    padding: Inset{left: 10 right: 10 top: 7 bottom: 7}
+                    draw_bg +: {
+                        border_color: instance(#x3e4653)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                            sdf.fill(#x1f2329)
+                            sdf.stroke(self.border_color 1.0)
+                            return sdf.result
                         }
                     }
-                    draw_text: {
-                        text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 11}
                         color: #xe2e8f0
                     }
                 }
             }
 
-            chat_history_scroll = <ScrollYView> {
-                width: Fill,
-                height: 120,
-                show_bg: true,
-                draw_bg: {
-                    fn pixel(self) -> vec4 {
-                        let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                        sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                        sdf.fill(#x1b2028);
-                        sdf.stroke(#x303745, 1.0);
-                        return sdf.result;
+            chat_history_scroll := ScrollYView{
+                width: Fill
+                height: 120
+                show_bg: true
+                draw_bg +: {
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                        sdf.fill(#x1b2028)
+                        sdf.stroke(#x303745 1.0)
+                        return sdf.result
                     }
                 }
-                <View> {
-                    width: Fill,
-                    height: Fit,
-                    padding: {left: 10, right: 10, top: 10, bottom: 10}
-                    chat_history_label = <Label> {
-                        width: Fill,
-                        text: "",
-                        draw_text: {
-                            text_style: <THEME_FONT_REGULAR> {font_size: 11},
+                View{
+                    width: Fill
+                    height: Fit
+                    padding: Inset{left: 10 right: 10 top: 10 bottom: 10}
+                    chat_history_label := Label{
+                        width: Fill
+                        text: ""
+                        draw_text +: {
+                            text_style: theme.font_regular {font_size: 11}
                             color: #xd3d9e6
-                            wrap: Word
                         }
                     }
                 }
             }
 
-            <View> {
-                width: Fill,
-                height: Fit,
-                flow: Right,
-                align: {y: 0.5},
-                spacing: 8,
-                padding: {left: 10, right: 10, top: 6, bottom: 6},
-                show_bg: true,
-                draw_bg: {
-                    fn pixel(self) -> vec4 {
-                        let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                        sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 7.0);
-                        sdf.fill(#x1b2028);
-                        sdf.stroke(#x303745, 1.0);
-                        return sdf.result;
+            View{
+                width: Fill
+                height: Fit
+                flow: Right
+                align: VCenter
+                spacing: 8
+                padding: Inset{left: 10 right: 10 top: 6 bottom: 6}
+                show_bg: true
+                draw_bg +: {
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 7.0)
+                        sdf.fill(#x1b2028)
+                        sdf.stroke(#x303745 1.0)
+                        return sdf.result
                     }
                 }
-                chat_status_label = <Label> {
-                    width: Fill,
-                    text: "Ready",
-                    draw_text: {
-                        text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                chat_status_label := Label{
+                    width: Fill
+                    text: "Ready"
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 10}
                         color: #x7fb9ff
                     }
                 }
-                chat_keys_label = <Label> {
-                    text: "Enter Send  |  Esc Back",
-                    draw_text: {
-                        text_style: <THEME_FONT_REGULAR> {font_size: 10},
+                chat_keys_label := Label{
+                    text: "Enter Send  |  Esc Back"
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 10}
                         color: #x8f9caf
                     }
                 }
             }
 
-            chat_surface_wrap = <ScrollYView> {
-                width: Fill,
-                height: Fill,
-                show_bg: true,
-                draw_bg: {
-                    fn pixel(self) -> vec4 {
-                        let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                        sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0);
-                        sdf.fill(#x1b2028);
-                        sdf.stroke(#x303745, 1.0);
-                        return sdf.result;
+            chat_output_scroll := ScrollYView{
+                width: Fill
+                height: Fill
+                show_bg: true
+                draw_bg +: {
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                        sdf.fill(#x1b2028)
+                        sdf.stroke(#x303745 1.0)
+                        return sdf.result
                     }
                 }
-                <View> {
-                    width: Fill,
-                    height: Fit,
-                    padding: {left: 10, right: 10, top: 10, bottom: 10}
-                    chat_surface = <A2uiSurface> {
-                        width: Fill,
-                        height: Fit,
+                View{
+                    width: Fill
+                    height: Fit
+                    padding: Inset{left: 10 right: 10 top: 10 bottom: 10}
+                    chat_output_label := Label{
+                        width: Fill
+                        text: ""
+                        draw_text +: {
+                            text_style: theme.font_regular {font_size: 11}
+                            color: #xd3d9e6
+                        }
                     }
                 }
             }
         }
     }
 
-    App = {{App}} {
-        ui: <Root> {
-            main_window = <Window> {
-                width: Fill,
-                height: Fill,
-                show_bg: true,
-                draw_bg: {
-                    fn pixel(self) -> vec4 {
-                        let center = vec2(0.5, 0.5);
-                        let d = distance(self.pos, center);
-                        let t = clamp(d * 1.35, 0.0, 1.0);
-                        return mix(#x0f1115, #x20242b, t);
+    startup() do #(App::script_component(vm)){
+        ui: Root{
+            main_window := Window{
+                window.inner_size: vec2(900 700)
+                window.title: "Raycast Launcher"
+                pass +: { clear_color: #x0f1115 }
+                body +: {
+                    bg_view := View{
+                        width: Fill
+                        height: Fill
+                        show_bg: true
+                        draw_bg +: {
+                            pixel: fn() {
+                                let center = vec2(0.5 0.5)
+                                let d = distance(self.pos center)
+                                let t = clamp(d * 1.35 0.0 1.0)
+                                return mix(#x0f1115 #x20242b t)
+                            }
+                        }
+                        launcher := mod.widgets.LauncherPanel{}
                     }
-                }
-
-                body = <View> {
-                    width: Fill,
-                    height: Fill,
-                    flow: Down,
-
-                    launcher = <LauncherPanel> {}
                 }
             }
         }
@@ -751,7 +934,7 @@ struct LauncherItem {
     launch: LaunchTarget,
 }
 
-#[derive(Live, Widget)]
+#[derive(Script, Widget)]
 pub struct LauncherPanel {
     #[deref]
     view: View,
@@ -795,40 +978,42 @@ pub struct LauncherPanel {
     chat_api_key: String,
 }
 
-impl LiveHook for LauncherPanel {
-    fn after_new_from_doc(&mut self, cx: &mut Cx) {
-        self.all_items = load_launcher_items();
-        self.query.clear();
-        self.todo_draft.clear();
-        self.chat_draft.clear();
-        self.selected_index = 0;
-        self.icon_cache.clear();
-        self.row_hit_rects.clear();
-        self.hovered_index = None;
-        self.last_click_item = None;
-        self.last_click_time = 0.0;
-        self.show_todo = false;
-        self.todos = todo::default_todos();
-        self.show_chat = false;
-        self.chat_messages = chat::default_chat_messages();
-        self.chat_loading = false;
-        self.chat_server_url = std::env::var("LLM_API_URL")
-            .unwrap_or_else(|_| "https://openrouter.ai/api/v1/chat/completions".to_string());
-        self.chat_model =
-            std::env::var("LLM_MODEL").unwrap_or_else(|_| "openrouter/auto".to_string());
-        self.chat_api_key = std::env::var("LLM_API_KEY").unwrap_or_default();
-        self.rebuild_filter();
-        self.sync_mode_input(cx);
-        self.view.text_input(ids!(mode_input)).set_key_focus(cx);
-        self.sync_todo_ui(cx);
-        self.sync_chat_ui(cx);
-        self.view
-            .text_input(ids!(chat_server_input))
-            .set_text(cx, &self.chat_server_url);
-        self.view
-            .text_input(ids!(chat_model_input))
-            .set_text(cx, &self.chat_model);
-        self.update_labels(cx, "Ready");
+impl ScriptHook for LauncherPanel {
+    fn on_after_new(&mut self, vm: &mut ScriptVm) {
+        vm.with_cx_mut(|cx| {
+            self.all_items = load_launcher_items();
+            self.query.clear();
+            self.todo_draft.clear();
+            self.chat_draft.clear();
+            self.selected_index = 0;
+            self.icon_cache.clear();
+            self.row_hit_rects.clear();
+            self.hovered_index = None;
+            self.last_click_item = None;
+            self.last_click_time = 0.0;
+            self.show_todo = false;
+            self.todos = todo::default_todos();
+            self.show_chat = false;
+            self.chat_messages = chat::default_chat_messages();
+            self.chat_loading = false;
+            self.chat_server_url = std::env::var("LLM_API_URL")
+                .unwrap_or_else(|_| "https://openrouter.ai/api/v1/chat/completions".to_string());
+            self.chat_model =
+                std::env::var("LLM_MODEL").unwrap_or_else(|_| "openrouter/auto".to_string());
+            self.chat_api_key = std::env::var("LLM_API_KEY").unwrap_or_default();
+            self.rebuild_filter();
+            self.sync_mode_input(cx);
+            self.view.text_input(cx, ids!(mode_input)).set_key_focus(cx);
+            self.sync_todo_ui(cx);
+            self.sync_chat_ui(cx);
+            self.view
+                .text_input(cx, ids!(chat_server_input))
+                .set_text(cx, &self.chat_server_url);
+            self.view
+                .text_input(cx, ids!(chat_model_input))
+                .set_text(cx, &self.chat_model);
+            self.update_labels(cx, "Ready");
+        });
     }
 }
 
@@ -1093,33 +1278,33 @@ impl LauncherPanel {
             )
         };
 
+        if let Some(mut v) = self.view.view(cx, ids!(mode_input_row)).borrow_mut() {
+            v.layout.spacing = row_spacing;
+        }
         self.view
-            .view(ids!(mode_input_row))
-            .apply_over(cx, live! { spacing: (row_spacing) });
+            .text_input(cx, ids!(mode_input))
+            .set_empty_text(cx, empty_text.to_string());
+        self.view.text_input(cx, ids!(mode_input)).set_text(cx, text);
         self.view
-            .text_input(ids!(mode_input))
-            .apply_over(cx, live! { empty_text: (empty_text) });
-        self.view.text_input(ids!(mode_input)).set_text(cx, text);
-        self.view
-            .text_input(ids!(mode_input))
+            .text_input(cx, ids!(mode_input))
             .set_is_read_only(cx, read_only);
         self.view
-            .widget(ids!(mode_back_wrap))
+            .widget(cx, ids!(mode_back_wrap))
             .set_visible(cx, show_back);
         self.view
-            .widget(ids!(mode_back_btn))
+            .widget(cx, ids!(mode_back_btn))
             .set_visible(cx, show_back);
-        let action_btn = self.view.mp_button(ids!(mode_action_btn));
+        let action_btn = self.view.button(cx, ids!(mode_action_btn));
         self.view
-            .widget(ids!(mode_action_wrap))
+            .widget(cx, ids!(mode_action_wrap))
             .set_visible(cx, show_action);
         self.view
-            .widget(ids!(mode_action_btn))
+            .widget(cx, ids!(mode_action_btn))
             .set_visible(cx, show_action);
-        action_btn.set_text(action_text);
+        action_btn.set_text(cx, action_text);
         action_btn.set_disabled(cx, action_disabled);
         self.view
-            .label(ids!(mode_hint_label))
+            .label(cx, ids!(mode_hint_label))
             .set_text(cx, mode_hint_text);
     }
 
@@ -1288,12 +1473,12 @@ impl LauncherPanel {
             .and_then(|idx| self.all_items.get(*idx))
     }
 
-    fn ensure_selection_visible(&self) {
+    pub(crate) fn ensure_selection_visible(&self, cx: &mut Cx) {
         if self.filtered_indices.is_empty() {
             return;
         }
         let target = self.selected_index.min(self.filtered_indices.len().saturating_sub(1));
-        let list = self.view.portal_list(ids!(results));
+        let list = self.view.portal_list(cx, ids!(results));
         let first = list.first_id();
         let visible = list.visible_items().max(1);
         let last = first.saturating_add(visible.saturating_sub(1));
@@ -1314,8 +1499,8 @@ impl LauncherPanel {
 
     fn update_labels(&mut self, cx: &mut Cx, _status_hint: &str) {
         let has_results = !self.filtered_indices.is_empty();
-        self.view.widget(ids!(results)).set_visible(cx, has_results);
-        self.view.widget(ids!(empty_state)).set_visible(cx, !has_results);
+        self.view.widget(cx, ids!(results)).set_visible(cx, has_results);
+        self.view.widget(cx, ids!(empty_state)).set_visible(cx, !has_results);
         let mut command_count = 0usize;
         let mut app_count = 0usize;
         for idx in &self.filtered_indices {
@@ -1342,37 +1527,37 @@ impl LauncherPanel {
             app_count,
             command_count
         );
-        self.view.label(ids!(result_count)).set_text(cx, "");
+        self.view.label(cx, ids!(result_count)).set_text(cx, "");
         if has_results {
             self.view
-                .label(ids!(empty_title))
+                .label(cx, ids!(empty_title))
                 .set_text(cx, "No Results");
             self.view
-                .label(ids!(empty_desc))
+                .label(cx, ids!(empty_desc))
                 .set_text(cx, "Try another keyword, or use /todo and /chat");
         } else {
             let q = self.query.trim();
             if q.is_empty() {
                 self.view
-                    .label(ids!(empty_title))
+                    .label(cx, ids!(empty_title))
                     .set_text(cx, "Start Searching");
                 self.view
-                    .label(ids!(empty_desc))
+                    .label(cx, ids!(empty_desc))
                     .set_text(cx, "Type app or command name. Try: todo, chat, terminal");
             } else {
                 self.view
-                    .label(ids!(empty_title))
+                    .label(cx, ids!(empty_title))
                     .set_text(cx, "No Results");
-                self.view.label(ids!(empty_desc)).set_text(
+                self.view.label(cx, ids!(empty_desc)).set_text(
                     cx,
                     &format!("No match for \"{}\". Try /todo or /chat", q),
                 );
             }
         }
 
-        self.view.label(ids!(status_label)).set_text(cx, &count_text);
+        self.view.label(cx, ids!(status_label)).set_text(cx, &count_text);
         self.view
-            .label(ids!(status_keys_label))
+            .label(cx, ids!(status_keys_label))
             .set_text(cx, "Up/Down Select  |  Enter Open  |  Double Click Open");
     }
 
@@ -1431,7 +1616,7 @@ impl Widget for LauncherPanel {
             self.handle_chat_network_responses(cx, responses);
         }
 
-        if let Some(text) = self.view.text_input(ids!(mode_input)).changed(&actions) {
+        if let Some(text) = self.view.text_input(cx, ids!(mode_input)).changed(&actions) {
             if self.show_todo {
                 self.todo_draft = text;
             } else if self.show_chat {
@@ -1505,7 +1690,7 @@ impl Widget for LauncherPanel {
         }
 
         let mut handled_enter = false;
-        if let Some((text, _mods)) = self.view.text_input(ids!(mode_input)).returned(&actions) {
+        if let Some((text, _mods)) = self.view.text_input(cx, ids!(mode_input)).returned(&actions) {
             handled_enter = true;
             self.query = text;
             let q = self.query.trim().to_lowercase();
@@ -1527,13 +1712,13 @@ impl Widget for LauncherPanel {
             match key.key_code {
                 KeyCode::ArrowDown => {
                     self.step_selection(1);
-                    self.ensure_selection_visible();
+                    self.ensure_selection_visible(cx);
                     self.update_labels(cx, "Selected");
                     self.redraw(cx);
                 }
                 KeyCode::ArrowUp => {
                     self.step_selection(-1);
-                    self.ensure_selection_visible();
+                    self.ensure_selection_visible(cx);
                     self.update_labels(cx, "Selected");
                     self.redraw(cx);
                 }
@@ -1550,13 +1735,13 @@ impl Widget for LauncherPanel {
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         self.row_hit_rects.clear();
         while let Some(item) = self.view.draw_walk(cx, scope, walk).step() {
-            if let Some(mut list) = item.as_portal_list().borrow_mut() {
+            if let Some(mut list) = item.borrow_mut::<PortalList>() {
                 list.set_item_range(cx, 0, self.filtered_indices.len());
 
                 while let Some(item_id) = list.next_visible_item(cx) {
-	                    if let Some(source_idx) = self.filtered_indices.get(item_id) {
-	                        let source_idx = *source_idx;
-	                        let (app_name, category, subtitle, fallback, is_command, is_builtin, group_name) =
+                    if let Some(source_idx) = self.filtered_indices.get(item_id) {
+                        let source_idx = *source_idx;
+                        let (app_name, category, subtitle, fallback, is_command, is_builtin, group_name) =
                             if let Some(entry) = self.all_items.get(source_idx) {
                                 let is_builtin = matches!(
                                     entry.launch,
@@ -1577,164 +1762,139 @@ impl Widget for LauncherPanel {
 
                         let icon_path = self.resolve_icon_for_index(source_idx);
 
-	                        let row = list.item(cx, item_id, live_id!(ResultRow));
-	                        let show_group = if item_id == 0 {
-	                            true
-	                        } else if let Some(prev_source_idx) = self.filtered_indices.get(item_id - 1) {
-	                            if let Some(prev_entry) = self.all_items.get(*prev_source_idx) {
-	                                Self::group_name_for(prev_entry) != group_name
-	                            } else {
-	                                false
-	                            }
-	                        } else {
-	                            false
-	                        };
-	                        row.widget(ids!(group_label)).set_visible(cx, show_group);
-	                        row.label(ids!(group_label)).set_text(cx, group_name);
-	                        let group_color = match group_name {
-	                            "Built-in" => vec4(0.52, 0.69, 1.0, 1.0),
-	                            "Commands" => vec4(0.95, 0.75, 0.46, 1.0),
-	                            _ => vec4(0.56, 0.63, 0.73, 1.0),
-	                        };
-	                        row.label(ids!(group_label)).apply_over(
-	                            cx,
-	                            live! {
-	                                draw_text: { color: (group_color) }
-	                            },
-	                        );
-	                        row.label(ids!(app_name)).set_text(cx, &app_name);
-	                        row.label(ids!(app_meta)).set_text(cx, &category);
-	                        row.label(ids!(app_desc)).set_text(cx, &subtitle);
-	                        row.label(ids!(app_icon_fallback)).set_text(cx, &fallback);
-	                        let action_text = if is_command { "Run ↩" } else { "Open ↩" };
-	                        row.label(ids!(action_hint_text)).set_text(cx, action_text);
-	                        let meta_color = if category == "Command" {
-	                            vec4(0.96, 0.75, 0.44, 1.0)
-	                        } else {
-	                            vec4(0.65, 0.70, 0.78, 1.0)
-	                        };
-	                        let meta_chip_fill = if category == "Command" {
-	                            vec4(0.28, 0.23, 0.17, 1.0)
-	                        } else {
-	                            vec4(0.13, 0.16, 0.20, 1.0)
-	                        };
-	                        let meta_chip_stroke = if category == "Command" {
-	                            vec4(0.55, 0.44, 0.27, 1.0)
-	                        } else {
-	                            vec4(0.23, 0.29, 0.36, 1.0)
-	                        };
-	                        row.label(ids!(app_meta)).apply_over(
-	                            cx,
-	                            live! {
-	                                draw_text: { color: (meta_color) }
-	                            },
-	                        );
-	                        row.view(ids!(app_meta_chip)).apply_over(
-	                            cx,
-	                            live! {
-	                                draw_bg: {
-	                                    fill_color: (meta_chip_fill),
-	                                    border_color: (meta_chip_stroke)
-	                                }
-	                            },
-	                        );
+                        let row = list.item(cx, item_id, live_id!(ResultRow));
+                        let show_group = if item_id == 0 {
+                            true
+                        } else if let Some(prev_source_idx) = self.filtered_indices.get(item_id - 1) {
+                            if let Some(prev_entry) = self.all_items.get(*prev_source_idx) {
+                                Self::group_name_for(prev_entry) != group_name
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        };
+                        row.widget(cx, ids!(group_label)).set_visible(cx, show_group);
+                        row.label(cx, ids!(group_label)).set_text(cx, group_name);
+                        let group_color = match group_name {
+                            "Built-in" => vec4(0.52, 0.69, 1.0, 1.0),
+                            "Commands" => vec4(0.95, 0.75, 0.46, 1.0),
+                            _ => vec4(0.56, 0.63, 0.73, 1.0),
+                        };
+                        if let Some(mut label) = row.label(cx, ids!(group_label)).borrow_mut() {
+                            label.draw_text.color = group_color;
+                        }
+                        row.label(cx, ids!(app_name)).set_text(cx, &app_name);
+                        row.label(cx, ids!(app_meta)).set_text(cx, &category);
+                        row.label(cx, ids!(app_desc)).set_text(cx, &subtitle);
+                        row.label(cx, ids!(app_icon_fallback)).set_text(cx, &fallback);
+                        let action_text = if is_command { "Run ↩" } else { "Open ↩" };
+                        row.label(cx, ids!(action_hint_text)).set_text(cx, action_text);
+                        let meta_color = if category == "Command" {
+                            vec4(0.96, 0.75, 0.44, 1.0)
+                        } else {
+                            vec4(0.65, 0.70, 0.78, 1.0)
+                        };
+                        let meta_chip_fill = if category == "Command" {
+                            vec4(0.28, 0.23, 0.17, 1.0)
+                        } else {
+                            vec4(0.13, 0.16, 0.20, 1.0)
+                        };
+                        let meta_chip_stroke = if category == "Command" {
+                            vec4(0.55, 0.44, 0.27, 1.0)
+                        } else {
+                            vec4(0.23, 0.29, 0.36, 1.0)
+                        };
+                        if let Some(mut label) = row.label(cx, ids!(app_meta)).borrow_mut() {
+                            label.draw_text.color = meta_color;
+                        }
+                        if let Some(mut view) = row.view(cx, ids!(app_meta_chip)).borrow_mut() {
+                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(fill_color), &v4a(meta_chip_fill));
+                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(border_color), &v4a(meta_chip_stroke));
+                        }
 
-	                        if let Some(path) = icon_path {
-	                            let loaded = row
-	                                .image(ids!(app_icon))
-	                                .load_image_file_by_path(cx, Path::new(&path))
-	                                .is_ok();
-	                            row.widget(ids!(app_icon)).set_visible(cx, loaded);
-	                            row.widget(ids!(app_icon_fallback)).set_visible(cx, !loaded);
-	                            let icon_bg = if loaded {
-	                                vec4(0.0, 0.0, 0.0, 0.0)
-	                            } else {
-	                                vec4(0.102, 0.122, 0.149, 1.0)
-	                            };
-	                            let icon_stroke = if loaded {
-	                                vec4(0.0, 0.0, 0.0, 0.0)
-	                            } else {
-	                                vec4(0.196, 0.227, 0.271, 1.0)
-	                            };
-	                            row.view(ids!(icon_wrap)).apply_over(
-	                                cx,
-	                                live! {
-	                                    draw_bg: { bg_color: (icon_bg), border_color: (icon_stroke) }
-	                                },
-	                            );
-	                        } else {
-	                            row.widget(ids!(app_icon)).set_visible(cx, false);
-	                            row.widget(ids!(app_icon_fallback)).set_visible(cx, true);
-	                            row.view(ids!(icon_wrap)).apply_over(
-	                                cx,
-	                                live! {
-	                                    draw_bg: {
-	                                        bg_color: (vec4(0.102, 0.122, 0.149, 1.0)),
-	                                        border_color: (vec4(0.196, 0.227, 0.271, 1.0))
-	                                    }
-	                                },
-	                            );
-	                        }
+                        if let Some(path) = icon_path {
+                            let loaded = row
+                                .image(cx, ids!(app_icon))
+                                .load_image_file_by_path(cx, Path::new(&path))
+                                .is_ok();
+                            row.widget(cx, ids!(app_icon)).set_visible(cx, loaded);
+                            row.widget(cx, ids!(app_icon_fallback)).set_visible(cx, !loaded);
+                            let icon_bg = if loaded {
+                                vec4(0.0, 0.0, 0.0, 0.0)
+                            } else {
+                                vec4(0.102, 0.122, 0.149, 1.0)
+                            };
+                            let icon_stroke = if loaded {
+                                vec4(0.0, 0.0, 0.0, 0.0)
+                            } else {
+                                vec4(0.196, 0.227, 0.271, 1.0)
+                            };
+                            if let Some(mut view) = row.view(cx, ids!(icon_wrap)).borrow_mut() {
+                                view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(bg_color), &v4a(icon_bg));
+                                view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(border_color), &v4a(icon_stroke));
+                            }
+                        } else {
+                            row.widget(cx, ids!(app_icon)).set_visible(cx, false);
+                            row.widget(cx, ids!(app_icon_fallback)).set_visible(cx, true);
+                            if let Some(mut view) = row.view(cx, ids!(icon_wrap)).borrow_mut() {
+                                view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(bg_color), &v4a(vec4(0.102, 0.122, 0.149, 1.0)));
+                                view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(border_color), &v4a(vec4(0.196, 0.227, 0.271, 1.0)));
+                            }
+                        }
 
-	                        let selected = if item_id == self.selected_index { 1.0 } else { 0.0 };
-	                        let hovered = if Some(item_id) == self.hovered_index {
-	                            1.0
-	                        } else {
-	                            0.0
-	                        };
-	                        row.widget(ids!(action_hint_chip))
-	                            .set_visible(cx, selected > 0.5 || hovered > 0.5);
-	                        let hint_bg = if selected > 0.5 {
-	                            vec4(0.20, 0.30, 0.44, 1.0)
-	                        } else {
-	                            vec4(0.15, 0.20, 0.28, 1.0)
-	                        };
-	                        let hint_stroke = if selected > 0.5 {
-	                            vec4(0.45, 0.60, 0.82, 1.0)
-	                        } else {
-	                            vec4(0.27, 0.35, 0.49, 1.0)
-	                        };
-	                        row.view(ids!(action_hint_chip)).apply_over(
-	                            cx,
-	                            live! {
-	                                draw_bg: { fill_color: (hint_bg), border_color: (hint_stroke) }
-	                            },
-	                        );
-	                        let title_color = if selected > 0.5 {
-	                            vec4(0.98, 0.99, 1.0, 1.0)
-	                        } else {
-	                            vec4(0.92, 0.94, 0.98, 1.0)
-	                        };
-	                        row.label(ids!(app_name)).apply_over(
-	                            cx,
-	                            live! {
-	                                draw_text: { color: (title_color) }
-	                            },
-	                        );
-	                        let desc_color = if selected > 0.5 {
-	                            vec4(0.86, 0.91, 0.98, 1.0)
-	                        } else if hovered > 0.5 {
-	                            vec4(0.67, 0.74, 0.85, 1.0)
-	                        } else {
-	                            vec4(0.55, 0.61, 0.68, 1.0)
-	                        };
-	                        row.label(ids!(app_desc)).apply_over(
-	                            cx,
-	                            live! {
-	                                draw_text: { color: (desc_color) }
-	                            },
-	                        );
-	                        let command = if is_command { 1.0 } else { 0.0 };
-	                        let builtin = if is_builtin { 1.0 } else { 0.0 };
-	                        row.view(ids!(row_bg)).apply_over(
-	                            cx,
-	                            live! {
-	                                draw_bg: {selected: (selected), hovered: (hovered), command: (command), builtin: (builtin)}
-	                            },
-	                        );
+                        let selected = if item_id == self.selected_index { 1.0 } else { 0.0 };
+                        let hovered = if Some(item_id) == self.hovered_index {
+                            1.0
+                        } else {
+                            0.0
+                        };
+                        row.widget(cx, ids!(action_hint_chip))
+                            .set_visible(cx, selected > 0.5 || hovered > 0.5);
+                        let hint_bg = if selected > 0.5 {
+                            vec4(0.20, 0.30, 0.44, 1.0)
+                        } else {
+                            vec4(0.15, 0.20, 0.28, 1.0)
+                        };
+                        let hint_stroke = if selected > 0.5 {
+                            vec4(0.45, 0.60, 0.82, 1.0)
+                        } else {
+                            vec4(0.27, 0.35, 0.49, 1.0)
+                        };
+                        if let Some(mut view) = row.view(cx, ids!(action_hint_chip)).borrow_mut() {
+                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(fill_color), &v4a(hint_bg));
+                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(border_color), &v4a(hint_stroke));
+                        }
+                        let title_color = if selected > 0.5 {
+                            vec4(0.98, 0.99, 1.0, 1.0)
+                        } else {
+                            vec4(0.92, 0.94, 0.98, 1.0)
+                        };
+                        if let Some(mut label) = row.label(cx, ids!(app_name)).borrow_mut() {
+                            label.draw_text.color = title_color;
+                        }
+                        let desc_color = if selected > 0.5 {
+                            vec4(0.86, 0.91, 0.98, 1.0)
+                        } else if hovered > 0.5 {
+                            vec4(0.67, 0.74, 0.85, 1.0)
+                        } else {
+                            vec4(0.55, 0.61, 0.68, 1.0)
+                        };
+                        if let Some(mut label) = row.label(cx, ids!(app_desc)).borrow_mut() {
+                            label.draw_text.color = desc_color;
+                        }
+                        let command = if is_command { 1.0 } else { 0.0 };
+                        let builtin = if is_builtin { 1.0 } else { 0.0 };
+                        if let Some(mut view) = row.view(cx, ids!(row_bg)).borrow_mut() {
+                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(selected), &[selected]);
+                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(hovered), &[hovered]);
+                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(command), &[command]);
+                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(builtin), &[builtin]);
+                        }
                         row.draw_all(cx, &mut Scope::empty());
-                        self.row_hit_rects
-                            .push((item_id, row.view(ids!(row_bg)).area().rect(cx)));
+                        if let Some(area) = row.view(cx, ids!(row_bg)).borrow().map(|v| v.draw_bg.draw_vars.area) {
+                            self.row_hit_rects.push((item_id, area.rect(cx)));
+                        }
                     }
                 }
             }
@@ -1743,31 +1903,29 @@ impl Widget for LauncherPanel {
     }
 }
 
-#[derive(Live, LiveHook)]
+fn v4a(v: Vec4) -> [f32; 4] {
+    [v.x, v.y, v.z, v.w]
+}
+
+#[derive(Script, ScriptHook)]
 pub struct App {
     #[live]
     ui: WidgetRef,
 }
 
-impl LiveRegister for App {
-    fn live_register(cx: &mut Cx) {
-        makepad_widgets::live_design(cx);
-        makepad_component::live_design(cx);
-    }
-}
-
 impl AppMain for App {
+    fn script_mod(vm: &mut ScriptVm) -> ScriptValue {
+        crate::makepad_widgets::script_mod(vm);
+        self::script_mod(vm)
+    }
+
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
         if let Event::Startup = event {
             self.ui
-                .text_input(ids!(launcher.mode_input))
+                .text_input(cx, ids!(launcher.mode_input))
                 .set_key_focus(cx);
         }
 
         self.ui.handle_event(cx, event, &mut Scope::empty());
     }
-}
-
-fn main() {
-    app_main()
 }

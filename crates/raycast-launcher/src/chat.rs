@@ -1,5 +1,3 @@
-use makepad_component::a2ui::*;
-use makepad_component::widgets::button::*;
 use makepad_widgets::*;
 
 use crate::{a2ui_bridge_embed, LauncherPanel};
@@ -13,7 +11,7 @@ pub(crate) struct ChatMessage {
 pub(crate) fn default_chat_messages() -> Vec<ChatMessage> {
     vec![ChatMessage {
         role: "System",
-        text: "Embedded A2UI bridge (tool-call mode) is ready.".to_string(),
+        text: "Embedded bridge (text-only mode) is ready.".to_string(),
     }]
 }
 
@@ -27,14 +25,14 @@ impl LauncherPanel {
         if show {
             self.show_todo = false;
         }
-        self.view.view(ids!(launcher_view)).set_visible(cx, !show);
-        self.view.view(ids!(todo_view)).set_visible(cx, false);
-        self.view.view(ids!(chat_view)).set_visible(cx, show);
+        self.view.view(cx, ids!(launcher_view)).set_visible(cx, !show);
+        self.view.view(cx, ids!(todo_view)).set_visible(cx, false);
+        self.view.view(cx, ids!(chat_view)).set_visible(cx, show);
         self.sync_mode_input(cx);
         if show {
             self.sync_chat_ui(cx);
         }
-        self.view.text_input(ids!(mode_input)).set_key_focus(cx);
+        self.view.text_input(cx, ids!(mode_input)).set_key_focus(cx);
     }
 
     pub(crate) fn sync_chat_ui(&mut self, cx: &mut Cx) {
@@ -49,10 +47,10 @@ impl LauncherPanel {
             lines.push_str("No messages yet.");
         }
         self.view
-            .label(ids!(chat_history_label))
+            .label(cx, ids!(chat_history_label))
             .set_text(cx, &lines);
         self.sync_chat_controls(cx);
-        self.view.label(ids!(chat_keys_label)).set_text(
+        self.view.label(cx, ids!(chat_keys_label)).set_text(
             cx,
             if self.chat_loading {
                 "Esc Back"
@@ -63,21 +61,20 @@ impl LauncherPanel {
 
         if self.chat_loading {
             self.view
-                .label(ids!(chat_status_label))
-                .set_text(cx, "Generating UI in embedded bridge mode...");
+                .label(cx, ids!(chat_status_label))
+                .set_text(cx, "Sending request...");
         }
     }
 
     fn reset_chat(&mut self, cx: &mut Cx) {
         cx.cancel_http_request(live_id!(ChatCompletionRequest));
         self.chat_messages = default_chat_messages();
-        let surface_ref = self.view.widget(ids!(chat_surface));
-        if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
-            surface.clear();
-        }
+        self.view
+            .label(cx, ids!(chat_output_label))
+            .set_text(cx, "");
         self.chat_loading = false;
         self.view
-            .label(ids!(chat_status_label))
+            .label(cx, ids!(chat_status_label))
             .set_text(cx, "Conversation reset");
         self.sync_chat_ui(cx);
         self.redraw(cx);
@@ -88,14 +85,14 @@ impl LauncherPanel {
             return;
         }
 
-        let text = self.view.text_input(ids!(mode_input)).text();
+        let text = self.view.text_input(cx, ids!(mode_input)).text();
         let text = text.trim();
         if text.is_empty() {
             return;
         }
 
-        self.chat_server_url = self.view.text_input(ids!(chat_server_input)).text();
-        self.chat_model = self.view.text_input(ids!(chat_model_input)).text();
+        self.chat_server_url = self.view.text_input(cx, ids!(chat_server_input)).text();
+        self.chat_model = self.view.text_input(cx, ids!(chat_model_input)).text();
 
         let user_msg = text.to_string();
         self.chat_messages.push(ChatMessage {
@@ -106,7 +103,7 @@ impl LauncherPanel {
         self.chat_draft.clear();
         self.sync_chat_ui(cx);
         self.view
-            .label(ids!(chat_status_label))
+            .label(cx, ids!(chat_status_label))
             .set_text(cx, "Sending request...");
 
         let api_url = self.chat_server_url.trim();
@@ -118,7 +115,7 @@ impl LauncherPanel {
                 text: "LLM API URL or model is empty".to_string(),
             });
             self.view
-                .label(ids!(chat_status_label))
+                .label(cx, ids!(chat_status_label))
                 .set_text(cx, "Invalid configuration");
             self.sync_chat_ui(cx);
             self.redraw(cx);
@@ -145,39 +142,31 @@ impl LauncherPanel {
         responses: &NetworkResponsesEvent,
     ) {
         for item in responses {
-            if item.request_id != live_id!(ChatCompletionRequest) {
-                continue;
-            }
-            if !self.chat_loading {
-                continue;
-            }
+            match item {
+                NetworkResponse::HttpResponse {
+                    request_id,
+                    response,
+                } => {
+                    if *request_id != live_id!(ChatCompletionRequest) {
+                        continue;
+                    }
+                    if !self.chat_loading {
+                        continue;
+                    }
 
-            match &item.response {
-                NetworkResponse::HttpResponse(response) => {
                     let body = response.get_string_body().unwrap_or_default();
                     match a2ui_bridge_embed::parse_chat_response(response.status_code, &body) {
-                        Ok((assistant, a2ui_json)) => {
+                        Ok(assistant_text) => {
                             self.chat_messages.push(ChatMessage {
                                 role: "Assistant",
-                                text: assistant,
+                                text: assistant_text.clone(),
                             });
-                            let render_status = {
-                                let surface_ref = self.view.widget(ids!(chat_surface));
-                                let status = if let Some(mut surface) =
-                                    surface_ref.borrow_mut::<A2uiSurface>()
-                                {
-                                    match surface.process_json(&a2ui_json) {
-                                        Ok(events) => format!("Rendered {} events", events.len()),
-                                        Err(e) => format!("A2UI parse error: {}", e),
-                                    }
-                                } else {
-                                    "A2UI surface not found".to_string()
-                                };
-                                status
-                            };
                             self.view
-                                .label(ids!(chat_status_label))
-                                .set_text(cx, &render_status);
+                                .label(cx, ids!(chat_output_label))
+                                .set_text(cx, &assistant_text);
+                            self.view
+                                .label(cx, ids!(chat_status_label))
+                                .set_text(cx, "Response received");
                         }
                         Err(err) => {
                             self.chat_messages.push(ChatMessage {
@@ -185,7 +174,7 @@ impl LauncherPanel {
                                 text: err,
                             });
                             self.view
-                                .label(ids!(chat_status_label))
+                                .label(cx, ids!(chat_status_label))
                                 .set_text(cx, "Request failed");
                         }
                     }
@@ -193,14 +182,20 @@ impl LauncherPanel {
                     self.sync_chat_ui(cx);
                     self.redraw(cx);
                 }
-                NetworkResponse::HttpRequestError(error) => {
+                NetworkResponse::HttpError { request_id, error } => {
+                    if *request_id != live_id!(ChatCompletionRequest) {
+                        continue;
+                    }
+                    if !self.chat_loading {
+                        continue;
+                    }
                     self.chat_messages.push(ChatMessage {
                         role: "Error",
                         text: format!("Network error: {}", error.message),
                     });
                     self.chat_loading = false;
                     self.view
-                        .label(ids!(chat_status_label))
+                        .label(cx, ids!(chat_status_label))
                         .set_text(cx, "Request failed");
                     self.sync_chat_ui(cx);
                     self.redraw(cx);
@@ -211,23 +206,23 @@ impl LauncherPanel {
     }
 
     pub(crate) fn handle_chat_actions(&mut self, cx: &mut Cx, event: &Event, actions: &Actions) {
-        if self.view.mp_button(ids!(mode_back_btn)).clicked(actions) {
+        if self.view.button(cx, ids!(mode_back_btn)).clicked(actions) {
             self.set_chat_mode(cx, false);
             self.redraw(cx);
             return;
         }
 
-        if self.view.mp_button(ids!(chat_reset_btn)).clicked(actions) {
+        if self.view.button(cx, ids!(chat_reset_btn)).clicked(actions) {
             self.reset_chat(cx);
             return;
         }
 
-        if self.view.mp_button(ids!(mode_action_btn)).clicked(actions) {
+        if self.view.button(cx, ids!(mode_action_btn)).clicked(actions) {
             self.send_chat_from_input(cx);
             return;
         }
 
-        if let Some((_, _)) = self.view.text_input(ids!(mode_input)).returned(actions) {
+        if let Some((_, _)) = self.view.text_input(cx, ids!(mode_input)).returned(actions) {
             self.send_chat_from_input(cx);
             return;
         }

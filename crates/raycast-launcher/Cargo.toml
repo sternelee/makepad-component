@@ -2,7 +2,7 @@
 name = "raycast-launcher"
 version.workspace = true
 edition.workspace = true
-description = "Raycast-style app search launcher rendered with live_design"
+description = "Raycast-style app search launcher rendered with script_mod"
 
 [[bin]]
 name = "raycast-launcher"
@@ -10,6 +10,5 @@ path = "src/main.rs"
 
 [dependencies]
 makepad-widgets = { workspace = true }
-makepad-component = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

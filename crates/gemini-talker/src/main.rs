@@ -127,10 +127,10 @@ script_mod! {
                                 flow: Right
                                 spacing: 12
                                 padding: Inset{left: 24 right: 24 top: 0 bottom: 0}
-                                gemini_label := Label{text: "✨ Gemini" font_size: 14}
-                                status_label := Label{text: "Offline" font_size: 12}
+                                gemini_label := Label{text: "✨ Gemini" draw_text: {font_size: 14}}
+                                status_label := Label{text: "Offline" draw_text: {font_size: 12}}
                                 Filler{}
-                                duration_label := Label{text: "00:00" font_size: 12}
+                                duration_label := Label{text: "00:00" draw_text: {font_size: 12}}
                             }
 
                             scene_area := View{
@@ -139,7 +139,7 @@ script_mod! {
                                 align: Center
                                 show_bg: true
                                 draw_bg +: { color: vec4(0.05, 0.08, 0.15, 0.95) }
-                                scene_background := Image{width: Fill height: Fill align: Center visible: false}
+                                scene_background := Image{width: Fill height: Fill visible: false}
                                 scene_visual := View{width: 200 height: 200 align: Center show_bg: true
                                     draw_bg +: { color: vec4(0.2, 0.4, 0.8, 0.3) }
                                     inner_glow := View{width: 160 height: 160 align: Center show_bg: true
@@ -149,7 +149,7 @@ script_mod! {
                                 speech_overlay := View{width: Fill height: Fit flow: Down align: Center spacing: 8 padding: 24
                                     show_bg: true
                                     draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.6) }
-                                    speech_label := Label{text: "" font_size: 18 text_style: {align: Center} }
+                                    speech_label := Label{text: "" draw_text: {font_size: 18 text_style: {align: Center}}}
                                     speech_actions := View{width: Fit height: 32 flow: Right spacing: 12
                                         replay_btn := Button{text: "↺ Replay" visible: false}
                                         translate_btn := Button{text: "🌐 Translate" visible: false}
@@ -212,14 +212,14 @@ script_mod! {
                                         show_bg: true
                                         draw_bg +: { color: vec4(0.15, 0.15, 0.2, 0.9) }
                                         padding: 16
-                                        card_title := Label{text: "Title" font_size: 20}
-                                        card_mood := Label{text: "mood" font_size: 14}
-                                        card_summary := Label{text: "Summary..." font_size: 14}
-                                        card_date := Label{text: "Date" font_size: 12}
+                                        card_title := Label{text: "Title" draw_text: {font_size: 20}}
+                                        card_mood := Label{text: "mood" draw_text: {font_size: 14}}
+                                        card_summary := Label{text: "Summary..." draw_text: {font_size: 14}}
+                                        card_date := Label{text: "Date" draw_text: {font_size: 12}}
                                     }
                                     next_card_btn := Button{text: ">"}
                                 }
-                                carousel_indicators := View{width: Fill height: 24 flow: Center}
+                                carousel_indicators := View{width: Fill height: 24 flow: Right align: Center}
                             }
                             calendar_view := View{width: Fill height: Fit flow: Down spacing: 4 visible: false
                                 calendar_header := View{width: Fill height: 32 flow: Right spacing: 8
@@ -237,7 +237,7 @@ script_mod! {
                                         Label{text: "F"}
                                         Label{text: "S"}
                                     }
-                                    calendar_days := View{width: Fill height: Fill flow: Grid 7}
+                                    calendar_days := View{width: Fill height: Fill flow: Right spacing: 2}
                                 }
                                 selected_date_label := Label{text: "Select a date"}
                             }
