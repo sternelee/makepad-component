@@ -14,6 +14,85 @@ mod todo;
 script_mod! {
     use mod.prelude.widgets.*
 
+    let TodoRow = View{
+        width: Fill
+        height: Fit
+        flow: Right
+        spacing: 8
+        align: VCenter
+        padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
+        margin: Inset{top: 5 bottom: 5}
+        show_bg: true
+        draw_bg +: {
+            done: instance(0.0)
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                sdf.fill(mix(#x272c34 #x1f3a2a self.done))
+                sdf.stroke(#x3b424d 1.0)
+                return sdf.result
+            }
+        }
+        check := CheckBox{text: ""}
+        label := Label{
+            width: Fill
+            text: ""
+            draw_text +: {
+                text_style: theme.font_regular {font_size: 12}
+                color: #xe2e8f0
+            }
+        }
+        tag := View{
+            width: Fit
+            height: Fit
+            padding: Inset{left: 6 right: 6 top: 2 bottom: 2}
+            show_bg: true
+            draw_bg +: {
+                pixel: fn() {
+                    let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                    sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 4.0)
+                    sdf.fill(#x3b82f6)
+                    return sdf.result
+                }
+            }
+            tag_label := Label{
+                text: ""
+                draw_text +: {
+                    text_style: theme.font_regular {font_size: 9}
+                    color: #xffffff
+                }
+            }
+        }
+        del := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
+    }
+
+    let EmptyTodo = View{
+        width: Fill
+        height: Fit
+        align: Center
+        padding: Inset{top: 40 bottom: 40}
+        Label{
+            text: "No tasks yet — add one below"
+            draw_text +: {
+                text_style: theme.font_regular {font_size: 12}
+                color: #x8f9caf
+            }
+        }
+    }
+
+    mod.widgets.TodoListBase = #(todo::TodoList::register_widget(vm))
+    mod.widgets.TodoList = set_type_default() do mod.widgets.TodoListBase{
+        width: Fill
+        height: Fill
+        list := PortalList{
+            width: Fill
+            height: Fill
+            scroll_bar: ScrollBar{}
+            Item := CachedView{TodoRow{}}
+            Empty := CachedView{EmptyTodo{}}
+        }
+    }
+
     mod.widgets.LauncherPanelBase = #(LauncherPanel::register_widget(vm))
     mod.widgets.LauncherPanel = set_type_default() do mod.widgets.LauncherPanelBase{
         width: Fill
@@ -442,253 +521,7 @@ script_mod! {
 
             View{width: Fill height: 1 show_bg: true draw_bg +: {color: #x2e3541}}
 
-            todo_rows := View{
-                width: Fill
-                height: Fill
-                flow: Down
-                spacing: 5
-
-                row_0 := View{
-                    width: Fill
-                    height: Fit
-                    flow: Right
-                    spacing: 8
-                    align: VCenter
-                    visible: false
-                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
-                    show_bg: true
-                    draw_bg +: {
-                        done: instance(0.0)
-                        pixel: fn() {
-                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
-                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
-                            sdf.stroke(#x3b424d 1.0)
-                            return sdf.result
-                        }
-                    }
-                    check_0 := CheckBox{text: ""}
-                    label_0 := Label{
-                        width: Fill
-                        text: ""
-                        draw_text +: {
-                            text_style: theme.font_regular {font_size: 12}
-                            color: #xe2e8f0
-                        }
-                    }
-                    del_0 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
-                }
-                row_1 := View{
-                    width: Fill
-                    height: Fit
-                    flow: Right
-                    spacing: 8
-                    align: VCenter
-                    visible: false
-                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
-                    show_bg: true
-                    draw_bg +: {
-                        done: instance(0.0)
-                        pixel: fn() {
-                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
-                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
-                            sdf.stroke(#x3b424d 1.0)
-                            return sdf.result
-                        }
-                    }
-                    check_1 := CheckBox{text: ""}
-                    label_1 := Label{
-                        width: Fill
-                        text: ""
-                        draw_text +: {
-                            text_style: theme.font_regular {font_size: 12}
-                            color: #xe2e8f0
-                        }
-                    }
-                    del_1 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
-                }
-                row_2 := View{
-                    width: Fill
-                    height: Fit
-                    flow: Right
-                    spacing: 8
-                    align: VCenter
-                    visible: false
-                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
-                    show_bg: true
-                    draw_bg +: {
-                        done: instance(0.0)
-                        pixel: fn() {
-                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
-                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
-                            sdf.stroke(#x3b424d 1.0)
-                            return sdf.result
-                        }
-                    }
-                    check_2 := CheckBox{text: ""}
-                    label_2 := Label{
-                        width: Fill
-                        text: ""
-                        draw_text +: {
-                            text_style: theme.font_regular {font_size: 12}
-                            color: #xe2e8f0
-                        }
-                    }
-                    del_2 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
-                }
-                row_3 := View{
-                    width: Fill
-                    height: Fit
-                    flow: Right
-                    spacing: 8
-                    align: VCenter
-                    visible: false
-                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
-                    show_bg: true
-                    draw_bg +: {
-                        done: instance(0.0)
-                        pixel: fn() {
-                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
-                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
-                            sdf.stroke(#x3b424d 1.0)
-                            return sdf.result
-                        }
-                    }
-                    check_3 := CheckBox{text: ""}
-                    label_3 := Label{
-                        width: Fill
-                        text: ""
-                        draw_text +: {
-                            text_style: theme.font_regular {font_size: 12}
-                            color: #xe2e8f0
-                        }
-                    }
-                    del_3 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
-                }
-                row_4 := View{
-                    width: Fill
-                    height: Fit
-                    flow: Right
-                    spacing: 8
-                    align: VCenter
-                    visible: false
-                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
-                    show_bg: true
-                    draw_bg +: {
-                        done: instance(0.0)
-                        pixel: fn() {
-                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
-                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
-                            sdf.stroke(#x3b424d 1.0)
-                            return sdf.result
-                        }
-                    }
-                    check_4 := CheckBox{text: ""}
-                    label_4 := Label{
-                        width: Fill
-                        text: ""
-                        draw_text +: {
-                            text_style: theme.font_regular {font_size: 12}
-                            color: #xe2e8f0
-                        }
-                    }
-                    del_4 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
-                }
-                row_5 := View{
-                    width: Fill
-                    height: Fit
-                    flow: Right
-                    spacing: 8
-                    align: VCenter
-                    visible: false
-                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
-                    show_bg: true
-                    draw_bg +: {
-                        done: instance(0.0)
-                        pixel: fn() {
-                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
-                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
-                            sdf.stroke(#x3b424d 1.0)
-                            return sdf.result
-                        }
-                    }
-                    check_5 := CheckBox{text: ""}
-                    label_5 := Label{
-                        width: Fill
-                        text: ""
-                        draw_text +: {
-                            text_style: theme.font_regular {font_size: 12}
-                            color: #xe2e8f0
-                        }
-                    }
-                    del_5 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
-                }
-                row_6 := View{
-                    width: Fill
-                    height: Fit
-                    flow: Right
-                    spacing: 8
-                    align: VCenter
-                    visible: false
-                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
-                    show_bg: true
-                    draw_bg +: {
-                        done: instance(0.0)
-                        pixel: fn() {
-                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
-                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
-                            sdf.stroke(#x3b424d 1.0)
-                            return sdf.result
-                        }
-                    }
-                    check_6 := CheckBox{text: ""}
-                    label_6 := Label{
-                        width: Fill
-                        text: ""
-                        draw_text +: {
-                            text_style: theme.font_regular {font_size: 12}
-                            color: #xe2e8f0
-                        }
-                    }
-                    del_6 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
-                }
-                row_7 := View{
-                    width: Fill
-                    height: Fit
-                    flow: Right
-                    spacing: 8
-                    align: VCenter
-                    visible: false
-                    padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
-                    show_bg: true
-                    draw_bg +: {
-                        done: instance(0.0)
-                        pixel: fn() {
-                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
-                            sdf.fill(mix(#x272c34 #x1f3a2a self.done))
-                            sdf.stroke(#x3b424d 1.0)
-                            return sdf.result
-                        }
-                    }
-                    check_7 := CheckBox{text: ""}
-                    label_7 := Label{
-                        width: Fill
-                        text: ""
-                        draw_text +: {
-                            text_style: theme.font_regular {font_size: 12}
-                            color: #xe2e8f0
-                        }
-                    }
-                    del_7 := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
-                }
-            }
+            todo_list := mod.widgets.TodoList{}
         }
 
         chat_view := View{
@@ -963,8 +796,6 @@ pub struct LauncherPanel {
     #[rust]
     show_todo: bool,
     #[rust]
-    todos: Vec<todo::TodoItem>,
-    #[rust]
     show_chat: bool,
     #[rust]
     chat_messages: Vec<chat::ChatMessage>,
@@ -992,7 +823,7 @@ impl ScriptHook for LauncherPanel {
             self.last_click_item = None;
             self.last_click_time = 0.0;
             self.show_todo = false;
-            self.todos = todo::default_todos();
+            *todo::TODOS.write().unwrap() = todo::initial_todos();
             self.show_chat = false;
             self.chat_messages = chat::default_chat_messages();
             self.chat_loading = false;
@@ -1004,7 +835,7 @@ impl ScriptHook for LauncherPanel {
             self.rebuild_filter();
             self.sync_mode_input(cx);
             self.view.text_input(cx, ids!(mode_input)).set_key_focus(cx);
-            self.sync_todo_ui(cx);
+            self.sync_todo_stats(cx);
             self.sync_chat_ui(cx);
             self.view
                 .text_input(cx, ids!(chat_server_input))
