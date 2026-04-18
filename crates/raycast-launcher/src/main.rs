@@ -40,6 +40,78 @@ script_mod! {
             width: Fill
             height: Fill
             scroll_bar: ScrollBar{}
+
+            Item := View{
+                width: Fill
+                height: Fit
+                flow: Right
+                spacing: 8
+                align: VCenter
+                padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
+                margin: Inset{top: 5 bottom: 5}
+                show_bg: true
+                draw_bg +: {
+                    done: instance(0.0)
+                    bg_normal: uniform(#x272c34)
+                    bg_done: uniform(#x1f3a2a)
+                    stroke_color: uniform(#x3b424d)
+                    pixel: fn(){
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                        sdf.fill(mix(self.bg_normal self.bg_done self.done))
+                        sdf.stroke(self.stroke_color 1.0)
+                        return sdf.result
+                    }
+                }
+                check := CheckBox{text: ""}
+                label := Label{
+                    width: Fill
+                    text: ""
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 12}
+                        color: #xe2e8f0
+                    }
+                }
+                tag := View{
+                    width: Fit
+                    height: Fit
+                    padding: Inset{left: 6 right: 6 top: 2 bottom: 2}
+                    show_bg: true
+                    draw_bg +: {
+                        pixel: fn(){
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 4.0)
+                            sdf.fill(#x3b82f6)
+                            return sdf.result
+                        }
+                    }
+                    tag_label := Label{
+                        text: ""
+                        draw_text +: {
+                            text_style: theme.font_regular {font_size: 9}
+                            color: #xffffff
+                        }
+                    }
+                }
+                del := Button{
+                    text: "Remove"
+                    padding: Inset{left: 8 right: 8 top: 6 bottom: 6}
+                }
+            }
+
+            Empty := View{
+                width: Fill
+                height: Fit
+                align: Center
+                padding: Inset{top: 40 bottom: 40}
+                empty_label := Label{
+                    text: "No tasks yet - add one below"
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 12}
+                        color: #x8f9caf
+                    }
+                }
+            }
         }
     }
 
@@ -1552,19 +1624,24 @@ impl LauncherPanel {
             return;
         };
 
-        // Eval splash code — registers widgets in mod.widgets, returns templates object
-        let templates_value = cx.with_vm(|vm| {
-            let script_mod = app_loader::script_mod_from_code(&app.splash_code);
-            vm.eval(script_mod)
-        });
-
-        // Apply templates to PortalList with Apply::Reload
-        let todo_list_widget = self.view.widget(cx, ids!(todo_list));
-        let list = todo_list_widget.portal_list(cx, ids!(list));
-        if let Some(mut list_inner) = list.borrow_mut() {
-            cx.with_vm(|vm| {
-                list_inner.script_apply(vm, &Apply::Reload, &mut Scope::empty(), templates_value);
+        // Eval splash code for dynamic templates (e.g. AI-generated apps).
+        // Skip if empty — compile-time templates (e.g. Todo app) are already in place.
+        let splash_code = app.splash_code.trim();
+        if !splash_code.is_empty() && splash_code != "{}" {
+            let templates_value = cx.with_vm(|vm| {
+                let script_mod = app_loader::script_mod_from_code(splash_code);
+                vm.eval(script_mod)
             });
+
+            // Apply templates to PortalList with Apply::Reload
+            let todo_list_widget = self.view.widget(cx, ids!(todo_list));
+            let list = todo_list_widget.portal_list(cx, ids!(list));
+            if let Some(mut list_inner) = list.borrow_mut() {
+                cx.with_vm(|vm| {
+                    list_inner.script_apply(vm, &Apply::Reload, &mut Scope::empty(), templates_value);
+                });
+            }
+            let _ = (); // Drop temporaries before block end
         }
 
         // Inject state into mod.state.app
