@@ -1,11 +1,12 @@
-use makepad_widgets::*;
 use makepad_script::{ScriptHeap, ScriptObject, ScriptTrap::NoTrap};
+use makepad_widgets::*;
 use serde::{Deserialize, Serialize};
 use std::sync::{LazyLock, RwLock};
 
 // ==================== JSON File Path ====================
 
-static TODO_JSON_PATH: LazyLock<RwLock<Option<std::path::PathBuf>>> = LazyLock::new(|| RwLock::new(None));
+static TODO_JSON_PATH: LazyLock<RwLock<Option<std::path::PathBuf>>> =
+    LazyLock::new(|| RwLock::new(None));
 
 // ==================== Configuration Types ====================
 
@@ -27,13 +28,27 @@ pub(crate) struct TodoTheme {
     pub(crate) row_stroke: String,
 }
 
-fn default_empty_text() -> String { "No tasks yet — add one below".to_string() }
-fn default_text_color() -> String { "#xe2e8f0".to_string() }
-fn default_text_done_color() -> String { "#xa0d0a4".to_string() }
-fn default_tag_text_color() -> String { "#xffffff".to_string() }
-fn default_row_bg_normal() -> String { "#x272c34".to_string() }
-fn default_row_bg_done() -> String { "#x1f3a2a".to_string() }
-fn default_row_stroke() -> String { "#x3b424d".to_string() }
+fn default_empty_text() -> String {
+    "No tasks yet — add one below".to_string()
+}
+fn default_text_color() -> String {
+    "#xe2e8f0".to_string()
+}
+fn default_text_done_color() -> String {
+    "#xa0d0a4".to_string()
+}
+fn default_tag_text_color() -> String {
+    "#xffffff".to_string()
+}
+fn default_row_bg_normal() -> String {
+    "#x272c34".to_string()
+}
+fn default_row_bg_done() -> String {
+    "#x1f3a2a".to_string()
+}
+fn default_row_stroke() -> String {
+    "#x3b424d".to_string()
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub(crate) struct TodoItemJson {
@@ -61,13 +76,11 @@ pub(crate) struct TodoItemData {
     pub(crate) tag: String,
 }
 
-pub(crate) static TODO_CONFIG: LazyLock<RwLock<TodoConfig>> = LazyLock::new(|| {
-    RwLock::new(load_todo_config())
-});
+pub(crate) static TODO_CONFIG: LazyLock<RwLock<TodoConfig>> =
+    LazyLock::new(|| RwLock::new(load_todo_config()));
 
-pub(crate) static TODOS: LazyLock<RwLock<Vec<TodoItemData>>> = LazyLock::new(|| {
-    RwLock::new(initial_todos())
-});
+pub(crate) static TODOS: LazyLock<RwLock<Vec<TodoItemData>>> =
+    LazyLock::new(|| RwLock::new(initial_todos()));
 
 /// Load todo configuration from JSON file.
 /// Searches: ./todo.json, <crate-dir>/todo.json, <exe-dir>/todo.json
@@ -102,7 +115,10 @@ pub(crate) fn load_todo_config() -> TodoConfig {
 
     // No file found — default to crate dir so save_todos() can create it
     let default_path = crate_dir.join("todo.json");
-    log!("No todo.json found, using defaults; will create at: {}", default_path.display());
+    log!(
+        "No todo.json found, using defaults; will create at: {}",
+        default_path.display()
+    );
     *TODO_JSON_PATH.write().unwrap() = Some(default_path);
     TodoConfig::default()
 }
@@ -218,7 +234,9 @@ fn read_theme_from_script(cx: &mut Cx2d) -> TodoTheme {
 
         // mod.state
         let state_val = heap.value(mod_obj, ScriptValue::from_id(id!(state)), NoTrap);
-        let Some(state_obj) = state_val.as_object() else { return; };
+        let Some(state_obj) = state_val.as_object() else {
+            return;
+        };
 
         // Try mod.state.app.theme first (dynamically loaded apps), fallback to mod.state.todo.theme
         let mut theme_obj = None;
@@ -239,7 +257,9 @@ fn read_theme_from_script(cx: &mut Cx2d) -> TodoTheme {
             }
         }
 
-        let Some(theme_obj) = theme_obj else { return; };
+        let Some(theme_obj) = theme_obj else {
+            return;
+        };
 
         if let Some(v) = read_script_string(heap, theme_obj, id!(text_color)) {
             theme.text_color = v;
@@ -296,13 +316,16 @@ impl Widget for TodoList {
                 } else {
                     list.set_item_range(cx, 0, todos.len());
                     while let Some(item_id) = list.next_visible_item(cx) {
-                        let Some(todo) = todos.get(item_id) else { continue };
+                        let Some(todo) = todos.get(item_id) else {
+                            continue;
+                        };
                         let item = list.item(cx, item_id, id!(Item));
 
                         item.check_box(cx, ids!(check)).set_active(cx, todo.done);
                         item.label(cx, ids!(label)).set_text(cx, &todo.text);
                         item.label(cx, ids!(tag_label)).set_text(cx, &todo.tag);
-                        item.view(cx, ids!(tag)).set_visible(cx, !todo.tag.is_empty());
+                        item.view(cx, ids!(tag))
+                            .set_visible(cx, !todo.tag.is_empty());
 
                         if let Some(mut row_view) = item.view(cx, ids!(row)).borrow_mut() {
                             let done_value = if todo.done { 1.0 } else { 0.0 };
@@ -356,4 +379,3 @@ impl Widget for TodoList {
         self.view.handle_event(cx, event, scope);
     }
 }
-

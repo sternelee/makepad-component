@@ -20,8 +20,8 @@ struct LlmMessage {
 
 /// Keywords that indicate the user wants to generate a UI/app.
 const UI_GEN_KEYWORDS: &[&str] = &[
-    "create", "make", "build", "generate", "design", "app", "ui", "widget",
-    "界面", "应用", "创建", "生成", "设计", "组件", "页面", "布局",
+    "create", "make", "build", "generate", "design", "app", "ui", "widget", "界面", "应用", "创建",
+    "生成", "设计", "组件", "页面", "布局",
 ];
 
 /// Detect if a user message is requesting UI generation.
@@ -124,10 +124,7 @@ pub(crate) fn build_chat_request_body(model: &str, messages: &[ChatMessage]) -> 
     .to_string()
 }
 
-pub(crate) fn parse_chat_response(
-    status_code: u16,
-    body: &str,
-) -> Result<String, String> {
+pub(crate) fn parse_chat_response(status_code: u16, body: &str) -> Result<String, String> {
     if !(200..=299).contains(&status_code) {
         let msg = serde_json::from_str::<Value>(body)
             .ok()

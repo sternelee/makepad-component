@@ -66,7 +66,12 @@ pub(crate) fn default_or_history() -> Vec<ChatMessage> {
 /// Extract app name suggested by AI from response text.
 /// Looks for "**App Name:** Name" or "App Name: Name" pattern.
 pub(crate) fn extract_app_name(text: &str) -> Option<String> {
-    for prefix in &["**App Name:**", "App Name:", "**Suggested Name:**", "Suggested Name:"] {
+    for prefix in &[
+        "**App Name:**",
+        "App Name:",
+        "**Suggested Name:**",
+        "Suggested Name:",
+    ] {
         if let Some(start) = text.find(prefix) {
             let after = start + prefix.len();
             let rest = text[after..].trim_start();
@@ -118,7 +123,9 @@ impl LauncherPanel {
             self.stream_timer = None;
             self.stream_buffer.clear();
         }
-        self.view.view(cx, ids!(launcher_view)).set_visible(cx, !show);
+        self.view
+            .view(cx, ids!(launcher_view))
+            .set_visible(cx, !show);
         self.view.view(cx, ids!(todo_view)).set_visible(cx, false);
         self.view.view(cx, ids!(chat_view)).set_visible(cx, show);
         self.sync_mode_input(cx);
@@ -200,12 +207,24 @@ impl LauncherPanel {
         let name = ai_name
             .as_deref()
             .filter(|n| !n.is_empty())
-            .or_else(|| if input_name.is_empty() { None } else { Some(input_name) })
+            .or_else(|| {
+                if input_name.is_empty() {
+                    None
+                } else {
+                    Some(input_name)
+                }
+            })
             .unwrap_or("generated-app");
         // Sanitize name for filename
         let safe_name: String = name
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '-'
+                }
+            })
             .collect();
 
         let descriptor = app_loader::AppDescriptor {
@@ -231,12 +250,10 @@ impl LauncherPanel {
                     self.all_items = crate::load_launcher_items();
                     self.rebuild_filter();
                     self.last_saved_app_path = Some(path.clone());
-                    self.view
-                        .label(cx, ids!(chat_status_label))
-                        .set_text(cx, &format!(
-                        "Saved '{}'. Click 'Open App' to launch it.",
-                        name
-                    ));
+                    self.view.label(cx, ids!(chat_status_label)).set_text(
+                        cx,
+                        &format!("Saved '{}'. Click 'Open App' to launch it.", name),
+                    );
                     self.sync_chat_ui(cx);
                     // Clear input after save
                     self.chat_draft.clear();
@@ -407,7 +424,9 @@ impl LauncherPanel {
             if let Some(path) = self.last_saved_app_path.clone() {
                 self.set_chat_mode(cx, false);
                 self.show_todo = true;
-                self.view.view(cx, ids!(launcher_view)).set_visible(cx, false);
+                self.view
+                    .view(cx, ids!(launcher_view))
+                    .set_visible(cx, false);
                 self.view.view(cx, ids!(todo_view)).set_visible(cx, true);
                 self.view.view(cx, ids!(chat_view)).set_visible(cx, false);
                 self.sync_mode_input(cx);

@@ -1,6 +1,6 @@
+use makepad_script::Apply;
 pub use makepad_widgets;
 use makepad_widgets::*;
-use makepad_script::Apply;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
@@ -1189,7 +1189,9 @@ impl LauncherPanel {
         self.view
             .text_input(cx, ids!(mode_input))
             .set_empty_text(cx, empty_text.to_string());
-        self.view.text_input(cx, ids!(mode_input)).set_text(cx, text);
+        self.view
+            .text_input(cx, ids!(mode_input))
+            .set_text(cx, text);
         self.view
             .text_input(cx, ids!(mode_input))
             .set_is_read_only(cx, read_only);
@@ -1345,7 +1347,14 @@ impl LauncherPanel {
             let is_builtin = self
                 .all_items
                 .get(*idx)
-                .map(|it| matches!(it.launch, LaunchTarget::OpenTodo | LaunchTarget::OpenChat | LaunchTarget::OpenSplashApp(_)))
+                .map(|it| {
+                    matches!(
+                        it.launch,
+                        LaunchTarget::OpenTodo
+                            | LaunchTarget::OpenChat
+                            | LaunchTarget::OpenSplashApp(_)
+                    )
+                })
                 .unwrap_or(false);
             if is_builtin {
                 0
@@ -1382,7 +1391,9 @@ impl LauncherPanel {
         if self.filtered_indices.is_empty() {
             return;
         }
-        let target = self.selected_index.min(self.filtered_indices.len().saturating_sub(1));
+        let target = self
+            .selected_index
+            .min(self.filtered_indices.len().saturating_sub(1));
         let list = self.view.portal_list(cx, ids!(results));
         let first = list.first_id();
         let visible = list.visible_items().max(1);
@@ -1405,8 +1416,12 @@ impl LauncherPanel {
 
     fn update_labels(&mut self, cx: &mut Cx, _status_hint: &str) {
         let has_results = !self.filtered_indices.is_empty();
-        self.view.widget(cx, ids!(results)).set_visible(cx, has_results);
-        self.view.widget(cx, ids!(empty_state)).set_visible(cx, !has_results);
+        self.view
+            .widget(cx, ids!(results))
+            .set_visible(cx, has_results);
+        self.view
+            .widget(cx, ids!(empty_state))
+            .set_visible(cx, !has_results);
         let mut command_count = 0usize;
         let mut app_count = 0usize;
         for idx in &self.filtered_indices {
@@ -1423,7 +1438,9 @@ impl LauncherPanel {
         } else {
             format!(
                 "{} selected",
-                self.selected_index.saturating_add(1).min(self.filtered_indices.len())
+                self.selected_index
+                    .saturating_add(1)
+                    .min(self.filtered_indices.len())
             )
         };
         let count_text = format!(
@@ -1454,14 +1471,15 @@ impl LauncherPanel {
                 self.view
                     .label(cx, ids!(empty_title))
                     .set_text(cx, "No Results");
-                self.view.label(cx, ids!(empty_desc)).set_text(
-                    cx,
-                    &format!("No match for \"{}\". Try /todo or /chat", q),
-                );
+                self.view
+                    .label(cx, ids!(empty_desc))
+                    .set_text(cx, &format!("No match for \"{}\". Try /todo or /chat", q));
             }
         }
 
-        self.view.label(cx, ids!(status_label)).set_text(cx, &count_text);
+        self.view
+            .label(cx, ids!(status_label))
+            .set_text(cx, &count_text);
         self.view
             .label(cx, ids!(status_keys_label))
             .set_text(cx, "Up/Down Select  |  Enter Open  |  Double Click Open");
@@ -1509,7 +1527,9 @@ impl LauncherPanel {
             LaunchTarget::OpenSplashApp(ref path) => {
                 self.show_todo = true;
                 self.show_chat = false;
-                self.view.view(cx, ids!(launcher_view)).set_visible(cx, false);
+                self.view
+                    .view(cx, ids!(launcher_view))
+                    .set_visible(cx, false);
                 self.view.view(cx, ids!(todo_view)).set_visible(cx, true);
                 self.view.view(cx, ids!(chat_view)).set_visible(cx, false);
                 self.sync_mode_input(cx);
@@ -1555,9 +1575,17 @@ impl LauncherPanel {
             let items: Vec<todo::TodoItemData> = todos
                 .iter()
                 .map(|t| todo::TodoItemData {
-                    text: t.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    text: t
+                        .get("text")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
                     done: t.get("done").and_then(|v| v.as_bool()).unwrap_or(false),
-                    tag: t.get("tag").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    tag: t
+                        .get("tag")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
                 })
                 .collect();
             *todo::TODOS.write().unwrap() = items;
@@ -1576,7 +1604,9 @@ impl LauncherPanel {
             self.show_chat = false;
             self.load_todo_app(cx);
         }
-        self.view.view(cx, ids!(launcher_view)).set_visible(cx, !show);
+        self.view
+            .view(cx, ids!(launcher_view))
+            .set_visible(cx, !show);
         self.view.view(cx, ids!(todo_view)).set_visible(cx, show);
         self.view.view(cx, ids!(chat_view)).set_visible(cx, false);
         self.sync_mode_input(cx);
@@ -1679,7 +1709,8 @@ impl Widget for LauncherPanel {
                         if current_len < target_len {
                             // Append next char(s) — batch a few for speed
                             let batch = (target_len - current_len).min(3);
-                            msg.text.push_str(&self.stream_buffer[current_len..current_len + batch]);
+                            msg.text
+                                .push_str(&self.stream_buffer[current_len..current_len + batch]);
                             {
                                 let mut data = chat::CHAT_DATA.write().unwrap();
                                 if let Some(dm) = data.messages.get_mut(self.stream_msg_index) {
@@ -1778,7 +1809,11 @@ impl Widget for LauncherPanel {
         }
 
         let mut handled_enter = false;
-        if let Some((text, _mods)) = self.view.text_input(cx, ids!(mode_input)).returned(&actions) {
+        if let Some((text, _mods)) = self
+            .view
+            .text_input(cx, ids!(mode_input))
+            .returned(&actions)
+        {
             handled_enter = true;
             self.query = text;
             let q = self.query.trim().to_lowercase();
@@ -1829,31 +1864,41 @@ impl Widget for LauncherPanel {
                 while let Some(item_id) = list.next_visible_item(cx) {
                     if let Some(source_idx) = self.filtered_indices.get(item_id) {
                         let source_idx = *source_idx;
-                        let (app_name, category, subtitle, fallback, is_command, is_builtin, group_name) =
-                            if let Some(entry) = self.all_items.get(source_idx) {
-                                let is_builtin = matches!(
-                                    entry.launch,
-                                    LaunchTarget::OpenTodo | LaunchTarget::OpenChat | LaunchTarget::OpenSplashApp(_)
-                                );
-                                (
-                                    entry.app_name.clone(),
-                                    entry.category.clone(),
-                                    entry.subtitle.clone(),
-                                    entry.icon_fallback.clone(),
-                                    entry.category == "Command",
-                                    is_builtin,
-                                    Self::group_name_for(entry),
-                                )
-                            } else {
-                                continue;
-                            };
+                        let (
+                            app_name,
+                            category,
+                            subtitle,
+                            fallback,
+                            is_command,
+                            is_builtin,
+                            group_name,
+                        ) = if let Some(entry) = self.all_items.get(source_idx) {
+                            let is_builtin = matches!(
+                                entry.launch,
+                                LaunchTarget::OpenTodo
+                                    | LaunchTarget::OpenChat
+                                    | LaunchTarget::OpenSplashApp(_)
+                            );
+                            (
+                                entry.app_name.clone(),
+                                entry.category.clone(),
+                                entry.subtitle.clone(),
+                                entry.icon_fallback.clone(),
+                                entry.category == "Command",
+                                is_builtin,
+                                Self::group_name_for(entry),
+                            )
+                        } else {
+                            continue;
+                        };
 
                         let icon_path = self.resolve_icon_for_index(source_idx);
 
                         let row = list.item(cx, item_id, live_id!(ResultRow));
                         let show_group = if item_id == 0 {
                             true
-                        } else if let Some(prev_source_idx) = self.filtered_indices.get(item_id - 1) {
+                        } else if let Some(prev_source_idx) = self.filtered_indices.get(item_id - 1)
+                        {
                             if let Some(prev_entry) = self.all_items.get(*prev_source_idx) {
                                 Self::group_name_for(prev_entry) != group_name
                             } else {
@@ -1862,7 +1907,8 @@ impl Widget for LauncherPanel {
                         } else {
                             false
                         };
-                        row.widget(cx, ids!(group_label)).set_visible(cx, show_group);
+                        row.widget(cx, ids!(group_label))
+                            .set_visible(cx, show_group);
                         row.label(cx, ids!(group_label)).set_text(cx, group_name);
                         let group_color = match group_name {
                             "Built-in" => vec4(0.52, 0.69, 1.0, 1.0),
@@ -1875,9 +1921,11 @@ impl Widget for LauncherPanel {
                         row.label(cx, ids!(app_name)).set_text(cx, &app_name);
                         row.label(cx, ids!(app_meta)).set_text(cx, &category);
                         row.label(cx, ids!(app_desc)).set_text(cx, &subtitle);
-                        row.label(cx, ids!(app_icon_fallback)).set_text(cx, &fallback);
+                        row.label(cx, ids!(app_icon_fallback))
+                            .set_text(cx, &fallback);
                         let action_text = if is_command { "Run ↩" } else { "Open ↩" };
-                        row.label(cx, ids!(action_hint_text)).set_text(cx, action_text);
+                        row.label(cx, ids!(action_hint_text))
+                            .set_text(cx, action_text);
                         let meta_color = if category == "Command" {
                             vec4(0.96, 0.75, 0.44, 1.0)
                         } else {
@@ -1897,8 +1945,16 @@ impl Widget for LauncherPanel {
                             label.draw_text.color = meta_color;
                         }
                         if let Some(mut view) = row.view(cx, ids!(app_meta_chip)).borrow_mut() {
-                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(fill_color), &v4a(meta_chip_fill));
-                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(border_color), &v4a(meta_chip_stroke));
+                            view.draw_bg.draw_vars.set_dyn_instance(
+                                cx,
+                                live_id!(fill_color),
+                                &v4a(meta_chip_fill),
+                            );
+                            view.draw_bg.draw_vars.set_dyn_instance(
+                                cx,
+                                live_id!(border_color),
+                                &v4a(meta_chip_stroke),
+                            );
                         }
 
                         if let Some(path) = icon_path {
@@ -1907,7 +1963,8 @@ impl Widget for LauncherPanel {
                                 .load_image_file_by_path(cx, Path::new(&path))
                                 .is_ok();
                             row.widget(cx, ids!(app_icon)).set_visible(cx, loaded);
-                            row.widget(cx, ids!(app_icon_fallback)).set_visible(cx, !loaded);
+                            row.widget(cx, ids!(app_icon_fallback))
+                                .set_visible(cx, !loaded);
                             let icon_bg = if loaded {
                                 vec4(0.0, 0.0, 0.0, 0.0)
                             } else {
@@ -1919,19 +1976,40 @@ impl Widget for LauncherPanel {
                                 vec4(0.196, 0.227, 0.271, 1.0)
                             };
                             if let Some(mut view) = row.view(cx, ids!(icon_wrap)).borrow_mut() {
-                                view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(bg_color), &v4a(icon_bg));
-                                view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(border_color), &v4a(icon_stroke));
+                                view.draw_bg.draw_vars.set_dyn_instance(
+                                    cx,
+                                    live_id!(bg_color),
+                                    &v4a(icon_bg),
+                                );
+                                view.draw_bg.draw_vars.set_dyn_instance(
+                                    cx,
+                                    live_id!(border_color),
+                                    &v4a(icon_stroke),
+                                );
                             }
                         } else {
                             row.widget(cx, ids!(app_icon)).set_visible(cx, false);
-                            row.widget(cx, ids!(app_icon_fallback)).set_visible(cx, true);
+                            row.widget(cx, ids!(app_icon_fallback))
+                                .set_visible(cx, true);
                             if let Some(mut view) = row.view(cx, ids!(icon_wrap)).borrow_mut() {
-                                view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(bg_color), &v4a(vec4(0.102, 0.122, 0.149, 1.0)));
-                                view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(border_color), &v4a(vec4(0.196, 0.227, 0.271, 1.0)));
+                                view.draw_bg.draw_vars.set_dyn_instance(
+                                    cx,
+                                    live_id!(bg_color),
+                                    &v4a(vec4(0.102, 0.122, 0.149, 1.0)),
+                                );
+                                view.draw_bg.draw_vars.set_dyn_instance(
+                                    cx,
+                                    live_id!(border_color),
+                                    &v4a(vec4(0.196, 0.227, 0.271, 1.0)),
+                                );
                             }
                         }
 
-                        let selected = if item_id == self.selected_index { 1.0 } else { 0.0 };
+                        let selected = if item_id == self.selected_index {
+                            1.0
+                        } else {
+                            0.0
+                        };
                         let hovered = if Some(item_id) == self.hovered_index {
                             1.0
                         } else {
@@ -1950,8 +2028,16 @@ impl Widget for LauncherPanel {
                             vec4(0.27, 0.35, 0.49, 1.0)
                         };
                         if let Some(mut view) = row.view(cx, ids!(action_hint_chip)).borrow_mut() {
-                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(fill_color), &v4a(hint_bg));
-                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(border_color), &v4a(hint_stroke));
+                            view.draw_bg.draw_vars.set_dyn_instance(
+                                cx,
+                                live_id!(fill_color),
+                                &v4a(hint_bg),
+                            );
+                            view.draw_bg.draw_vars.set_dyn_instance(
+                                cx,
+                                live_id!(border_color),
+                                &v4a(hint_stroke),
+                            );
                         }
                         let title_color = if selected > 0.5 {
                             vec4(0.98, 0.99, 1.0, 1.0)
@@ -1974,13 +2060,33 @@ impl Widget for LauncherPanel {
                         let command = if is_command { 1.0 } else { 0.0 };
                         let builtin = if is_builtin { 1.0 } else { 0.0 };
                         if let Some(mut view) = row.view(cx, ids!(row_bg)).borrow_mut() {
-                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(selected), &[selected]);
-                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(hovered), &[hovered]);
-                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(command), &[command]);
-                            view.draw_bg.draw_vars.set_dyn_instance(cx, live_id!(builtin), &[builtin]);
+                            view.draw_bg.draw_vars.set_dyn_instance(
+                                cx,
+                                live_id!(selected),
+                                &[selected],
+                            );
+                            view.draw_bg.draw_vars.set_dyn_instance(
+                                cx,
+                                live_id!(hovered),
+                                &[hovered],
+                            );
+                            view.draw_bg.draw_vars.set_dyn_instance(
+                                cx,
+                                live_id!(command),
+                                &[command],
+                            );
+                            view.draw_bg.draw_vars.set_dyn_instance(
+                                cx,
+                                live_id!(builtin),
+                                &[builtin],
+                            );
                         }
                         row.draw_all(cx, &mut Scope::empty());
-                        if let Some(area) = row.view(cx, ids!(row_bg)).borrow().map(|v| v.draw_bg.draw_vars.area) {
+                        if let Some(area) = row
+                            .view(cx, ids!(row_bg))
+                            .borrow()
+                            .map(|v| v.draw_bg.draw_vars.area)
+                        {
                             self.row_hit_rects.push((item_id, area.rect(cx)));
                         }
                     }

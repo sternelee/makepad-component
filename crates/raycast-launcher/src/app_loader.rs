@@ -30,20 +30,32 @@ pub fn load_app_descriptor(path: &str) -> Option<AppDescriptor> {
 }
 
 /// Construct a ScriptMod from a Splash code string.
+/// Wraps with imports that are implicitly available in `script_mod!` blocks
+/// but missing in runtime `vm.eval()` context.
 pub fn script_mod_from_code(code: &str) -> ScriptMod {
+    // Prepend imports so widget types (View, Button, Fill, etc.), draw/shader
+    // types (uniform, instance, Sdf2d), and theme are in scope — matching the
+    // compile-time `script_mod!` environment where the code was authored.
+    let wrapped = format!(
+        "use mod.prelude.widgets.*\nuse mod.prelude.draw.*\ntheme = mod.prelude.theme\n\n{}",
+        code
+    );
     ScriptMod {
         cargo_manifest_path: env!("CARGO_MANIFEST_DIR").to_string(),
         module_path: module_path!().to_string(),
         file: file!().to_string(),
         line: 0,
         column: 0,
-        code: code.to_string(),
+        code: wrapped,
         values: vec![],
     }
 }
 
 /// Convert a JSON value to a ScriptValue.
-fn json_to_script_value(heap: &mut makepad_script::ScriptHeap, value: &serde_json::Value) -> ScriptValue {
+fn json_to_script_value(
+    heap: &mut makepad_script::ScriptHeap,
+    value: &serde_json::Value,
+) -> ScriptValue {
     match value {
         serde_json::Value::Null => ScriptValue::NIL,
         serde_json::Value::Bool(b) => ScriptValue::from_bool(*b),
@@ -83,11 +95,7 @@ pub fn inject_app_state(cx: &mut Cx, state: &serde_json::Value) {
         let state_val = heap.value(mod_obj, ScriptValue::from_id(id!(state)), NoTrap);
         if let Some(state_obj) = state_val.as_object() {
             let app_state = json_to_script_value(heap, state);
-            heap.set_value_def(
-                state_obj,
-                ScriptValue::from_id(id!(app)),
-                app_state,
-            );
+            heap.set_value_def(state_obj, ScriptValue::from_id(id!(app)), app_state);
         }
     });
 }

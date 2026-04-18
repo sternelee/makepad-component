@@ -1,0 +1,38 @@
+[
+  {
+    "role": "Assistant",
+    "text": "Welcome! I can answer questions or generate **Splash UI apps** that render live in chat.\n\nTry asking me:\n- \"Create a calculator with dark theme\"\n- \"Build a pomodoro timer app\"\n- \"Design a task dashboard with checkboxes\"\n\nThe UI will appear below my response. Click **Save as App** to add it to your launcher. Chat history is saved automatically."
+  },
+  {
+    "role": "User",
+    "text": "Create a calculator with dark theme"
+  },
+  {
+    "role": "Assistant",
+    "text": "Network error: unsupported URL"
+  },
+  {
+    "role": "User",
+    "text": "Create a calculator with dark theme"
+  },
+  {
+    "role": "Assistant",
+    "text": "Network error: unsupported URL"
+  },
+  {
+    "role": "User",
+    "text": "Create a calculator with dark theme"
+  },
+  {
+    "role": "Assistant",
+    "text": "Network error: unsupported URL"
+  },
+  {
+    "role": "User",
+    "text": "hi"
+  },
+  {
+    "role": "Assistant",
+    "text": "Network error: unsupported URL"
+  }
+]
