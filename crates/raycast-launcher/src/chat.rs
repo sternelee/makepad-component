@@ -1,18 +1,53 @@
 use makepad_widgets::*;
 
-use crate::{a2ui_bridge_embed, LauncherPanel};
+use crate::{a2ui_bridge_embed, app_loader, LauncherPanel};
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ChatRole {
+    User,
+    Assistant,
+}
 
 #[derive(Clone)]
 pub(crate) struct ChatMessage {
-    pub(crate) role: &'static str,
+    pub(crate) role: ChatRole,
     pub(crate) text: String,
 }
 
+pub(crate) struct ChatData {
+    pub(crate) messages: Vec<ChatMessage>,
+}
+
+pub(crate) static CHAT_DATA: std::sync::RwLock<ChatData> = std::sync::RwLock::new(ChatData {
+    messages: Vec::new(),
+});
+
 pub(crate) fn default_chat_messages() -> Vec<ChatMessage> {
     vec![ChatMessage {
-        role: "System",
-        text: "Embedded bridge (text-only mode) is ready.".to_string(),
+        role: ChatRole::Assistant,
+        text: "Hello! I can help you with questions and generate Splash UI apps. Just ask me to create something!".to_string(),
     }]
+}
+
+/// Extract runsplash code block from markdown text.
+pub(crate) fn extract_runsplash(text: &str) -> Option<String> {
+    let prefix = "```runsplash";
+    let suffix = "```";
+    let start = text.find(prefix)?;
+    let after_start = start + prefix.len();
+    // Skip optional newline after opening fence
+    let after_start = if text[after_start..].starts_with('\n') {
+        after_start + 1
+    } else {
+        after_start
+    };
+    let end = text[after_start..].find(suffix)?;
+    let code = &text[after_start..after_start + end];
+    let code = code.trim_end();
+    if code.is_empty() {
+        return None;
+    }
+    Some(code.to_string())
 }
 
 impl LauncherPanel {
@@ -36,19 +71,12 @@ impl LauncherPanel {
     }
 
     pub(crate) fn sync_chat_ui(&mut self, cx: &mut Cx) {
-        let mut lines = String::new();
-        for msg in &self.chat_messages {
-            lines.push_str(msg.role);
-            lines.push_str(": ");
-            lines.push_str(&msg.text);
-            lines.push_str("\n\n");
+        // Sync CHAT_DATA into the global so ChatList can read it
+        {
+            let mut data = CHAT_DATA.write().unwrap();
+            data.messages.clone_from(&self.chat_messages);
         }
-        if lines.is_empty() {
-            lines.push_str("No messages yet.");
-        }
-        self.view
-            .label(cx, ids!(chat_history_label))
-            .set_text(cx, &lines);
+
         self.sync_chat_controls(cx);
         self.view.label(cx, ids!(chat_keys_label)).set_text(
             cx,
@@ -58,6 +86,16 @@ impl LauncherPanel {
                 "Enter Send  |  Esc Back"
             },
         );
+
+        // Toggle save-app button based on last assistant message having runsplash
+        let last_has_runsplash = self
+            .chat_messages
+            .last()
+            .map(|m| m.role == ChatRole::Assistant && extract_runsplash(&m.text).is_some())
+            .unwrap_or(false);
+        self.view
+            .widget(cx, ids!(save_app_wrap))
+            .set_visible(cx, last_has_runsplash);
 
         if self.chat_loading {
             self.view
@@ -80,6 +118,67 @@ impl LauncherPanel {
         self.redraw(cx);
     }
 
+    fn save_chat_app(&mut self, cx: &mut Cx) {
+        // Find the last assistant message with a runsplash block
+        let Some(last_msg) = self
+            .chat_messages
+            .iter()
+            .rev()
+            .find(|m| m.role == ChatRole::Assistant)
+        else {
+            return;
+        };
+        let Some(splash_code) = extract_runsplash(&last_msg.text) else {
+            return;
+        };
+
+        // Use the mode_input text as the app name (if user typed one), otherwise default
+        let name = self.view.text_input(cx, ids!(mode_input)).text();
+        let name = name.trim();
+        let name = if name.is_empty() {
+            "generated-app"
+        } else {
+            name
+        };
+        // Sanitize name for filename
+        let safe_name: String = name
+            .chars()
+            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+            .collect();
+
+        let descriptor = app_loader::AppDescriptor {
+            app: app_loader::AppInfo {
+                name: name.to_string(),
+                version: "1.0".to_string(),
+            },
+            splash_code,
+            state: serde_json::json!({}),
+        };
+
+        let path = format!("{}.json", safe_name);
+        match serde_json::to_string_pretty(&descriptor) {
+            Ok(json) => {
+                if let Err(e) = std::fs::write(&path, json) {
+                    log!("Failed to save app descriptor to {}: {}", path, e);
+                    self.view
+                        .label(cx, ids!(chat_status_label))
+                        .set_text(cx, &format!("Save failed: {}", e));
+                } else {
+                    log!("Saved app descriptor to {}", path);
+                    self.view
+                        .label(cx, ids!(chat_status_label))
+                        .set_text(cx, &format!("Saved as {}", path));
+                    // Clear input after save
+                    self.chat_draft.clear();
+                    self.sync_mode_input(cx);
+                }
+            }
+            Err(e) => {
+                log!("Failed to serialize app descriptor: {}", e);
+            }
+        }
+    }
+
     fn send_chat_from_input(&mut self, cx: &mut Cx) {
         if self.chat_loading {
             return;
@@ -96,7 +195,7 @@ impl LauncherPanel {
 
         let user_msg = text.to_string();
         self.chat_messages.push(ChatMessage {
-            role: "You",
+            role: ChatRole::User,
             text: user_msg.clone(),
         });
         self.chat_loading = true;
@@ -111,7 +210,7 @@ impl LauncherPanel {
         if api_url.is_empty() || model.is_empty() {
             self.chat_loading = false;
             self.chat_messages.push(ChatMessage {
-                role: "Error",
+                role: ChatRole::Assistant,
                 text: "LLM API URL or model is empty".to_string(),
             });
             self.view
@@ -130,7 +229,10 @@ impl LauncherPanel {
                 format!("Bearer {}", self.chat_api_key.trim()),
             );
         }
-        request.set_string_body(a2ui_bridge_embed::build_chat_request_body(model, &user_msg));
+        request.set_string_body(a2ui_bridge_embed::build_chat_request_body(
+            model,
+            &self.chat_messages,
+        ));
 
         cx.http_request(live_id!(ChatCompletionRequest), request);
         self.redraw(cx);
@@ -158,7 +260,7 @@ impl LauncherPanel {
                     match a2ui_bridge_embed::parse_chat_response(response.status_code, &body) {
                         Ok(assistant_text) => {
                             self.chat_messages.push(ChatMessage {
-                                role: "Assistant",
+                                role: ChatRole::Assistant,
                                 text: assistant_text.clone(),
                             });
                             self.view
@@ -170,7 +272,7 @@ impl LauncherPanel {
                         }
                         Err(err) => {
                             self.chat_messages.push(ChatMessage {
-                                role: "Error",
+                                role: ChatRole::Assistant,
                                 text: err,
                             });
                             self.view
@@ -190,7 +292,7 @@ impl LauncherPanel {
                         continue;
                     }
                     self.chat_messages.push(ChatMessage {
-                        role: "Error",
+                        role: ChatRole::Assistant,
                         text: format!("Network error: {}", error.message),
                     });
                     self.chat_loading = false;
@@ -219,6 +321,11 @@ impl LauncherPanel {
 
         if self.view.button(cx, ids!(mode_action_btn)).clicked(actions) {
             self.send_chat_from_input(cx);
+            return;
+        }
+
+        if self.view.button(cx, ids!(save_app_btn)).clicked(actions) {
+            self.save_chat_app(cx);
             return;
         }
 

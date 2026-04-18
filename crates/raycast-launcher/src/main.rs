@@ -11,6 +11,7 @@ use std::process::Command;
 mod a2ui_bridge_embed;
 mod app_loader;
 mod chat;
+mod chat_list;
 mod todo;
 
 script_mod! {
@@ -39,6 +40,78 @@ script_mod! {
             width: Fill
             height: Fill
             scroll_bar: ScrollBar{}
+        }
+    }
+
+    mod.widgets.ChatListBase = #(chat_list::ChatList::register_widget(vm))
+    mod.widgets.ChatList = set_type_default() do mod.widgets.ChatListBase{
+        width: Fill
+        height: Fill
+
+        list := PortalList{
+            width: Fill
+            height: Fill
+            flow: Down
+            drag_scrolling: false
+            auto_tail: true
+            smooth_tail: true
+            selectable: true
+
+            User := View{
+                width: Fill
+                height: Fit
+                margin: Inset{top: 4 bottom: 4 left: 50 right: 8}
+                padding: Inset{left: 12 top: 8 right: 12 bottom: 8}
+                flow: Overlay
+                show_bg: true
+                draw_bg +: {
+                    color: #x3a5a8a
+                    radius: 8.0
+                }
+
+                selectable := Markdown{
+                    width: Fill
+                    height: Fit
+                    selectable: true
+                    body: ""
+                    splash_block := View{
+                        width: Fill
+                        height: Fit
+                        splash_view := Splash{
+                            width: Fill
+                            height: Fit
+                        }
+                    }
+                }
+            }
+
+            Assistant := View{
+                width: Fill
+                height: Fit
+                margin: Inset{top: 4 bottom: 4 left: 8 right: 50}
+                padding: Inset{left: 12 top: 8 right: 12 bottom: 8}
+                flow: Overlay
+                show_bg: true
+                draw_bg +: {
+                    color: #x2a2a3a
+                    radius: 8.0
+                }
+
+                selectable := Markdown{
+                    width: Fill
+                    height: Fit
+                    selectable: true
+                    body: ""
+                    splash_block := View{
+                        width: Fill
+                        height: Fit
+                        splash_view := Splash{
+                            width: Fill
+                            height: Fit
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -576,33 +649,7 @@ script_mod! {
                 }
             }
 
-            chat_history_scroll := ScrollYView{
-                width: Fill
-                height: 120
-                show_bg: true
-                draw_bg +: {
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
-                        sdf.fill(#x1b2028)
-                        sdf.stroke(#x303745 1.0)
-                        return sdf.result
-                    }
-                }
-                View{
-                    width: Fill
-                    height: Fit
-                    padding: Inset{left: 10 right: 10 top: 10 bottom: 10}
-                    chat_history_label := Label{
-                        width: Fill
-                        text: ""
-                        draw_text +: {
-                            text_style: theme.font_regular {font_size: 11}
-                            color: #xd3d9e6
-                        }
-                    }
-                }
-            }
+            chat_list := mod.widgets.ChatList{}
 
             View{
                 width: Fill
@@ -627,6 +674,15 @@ script_mod! {
                     draw_text +: {
                         text_style: theme.font_regular {font_size: 10}
                         color: #x7fb9ff
+                    }
+                }
+                save_app_wrap := View{
+                    visible: false
+                    width: Fit
+                    height: Fit
+                    save_app_btn := Button{
+                        text: "Save as App"
+                        padding: Inset{left: 10 right: 10 top: 6 bottom: 6}
                     }
                 }
                 chat_keys_label := Label{
@@ -703,6 +759,7 @@ enum LaunchTarget {
     Command { program: String, args: Vec<String> },
     OpenTodo,
     OpenChat,
+    OpenSplashApp(String),
 }
 
 #[derive(Clone)]
@@ -1022,6 +1079,31 @@ fn fallback_demo_apps() -> Vec<LauncherItem> {
     ]
 }
 
+fn scan_splash_apps() -> Vec<LauncherItem> {
+    let mut items = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(".") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if name.ends_with("-app.json") || name.ends_with("_app.json") {
+                    if let Some(app) = app_loader::load_app_descriptor(name) {
+                        items.push(launcher_item(
+                            app.app.name.clone(),
+                            format!("Splash App: {}", app.app.name),
+                            "Splash Apps".to_string(),
+                            None,
+                            Some("S"),
+                            LaunchTarget::OpenSplashApp(name.to_string()),
+                            "splash app ui generated",
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    items
+}
+
 fn load_launcher_items() -> Vec<LauncherItem> {
     let mut items = scan_macos_applications();
     if items.is_empty() {
@@ -1029,6 +1111,7 @@ fn load_launcher_items() -> Vec<LauncherItem> {
     }
 
     items.extend(command_items());
+    items.extend(scan_splash_apps());
     items.sort_by(|a, b| {
         a.category
             .cmp(&b.category)
@@ -1257,7 +1340,7 @@ impl LauncherPanel {
             let is_builtin = self
                 .all_items
                 .get(*idx)
-                .map(|it| matches!(it.launch, LaunchTarget::OpenTodo | LaunchTarget::OpenChat))
+                .map(|it| matches!(it.launch, LaunchTarget::OpenTodo | LaunchTarget::OpenChat | LaunchTarget::OpenSplashApp(_)))
                 .unwrap_or(false);
             if is_builtin {
                 0
@@ -1309,6 +1392,7 @@ impl LauncherPanel {
     fn group_name_for(item: &LauncherItem) -> &'static str {
         match item.launch {
             LaunchTarget::OpenTodo | LaunchTarget::OpenChat => "Built-in",
+            LaunchTarget::OpenSplashApp(_) => "Splash Apps",
             LaunchTarget::Command { .. } => "Commands",
             LaunchTarget::OpenPath(_) => "Applications",
         }
@@ -1417,6 +1501,19 @@ impl LauncherPanel {
                 self.set_chat_mode(cx, true);
                 self.update_labels(cx, "Opened");
             }
+            LaunchTarget::OpenSplashApp(ref path) => {
+                self.show_todo = true;
+                self.show_chat = false;
+                self.view.view(cx, ids!(launcher_view)).set_visible(cx, false);
+                self.view.view(cx, ids!(todo_view)).set_visible(cx, true);
+                self.view.view(cx, ids!(chat_view)).set_visible(cx, false);
+                self.sync_mode_input(cx);
+                self.load_splash_app(cx, path);
+                self.sync_todo_stats(cx);
+                self.redraw(cx);
+                self.view.text_input(cx, ids!(mode_input)).set_key_focus(cx);
+                self.update_labels(cx, "Opened");
+            }
         }
 
         self.redraw(cx);
@@ -1424,13 +1521,13 @@ impl LauncherPanel {
 
     // ==================== Todo Methods ====================
 
-    fn load_todo_app(&mut self, cx: &mut Cx) {
-        let Some(app) = app_loader::load_app_descriptor("todo-app.json") else {
-            log!("Failed to load todo-app.json");
+    fn load_splash_app(&mut self, cx: &mut Cx, path: &str) {
+        let Some(app) = app_loader::load_app_descriptor(path) else {
+            log!("Failed to load app descriptor: {}", path);
             return;
         };
 
-        // Eval splash code — registers TodoRow/EmptyTodo in mod.widgets, returns templates object
+        // Eval splash code — registers widgets in mod.widgets, returns templates object
         let templates_value = cx.with_vm(|vm| {
             let script_mod = app_loader::script_mod_from_code(&app.splash_code);
             vm.eval(script_mod)
@@ -1448,7 +1545,7 @@ impl LauncherPanel {
         // Inject state into mod.state.app
         app_loader::inject_app_state(cx, &app.state);
 
-        // Sync todo data from JSON state into runtime TODOS
+        // Sync todo data from JSON state into runtime TODOS (if present)
         if let Some(todos) = app.state.get("todos").and_then(|v| v.as_array()) {
             let items: Vec<todo::TodoItemData> = todos
                 .iter()
@@ -1462,6 +1559,10 @@ impl LauncherPanel {
         }
 
         self.redraw(cx);
+    }
+
+    fn load_todo_app(&mut self, cx: &mut Cx) {
+        self.load_splash_app(cx, "todo-app.json");
     }
 
     pub(crate) fn set_todo_mode(&mut self, cx: &mut Cx, show: bool) {
@@ -1693,7 +1794,7 @@ impl Widget for LauncherPanel {
                             if let Some(entry) = self.all_items.get(source_idx) {
                                 let is_builtin = matches!(
                                     entry.launch,
-                                    LaunchTarget::OpenTodo | LaunchTarget::OpenChat
+                                    LaunchTarget::OpenTodo | LaunchTarget::OpenChat | LaunchTarget::OpenSplashApp(_)
                                 );
                                 (
                                     entry.app_name.clone(),
