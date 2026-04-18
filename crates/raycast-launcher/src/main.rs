@@ -1,5 +1,6 @@
 pub use makepad_widgets;
 use makepad_widgets::*;
+use makepad_script::Apply;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
@@ -8,77 +9,27 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 mod a2ui_bridge_embed;
+mod app_loader;
 mod chat;
 mod todo;
 
 script_mod! {
     use mod.prelude.widgets.*
 
-    let TodoRow = View{
-        width: Fill
-        height: Fit
-        flow: Right
-        spacing: 8
-        align: VCenter
-        padding: Inset{left: 8 right: 8 top: 8 bottom: 8}
-        margin: Inset{top: 5 bottom: 5}
-        show_bg: true
-        draw_bg +: {
-            done: instance(0.0)
-            pixel: fn() {
-                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
-                sdf.fill(mix(#x272c34 #x1f3a2a self.done))
-                sdf.stroke(#x3b424d 1.0)
-                return sdf.result
-            }
-        }
-        check := CheckBox{text: ""}
-        label := Label{
-            width: Fill
-            text: ""
-            draw_text +: {
-                text_style: theme.font_regular {font_size: 12}
-                color: #xe2e8f0
-            }
-        }
-        tag := View{
-            width: Fit
-            height: Fit
-            padding: Inset{left: 6 right: 6 top: 2 bottom: 2}
-            show_bg: true
-            draw_bg +: {
-                pixel: fn() {
-                    let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                    sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 4.0)
-                    sdf.fill(#x3b82f6)
-                    return sdf.result
-                }
-            }
-            tag_label := Label{
-                text: ""
-                draw_text +: {
-                    text_style: theme.font_regular {font_size: 9}
-                    color: #xffffff
-                }
-            }
-        }
-        del := Button{text: "Remove" padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}
-    }
-
-    let EmptyTodo = View{
-        width: Fill
-        height: Fit
-        align: Center
-        padding: Inset{top: 40 bottom: 40}
-        Label{
-            text: "No tasks yet — add one below"
-            draw_text +: {
-                text_style: theme.font_regular {font_size: 12}
-                color: #x8f9caf
+    let state = {
+        todo: {
+            theme: {
+                empty_text: "No tasks yet — add one below"
+                text_color: "#xe2e8f0"
+                text_done_color: "#xa0d0a4"
+                tag_text_color: "#xffffff"
+                row_bg_normal: "#x272c34"
+                row_bg_done: "#x1f3a2a"
+                row_stroke: "#x3b424d"
             }
         }
     }
+    mod.state = state
 
     mod.widgets.TodoListBase = #(todo::TodoList::register_widget(vm))
     mod.widgets.TodoList = set_type_default() do mod.widgets.TodoListBase{
@@ -88,8 +39,6 @@ script_mod! {
             width: Fill
             height: Fill
             scroll_bar: ScrollBar{}
-            Item := CachedView{TodoRow{}}
-            Empty := CachedView{EmptyTodo{}}
         }
     }
 
@@ -811,6 +760,9 @@ pub struct LauncherPanel {
 
 impl ScriptHook for LauncherPanel {
     fn on_after_new(&mut self, vm: &mut ScriptVm) {
+        // Load todo config before entering vm.with_cx_mut so we can inject it into mod.state.
+        let todo_config = todo::load_todo_config();
+
         vm.with_cx_mut(|cx| {
             self.all_items = load_launcher_items();
             self.query.clear();
@@ -845,6 +797,40 @@ impl ScriptHook for LauncherPanel {
                 .set_text(cx, &self.chat_model);
             self.update_labels(cx, "Ready");
         });
+
+        // Inject todo theme from JSON into mod.state.todo.theme via runtime Splash eval.
+        let theme = &todo_config.theme;
+        let splash_code = format!(
+            r#"mod.state.todo.theme.empty_text = "{}"
+            mod.state.todo.theme.text_color = "{}"
+            mod.state.todo.theme.text_done_color = "{}"
+            mod.state.todo.theme.tag_text_color = "{}"
+            mod.state.todo.theme.row_bg_normal = "{}"
+            mod.state.todo.theme.row_bg_done = "{}"
+            mod.state.todo.theme.row_stroke = "{}""#,
+            theme.empty_text.replace('"', "\\\""),
+            theme.text_color.replace('"', "\\\""),
+            theme.text_done_color.replace('"', "\\\""),
+            theme.tag_text_color.replace('"', "\\\""),
+            theme.row_bg_normal.replace('"', "\\\""),
+            theme.row_bg_done.replace('"', "\\\""),
+            theme.row_stroke.replace('"', "\\\""),
+        );
+        let script_mod = makepad_script::ScriptMod {
+            cargo_manifest_path: String::new(),
+            module_path: String::new(),
+            file: String::new(),
+            line: 0,
+            column: 0,
+            code: String::new(),
+            values: vec![],
+        };
+        let result = vm.eval_with_append_source(script_mod, &splash_code, ScriptValue::NIL.into());
+        if let Some(err) = result.as_err() {
+            log!("Failed to inject todo theme into mod.state: {:?}", err);
+        } else {
+            log!("Injected todo theme into mod.state via Splash runtime eval");
+        }
     }
 }
 
@@ -1434,6 +1420,137 @@ impl LauncherPanel {
         }
 
         self.redraw(cx);
+    }
+
+    // ==================== Todo Methods ====================
+
+    fn load_todo_app(&mut self, cx: &mut Cx) {
+        let Some(app) = app_loader::load_app_descriptor("todo-app.json") else {
+            log!("Failed to load todo-app.json");
+            return;
+        };
+
+        // Eval splash code — registers TodoRow/EmptyTodo in mod.widgets, returns templates object
+        let templates_value = cx.with_vm(|vm| {
+            let script_mod = app_loader::script_mod_from_code(&app.splash_code);
+            vm.eval(script_mod)
+        });
+
+        // Apply templates to PortalList with Apply::Reload
+        let todo_list_widget = self.view.widget(cx, ids!(todo_list));
+        let list = todo_list_widget.portal_list(cx, ids!(list));
+        if let Some(mut list_inner) = list.borrow_mut() {
+            cx.with_vm(|vm| {
+                list_inner.script_apply(vm, &Apply::Reload, &mut Scope::empty(), templates_value);
+            });
+        }
+
+        // Inject state into mod.state.app
+        app_loader::inject_app_state(cx, &app.state);
+
+        // Sync todo data from JSON state into runtime TODOS
+        if let Some(todos) = app.state.get("todos").and_then(|v| v.as_array()) {
+            let items: Vec<todo::TodoItemData> = todos
+                .iter()
+                .map(|t| todo::TodoItemData {
+                    text: t.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    done: t.get("done").and_then(|v| v.as_bool()).unwrap_or(false),
+                    tag: t.get("tag").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                })
+                .collect();
+            *todo::TODOS.write().unwrap() = items;
+        }
+
+        self.redraw(cx);
+    }
+
+    pub(crate) fn set_todo_mode(&mut self, cx: &mut Cx, show: bool) {
+        self.show_todo = show;
+        if show {
+            self.show_chat = false;
+            self.load_todo_app(cx);
+        }
+        self.view.view(cx, ids!(launcher_view)).set_visible(cx, !show);
+        self.view.view(cx, ids!(todo_view)).set_visible(cx, show);
+        self.view.view(cx, ids!(chat_view)).set_visible(cx, false);
+        self.sync_mode_input(cx);
+        if show {
+            self.sync_todo_stats(cx);
+            self.redraw(cx);
+        }
+        self.view.text_input(cx, ids!(mode_input)).set_key_focus(cx);
+    }
+
+    fn add_todo_from_input(&mut self, cx: &mut Cx) {
+        let text = self.view.text_input(cx, ids!(mode_input)).text();
+        let text = text.trim();
+        if text.is_empty() {
+            return;
+        }
+        todo::TODOS.write().unwrap().insert(
+            0,
+            todo::TodoItemData {
+                text: text.to_string(),
+                done: false,
+                tag: String::new(),
+            },
+        );
+        self.todo_draft.clear();
+        self.sync_mode_input(cx);
+        self.sync_todo_stats(cx);
+        self.redraw(cx);
+        todo::save_todos();
+    }
+
+    pub(crate) fn sync_todo_stats(&mut self, cx: &mut Cx) {
+        let todos = todo::TODOS.read().unwrap();
+        let done = todos.iter().filter(|t| t.done).count();
+        let total = todos.len();
+        self.view
+            .label(cx, ids!(todo_count_label))
+            .set_text(cx, &format!("{} / {} done", done, total));
+    }
+
+    pub(crate) fn handle_todo_actions(&mut self, cx: &mut Cx, actions: &Actions) {
+        if self.view.button(cx, ids!(mode_back_btn)).clicked(actions) {
+            self.set_todo_mode(cx, false);
+            self.redraw(cx);
+            return;
+        }
+
+        if self.view.button(cx, ids!(mode_action_btn)).clicked(actions) {
+            self.add_todo_from_input(cx);
+        }
+
+        if let Some((_text, _mods)) = self.view.text_input(cx, ids!(mode_input)).returned(actions) {
+            self.add_todo_from_input(cx);
+        }
+
+        let todo_list_widget = self.view.widget(cx, ids!(todo_list));
+        let list = todo_list_widget.portal_list(cx, ids!(list));
+
+        let mut changed = false;
+        for (item_id, item) in list.items_with_actions(actions) {
+            if let Some(checked) = item.check_box(cx, ids!(check)).changed(actions) {
+                if let Some(todo) = todo::TODOS.write().unwrap().get_mut(item_id) {
+                    todo.done = checked;
+                    changed = true;
+                }
+            }
+            if item.button(cx, ids!(del)).clicked(actions) {
+                let mut todos = todo::TODOS.write().unwrap();
+                if item_id < todos.len() {
+                    todos.remove(item_id);
+                    changed = true;
+                }
+            }
+        }
+
+        if changed {
+            self.sync_todo_stats(cx);
+            self.redraw(cx);
+            todo::save_todos();
+        }
     }
 }
 

@@ -1,0 +1,32 @@
+{
+  "app": {
+    "name": "Todo",
+    "version": "1.0"
+  },
+  "splash_code": "mod.widgets.TodoRow = View{width: Fill height: Fit flow: Right spacing: 8 align: VCenter padding: Inset{left: 8 right: 8 top: 8 bottom: 8} margin: Inset{top: 5 bottom: 5} show_bg: true draw_bg +: {done: instance(0.0) bg_normal: uniform(#x272c34) bg_done: uniform(#x1f3a2a) stroke_color: uniform(#x3b424d) pixel: fn(){let sdf = Sdf2d.viewport(self.pos * self.rect_size) sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0) sdf.fill(mix(self.bg_normal self.bg_done self.done)) sdf.stroke(self.stroke_color 1.0) return sdf.result}} check := CheckBox{text: ''} label := Label{width: Fill text: '' draw_text +: {text_style: theme.font_regular {font_size: 12} color: #xe2e8f0}} tag := View{width: Fit height: Fit padding: Inset{left: 6 right: 6 top: 2 bottom: 2} show_bg: true draw_bg +: {pixel: fn(){let sdf = Sdf2d.viewport(self.pos * self.rect_size) sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 4.0) sdf.fill(#x3b82f6) return sdf.result}} tag_label := Label{text: '' draw_text +: {text_style: theme.font_regular {font_size: 9} color: #xffffff}}} del := Button{text: 'Remove' padding: Inset{left: 8 right: 8 top: 6 bottom: 6}}} mod.widgets.EmptyTodo = View{width: Fill height: Fit align: Center padding: Inset{top: 40 bottom: 40} empty_label := Label{text: 'No tasks yet — add one below' draw_text +: {text_style: theme.font_regular {font_size: 12} color: #x8f9caf}}} { Item := CachedView{mod.widgets.TodoRow{}} Empty := CachedView{mod.widgets.EmptyTodo{}} }",
+  "state": {
+    "todos": [
+      { "text": "Review launcher UX and interaction flow", "done": false, "tag": "design" },
+      { "text": "Polish icon rendering with dithering effect", "done": true, "tag": "ui" },
+      { "text": "Add dark mode toggle in settings", "done": false, "tag": "feature" },
+      { "text": "Optimize search indexing for large app lists", "done": true, "tag": "perf" },
+      { "text": "Write user documentation and README", "done": false, "tag": "docs" },
+      { "text": "Fix memory leak in icon cache system", "done": false, "tag": "bug" },
+      { "text": "Add keyboard shortcuts for all modes", "done": true, "tag": "feature" },
+      { "text": "Refactor mode switching logic to be more robust", "done": false, "tag": "refactor" },
+      { "text": "Test cross-platform on Windows and Linux", "done": false, "tag": "qa" },
+      { "text": "Prepare release v0.2.0 with changelog", "done": false, "tag": "release" },
+      { "text": "Integrate AI chat with local LLM inference", "done": false, "tag": "ai" },
+      { "text": "Add splash script hot-reload for development", "done": false, "tag": "dev" }
+    ],
+    "theme": {
+      "empty_text": "No tasks yet — add one below",
+      "text_color": "#xe2e8f0",
+      "text_done_color": "#xa0d0a4",
+      "tag_text_color": "#xffffff",
+      "row_bg_normal": "#x272c34",
+      "row_bg_done": "#x1f3a2a",
+      "row_stroke": "#x3b424d"
+    }
+  }
+}

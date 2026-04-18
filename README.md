@@ -21,6 +21,7 @@ A modern UI component library for [Makepad](https://github.com/makepad/makepad),
   - [A2UI Bridge (LLM-powered UI)](#a2ui-bridge-llm-powered-ui)
   - [Watch Server (Live File Editing)](#watch-server-live-file-editing)
   - [Math Charts Demo](#math-charts-demo)
+  - [Raycast Launcher + Splash App](#raycast-launcher--splash-app)
 - [LLM Configuration](#llm-configuration)
 - [A2UI App Types & Examples](#a2ui-app-types--examples)
 - [Architecture](#architecture)
@@ -295,6 +296,65 @@ cargo run -p a2ui-demo --bin a2ui-demo
 
 Functions include Gaussian, Saddle, Mexican Hat, Damped Ripple, and more.
 
+3D surfaces support interactive drag rotation and scroll zoom.
+
+### Raycast Launcher + Splash App
+
+A Raycast-style launcher that demonstrates **dynamic Splash script app loading**. Apps are defined entirely by JSON descriptors containing Splash UI code — no pre-declared Rust widgets needed per app.
+
+```bash
+# Run the launcher
+cargo run -p raycast-launcher
+```
+
+Type `todo` or select "Todo" to open the dynamically loaded todo app.
+
+#### Dynamic App Loading
+
+The launcher reads app descriptors (e.g. `todo-app.json`) at runtime:
+
+| Field | Description |
+|-------|-------------|
+| `splash_code` | Complete Splash script defining widget templates and UI behavior |
+| `state` | Initial app state (todos, theme, etc.) injected into `mod.state.app` |
+
+This enables **AI-generated apps**: describe the app in JSON + Splash code, and the launcher loads and renders it without any code changes.
+
+**App Descriptor Format:**
+
+```json
+{
+  "app": {
+    "name": "Todo List",
+    "version": "1.0.0"
+  },
+  "splash_code": "mod.widgets.TodoRow = ...",
+  "state": {
+    "todos": [
+      {"text": "Buy milk", "done": false, "tag": "shopping"}
+    ],
+    "theme": {
+      "text_color": "#xe2e8f0",
+      "row_bg_normal": "#x272c34",
+      "row_stroke": "#x3b424d"
+    }
+  }
+}
+```
+
+**Dynamic Loading Flow:**
+
+```
+App Descriptor (JSON)
+  |-- splash_code --> vm.eval() --> registers widgets in mod.widgets
+  |-- state --------> inject_app_state() --> mod.state.app
+                          |
+                          v
+             PortalList::script_apply(Apply::Reload)
+             -> collects Item / Empty templates
+             -> TodoList::draw_walk renders with dynamic theme
+```
+
 ---
 
 ## LLM Configuration
@@ -498,12 +558,20 @@ makepad-component/
 │   │       │   └── mureka.rs        #   Music generation (optional)
 │   │       ├── watch_server.rs  # File-watching SSE server (port 8080)
 │   │       └── math_charts.rs   # Math function chart generator
-│   └── makepad-plot/        # Chart/plot library (29 chart types + 3D)
-│       └── src/
-│           ├── lib.rs
-│           ├── plot/        # Chart widgets (LinePlot, BarPlot, Surface3D, etc.)
-│           ├── elements.rs  # Drawing primitives
-│           └── text.rs      # Plot text rendering
+│   ├── makepad-plot/        # Chart/plot library (29 chart types + 3D)
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── plot/        # Chart widgets (LinePlot, BarPlot, Surface3D, etc.)
+│   │       ├── elements.rs  # Drawing primitives
+│   │       └── text.rs      # Plot text rendering
+│   └── raycast-launcher/    # Raycast-style launcher with Splash dynamic app loading
+│       ├── src/
+│       │   ├── main.rs      # LauncherPanel + dynamic app loading
+│       │   ├── todo.rs      # TodoList widget (theme from mod.state)
+│       │   ├── app_loader.rs# JSON descriptor → Splash VM eval + state injection
+│       │   └── chat.rs      # Chat panel
+│       ├── todo-app.json    # Todo app descriptor (splash_code + state)
+│       └── todo.json        # Todo runtime data
 ├── ui_live.json             # Live-editable A2UI JSON
 ├── chart_test.json          # Chart examples
 └── math_test.json           # Math charts output

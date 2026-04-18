@@ -1,0 +1,25 @@
+{
+  "items": [
+    { "text": "Review launcher UX and interaction flow", "done": false, "tag": "design" },
+    { "text": "Polish icon rendering with dithering effect", "done": true, "tag": "ui" },
+    { "text": "Add dark mode toggle in settings", "done": false, "tag": "feature" },
+    { "text": "Optimize search indexing for large app lists", "done": true, "tag": "perf" },
+    { "text": "Write user documentation and README", "done": false, "tag": "docs" },
+    { "text": "Fix memory leak in icon cache system", "done": false, "tag": "bug" },
+    { "text": "Add keyboard shortcuts for all modes", "done": true, "tag": "feature" },
+    { "text": "Refactor mode switching logic to be more robust", "done": false, "tag": "refactor" },
+    { "text": "Test cross-platform on Windows and Linux", "done": false, "tag": "qa" },
+    { "text": "Prepare release v0.2.0 with changelog", "done": false, "tag": "release" },
+    { "text": "Integrate AI chat with local LLM inference", "done": false, "tag": "ai" },
+    { "text": "Add splash script hot-reload for development", "done": false, "tag": "dev" }
+  ],
+  "theme": {
+    "empty_text": "No tasks yet — add one below",
+    "text_color": "#xe2e8f0",
+    "text_done_color": "#xa0d0a4",
+    "tag_text_color": "#xffffff",
+    "row_bg_normal": "#x272c34",
+    "row_bg_done": "#x1f3a2a",
+    "row_stroke": "#x3b424d"
+  }
+}
