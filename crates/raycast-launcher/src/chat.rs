@@ -109,6 +109,32 @@ pub(crate) fn extract_runsplash(text: &str) -> Option<String> {
     Some(code.to_string())
 }
 
+/// Remove the runsplash code block from text for clean Markdown display.
+/// The Splash app is shown inline by the ChatList renderer instead.
+pub(crate) fn strip_runsplash(text: &str) -> String {
+    let prefix = "```runsplash";
+    let Some(start) = text.find(prefix) else {
+        return text.to_string();
+    };
+    let before = text[..start].trim_end();
+    let after_fence = start + prefix.len();
+    // Find closing ```
+    let close = text[after_fence..]
+        .find("```")
+        .map(|end| after_fence + end + 3)
+        .unwrap_or(text.len());
+    let after = text[close..].trim_start();
+    if before.is_empty() && after.is_empty() {
+        String::new()
+    } else if after.is_empty() {
+        before.to_string()
+    } else if before.is_empty() {
+        after.to_string()
+    } else {
+        format!("{}\n\n{}", before, after)
+    }
+}
+
 impl LauncherPanel {
     fn sync_chat_controls(&mut self, cx: &mut Cx) {
         self.sync_mode_input(cx);

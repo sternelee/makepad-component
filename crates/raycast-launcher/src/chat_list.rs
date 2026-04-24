@@ -1,6 +1,6 @@
 use makepad_widgets::*;
 
-use crate::chat::CHAT_DATA;
+use crate::chat::{extract_runsplash, strip_runsplash, ChatRole, CHAT_DATA};
 
 #[derive(Script, ScriptHook, Widget)]
 pub struct ChatList {
@@ -23,12 +23,36 @@ impl Widget for ChatList {
                 while let Some(item_id) = list.next_visible_item(cx) {
                     if let Some(msg) = data.messages.get(item_id) {
                         let template = match msg.role {
-                            crate::chat::ChatRole::User => id!(User),
-                            crate::chat::ChatRole::Assistant => id!(Assistant),
+                            ChatRole::User => id!(User),
+                            ChatRole::Assistant => id!(Assistant),
                         };
                         let item_widget = list.item(cx, item_id, template);
-                        let mut markdown = item_widget.markdown(cx, ids!(selectable));
-                        markdown.set_text(cx, &msg.text);
+
+                        if msg.role == ChatRole::Assistant {
+                            if let Some(splash_code) = extract_runsplash(&msg.text) {
+                                // Render the Splash app inline below the text
+                                item_widget
+                                    .view(cx, ids!(splash_block))
+                                    .set_visible(cx, true);
+                                item_widget
+                                    .widget(cx, ids!(splash_view))
+                                    .set_text(cx, &splash_code);
+                                // Show the explanatory text without the code block
+                                let display_text = strip_runsplash(&msg.text);
+                                let mut markdown = item_widget.markdown(cx, ids!(selectable));
+                                markdown.set_text(cx, &display_text);
+                            } else {
+                                item_widget
+                                    .view(cx, ids!(splash_block))
+                                    .set_visible(cx, false);
+                                let mut markdown = item_widget.markdown(cx, ids!(selectable));
+                                markdown.set_text(cx, &msg.text);
+                            }
+                        } else {
+                            let mut markdown = item_widget.markdown(cx, ids!(selectable));
+                            markdown.set_text(cx, &msg.text);
+                        }
+
                         item_widget.draw_all_unscoped(cx);
                     }
                 }

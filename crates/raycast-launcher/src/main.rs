@@ -46,8 +46,10 @@ script_mod! {
                     selectable: true
                     body: ""
                     splash_block := View{
+                        visible: false
                         width: Fill
                         height: Fit
+                        padding: Inset{top: 8}
                         splash_view := Splash{
                             width: Fill
                             height: Fit
@@ -74,8 +76,10 @@ script_mod! {
                     selectable: true
                     body: ""
                     splash_block := View{
+                        visible: false
                         width: Fill
                         height: Fit
+                        padding: Inset{top: 8}
                         splash_view := Splash{
                             width: Fill
                             height: Fit
