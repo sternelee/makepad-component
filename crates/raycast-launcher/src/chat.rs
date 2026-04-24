@@ -423,15 +423,7 @@ impl LauncherPanel {
         if self.view.button(cx, ids!(open_app_btn)).clicked(actions) {
             if let Some(path) = self.last_saved_app_path.clone() {
                 self.set_chat_mode(cx, false);
-                self.show_todo = true;
-                self.view
-                    .view(cx, ids!(launcher_view))
-                    .set_visible(cx, false);
-                self.view.view(cx, ids!(todo_view)).set_visible(cx, true);
-                self.view.view(cx, ids!(chat_view)).set_visible(cx, false);
-                self.sync_mode_input(cx);
-                self.load_splash_app(cx, &path);
-                self.redraw(cx);
+                self.open_splash_app(cx, &path);
             }
             return;
         }

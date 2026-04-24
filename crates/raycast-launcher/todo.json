@@ -1,13 +1,8 @@
 {
   "items": [
     {
-      "text": "ha",
-      "done": false,
-      "tag": ""
-    },
-    {
       "text": "Review launcher UX and interaction flow",
-      "done": false,
+      "done": true,
       "tag": "design"
     },
     {

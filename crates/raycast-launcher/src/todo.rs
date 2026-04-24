@@ -1,201 +1,223 @@
-use makepad_script::{ScriptHeap, ScriptObject, ScriptTrap::NoTrap};
+use makepad_script::{ScriptHeap, ScriptObject, ScriptTrap::NoTrap, ScriptValue};
 use makepad_widgets::*;
-use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::{LazyLock, RwLock};
 
-// ==================== JSON File Path ====================
+// ==================== Save Path ====================
 
-static TODO_JSON_PATH: LazyLock<RwLock<Option<std::path::PathBuf>>> =
-    LazyLock::new(|| RwLock::new(None));
+static SAVE_PATH: LazyLock<RwLock<Option<PathBuf>>> = LazyLock::new(|| RwLock::new(None));
 
-// ==================== Configuration Types ====================
-
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub(crate) struct TodoTheme {
-    #[serde(default = "default_empty_text")]
-    pub(crate) empty_text: String,
-    #[serde(default = "default_text_color")]
-    pub(crate) text_color: String,
-    #[serde(default = "default_text_done_color")]
-    pub(crate) text_done_color: String,
-    #[serde(default = "default_tag_text_color")]
-    pub(crate) tag_text_color: String,
-    #[serde(default = "default_row_bg_normal")]
-    pub(crate) row_bg_normal: String,
-    #[serde(default = "default_row_bg_done")]
-    pub(crate) row_bg_done: String,
-    #[serde(default = "default_row_stroke")]
-    pub(crate) row_stroke: String,
+pub fn set_save_path(path: PathBuf) {
+    *SAVE_PATH.write().unwrap() = Some(path);
 }
 
-fn default_empty_text() -> String {
-    "No tasks yet — add one below".to_string()
-}
-fn default_text_color() -> String {
-    "#xe2e8f0".to_string()
-}
-fn default_text_done_color() -> String {
-    "#xa0d0a4".to_string()
-}
-fn default_tag_text_color() -> String {
-    "#xffffff".to_string()
-}
-fn default_row_bg_normal() -> String {
-    "#x272c34".to_string()
-}
-fn default_row_bg_done() -> String {
-    "#x1f3a2a".to_string()
-}
-fn default_row_stroke() -> String {
-    "#x3b424d".to_string()
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub(crate) struct TodoItemJson {
-    pub(crate) text: String,
-    #[serde(default)]
-    pub(crate) done: bool,
-    #[serde(default)]
-    pub(crate) tag: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub(crate) struct TodoConfig {
-    #[serde(default)]
-    pub(crate) items: Vec<TodoItemJson>,
-    #[serde(default)]
-    pub(crate) theme: TodoTheme,
-}
-
-// ==================== Runtime Data ====================
+// ==================== Data Types ====================
 
 #[derive(Clone, Debug)]
-pub(crate) struct TodoItemData {
-    pub(crate) text: String,
-    pub(crate) done: bool,
-    pub(crate) tag: String,
+pub struct TodoItemData {
+    pub text: String,
+    pub done: bool,
+    pub tag: String,
 }
 
-pub(crate) static TODO_CONFIG: LazyLock<RwLock<TodoConfig>> =
-    LazyLock::new(|| RwLock::new(load_todo_config()));
+#[derive(Clone, Debug, Default)]
+pub struct TodoTheme {
+    pub empty_text: String,
+    pub text_color: String,
+    pub text_done_color: String,
+    pub tag_text_color: String,
+    pub row_bg_normal: String,
+    pub row_bg_done: String,
+    pub row_stroke: String,
+}
 
-pub(crate) static TODOS: LazyLock<RwLock<Vec<TodoItemData>>> =
-    LazyLock::new(|| RwLock::new(initial_todos()));
+// ==================== VM State Helpers ====================
 
-/// Load todo configuration from JSON file.
-/// Searches: ./todo.json, <crate-dir>/todo.json, <exe-dir>/todo.json
-pub(crate) fn load_todo_config() -> TodoConfig {
-    let mut paths = vec![std::path::PathBuf::from("todo.json")];
+fn heap_todo_to_data(heap: &ScriptHeap, obj: ScriptObject) -> Option<TodoItemData> {
+    let text = read_script_string(heap, obj, id!(text))?;
+    let done_val = heap.value(obj, ScriptValue::from_id(id!(done)), NoTrap);
+    let done = done_val.as_bool().unwrap_or(false);
+    let tag = read_script_string(heap, obj, id!(tag)).unwrap_or_default();
+    Some(TodoItemData { text, done, tag })
+}
 
-    // Crate source directory (compile-time, works for `cargo run`)
-    let crate_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    paths.push(crate_dir.join("todo.json"));
+fn data_to_script_value(heap: &mut ScriptHeap, item: &TodoItemData) -> ScriptValue {
+    let text = heap.new_string_from_str(&item.text);
+    let tag = heap.new_string_from_str(&item.tag);
+    let obj = heap.new_object();
+    heap.set_value_def(obj, ScriptValue::from_id(id!(text)), text.into());
+    heap.set_value_def(
+        obj,
+        ScriptValue::from_id(id!(done)),
+        ScriptValue::from_bool(item.done),
+    );
+    heap.set_value_def(obj, ScriptValue::from_id(id!(tag)), tag.into());
+    obj.into()
+}
 
-    // Exe directory
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            paths.push(dir.join("todo.json"));
+pub fn read_todos(cx: &mut Cx) -> Vec<TodoItemData> {
+    cx.with_vm(|vm| {
+        let heap = vm.heap();
+        let mod_obj = heap.modules;
+        let state_val = heap.value(mod_obj, ScriptValue::from_id(id!(state)), NoTrap);
+        let Some(state_obj) = state_val.as_object() else {
+            return Vec::new();
+        };
+
+        let mut app_obj = None;
+        let app_val = heap.value(state_obj, ScriptValue::from_id(id!(app)), NoTrap);
+        if let Some(obj) = app_val.as_object() {
+            app_obj = Some(obj);
         }
-    }
+        if app_obj.is_none() {
+            let todo_val = heap.value(state_obj, ScriptValue::from_id(id!(todo)), NoTrap);
+            if let Some(obj) = todo_val.as_object() {
+                app_obj = Some(obj);
+            }
+        }
+        let Some(app_obj) = app_obj else {
+            return Vec::new();
+        };
 
-    for path in &paths {
-        if let Ok(content) = std::fs::read_to_string(path) {
-            match serde_json::from_str::<TodoConfig>(&content) {
-                Ok(config) => {
-                    log!("Loaded todo config from: {}", path.display());
-                    *TODO_JSON_PATH.write().unwrap() = Some(path.clone());
-                    return config;
-                }
-                Err(e) => {
-                    log!("Failed to parse {}: {}", path.display(), e);
+        let todos_val = heap.value(app_obj, ScriptValue::from_id(id!(todos)), NoTrap);
+        let Some(todos_arr) = todos_val.as_array() else {
+            return Vec::new();
+        };
+        let len = heap.array_len(todos_arr);
+        let mut result = Vec::with_capacity(len);
+        for i in 0..len {
+            let item_val = heap.array_index(todos_arr, i, NoTrap);
+            if let Some(item_obj) = item_val.as_object() {
+                if let Some(data) = heap_todo_to_data(heap, item_obj) {
+                    result.push(data);
                 }
             }
         }
-    }
-
-    // No file found — default to crate dir so save_todos() can create it
-    let default_path = crate_dir.join("todo.json");
-    log!(
-        "No todo.json found, using defaults; will create at: {}",
-        default_path.display()
-    );
-    *TODO_JSON_PATH.write().unwrap() = Some(default_path);
-    TodoConfig::default()
+        result
+    })
 }
 
-/// Save current todos back to the JSON file.
-pub(crate) fn save_todos() {
-    let path_guard = TODO_JSON_PATH.read().unwrap();
+fn write_todos_to_vm(cx: &mut Cx, todos: &[TodoItemData]) {
+    cx.with_vm(|vm| {
+        let heap = vm.heap_mut();
+        let mod_obj = heap.modules;
+        let state_val = heap.value(mod_obj, ScriptValue::from_id(id!(state)), NoTrap);
+        let Some(state_obj) = state_val.as_object() else {
+            return;
+        };
+
+        let mut app_obj = None;
+        let app_val = heap.value(state_obj, ScriptValue::from_id(id!(app)), NoTrap);
+        if let Some(obj) = app_val.as_object() {
+            app_obj = Some(obj);
+        }
+        if app_obj.is_none() {
+            let todo_val = heap.value(state_obj, ScriptValue::from_id(id!(todo)), NoTrap);
+            if let Some(obj) = todo_val.as_object() {
+                app_obj = Some(obj);
+            }
+        }
+        let Some(app_obj) = app_obj else {
+            return;
+        };
+
+        let new_arr = heap.new_array();
+        for item in todos {
+            let val = data_to_script_value(heap, item);
+            heap.array_push(new_arr, val, NoTrap);
+        }
+        heap.set_value_def(app_obj, ScriptValue::from_id(id!(todos)), new_arr.into());
+    });
+}
+
+pub fn add_todo(cx: &mut Cx, text: &str) {
+    let mut todos = read_todos(cx);
+    todos.insert(
+        0,
+        TodoItemData {
+            text: text.to_string(),
+            done: false,
+            tag: String::new(),
+        },
+    );
+    write_todos_to_vm(cx, &todos);
+    save_todos(cx);
+}
+
+pub fn count_todos(cx: &mut Cx) -> (usize, usize) {
+    let todos = read_todos(cx);
+    let done = todos.iter().filter(|t| t.done).count();
+    (done, todos.len())
+}
+
+pub fn save_todos(cx: &mut Cx) {
+    let path_guard = SAVE_PATH.read().unwrap();
     let Some(ref path) = *path_guard else {
-        log!("No todo.json path known, cannot save");
         return;
     };
 
-    let todos = TODOS.read().unwrap();
-    let config = TODO_CONFIG.read().unwrap();
+    let todos = read_todos(cx);
+    let theme = read_theme_from_script(cx);
 
-    let items: Vec<TodoItemJson> = todos
+    let items: Vec<serde_json::Value> = todos
         .iter()
-        .map(|t| TodoItemJson {
-            text: t.text.clone(),
-            done: t.done,
-            tag: t.tag.clone(),
+        .map(|t| {
+            serde_json::json!({
+                "text": t.text,
+                "done": t.done,
+                "tag": t.tag,
+            })
         })
         .collect();
 
-    let save_config = TodoConfig {
-        items,
-        theme: config.theme.clone(),
-    };
-
-    match serde_json::to_string_pretty(&save_config) {
-        Ok(json) => {
-            if let Err(e) = std::fs::write(path, json) {
-                log!("Failed to save todo.json: {}", e);
-            } else {
-                log!("Saved todo.json to: {}", path.display());
+    let json = serde_json::json!({
+        "app": {
+            "name": "Todo",
+            "version": "1.0"
+        },
+        "splash_code": read_splash_code_from_file(path),
+        "state": {
+            "todos": items,
+            "theme": {
+                "empty_text": theme.empty_text,
+                "text_color": theme.text_color,
+                "text_done_color": theme.text_done_color,
+                "tag_text_color": theme.tag_text_color,
+                "row_bg_normal": theme.row_bg_normal,
+                "row_bg_done": theme.row_bg_done,
+                "row_stroke": theme.row_stroke,
             }
         }
-        Err(e) => {
-            log!("Failed to serialize todo config: {}", e);
+    });
+
+    match serde_json::to_string_pretty(&json) {
+        Ok(s) => {
+            if let Err(e) = std::fs::write(path, s) {
+                log!("Failed to save todo app state: {}", e);
+            } else {
+                log!("Saved todo app state to: {}", path.display());
+            }
         }
+        Err(e) => log!("Failed to serialize todo state: {}", e),
     }
 }
 
-/// Reload configuration from disk and refresh data.
-#[allow(dead_code)]
-pub(crate) fn reload_todo_config() {
-    let config = load_todo_config();
-    let items: Vec<TodoItemData> = config
-        .items
-        .iter()
-        .map(|item| TodoItemData {
-            text: item.text.clone(),
-            done: item.done,
-            tag: item.tag.clone(),
-        })
-        .collect();
-    *TODOS.write().unwrap() = items;
-    *TODO_CONFIG.write().unwrap() = config;
+fn read_splash_code_from_file(path: &std::path::Path) -> String {
+    match std::fs::read_to_string(path) {
+        Ok(content) => match serde_json::from_str::<serde_json::Value>(&content) {
+            Ok(val) => val
+                .get("splash_code")
+                .and_then(|v| v.as_str())
+                .unwrap_or("{}")
+                .to_string(),
+            Err(_) => "{}".to_string(),
+        },
+        Err(_) => "{}".to_string(),
+    }
 }
 
-pub(crate) fn initial_todos() -> Vec<TodoItemData> {
-    let config = TODO_CONFIG.read().unwrap();
-    config
-        .items
-        .iter()
-        .map(|item| TodoItemData {
-            text: item.text.clone(),
-            done: item.done,
-            tag: item.tag.clone(),
-        })
-        .collect()
-}
+// ==================== Theme Helpers ====================
 
-// ==================== Helpers ====================
-
-/// Parse a hex color string to vec4.
-/// Supports: #RRGGBB, #xRRGGBB, #RRGGBBAA, #xRRGGBBAA
 fn hex_to_vec4(hex: &str) -> Vec4 {
     let hex = hex.trim();
     let hex = hex.strip_prefix('#').unwrap_or(hex);
@@ -217,38 +239,32 @@ fn hex_to_vec4(hex: &str) -> Vec4 {
     }
 }
 
-/// Read a string property from a script object.
 fn read_script_string(heap: &ScriptHeap, obj: ScriptObject, key: LiveId) -> Option<String> {
     let val = heap.value(obj, ScriptValue::from_id(key), NoTrap);
     let s = val.as_string()?;
     Some(heap.string(s).to_string())
 }
 
-/// Read theme from `mod.state.app.theme` or `mod.state.todo.theme` in the script VM.
-fn read_theme_from_script(cx: &mut Cx2d) -> TodoTheme {
+pub fn read_theme_from_script(cx: &mut Cx) -> TodoTheme {
     let mut theme = TodoTheme::default();
 
-    cx.cx.with_vm(|vm| {
-        let mod_obj = vm.module(id!(mod));
+    cx.with_vm(|vm| {
         let heap = vm.heap();
+        let mod_obj = heap.modules;
 
-        // mod.state
         let state_val = heap.value(mod_obj, ScriptValue::from_id(id!(state)), NoTrap);
         let Some(state_obj) = state_val.as_object() else {
             return;
         };
 
-        // Try mod.state.app.theme first (dynamically loaded apps), fallback to mod.state.todo.theme
         let mut theme_obj = None;
 
-        // mod.state.app
         let app_val = heap.value(state_obj, ScriptValue::from_id(id!(app)), NoTrap);
         if let Some(app_obj) = app_val.as_object() {
             let t = heap.value(app_obj, ScriptValue::from_id(id!(theme)), NoTrap);
             theme_obj = t.as_object();
         }
 
-        // Fallback: mod.state.todo.theme
         if theme_obj.is_none() {
             let todo_val = heap.value(state_obj, ScriptValue::from_id(id!(todo)), NoTrap);
             if let Some(todo_obj) = todo_val.as_object() {
@@ -287,18 +303,25 @@ fn read_theme_from_script(cx: &mut Cx2d) -> TodoTheme {
     theme
 }
 
-// ==================== TodoList Custom Widget ====================
+// ==================== TodoList Widget ====================
+
+#[derive(Clone, Debug)]
+pub enum TodoListAction {
+    StateChanged,
+}
 
 #[derive(Script, ScriptHook, Widget)]
 pub struct TodoList {
     #[deref]
     view: View,
+    #[live]
+    list: WidgetRef,
 }
 
 impl Widget for TodoList {
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
-        let todos = TODOS.read().unwrap();
-        let theme = read_theme_from_script(cx);
+        let todos = read_todos(cx.cx);
+        let theme = read_theme_from_script(cx.cx);
         let text_color = hex_to_vec4(&theme.text_color);
         let text_done_color = hex_to_vec4(&theme.text_done_color);
         let tag_text_color = hex_to_vec4(&theme.tag_text_color);
@@ -319,41 +342,14 @@ impl Widget for TodoList {
                         let Some(todo) = todos.get(item_id) else {
                             continue;
                         };
-                        let item = list.item(cx, item_id, id!(Item));
+                        let template = if todo.done { id!(ItemDone) } else { id!(Item) };
+                        let item = list.item(cx, item_id, template);
 
                         item.check_box(cx, ids!(check)).set_active(cx, todo.done);
                         item.label(cx, ids!(label)).set_text(cx, &todo.text);
                         item.label(cx, ids!(tag_label)).set_text(cx, &todo.tag);
                         item.view(cx, ids!(tag))
                             .set_visible(cx, !todo.tag.is_empty());
-
-                        // Set shader uniforms on the item's root View draw_bg
-                        if let Some(mut item_view) = item.borrow_mut::<View>() {
-                            let done_value = if todo.done { 1.0 } else { 0.0 };
-                            item_view.draw_bg.draw_vars.set_dyn_instance(
-                                cx,
-                                live_id!(done),
-                                &[done_value],
-                            );
-                            let bg_normal = hex_to_vec4(&theme.row_bg_normal);
-                            let bg_done = hex_to_vec4(&theme.row_bg_done);
-                            let stroke = hex_to_vec4(&theme.row_stroke);
-                            item_view.draw_bg.draw_vars.set_uniform(
-                                cx,
-                                live_id!(bg_normal),
-                                &[bg_normal.x, bg_normal.y, bg_normal.z, bg_normal.w],
-                            );
-                            item_view.draw_bg.draw_vars.set_uniform(
-                                cx,
-                                live_id!(bg_done),
-                                &[bg_done.x, bg_done.y, bg_done.z, bg_done.w],
-                            );
-                            item_view.draw_bg.draw_vars.set_uniform(
-                                cx,
-                                live_id!(stroke_color),
-                                &[stroke.x, stroke.y, stroke.z, stroke.w],
-                            );
-                        }
 
                         if let Some(mut label) = item.label(cx, ids!(label)).borrow_mut() {
                             label.draw_text.color = if todo.done {
@@ -377,6 +373,77 @@ impl Widget for TodoList {
     }
 
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        self.view.handle_event(cx, event, scope);
+        let actions = cx.capture_actions(|cx| {
+            self.view.handle_event(cx, event, scope);
+        });
+
+        let mut changed = false;
+        let todos = read_todos(cx);
+
+        {
+            let Some(list) = self.list.borrow::<PortalList>() else {
+                return;
+            };
+
+            for item_id in 0..todos.len() {
+                if let Some((_, item)) = list.get_item(item_id) {
+                    // CheckBox: detect state change by reading animator state directly
+                    let is_checked = item
+                        .child(id!(check))
+                        .borrow::<CheckBox>()
+                        .map_or(false, |cb| cb.active(cx));
+                    let expected = todos[item_id].done;
+                    if is_checked != expected {
+                        cx.with_vm(|vm| {
+                            let heap = vm.heap_mut();
+                            let mod_obj = heap.modules;
+                            let state_val =
+                                heap.value(mod_obj, ScriptValue::from_id(id!(state)), NoTrap);
+                            let Some(state_obj) = state_val.as_object() else {
+                                return;
+                            };
+                            let app_val =
+                                heap.value(state_obj, ScriptValue::from_id(id!(app)), NoTrap);
+                            let Some(app_obj) = app_val.as_object() else {
+                                return;
+                            };
+                            let todos_val =
+                                heap.value(app_obj, ScriptValue::from_id(id!(todos)), NoTrap);
+                            let Some(todos_arr) = todos_val.as_array() else {
+                                return;
+                            };
+                            let item_val = heap.array_index(todos_arr, item_id, NoTrap);
+                            if let Some(item_obj) = item_val.as_object() {
+                                heap.set_value_def(
+                                    item_obj,
+                                    ScriptValue::from_id(id!(done)),
+                                    ScriptValue::from_bool(is_checked),
+                                );
+                            }
+                        });
+                        changed = true;
+                    }
+
+                    // Delete button: use direct child borrow
+                    let del_clicked = item
+                        .child(id!(del))
+                        .borrow::<Button>()
+                        .map_or(false, |btn| btn.clicked(&actions));
+                    if del_clicked {
+                        let mut new_todos = read_todos(cx);
+                        if item_id < new_todos.len() {
+                            new_todos.remove(item_id);
+                            write_todos_to_vm(cx, &new_todos);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if changed {
+            self.redraw(cx);
+            cx.widget_action(self.widget_uid(), TodoListAction::StateChanged);
+        }
     }
 }

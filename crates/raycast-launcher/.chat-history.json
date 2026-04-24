@@ -5,34 +5,18 @@
   },
   {
     "role": "User",
-    "text": "Create a calculator with dark theme"
-  },
-  {
-    "role": "Assistant",
-    "text": "Network error: unsupported URL"
-  },
-  {
-    "role": "User",
-    "text": "Create a calculator with dark theme"
-  },
-  {
-    "role": "Assistant",
-    "text": "Network error: unsupported URL"
-  },
-  {
-    "role": "User",
-    "text": "Create a calculator with dark theme"
-  },
-  {
-    "role": "Assistant",
-    "text": "Network error: unsupported URL"
-  },
-  {
-    "role": "User",
     "text": "hi"
   },
   {
     "role": "Assistant",
-    "text": "Network error: unsupported URL"
+    "text": "Hello! I'm your Splash UI expert assistant. I can help you build interactive apps and widgets using Makepad's Splash declarative language.\n\n**What I can do:**\n- Generate complete, runnable UI apps (calculators, dashboards, timers, etc.)\n- Answer questions about Splash syntax and components\n- Modify existing apps with new features\n\n**Try asking:**\n- \"Create a dark-themed calculator\"\n- \"Build a pomodoro timer with progress ring\"\n- \"Design a todo list with checkboxes\"\n\nJust let me know what you'd like to build!"
+  },
+  {
+    "role": "User",
+    "text": "Create a dark-themed calculator"
+  },
+  {
+    "role": "Assistant",
+    "text": "Network error: The request timed out."
   }
 ]
