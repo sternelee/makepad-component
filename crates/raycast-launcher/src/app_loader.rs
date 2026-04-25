@@ -178,6 +178,21 @@ pub fn read_app_state(cx: &mut Cx) -> Option<serde_json::Value> {
     })
 }
 
+/// Write a search query string into `mod.state.app.search` in the Splash VM.
+/// Called from Rust when mode_input changes, so the Splash body can filter on reload.
+pub fn set_splash_search(cx: &mut Cx, search: &str) {
+    cx.with_vm(|vm| {
+        let heap = vm.heap_mut();
+        let mod_obj = heap.modules;
+        let state_val = heap.value(mod_obj, ScriptValue::from_id(id!(state)), NoTrap);
+        let Some(state_obj) = state_val.as_object() else { return; };
+        let app_val = heap.value(state_obj, ScriptValue::from_id(id!(app)), NoTrap);
+        let Some(app_obj) = app_val.as_object() else { return; };
+        let sv = heap.new_string_from_str(search);
+        heap.set_value_def(app_obj, ScriptValue::from_id(id!(search)), sv.into());
+    });
+}
+
 /// Read the `version` counter from `mod.state.app.version` in the Splash VM.
 /// Returns 0 if the field doesn't exist or isn't accessible.
 pub fn read_todo_version(cx: &mut Cx) -> i64 {

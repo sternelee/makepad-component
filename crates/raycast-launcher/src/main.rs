@@ -781,7 +781,7 @@ pub struct LauncherPanel {
     #[rust]
     last_todo_version: i64,
     #[rust]
-    restore_splash_focus: bool,
+    splash_has_search: bool,
     #[rust]
     chat_messages: Vec<chat::ChatMessage>,
     #[rust]
@@ -818,7 +818,7 @@ impl ScriptHook for LauncherPanel {
             self.show_chat = false;
             self.splash_reload_version = 0;
             self.last_todo_version = 0;
-            self.restore_splash_focus = false;
+            self.splash_has_search = false;
             self.chat_messages = chat::default_or_history();
             self.chat_loading = false;
             self.last_saved_app_path = None;
@@ -1080,17 +1080,17 @@ impl LauncherPanel {
             action_disabled,
             row_spacing,
             mode_hint_text,
-        ) = if self.show_todo {
+        ) = if self.show_todo && self.splash_has_search {
             (
-                "Splash app running — press Esc to go back",
+                "Search tasks...",
                 "",
-                true,  // read-only
+                false, // editable — search via Rust, focus never lost on Splash reload
                 true,  // show_back
                 false, // no action button
                 "Add",
                 false,
                 8.0,
-                "Esc Back",
+                "Type to search  |  Esc Back",
             )
         } else if self.show_chat {
             (
@@ -1520,6 +1520,10 @@ impl LauncherPanel {
         app_loader::inject_app_state(cx, &app.state);
         // Read initial version from injected state
         self.last_todo_version = app_loader::read_todo_version(cx);
+        // Detect if this app has a search field (enables mode_input search)
+        self.splash_has_search = app.state.get("search").is_some();
+        // Sync mode_input hint with search capability
+        self.sync_mode_input(cx);
 
         // Append version comment to force re-evaluation on reload cycles
         self.splash_reload_version += 1;
@@ -1551,8 +1555,11 @@ impl LauncherPanel {
         );
         // Don't re-inject state — VM already has updated state from Splash on_click handlers
         self.view.widget(cx, ids!(todo_list)).set_text(cx, &code);
-        // Signal handle_event to restore focus after the next draw_walk registers the new widgets
-        self.restore_splash_focus = true;
+        // mode_input is outside the Splash widget, so it never loses focus on rebuild.
+        // For apps with search, ensure mode_input stays focused after reload.
+        if self.splash_has_search {
+            self.view.text_input(cx, ids!(mode_input)).set_key_focus(cx);
+        }
         self.redraw(cx);
     }
 
@@ -1592,22 +1599,6 @@ impl LauncherPanel {
 
 impl Widget for LauncherPanel {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        // ── Restore Splash search focus after reload ────────────────────────────────
-        // After reload_splash_widget calls set_text, the Splash widget rebuilds its tree.
-        // Widgets are registered during draw_walk which runs before the next handle_event.
-        // We use a one-shot flag to restore focus on the first handle_event after reload.
-        if self.restore_splash_focus && self.show_todo {
-            self.restore_splash_focus = false;
-            // Try to find search_input (named TextInput) inside the Splash widget
-            let search = self
-                .view
-                .widget(cx, ids!(todo_list))
-                .text_input(cx, ids!(search_input));
-            if !search.is_empty() {
-                search.set_key_focus(cx);
-            }
-        }
-
         // ── Todo: detect Splash on_click state changes ──────────────────────────
         // Splash on_click closures are queued async and executed by the script pump
         // AFTER the current handle_event returns. By checking version HERE (before
@@ -1686,6 +1677,15 @@ impl Widget for LauncherPanel {
             let handled = self.handle_todo_actions(cx, &actions);
             if handled {
                 return;
+            }
+            // Search via mode_input — mode_input is OUTSIDE the Splash widget so it
+            // never loses focus when the Splash rebuild happens on version change.
+            if self.splash_has_search {
+                if let Some(text) = self.view.text_input(cx, ids!(mode_input)).changed(&actions) {
+                    app_loader::set_splash_search(cx, &text);
+                    self.reload_splash_widget(cx);
+                    return;
+                }
             }
             self.persist_todo_app_if_needed(cx, &actions);
             if let Event::KeyDown(key) = event {
