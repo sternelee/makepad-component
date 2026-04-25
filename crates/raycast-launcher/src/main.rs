@@ -101,14 +101,13 @@ script_mod! {
                         draw_bg +: { color: #x1e2330 }
 
                         Label{
+                            width: Fill
                             text: "Splash App Preview"
                             draw_text +: {
                                 text_style: theme.font_regular {font_size: 9}
                                 color: #x64748b
                             }
                         }
-
-                        Filler{}
 
                         save_splash_btn := Button{
                             text: "Save as App"
