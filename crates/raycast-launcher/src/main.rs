@@ -65,47 +65,6 @@ script_mod! {
                     height: Fit
                     selectable: true
                     body: ""
-
-                    splash_block := View{
-                        visible: false
-                        width: Fill
-                        height: Fit
-                        flow: Down
-                        spacing: 6
-                        padding: Inset{top: 8}
-
-                        splash_view := Splash{
-                            width: Fill
-                            height: Fit
-                        }
-
-                        View{
-                            width: Fill
-                            height: Fit
-                            flow: Right
-                            spacing: 8
-                            padding: Inset{top: 4 bottom: 2}
-
-                            Label{
-                                width: Fill
-                                text: "Splash App Preview"
-                                draw_text +: {
-                                    text_style: theme.font_regular {font_size: 9}
-                                    color: #x64748b
-                                }
-                            }
-
-                            save_splash_btn := Button{
-                                text: "Save as App"
-                                padding: Inset{left: 12 right: 12 top: 5 bottom: 5}
-                                draw_bg +: { color: #x1d4ed8 radius: 5.0 }
-                                draw_text +: {
-                                    text_style: theme.font_bold {font_size: 10}
-                                    color: #xffffff
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -651,6 +610,57 @@ script_mod! {
             }
 
             chat_list := mod.widgets.ChatList{}
+
+            splash_preview := View{
+                visible: false
+                width: Fill
+                height: Fit
+                flow: Down
+                spacing: 0
+
+                View{width: Fill height: 1 show_bg: true draw_bg +: {color: #x2e3541}}
+
+                View{
+                    width: Fill
+                    height: Fit
+                    flow: Right
+                    spacing: 8
+                    padding: Inset{left: 12 right: 12 top: 7 bottom: 7}
+                    show_bg: true
+                    draw_bg +: {
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 0.0)
+                            sdf.fill(#x1b2028)
+                            return sdf.result
+                        }
+                    }
+
+                    splash_preview_label := Label{
+                        width: Fill
+                        text: "Splash App Preview"
+                        draw_text +: {
+                            text_style: theme.font_bold {font_size: 12}
+                            color: #xf1f5f9
+                        }
+                    }
+
+                    save_splash_btn := Button{
+                        text: "Save as App"
+                        padding: Inset{left: 12 right: 12 top: 5 bottom: 5}
+                        draw_bg +: { color: #x1d4ed8 radius: 5.0 }
+                        draw_text +: {
+                            text_style: theme.font_bold {font_size: 10}
+                            color: #xffffff
+                        }
+                    }
+                }
+
+                splash_preview_view := Splash{
+                    width: Fill
+                    height: 320.0
+                }
+            }
 
             View{
                 width: Fill

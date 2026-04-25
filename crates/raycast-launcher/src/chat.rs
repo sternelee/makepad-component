@@ -1,7 +1,7 @@
 use makepad_widgets::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{a2ui_bridge_embed, app_loader, chat_list::ChatListAction, LauncherPanel};
+use crate::{a2ui_bridge_embed, app_loader, LauncherPanel};
 
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum ChatRole {
@@ -130,6 +130,7 @@ pub(crate) fn extract_runsplash(text: &str) -> Option<String> {
 
 /// Remove the runsplash code block from text for clean Markdown display.
 /// The Splash app is shown inline by the ChatList renderer instead.
+#[allow(dead_code)]
 pub(crate) fn strip_runsplash(text: &str) -> String {
     let prefix = "```runsplash";
     let Some(start) = text.find(prefix) else {
@@ -198,11 +199,23 @@ impl LauncherPanel {
         );
 
         // Toggle save-app button based on last assistant message having runsplash
-        let last_has_runsplash = self
+        let last_runsplash = self
             .chat_messages
             .last()
-            .map(|m| m.role == ChatRole::Assistant && extract_runsplash(&m.text).is_some())
-            .unwrap_or(false);
+            .filter(|m| m.role == ChatRole::Assistant)
+            .and_then(|m| extract_runsplash(&m.text));
+        let last_has_runsplash = last_runsplash.is_some();
+
+        // Update splash preview panel
+        self.view
+            .widget(cx, ids!(splash_preview))
+            .set_visible(cx, last_has_runsplash);
+        if let Some(ref code) = last_runsplash {
+            self.view
+                .widget(cx, ids!(splash_preview_view))
+                .set_text(cx, code);
+        }
+
         self.view
             .widget(cx, ids!(save_app_wrap))
             .set_visible(cx, last_has_runsplash);
@@ -460,7 +473,9 @@ impl LauncherPanel {
             return;
         }
 
-        if self.view.button(cx, ids!(save_app_btn)).clicked(actions) {
+        if self.view.button(cx, ids!(save_app_btn)).clicked(actions)
+            || self.view.button(cx, ids!(save_splash_btn)).clicked(actions)
+        {
             self.save_chat_app(cx);
             return;
         }
@@ -471,24 +486,6 @@ impl LauncherPanel {
                 self.open_splash_app(cx, &path);
             }
             return;
-        }
-
-        // Per-message "Save as App" buttons dispatched by ChatList
-        for action in actions.iter() {
-            if let ChatListAction::SaveSplashApp(item_id) = action.as_widget_action().cast() {
-                let data = CHAT_DATA.read().unwrap();
-                if let Some(msg) = data.messages.get(item_id) {
-                    let code = extract_runsplash(&msg.text);
-                    let name = extract_app_name(&msg.text);
-                    let state = extract_initial_state(&msg.text);
-                    drop(data);
-                    if let Some(code) = code {
-                        let name = name.as_deref().unwrap_or("generated-app");
-                        self.save_splash_app_from_code(cx, name, &code, state);
-                    }
-                }
-                return;
-            }
         }
 
         if let Some((_, _)) = self.view.text_input(cx, ids!(mode_input)).returned(actions) {
@@ -505,6 +502,7 @@ impl LauncherPanel {
     }
 
     /// Save a Splash app from raw code + name + initial state (used by per-message Save buttons).
+    #[allow(dead_code)]
     fn save_splash_app_from_code(
         &mut self,
         cx: &mut Cx,
