@@ -198,18 +198,23 @@ impl LauncherPanel {
             },
         );
 
-        // Toggle save-app button based on last assistant message having runsplash
+        // Toggle action bar and buttons — only visible after a Splash app is generated
         let last_has_runsplash = self
             .chat_messages
             .last()
             .map(|m| m.role == ChatRole::Assistant && extract_runsplash(&m.text).is_some())
             .unwrap_or(false);
+        let has_saved_app = self.last_saved_app_path.is_some();
+        let show_action_bar = last_has_runsplash || has_saved_app;
+        self.view
+            .widget(cx, ids!(chat_action_bar))
+            .set_visible(cx, show_action_bar);
         self.view
             .widget(cx, ids!(save_app_wrap))
             .set_visible(cx, last_has_runsplash);
         self.view
             .widget(cx, ids!(open_app_wrap))
-            .set_visible(cx, self.last_saved_app_path.is_some());
+            .set_visible(cx, has_saved_app);
 
         if self.chat_loading {
             self.view

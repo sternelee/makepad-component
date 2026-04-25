@@ -611,7 +611,8 @@ script_mod! {
 
             chat_list := mod.widgets.ChatList{}
 
-            View{
+            chat_action_bar := View{
+                visible: false
                 width: Fill
                 height: Fit
                 flow: Right
