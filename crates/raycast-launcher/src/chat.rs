@@ -230,6 +230,7 @@ impl LauncherPanel {
         self.chat_messages = default_chat_messages();
         save_chat_history(&self.chat_messages);
         self.chat_loading = false;
+        self.last_saved_app_path = None; // Clear saved app path so Open App button hides
         self.view
             .label(cx, ids!(chat_status_label))
             .set_text(cx, "Conversation reset");
@@ -251,21 +252,9 @@ impl LauncherPanel {
             return;
         };
 
-        // Name priority: 1) AI suggested name, 2) user input, 3) default
+        // Name: AI suggested name → "generated-app" (don't use mode_input which is the message field)
         let ai_name = extract_app_name(&last_msg.text);
-        let input_name = self.view.text_input(cx, ids!(mode_input)).text();
-        let input_name = input_name.trim();
-        let name = ai_name
-            .as_deref()
-            .filter(|n| !n.is_empty())
-            .or_else(|| {
-                if input_name.is_empty() {
-                    None
-                } else {
-                    Some(input_name)
-                }
-            })
-            .unwrap_or("generated-app");
+        let name = ai_name.as_deref().unwrap_or("generated-app");
         // Sanitize name for filename
         let safe_name: String = name
             .chars()
@@ -306,9 +295,7 @@ impl LauncherPanel {
                         &format!("Saved '{}'. Click 'Open App' to launch it.", name),
                     );
                     self.sync_chat_ui(cx);
-                    // Clear input after save
-                    self.chat_draft.clear();
-                    self.sync_mode_input(cx);
+                    self.redraw(cx);
                 }
             }
             Err(e) => {
@@ -473,7 +460,9 @@ impl LauncherPanel {
 
         if self.view.button(cx, ids!(open_app_btn)).clicked(actions) {
             if let Some(path) = self.last_saved_app_path.clone() {
-                self.set_chat_mode(cx, false);
+                // Open splash app directly without briefly showing the launcher
+                self.show_chat = false;
+                self.view.view(cx, ids!(chat_view)).set_visible(cx, false);
                 self.open_splash_app(cx, &path);
             }
             return;
