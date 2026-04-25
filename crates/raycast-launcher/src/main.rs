@@ -1485,7 +1485,7 @@ impl LauncherPanel {
 
     fn default_todo_app_path() -> String {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("todo-app.json")
+            .join("app-todo.json")
             .to_string_lossy()
             .to_string()
     }
