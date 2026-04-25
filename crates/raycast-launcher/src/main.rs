@@ -463,55 +463,57 @@ script_mod! {
             width: Fill
             height: Fill
             flow: Down
-            spacing: 10
+            spacing: 0
             padding: Inset{left: 2 right: 2 top: 2 bottom: 2}
 
-            View{
+            // ── App nav header ──────────────────────────────────────────────
+            splash_header := View{
                 width: Fill
                 height: Fit
                 flow: Right
                 align: VCenter
                 spacing: 8
-
-                Label{
-                    text: "Todo List"
-                    draw_text +: {
-                        text_style: theme.font_bold {font_size: 17}
-                        color: #xf9fbff
-                    }
-                }
-            }
-
-            Label{
-                text: "Capture quick tasks for this workspace"
-                draw_text +: {
-                    text_style: theme.font_regular {font_size: 10}
-                    color: #x8f9caf
-                }
-            }
-
-            stats_card := View{
-                width: Fill
-                height: Fit
-                flow: Down
-                spacing: 8
-                padding: Inset{left: 10 right: 10 top: 10 bottom: 10}
+                padding: Inset{left: 12 right: 12 top: 8 bottom: 8}
                 show_bg: true
                 draw_bg +: {
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
-                        sdf.fill(#x1b2028)
-                        sdf.stroke(#x303745 1.0)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 0.0)
+                        sdf.fill(#x151c26)
+                        sdf.stroke(#x2a3341 1.0)
                         return sdf.result
                     }
                 }
 
-                todo_count_label := Label{
-                    text: "0 / 0 done"
+                app_name_label := Label{
+                    width: Fill
+                    text: "App"
                     draw_text +: {
-                        text_style: theme.font_regular {font_size: 10}
-                        color: #xa7b4c8
+                        text_style: theme.font_bold {font_size: 15}
+                        color: #xf1f5f9
+                    }
+                }
+
+                View{
+                    width: Fit
+                    height: Fit
+                    padding: Inset{left: 7 right: 7 top: 3 bottom: 3}
+                    show_bg: true
+                    draw_bg +: {
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 4.0)
+                            sdf.fill(#x1d3048)
+                            sdf.stroke(#x2a4a70 1.0)
+                            return sdf.result
+                        }
+                    }
+                    Label{
+                        text: "Splash"
+                        draw_text +: {
+                            text_style: theme.font_bold {font_size: 9}
+                            color: #x60a5fa
+                        }
                     }
                 }
             }
@@ -1478,32 +1480,14 @@ impl LauncherPanel {
         self.view.text_input(cx, ids!(mode_input)).set_key_focus(cx);
     }
 
-    fn refresh_todo_stats(&mut self, cx: &mut Cx) {
-        let Some(state) = app_loader::read_app_state(cx) else {
-            self.view
-                .label(cx, ids!(todo_count_label))
-                .set_text(cx, "0 / 0 done");
-            return;
-        };
+    fn refresh_todo_stats(&mut self, _cx: &mut Cx) {
+        // Stats card removed — no-op kept for call-site compatibility
+    }
 
-        let todos = state
-            .get("todos")
-            .and_then(|value| value.as_array())
-            .cloned()
-            .unwrap_or_default();
-        let total = todos.len();
-        let done = todos
-            .iter()
-            .filter(|todo| {
-                todo.get("done")
-                    .and_then(|value| value.as_bool())
-                    .unwrap_or(false)
-            })
-            .count();
-
+    fn set_app_nav_header(&mut self, cx: &mut Cx, app_name: &str) {
         self.view
-            .label(cx, ids!(todo_count_label))
-            .set_text(cx, &format!("{} / {} done", done, total));
+            .label(cx, ids!(app_name_label))
+            .set_text(cx, app_name);
     }
 
     fn save_current_splash_app(&mut self, cx: &mut Cx) {
@@ -1542,7 +1526,7 @@ impl LauncherPanel {
             self.splash_reload_version
         );
         self.view.widget(cx, ids!(todo_list)).set_text(cx, &code);
-        self.refresh_todo_stats(cx);
+        self.set_app_nav_header(cx, &app.app.name);
         self.redraw(cx);
     }
 
@@ -1564,7 +1548,6 @@ impl LauncherPanel {
         );
         // Don't re-inject state — VM already has updated state from Splash on_click handlers
         self.view.widget(cx, ids!(todo_list)).set_text(cx, &code);
-        self.refresh_todo_stats(cx);
         self.redraw(cx);
     }
 
