@@ -731,7 +731,6 @@ app_main!(App);
 enum LaunchTarget {
     OpenPath(String),
     Command { program: String, args: Vec<String> },
-    OpenTodo,
     OpenChat,
     OpenSplashApp(String),
 }
@@ -907,15 +906,6 @@ fn command_items() -> Vec<LauncherItem> {
             "rust ci tests",
         ),
         launcher_item(
-            "Todo".to_string(),
-            "Open built-in todo list".to_string(),
-            "Command".to_string(),
-            None,
-            Some("T"),
-            LaunchTarget::OpenTodo,
-            "tasks checklist todos 待办 任务 清单",
-        ),
-        launcher_item(
             "Chat".to_string(),
             "Open A2UI conversation panel".to_string(),
             "Command".to_string(),
@@ -1087,15 +1077,15 @@ impl LauncherPanel {
             mode_hint_text,
         ) = if self.show_todo {
             (
-                "Add a task and press Enter or Add…",
+                "Splash app running — press Esc to go back",
                 "",
-                false, // editable
+                true,  // read-only
                 true,  // show_back
-                true,  // show_action (Add button)
+                false, // no action button
                 "Add",
                 false,
                 8.0,
-                "Enter/Add — add task  |  Esc Back",
+                "Esc Back",
             )
         } else if self.show_chat {
             (
@@ -1268,17 +1258,6 @@ impl LauncherPanel {
             })
             .collect();
 
-        if q.contains("todo") || q.contains("待办") || q.contains("任务") {
-            if let Some(todo_idx) = self
-                .all_items
-                .iter()
-                .position(|it| matches!(it.launch, LaunchTarget::OpenTodo))
-            {
-                self.filtered_indices.retain(|idx| *idx != todo_idx);
-                self.filtered_indices.insert(0, todo_idx);
-            }
-        }
-
         if q.contains("chat") || q.contains("对话") || q.contains("聊天") || q_norm == "chat" {
             if let Some(chat_idx) = self
                 .all_items
@@ -1298,8 +1277,7 @@ impl LauncherPanel {
                 .map(|it| {
                     matches!(
                         it.launch,
-                        LaunchTarget::OpenTodo
-                            | LaunchTarget::OpenChat
+                        LaunchTarget::OpenChat
                             | LaunchTarget::OpenSplashApp(_)
                     )
                 })
@@ -1355,7 +1333,7 @@ impl LauncherPanel {
 
     fn group_name_for(item: &LauncherItem) -> &'static str {
         match item.launch {
-            LaunchTarget::OpenTodo | LaunchTarget::OpenChat => "Built-in",
+            LaunchTarget::OpenChat => "Built-in",
             LaunchTarget::OpenSplashApp(_) => "Splash Apps",
             LaunchTarget::Command { .. } => "Commands",
             LaunchTarget::OpenPath(_) => "Applications",
@@ -1463,10 +1441,6 @@ impl LauncherPanel {
                     Ok(_) => self.update_labels(cx, &format!("Executed: {}", program)),
                     Err(_) => self.update_labels(cx, &format!("Command failed: {}", program)),
                 }
-            }
-            LaunchTarget::OpenTodo => {
-                self.set_todo_mode(cx, true);
-                self.update_labels(cx, "Opened");
             }
             LaunchTarget::OpenChat => {
                 self.set_chat_mode(cx, true);
@@ -1624,86 +1598,7 @@ impl LauncherPanel {
             self.redraw(cx);
             return true;
         }
-
-        // Add todo from mode_input (button or Enter)
-        let add_clicked = self.view.button(cx, ids!(mode_action_btn)).clicked(actions);
-        let entered = self
-            .view
-            .text_input(cx, ids!(mode_input))
-            .returned(actions)
-            .is_some();
-        if add_clicked || entered {
-            let text = self.view.text_input(cx, ids!(mode_input)).text();
-            let text = text.trim().to_string();
-            if !text.is_empty() {
-                self.add_todo_to_vm(cx, &text);
-                self.view.text_input(cx, ids!(mode_input)).set_text(cx, "");
-                self.save_current_splash_app(cx);
-                self.reload_splash_widget(cx);
-                self.redraw(cx);
-            }
-            return true;
-        }
-
         false
-    }
-
-    /// Directly insert a new todo into the Splash VM state.
-    fn add_todo_to_vm(&self, cx: &mut Cx, text: &str) {
-        use makepad_script::{ScriptTrap::NoTrap, ScriptValue};
-        cx.with_vm(|vm| {
-            let heap = vm.heap_mut();
-            let mod_obj = heap.modules;
-            let state_val = heap.value(mod_obj, ScriptValue::from_id(id!(state)), NoTrap);
-            let Some(state_obj) = state_val.as_object() else {
-                return;
-            };
-            let app_val = heap.value(state_obj, ScriptValue::from_id(id!(app)), NoTrap);
-            let Some(app_obj) = app_val.as_object() else {
-                return;
-            };
-
-            // Read current count
-            let count_val = heap.value(app_obj, ScriptValue::from_id(id!(count)), NoTrap);
-            let count = count_val.as_f64().unwrap_or(0.0) as usize;
-
-            // Get todos array
-            let todos_val = heap.value(app_obj, ScriptValue::from_id(id!(todos)), NoTrap);
-            let Some(todos_arr) = todos_val.as_array() else {
-                return;
-            };
-
-            // Build new todo object
-            let todo_obj = heap.new_object();
-            let text_sv = heap.new_string_from_str(text);
-            let tag_sv = heap.new_string_from_str("");
-            heap.set_value_def(todo_obj, ScriptValue::from_id(id!(text)), text_sv.into());
-            heap.set_value_def(
-                todo_obj,
-                ScriptValue::from_id(id!(done)),
-                ScriptValue::from_bool(false),
-            );
-            heap.set_value_def(todo_obj, ScriptValue::from_id(id!(tag)), tag_sv.into());
-
-            // Append to array
-            heap.array_push(todos_arr, todo_obj.into(), NoTrap);
-
-            // Update count
-            heap.set_value_def(
-                app_obj,
-                ScriptValue::from_id(id!(count)),
-                ScriptValue::from_f64((count + 1) as f64),
-            );
-
-            // Bump version so persist logic picks it up (even though Rust added this todo)
-            let ver_val = heap.value(app_obj, ScriptValue::from_id(id!(version)), NoTrap);
-            let ver = ver_val.as_f64().unwrap_or(0.0) as i64;
-            heap.set_value_def(
-                app_obj,
-                ScriptValue::from_id(id!(version)),
-                ScriptValue::from_f64((ver + 1) as f64),
-            );
-        });
     }
 }
 
@@ -1913,8 +1808,7 @@ impl Widget for LauncherPanel {
                         ) = if let Some(entry) = self.all_items.get(source_idx) {
                             let is_builtin = matches!(
                                 entry.launch,
-                                LaunchTarget::OpenTodo
-                                    | LaunchTarget::OpenChat
+                                LaunchTarget::OpenChat
                                     | LaunchTarget::OpenSplashApp(_)
                             );
                             (
