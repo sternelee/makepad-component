@@ -611,8 +611,7 @@ script_mod! {
 
             chat_list := mod.widgets.ChatList{}
 
-            chat_action_bar := View{
-                visible: false
+            View{
                 width: Fill
                 height: Fit
                 flow: Right
@@ -638,13 +637,50 @@ script_mod! {
                         color: #x7fb9ff
                     }
                 }
+                chat_keys_label := Label{
+                    text: "Enter Send  |  Esc Back"
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 10}
+                        color: #x8f9caf
+                    }
+                }
+            }
+
+            chat_action_bar := View{
+                visible: false
+                width: Fill
+                height: Fit
+                flow: Right
+                align: VCenter
+                spacing: 8
+                padding: Inset{left: 10 right: 10 top: 4 bottom: 6}
+                show_bg: true
+                new_batch: true
+                draw_bg +: {
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 7.0)
+                        sdf.fill(#x131a24)
+                        sdf.stroke(#x1d4ed8 1.0)
+                        return sdf.result
+                    }
+                }
+                Label{
+                    text: "App ready:"
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 10}
+                        color: #x60a5fa
+                    }
+                }
                 save_app_wrap := View{
                     visible: false
                     width: Fit
                     height: Fit
                     save_app_btn := Button{
                         text: "Save as App"
-                        padding: Inset{left: 10 right: 10 top: 6 bottom: 6}
+                        padding: Inset{left: 10 right: 10 top: 5 bottom: 5}
+                        draw_bg +: { color: #x1d4ed8 radius: 5.0 }
+                        draw_text +: { color: #xffffff }
                     }
                 }
                 open_app_wrap := View{
@@ -653,14 +689,9 @@ script_mod! {
                     height: Fit
                     open_app_btn := Button{
                         text: "Open App"
-                        padding: Inset{left: 10 right: 10 top: 6 bottom: 6}
-                    }
-                }
-                chat_keys_label := Label{
-                    text: "Enter Send  |  Esc Back"
-                    draw_text +: {
-                        text_style: theme.font_regular {font_size: 10}
-                        color: #x8f9caf
+                        padding: Inset{left: 10 right: 10 top: 5 bottom: 5}
+                        draw_bg +: { color: #x22c55e radius: 5.0 }
+                        draw_text +: { color: #xffffff }
                     }
                 }
             }
