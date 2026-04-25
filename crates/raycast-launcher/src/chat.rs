@@ -199,23 +199,11 @@ impl LauncherPanel {
         );
 
         // Toggle save-app button based on last assistant message having runsplash
-        let last_runsplash = self
+        let last_has_runsplash = self
             .chat_messages
             .last()
-            .filter(|m| m.role == ChatRole::Assistant)
-            .and_then(|m| extract_runsplash(&m.text));
-        let last_has_runsplash = last_runsplash.is_some();
-
-        // Update splash preview panel
-        self.view
-            .widget(cx, ids!(splash_preview))
-            .set_visible(cx, last_has_runsplash);
-        if let Some(ref code) = last_runsplash {
-            self.view
-                .widget(cx, ids!(splash_preview_view))
-                .set_text(cx, code);
-        }
-
+            .map(|m| m.role == ChatRole::Assistant && extract_runsplash(&m.text).is_some())
+            .unwrap_or(false);
         self.view
             .widget(cx, ids!(save_app_wrap))
             .set_visible(cx, last_has_runsplash);
@@ -473,9 +461,7 @@ impl LauncherPanel {
             return;
         }
 
-        if self.view.button(cx, ids!(save_app_btn)).clicked(actions)
-            || self.view.button(cx, ids!(save_splash_btn)).clicked(actions)
-        {
+        if self.view.button(cx, ids!(save_app_btn)).clicked(actions) {
             self.save_chat_app(cx);
             return;
         }
