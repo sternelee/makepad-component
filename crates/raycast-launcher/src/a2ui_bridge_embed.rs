@@ -82,6 +82,13 @@ OTHER IRONCLAD RULES
 2. new_batch: true on every show_bg View that contains Labels
 3. ALL hex colors use #x prefix: #x1e293b, #x3b82f6
 4. Floats need trailing dot: 8.0 not 8
+5. NEVER write placeholder code — every function must be fully implemented
+   ❌ fn calculate() { display = "Error" // TODO }
+   ✅ Implement real logic or omit the feature
+6. CALCULATOR PATTERN — store numbers in state, pass numeric literals to handlers:
+   ❌ fn press_num(d) { current = current + d }  ← d is string, breaks arithmetic
+   ✅ Button{ text: "7" on_click: ||{ press_num(7) } }  ← 7 is a number literal
+   Track val/first/op in state as NUMBERS; display as string with "" + val
 5. Parse JSON ONCE: let data = res.body.parse_json()  then use data.xxx
 6. Functions defined before widget declarations
 7. Generate COMPLETE apps: stat cards, loading/error states, all data fields
