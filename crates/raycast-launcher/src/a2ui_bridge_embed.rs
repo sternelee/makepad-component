@@ -22,8 +22,10 @@ struct LlmMessage {
 const UI_GEN_KEYWORDS: &[&str] = &[
     "create", "make", "build", "generate", "design", "app", "ui", "widget", "timer", "clock",
     "calculator", "weather", "todo", "dashboard", "player", "tracker", "viewer", "monitor",
+    "file", "editor", "terminal", "shell", "process", "system", "tool", "launcher", "browser",
     "界面", "应用", "创建", "生成", "设计", "组件", "页面", "布局",
     "天气", "计时", "计算", "仪表", "追踪", "查询", "显示",
+    "文件", "编辑器", "终端", "进程", "系统", "工具",
 ];
 
 /// Detect if a user message is requesting UI generation.
@@ -89,9 +91,21 @@ OTHER IRONCLAD RULES
    ❌ fn press_num(d) { current = current + d }  ← d is string, breaks arithmetic
    ✅ Button{ text: "7" on_click: ||{ press_num(7) } }  ← 7 is a number literal
    Track val/first/op in state as NUMBERS; display as string with "" + val
-5. Parse JSON ONCE: let data = res.body.parse_json()  then use data.xxx
-6. Functions defined before widget declarations
-7. Generate COMPLETE apps: stat cards, loading/error states, all data fields
+7. Parse JSON ONCE: let data = res.body.parse_json()  then use data.xxx
+8. Functions defined before widget declarations
+9. Generate COMPLETE apps: stat cards, loading/error states, all data fields
+10. When using file I/O or child processes, ALWAYS handle errors gracefully
+    by storing error messages in mod.state.app.status and bumping version.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+AVAILABLE NATIVE MODULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• mod.net     — HTTP requests, WebSocket, TCP socket_stream, HTTP server
+• mod.run     — Child process spawning (ls, curl, grep, any shell command)
+• mod.fs      — File read/write (read_to_string, write_string)
+• std         — regex, random, timers, task/promise channels, log/print
+• cx          — cx.os_type(), cx.quit()
+• math        — sin, cos, sqrt, pow, floor, ceil, abs, min, max, clamp, PI
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RESPONSE FORMAT
@@ -324,14 +338,28 @@ on_response: |res|{
 Label{ text: "" + mod.state.app.result }
 ```
 
-### Layout
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### Layout & Containers
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 height: Fill   flow: Down|Right|Overlay   spacing: 12
 padding: Inset{left: 16 right: 16 top: 12 bottom: 12}
 align: VCenter|Center|TopLeft
+
+// Scrollable area
+ScrollXY{
+    width: Fill height: Fill
+    scroll_bars: ""   // or "xy", "x", "y"
+    View{ flow: Down spacing: 8 ... }
+}
+
+// Horizontal divider line
+Rect{ height: 1.0 draw_bg: { color: #x334155 } }
 ```
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ### Text
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 Label{ text: "" + mod.state.app.value
     draw_text +: { text_style: theme.font_bold {font_size: 24} color: #xf1f5f9 } }
@@ -339,7 +367,9 @@ Label{ text: "LABEL"
     draw_text +: { text_style: theme.font_bold {font_size: 9} color: #x64748b } }
 ```
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ### Buttons
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 Button{
     text: "Action"
@@ -350,7 +380,9 @@ Button{
 }
 ```
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ### TextInput (always use on_change to capture value)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 TextInput{
     width: Fill height: Fit
@@ -360,7 +392,49 @@ TextInput{
 }
 ```
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### CheckBox
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+CheckBox{
+    text: "Enable feature"
+    bind: mod.state.app.enabled   // bool field
+}
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### Slider
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+Slider{
+    min: 0.0 max: 100.0 step: 1.0
+    bind: mod.state.app.volume
+}
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### DropDown
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+DropDown{
+    labels: ["Option A", "Option B", "Option C"]
+    bind: mod.state.app.selected_index   // numeric index
+}
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### Image
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+Image{
+    width: 120 height: 120
+    source: Image{ source: "https://example.com/image.png" }
+}
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ### Stat Card (show_bg + new_batch + read from state)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 View{
     width: Fill height: Fit flow: Down spacing: 4 align: Center
@@ -374,7 +448,98 @@ View{
 }
 ```
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### File I/O (mod.fs)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+// Read entire file as string
+let content = fs.read_to_string("./data.txt")
+mod.state.app.content = content
+mod.state.app.version = mod.state.app.version + 1
+
+// Write string to file
+fs.write_string("./output.txt", "Hello Splash")
+mod.state.app.status = "Saved"
+mod.state.app.version = mod.state.app.version + 1
+
+// Read raw bytes (returns array of u8)
+let bytes = fs.read("./image.png")
+
+// Write raw bytes
+fs.write("./image.png", bytes)
+```
+IMPORTANT: fs operations can fail. Wrap in try-like pattern by checking if
+mod.state.app fields stay empty/unexpected after read.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### Child Processes (mod.run) — shell commands, ls, curl, grep, etc.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+fn run_command() {
+    mod.state.app.status = "Running..."
+    mod.state.app.output = ""
+    mod.state.app.version = mod.state.app.version + 1
+
+    let cmd = run.ScriptChildCmd{
+        cmd: "ls"
+        args: ["-la"]
+        cwd: "."
+    }
+    run.child(cmd) do run.ScriptChildEvents{
+        on_stdout: |line|{
+            mod.state.app.output = mod.state.app.output + line
+            mod.state.app.version = mod.state.app.version + 1
+        }
+        on_stderr: |line|{
+            mod.state.app.output = mod.state.app.output + "ERR: " + line
+            mod.state.app.version = mod.state.app.version + 1
+        }
+        on_term: ||{
+            mod.state.app.status = "Done"
+            mod.state.app.version = mod.state.app.version + 1
+        }
+    }
+}
+
+// curl via child process (when net.http_request is insufficient)
+fn fetch_with_curl() {
+    let cmd = run.ScriptChildCmd{
+        cmd: "curl"
+        args: ["-s", "https://api.example.com/data"]
+    }
+    run.child(cmd) do run.ScriptChildEvents{
+        on_stdout: |line|{
+            let data = line.parse_json()
+            mod.state.app.result = data.value
+            mod.state.app.version = mod.state.app.version + 1
+        }
+        on_error: |err|{
+            mod.state.app.status = "curl failed"
+            mod.state.app.version = mod.state.app.version + 1
+        }
+    }
+}
+
+// grep / filter text
+fn grep_text() {
+    let cmd = run.ScriptChildCmd{
+        cmd: "grep"
+        args: ["pattern", "./file.txt"]
+    }
+    run.child(cmd) do run.ScriptChildEvents{
+        on_stdout: |line|{
+            mod.state.app.matches = mod.state.app.matches + line + "\n"
+            mod.state.app.version = mod.state.app.version + 1
+        }
+    }
+}
+```
+CRITICAL: run.child is ASYNC. Output arrives line-by-line via on_stdout/on_stderr.
+Store accumulating output in mod.state.app and bump version each line.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ### HTTP Request (state-driven, NOT ui.xxx.set_text)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 fn fetch_data() {
     let query = mod.state.app.query
@@ -400,7 +565,141 @@ fn fetch_data() {
 }
 ```
 
+Methods: net.HttpMethod.GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### WebSocket
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+fn connect_ws() {
+    net.web_socket("wss://echo.websocket.org/") do net.WebSocketEvents{
+        on_opened: ||{
+            mod.state.app.ws_status = "Connected"
+            mod.state.app.version = mod.state.app.version + 1
+        }
+        on_string: |msg|{
+            mod.state.app.last_msg = msg
+            mod.state.app.version = mod.state.app.version + 1
+        }
+        on_closed: ||{
+            mod.state.app.ws_status = "Disconnected"
+            mod.state.app.version = mod.state.app.version + 1
+        }
+        on_error: |err|{
+            mod.state.app.ws_status = "Error: " + err
+            mod.state.app.version = mod.state.app.version + 1
+        }
+    }
+}
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### TCP Socket Stream
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+fn open_socket() {
+    let opts = net.SocketStreamOptions{
+        host: "example.com"
+        port: "80"
+        use_tls: true
+        ignore_ssl_cert: false
+    }
+    let stream = net.socket_stream(opts)
+    stream.write_string("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+
+    // Read loop with next() / next_string()
+    let data = stream.next_string()
+    mod.state.app.socket_data = data
+    mod.state.app.version = mod.state.app.version + 1
+}
+```
+Properties: stream.closed (bool), stream.pending (number), stream.error (string), stream.host (string)
+Methods: stream.write(data), stream.write_string(str), stream.start_tls(host, ignore), stream.close(), stream.next(), stream.next_string()
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### Regex (std.regex)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+let re = std.regex("\\d+", "g")   // pattern, flags (g=global)
+if re.test("abc123") {
+    let match = re.exec("abc123")
+    // match.value = "123"
+    // match.index = 3
+    // match.captures = ["123"]
+}
+// Properties: re.source (string), re.global (bool)
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### Timers (std)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+// One-shot timer (delay in seconds)
+let timer = std.start_timeout(2.0, ||{
+    mod.state.app.status = "Timed out"
+    mod.state.app.version = mod.state.app.version + 1
+})
+
+// Repeating timer
+let interval = std.start_interval(1.0, ||{
+    mod.state.app.counter = mod.state.app.counter + 1
+    mod.state.app.version = mod.state.app.version + 1
+})
+
+// Stop timer
+std.stop_timer(timer)
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### Random (std)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+let r = std.random()        // 0.0 ~ 1.0
+let n = std.random_u32()    // 0 ~ 4294967295 as float
+std.random_seed()           // re-seed
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### Task / Promise Channels (std)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+// Task channel (multi-value)
+let t = std.task(10)   // max_depth 10
+std.task(my_fn)        // task with start function
+
+t.emit(value)          // send value (pauses if full)
+let v = t.next()       // receive value (pauses if empty)
+let v = t.last()       // receive last value, waits for end
+let q = t.queue        // access underlying queue array
+
+// Promise (single value)
+let p = std.promise()
+p.resolve(value)
+let v = p.await()
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### System (cx)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+let os = cx.os_type()   // "macos", "windows", "linux", etc.
+cx.quit()               // close the application
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### Math (math)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+math.sin(x)   math.cos(x)   math.tan(x)
+math.sqrt(x)  math.pow(x, y) math.log(x)   math.log2(x)
+math.floor(x) math.ceil(x)  math.round(x) math.abs(x)
+math.min(a,b) math.max(a,b) math.clamp(x, lo, hi)
+math.PI
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ### wttr.in Weather (free, no key)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 URL: https://wttr.in/{city}?format=j1
 
@@ -419,14 +718,20 @@ mod.state.app.cloud = cur.cloudcover + "%"
 mod.state.app.location = area.areaName[0].value + ", " + area.country[0].value
 ```
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ### Other Free APIs
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 Exchange: https://open.er-api.com/v6/latest/USD  → .rates.EUR, .rates.CNY
 IP info:  https://ipapi.co/json/  → .city, .country_name, .timezone
 Jokes:    https://official-joke-api.appspot.com/random_joke  → .setup, .punchline
+GitHub:   https://api.github.com/users/{username}  → .login, .public_repos, .followers
+Quotes:   https://api.quotable.io/random  → .content, .author
 ```
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ### Initial State JSON (provide with every app)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Always provide initial values for ALL state fields so widgets show defaults:
 ```json
 {"query":"","status":"Ready","result":"--","version":0}

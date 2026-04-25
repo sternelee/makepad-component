@@ -130,7 +130,6 @@ pub(crate) fn extract_runsplash(text: &str) -> Option<String> {
 
 /// Remove the runsplash code block from text for clean Markdown display.
 /// The Splash app is shown inline by the ChatList renderer instead.
-#[allow(dead_code)]
 pub(crate) fn strip_runsplash(text: &str) -> String {
     let prefix = "```runsplash";
     let Some(start) = text.find(prefix) else {

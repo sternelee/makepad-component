@@ -27,9 +27,13 @@ impl Widget for ChatList {
                             ChatRole::Assistant => id!(Assistant),
                         };
                         let item_widget = list.item(cx, item_id, template);
-                        // Render full message text as Markdown (runsplash shown as code block)
+                        let display_text = if msg.role == ChatRole::Assistant {
+                            crate::chat::strip_runsplash(&msg.text)
+                        } else {
+                            msg.text.clone()
+                        };
                         let mut md = item_widget.markdown(cx, ids!(selectable));
-                        md.set_text(cx, &msg.text);
+                        md.set_text(cx, &display_text);
                         item_widget.draw_all_unscoped(cx);
                     }
                 }
