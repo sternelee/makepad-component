@@ -704,20 +704,6 @@ script_mod! {
                 }
             }
 
-            chat_output_scroll := ScrollYView{
-                width: Fill
-                height: Fill
-                show_bg: true
-                draw_bg +: {
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
-                        sdf.fill(#x1b2028)
-                        sdf.stroke(#x303745 1.0)
-                        return sdf.result
-                    }
-                }
-            }
         }
     }
 
