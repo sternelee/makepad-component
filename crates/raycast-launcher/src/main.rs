@@ -33,9 +33,8 @@ script_mod! {
                 height: Fit
                 margin: Inset{top: 4 bottom: 4 left: 50 right: 8}
                 padding: Inset{left: 12 top: 8 right: 12 bottom: 8}
-                flow: Down
+                flow: Overlay
                 show_bg: true
-                new_batch: true
                 draw_bg +: {
                     color: #x3a5a8a
                     radius: 8.0
@@ -53,10 +52,9 @@ script_mod! {
                 width: Fill
                 height: Fit
                 margin: Inset{top: 4 bottom: 4 left: 8 right: 50}
-                flow: Down
-                spacing: 0
+                padding: Inset{left: 12 top: 8 right: 12 bottom: 8}
+                flow: Overlay
                 show_bg: true
-                new_batch: true
                 draw_bg +: {
                     color: #x2a2a3a
                     radius: 8.0
@@ -67,55 +65,44 @@ script_mod! {
                     height: Fit
                     selectable: true
                     body: ""
-                    padding: Inset{left: 12 top: 8 right: 12 bottom: 8}
-                }
 
-                splash_block := View{
-                    visible: false
-                    width: Fill
-                    height: Fit
-                    flow: Down
-                    spacing: 0
-
-                    View{
-                        width: Fill
-                        height: 1
-                        show_bg: true
-                        draw_bg +: { color: #x3a3a4a }
-                    }
-
-                    splash_view := Splash{
+                    splash_block := View{
+                        visible: false
                         width: Fill
                         height: Fit
-                    }
+                        flow: Down
+                        spacing: 6
+                        padding: Inset{top: 8}
 
-                    View{
-                        width: Fill
-                        height: Fit
-                        flow: Right
-                        align: VCenter
-                        spacing: 8
-                        padding: Inset{left: 12 right: 12 top: 6 bottom: 6}
-                        show_bg: true
-                        new_batch: true
-                        draw_bg +: { color: #x1e2330 }
-
-                        Label{
+                        splash_view := Splash{
                             width: Fill
-                            text: "Splash App Preview"
-                            draw_text +: {
-                                text_style: theme.font_regular {font_size: 9}
-                                color: #x64748b
-                            }
+                            height: Fit
                         }
 
-                        save_splash_btn := Button{
-                            text: "Save as App"
-                            padding: Inset{left: 12 right: 12 top: 5 bottom: 5}
-                            draw_bg +: { color: #x1d4ed8 radius: 5.0 }
-                            draw_text +: {
-                                text_style: theme.font_bold {font_size: 10}
-                                color: #xffffff
+                        View{
+                            width: Fill
+                            height: Fit
+                            flow: Right
+                            spacing: 8
+                            padding: Inset{top: 4 bottom: 2}
+
+                            Label{
+                                width: Fill
+                                text: "Splash App Preview"
+                                draw_text +: {
+                                    text_style: theme.font_regular {font_size: 9}
+                                    color: #x64748b
+                                }
+                            }
+
+                            save_splash_btn := Button{
+                                text: "Save as App"
+                                padding: Inset{left: 12 right: 12 top: 5 bottom: 5}
+                                draw_bg +: { color: #x1d4ed8 radius: 5.0 }
+                                draw_text +: {
+                                    text_style: theme.font_bold {font_size: 10}
+                                    color: #xffffff
+                                }
                             }
                         }
                     }
