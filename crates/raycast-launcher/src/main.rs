@@ -619,6 +619,7 @@ script_mod! {
                 spacing: 8
                 padding: Inset{left: 10 right: 10 top: 6 bottom: 6}
                 show_bg: true
+                new_batch: true
                 draw_bg +: {
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
