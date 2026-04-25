@@ -88,7 +88,26 @@ pub(crate) fn extract_app_name(text: &str) -> Option<String> {
     None
 }
 
-/// Extract runsplash code block from markdown text.
+/// Extract the initial state JSON block from the AI response.
+/// Looks for a ```json block after "Initial State:" marker.
+pub(crate) fn extract_initial_state(text: &str) -> serde_json::Value {
+    // Look for **Initial State:** marker followed by a ```json block
+    let marker = "Initial State:";
+    let start = text.find(marker).unwrap_or(text.len());
+    let after = &text[start..];
+    let json_fence = "```json";
+    if let Some(fence_start) = after.find(json_fence) {
+        let content_start = fence_start + json_fence.len();
+        if let Some(fence_end) = after[content_start..].find("```") {
+            let json_str = after[content_start..content_start + fence_end].trim();
+            if let Ok(val) = serde_json::from_str(json_str) {
+                return val;
+            }
+        }
+    }
+    serde_json::json!({})
+}
+
 pub(crate) fn extract_runsplash(text: &str) -> Option<String> {
     let prefix = "```runsplash";
     let suffix = "```";
@@ -259,7 +278,7 @@ impl LauncherPanel {
                 version: "1.0".to_string(),
             },
             splash_code,
-            state: serde_json::json!({}),
+            state: extract_initial_state(&last_msg.text),
         };
 
         let path = format!("app-{}.json", safe_name);
