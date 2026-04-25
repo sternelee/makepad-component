@@ -1,7 +1,7 @@
 use makepad_widgets::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{a2ui_bridge_embed, app_loader, LauncherPanel};
+use crate::{a2ui_bridge_embed, app_loader, chat_list::ChatListAction, LauncherPanel};
 
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum ChatRole {
@@ -473,6 +473,24 @@ impl LauncherPanel {
             return;
         }
 
+        // Per-message "Save as App" buttons dispatched by ChatList
+        for action in actions.iter() {
+            if let ChatListAction::SaveSplashApp(item_id) = action.as_widget_action().cast() {
+                let data = CHAT_DATA.read().unwrap();
+                if let Some(msg) = data.messages.get(item_id) {
+                    let code = extract_runsplash(&msg.text);
+                    let name = extract_app_name(&msg.text);
+                    let state = extract_initial_state(&msg.text);
+                    drop(data);
+                    if let Some(code) = code {
+                        let name = name.as_deref().unwrap_or("generated-app");
+                        self.save_splash_app_from_code(cx, name, &code, state);
+                    }
+                }
+                return;
+            }
+        }
+
         if let Some((_, _)) = self.view.text_input(cx, ids!(mode_input)).returned(actions) {
             self.send_chat_from_input(cx);
             return;
@@ -483,6 +501,58 @@ impl LauncherPanel {
                 self.set_chat_mode(cx, false);
                 self.redraw(cx);
             }
+        }
+    }
+
+    /// Save a Splash app from raw code + name + initial state (used by per-message Save buttons).
+    fn save_splash_app_from_code(
+        &mut self,
+        cx: &mut Cx,
+        name: &str,
+        splash_code: &str,
+        state: serde_json::Value,
+    ) {
+        let safe_name: String = name
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '-'
+                }
+            })
+            .collect();
+
+        let descriptor = app_loader::AppDescriptor {
+            app: app_loader::AppInfo {
+                name: name.to_string(),
+                version: "1.0".to_string(),
+            },
+            splash_code: splash_code.to_string(),
+            state,
+        };
+
+        let path = format!("app-{}.json", safe_name);
+        match serde_json::to_string_pretty(&descriptor) {
+            Ok(json) => {
+                if let Err(e) = std::fs::write(&path, json) {
+                    log!("Failed to save app '{}': {}", path, e);
+                    self.view
+                        .label(cx, ids!(chat_status_label))
+                        .set_text(cx, &format!("Save failed: {}", e));
+                } else {
+                    log!("Saved app descriptor to {}", path);
+                    self.all_items = crate::load_launcher_items();
+                    self.rebuild_filter();
+                    self.last_saved_app_path = Some(path.clone());
+                    self.view
+                        .label(cx, ids!(chat_status_label))
+                        .set_text(cx, &format!("Saved '{}' — search in launcher to open", name));
+                    self.sync_chat_ui(cx);
+                    self.redraw(cx);
+                }
+            }
+            Err(e) => log!("Failed to serialize app: {}", e),
         }
     }
 }

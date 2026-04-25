@@ -2,6 +2,14 @@ use makepad_widgets::*;
 
 use crate::chat::{extract_runsplash, strip_runsplash, ChatRole, CHAT_DATA};
 
+/// Action dispatched when the user clicks "Save as App" on an inline Splash preview.
+#[derive(Clone, Debug, Default)]
+pub enum ChatListAction {
+    #[default]
+    None,
+    SaveSplashApp(usize), // message index in CHAT_DATA
+}
+
 #[derive(Script, ScriptHook, Widget)]
 pub struct ChatList {
     #[deref]
@@ -30,27 +38,27 @@ impl Widget for ChatList {
 
                         if msg.role == ChatRole::Assistant {
                             if let Some(splash_code) = extract_runsplash(&msg.text) {
-                                // Render the Splash app inline below the text
+                                // Show Splash preview block
                                 item_widget
                                     .view(cx, ids!(splash_block))
                                     .set_visible(cx, true);
                                 item_widget
                                     .widget(cx, ids!(splash_view))
                                     .set_text(cx, &splash_code);
-                                // Show the explanatory text without the code block
+                                // Show explanatory text without the raw code block
                                 let display_text = strip_runsplash(&msg.text);
-                                let mut markdown = item_widget.markdown(cx, ids!(selectable));
-                                markdown.set_text(cx, &display_text);
+                                let mut md = item_widget.markdown(cx, ids!(selectable));
+                                md.set_text(cx, &display_text);
                             } else {
                                 item_widget
                                     .view(cx, ids!(splash_block))
                                     .set_visible(cx, false);
-                                let mut markdown = item_widget.markdown(cx, ids!(selectable));
-                                markdown.set_text(cx, &msg.text);
+                                let mut md = item_widget.markdown(cx, ids!(selectable));
+                                md.set_text(cx, &msg.text);
                             }
                         } else {
-                            let mut markdown = item_widget.markdown(cx, ids!(selectable));
-                            markdown.set_text(cx, &msg.text);
+                            let mut md = item_widget.markdown(cx, ids!(selectable));
+                            md.set_text(cx, &msg.text);
                         }
 
                         item_widget.draw_all_unscoped(cx);
@@ -62,6 +70,19 @@ impl Widget for ChatList {
     }
 
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        self.view.handle_event(cx, event, scope);
+        let actions = cx.capture_actions(|cx| {
+            self.view.handle_event(cx, event, scope);
+        });
+
+        // Detect "Save as App" button clicks inside each PortalList item
+        let list = self.view.portal_list(cx, ids!(list));
+        for (item_id, item) in list.items_with_actions(&actions) {
+            if item.button(cx, ids!(save_splash_btn)).clicked(&actions) {
+                cx.widget_action(
+                    self.widget_uid(),
+                    ChatListAction::SaveSplashApp(item_id),
+                );
+            }
+        }
     }
 }
