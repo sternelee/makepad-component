@@ -1,23 +1,23 @@
 //! A2uiSurface widget definition and core implementation
 
-use makepad_widgets::*;
 use makepad_plot::*;
+use makepad_widgets::*;
 
 use crate::a2ui::{
     chart_bridge,
     data_model::DataModel,
     message::*,
     processor::{
-        resolve_boolean_value_scoped, resolve_number_value_scoped,
-        resolve_string_value_scoped, A2uiMessageProcessor, ProcessorEvent,
+        resolve_boolean_value_scoped, resolve_number_value_scoped, resolve_string_value_scoped,
+        A2uiMessageProcessor, ProcessorEvent,
     },
 };
 use crate::widgets::{
     button::MpButton,
     calendar::MpCalendar,
     checkbox::{MpCheckbox, MpCheckboxAction},
-    slider::{MpSlider, MpSliderAction},
     label::MpLabel,
+    slider::{MpSlider, MpSliderAction},
 };
 
 use super::draw_types::*;
@@ -394,34 +394,62 @@ pub struct A2uiSurface {
     draw_divider: DrawColor,
 
     // makepad-plot chart widget instances
-    #[live] plot_line: LinePlot,
-    #[live] plot_bar: BarPlot,
-    #[live] plot_scatter: ScatterPlot,
-    #[live] plot_pie: PieChart,
-    #[live] plot_area: AreaChart,
-    #[live] plot_radar: RadarChart,
-    #[live] plot_gauge: GaugeChart,
-    #[live] plot_bubble: BubbleChart,
-    #[live] plot_candlestick: CandlestickChart,
-    #[live] plot_heatmap: HeatmapChart,
-    #[live] plot_treemap: Treemap,
-    #[live] plot_sankey: SankeyDiagram,
-    #[live] plot_histogram: HistogramChart,
-    #[live] plot_boxplot: BoxPlotChart,
-    #[live] plot_donut: DonutChart,
-    #[live] plot_stem: StemPlot,
-    #[live] plot_violin: ViolinPlot,
-    #[live] plot_polar: PolarPlot,
-    #[live] plot_contour: ContourPlot,
-    #[live] plot_waterfall: WaterfallChart,
-    #[live] plot_funnel: FunnelChart,
-    #[live] plot_step: StepPlot,
-    #[live] plot_stackplot: Stackplot,
-    #[live] plot_hexbin: HexbinChart,
-    #[live] plot_streamgraph: Streamgraph,
-    #[live] plot_surface3d: Surface3D,
-    #[live] plot_scatter3d: Scatter3D,
-    #[live] plot_line3d: Line3D,
+    #[live]
+    plot_line: LinePlot,
+    #[live]
+    plot_bar: BarPlot,
+    #[live]
+    plot_scatter: ScatterPlot,
+    #[live]
+    plot_pie: PieChart,
+    #[live]
+    plot_area: AreaChart,
+    #[live]
+    plot_radar: RadarChart,
+    #[live]
+    plot_gauge: GaugeChart,
+    #[live]
+    plot_bubble: BubbleChart,
+    #[live]
+    plot_candlestick: CandlestickChart,
+    #[live]
+    plot_heatmap: HeatmapChart,
+    #[live]
+    plot_treemap: Treemap,
+    #[live]
+    plot_sankey: SankeyDiagram,
+    #[live]
+    plot_histogram: HistogramChart,
+    #[live]
+    plot_boxplot: BoxPlotChart,
+    #[live]
+    plot_donut: DonutChart,
+    #[live]
+    plot_stem: StemPlot,
+    #[live]
+    plot_violin: ViolinPlot,
+    #[live]
+    plot_polar: PolarPlot,
+    #[live]
+    plot_contour: ContourPlot,
+    #[live]
+    plot_waterfall: WaterfallChart,
+    #[live]
+    plot_funnel: FunnelChart,
+    #[live]
+    plot_step: StepPlot,
+    #[live]
+    plot_stackplot: Stackplot,
+    #[live]
+    plot_hexbin: HexbinChart,
+    #[live]
+    plot_streamgraph: Streamgraph,
+    #[live]
+    plot_surface3d: Surface3D,
+    #[live]
+    plot_scatter3d: Scatter3D,
+    #[live]
+    plot_line3d: Line3D,
 
     /// Draw Aurora shader stage effect
     #[redraw]
@@ -470,18 +498,22 @@ pub struct A2uiSurface {
     // ============================================================================
     // Widget pool templates (used to clone new pool instances)
     // ============================================================================
-
-    #[live] tpl_button: Option<LivePtr>,
-    #[live] tpl_checkbox: Option<LivePtr>,
-    #[live] tpl_slider: Option<LivePtr>,
-    #[live] tpl_label: Option<LivePtr>,
-    #[live] tpl_text_input: Option<LivePtr>,
-    #[live] tpl_calendar: Option<LivePtr>,
+    #[live]
+    tpl_button: Option<LivePtr>,
+    #[live]
+    tpl_checkbox: Option<LivePtr>,
+    #[live]
+    tpl_slider: Option<LivePtr>,
+    #[live]
+    tpl_label: Option<LivePtr>,
+    #[live]
+    tpl_text_input: Option<LivePtr>,
+    #[live]
+    tpl_calendar: Option<LivePtr>,
 
     // ============================================================================
     // Widget pools
     // ============================================================================
-
     /// Pool of MpButton instances
     #[rust]
     mp_buttons: Vec<MpButton>,
@@ -505,7 +537,6 @@ pub struct A2uiSurface {
     // ============================================================================
     // Pool metadata (maps pool index to A2UI component info)
     // ============================================================================
-
     /// Button metadata: (component_id, action_def, scope)
     #[rust]
     button_meta: Vec<(String, Option<ActionDefinition>, Option<String>)>,
@@ -533,7 +564,6 @@ pub struct A2uiSurface {
     // ============================================================================
     // Image sources (preloaded)
     // ============================================================================
-
     #[live]
     img_headphones: LiveDependency,
     #[live]
@@ -579,7 +609,6 @@ pub struct A2uiSurface {
     // ============================================================================
     // Calendar widget (lazy-initialized)
     // ============================================================================
-
     #[rust]
     mp_calendar: Option<MpCalendar>,
 
@@ -642,38 +671,59 @@ impl A2uiSurface {
     /// Apply theme colors to all A2UI components
     pub fn set_theme_colors(&mut self, cx: &mut Cx, colors: &A2uiThemeColors) {
         // Apply surface background
-        self.draw_bg.apply_over(cx, live! {
-            bg_color: (colors.bg_surface)
-        });
+        self.draw_bg.apply_over(
+            cx,
+            live! {
+                bg_color: (colors.bg_surface)
+            },
+        );
 
         // Apply card colors
-        self.draw_card.apply_over(cx, live! {
-            color: (colors.bg_card)
-            border_color: (colors.border_color)
-        });
+        self.draw_card.apply_over(
+            cx,
+            live! {
+                color: (colors.bg_card)
+                border_color: (colors.border_color)
+            },
+        );
 
         // Apply divider color
-        self.draw_divider.apply_over(cx, live! {
-            color: (colors.border_color)
-        });
+        self.draw_divider.apply_over(
+            cx,
+            live! {
+                color: (colors.border_color)
+            },
+        );
 
         // Apply image placeholder text
-        self.draw_image_text.apply_over(cx, live! {
-            color: (colors.text_secondary)
-        });
+        self.draw_image_text.apply_over(
+            cx,
+            live! {
+                color: (colors.text_secondary)
+            },
+        );
 
         // Apply button color for audio player
-        self.draw_button.apply_over(cx, live! {
-            color: (colors.accent)
-        });
+        self.draw_button.apply_over(
+            cx,
+            live! {
+                color: (colors.accent)
+            },
+        );
 
-        self.draw_button_text.apply_over(cx, live! {
-            color: (vec4(1.0, 1.0, 1.0, 1.0))
-        });
+        self.draw_button_text.apply_over(
+            cx,
+            live! {
+                color: (vec4(1.0, 1.0, 1.0, 1.0))
+            },
+        );
 
-        self.draw_card_text.apply_over(cx, live! {
-            color: (colors.text_primary)
-        });
+        self.draw_card_text.apply_over(
+            cx,
+            live! {
+                color: (colors.text_primary)
+            },
+        );
     }
 
     /// Load image textures from LiveDependency resources
@@ -942,8 +992,11 @@ impl A2uiSurfaceRef {
     pub fn play_audio(&self, actions: &Actions) -> Option<(String, String, String)> {
         if let Some(inner) = self.borrow() {
             if let Some(action) = actions.find_widget_action(inner.widget_uid()) {
-                if let A2uiSurfaceAction::PlayAudio { component_id, url, title } =
-                    action.cast::<A2uiSurfaceAction>()
+                if let A2uiSurfaceAction::PlayAudio {
+                    component_id,
+                    url,
+                    title,
+                } = action.cast::<A2uiSurfaceAction>()
                 {
                     return Some((component_id, url, title));
                 }

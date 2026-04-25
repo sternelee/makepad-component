@@ -1,7 +1,7 @@
-use makepad_widgets::*;
+use super::*;
 use crate::elements::*;
 use crate::text::*;
-use super::*;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -247,7 +247,8 @@ impl StemPlot {
             self.draw_line.color = self.theme.grid_color;
             let p1 = self.data_to_pixel(self.x_range.0, self.baseline);
             let p2 = self.data_to_pixel(self.x_range.1, self.baseline);
-            self.draw_line.draw_line_styled(cx, p1, p2, 1.0, LineStyle::Dashed, 0.0);
+            self.draw_line
+                .draw_line_styled(cx, p1, p2, 1.0, LineStyle::Dashed, 0.0);
         }
     }
 
@@ -272,10 +273,18 @@ impl StemPlot {
                 // Draw stem (vertical line from baseline to point)
                 let p_base = self.data_to_pixel(x, self.baseline);
                 let p_top = self.data_to_pixel(x, y);
-                self.draw_line.draw_line_styled(cx, p_base, p_top, stem_width, series.line_style, 0.0);
+                self.draw_line.draw_line_styled(
+                    cx,
+                    p_base,
+                    p_top,
+                    stem_width,
+                    series.line_style,
+                    0.0,
+                );
 
                 // Draw marker at top
-                self.draw_point.draw_marker(cx, p_top, marker_size, marker_style);
+                self.draw_point
+                    .draw_marker(cx, p_top, marker_size, marker_style);
             }
         }
     }
@@ -289,7 +298,8 @@ impl StemPlot {
             let x = self.x_range.0 + i as f64 * x_step;
             let p = self.data_to_pixel(x, self.y_range.0);
             let label = format!("{:.1}", x);
-            self.label.draw_at(cx, dvec2(p.x, p.y + 5.0), &label, TextAnchor::TopCenter);
+            self.label
+                .draw_at(cx, dvec2(p.x, p.y + 5.0), &label, TextAnchor::TopCenter);
         }
 
         // Y axis tick labels
@@ -298,13 +308,19 @@ impl StemPlot {
             let y = self.y_range.0 + i as f64 * y_step;
             let p = self.data_to_pixel(self.x_range.0, y);
             let label = format!("{:.1}", y);
-            self.label.draw_at(cx, dvec2(p.x - 5.0, p.y), &label, TextAnchor::MiddleRight);
+            self.label
+                .draw_at(cx, dvec2(p.x - 5.0, p.y), &label, TextAnchor::MiddleRight);
         }
 
         // Title
         if !self.title.is_empty() {
             let center_x = (self.plot_area.left + self.plot_area.right) / 2.0;
-            self.label.draw_at(cx, dvec2(center_x, self.plot_area.top - 10.0), &self.title, TextAnchor::BottomCenter);
+            self.label.draw_at(
+                cx,
+                dvec2(center_x, self.plot_area.top - 10.0),
+                &self.title,
+                TextAnchor::BottomCenter,
+            );
         }
     }
 
@@ -317,8 +333,12 @@ impl StemPlot {
         let (legend_x, legend_y) = match self.legend_position {
             LegendPosition::TopRight => (self.plot_area.right - 100.0, self.plot_area.top + 10.0),
             LegendPosition::TopLeft => (self.plot_area.left + 10.0, self.plot_area.top + 10.0),
-            LegendPosition::BottomRight => (self.plot_area.right - 100.0, self.plot_area.bottom - 50.0),
-            LegendPosition::BottomLeft => (self.plot_area.left + 10.0, self.plot_area.bottom - 50.0),
+            LegendPosition::BottomRight => {
+                (self.plot_area.right - 100.0, self.plot_area.bottom - 50.0)
+            }
+            LegendPosition::BottomLeft => {
+                (self.plot_area.left + 10.0, self.plot_area.bottom - 50.0)
+            }
             LegendPosition::None => return,
         };
 
@@ -334,10 +354,20 @@ impl StemPlot {
 
             // Draw marker
             self.draw_point.color = color;
-            self.draw_point.draw_marker(cx, dvec2(legend_x + 8.0, y_offset), 4.0, MarkerStyle::Circle);
+            self.draw_point.draw_marker(
+                cx,
+                dvec2(legend_x + 8.0, y_offset),
+                4.0,
+                MarkerStyle::Circle,
+            );
 
             // Draw label
-            self.label.draw_at(cx, dvec2(legend_x + 20.0, y_offset), &series.label, TextAnchor::MiddleLeft);
+            self.label.draw_at(
+                cx,
+                dvec2(legend_x + 20.0, y_offset),
+                &series.label,
+                TextAnchor::MiddleLeft,
+            );
         }
     }
 }
@@ -398,7 +428,6 @@ impl StemPlotRef {
     }
 }
 
-
 #[derive(Clone, Debug)]
 pub struct ViolinItem {
     pub label: String,
@@ -408,7 +437,11 @@ pub struct ViolinItem {
 
 impl ViolinItem {
     pub fn new(label: impl Into<String>, values: Vec<f64>) -> Self {
-        Self { label: label.into(), values, color: None }
+        Self {
+            label: label.into(),
+            values,
+            color: None,
+        }
     }
 
     pub fn with_color(mut self, color: Vec4) -> Self {
@@ -419,22 +452,39 @@ impl ViolinItem {
 
 #[derive(Live, LiveHook, Widget)]
 pub struct ViolinPlot {
-    #[deref] #[live] view: View,
-    #[live] draw_fill: DrawPlotFill,
-    #[live] draw_line: DrawPlotLine,
-    #[live] draw_point: DrawPlotPoint,
-    #[live] label: PlotLabel,
-    #[live] theme: ChartTheme,
-    #[rust] title: String,
-    #[rust] items: Vec<ViolinItem>,
-    #[rust] show_box: bool,
-    #[rust] show_median: bool,
-    #[rust] bandwidth: f64,
-    #[rust] plot_area: PlotArea,
-    #[live(40.0)] left_margin: f64,
-    #[live(30.0)] right_margin: f64,
-    #[live(30.0)] top_margin: f64,
-    #[live(50.0)] bottom_margin: f64,
+    #[deref]
+    #[live]
+    view: View,
+    #[live]
+    draw_fill: DrawPlotFill,
+    #[live]
+    draw_line: DrawPlotLine,
+    #[live]
+    draw_point: DrawPlotPoint,
+    #[live]
+    label: PlotLabel,
+    #[live]
+    theme: ChartTheme,
+    #[rust]
+    title: String,
+    #[rust]
+    items: Vec<ViolinItem>,
+    #[rust]
+    show_box: bool,
+    #[rust]
+    show_median: bool,
+    #[rust]
+    bandwidth: f64,
+    #[rust]
+    plot_area: PlotArea,
+    #[live(40.0)]
+    left_margin: f64,
+    #[live(30.0)]
+    right_margin: f64,
+    #[live(30.0)]
+    top_margin: f64,
+    #[live(50.0)]
+    bottom_margin: f64,
 }
 
 impl Widget for ViolinPlot {
@@ -454,89 +504,181 @@ impl Widget for ViolinPlot {
 }
 
 impl ViolinPlot {
-    pub fn set_title(&mut self, title: impl Into<String>) { self.title = title.into(); }
-    pub fn add_item(&mut self, item: ViolinItem) { self.items.push(item); }
+    pub fn set_title(&mut self, title: impl Into<String>) {
+        self.title = title.into();
+    }
+    pub fn add_item(&mut self, item: ViolinItem) {
+        self.items.push(item);
+    }
     pub fn add_from_values(&mut self, label: impl Into<String>, values: &[f64]) {
         self.items.push(ViolinItem::new(label, values.to_vec()));
     }
-    pub fn set_show_box(&mut self, show: bool) { self.show_box = show; }
-    pub fn set_show_median(&mut self, show: bool) { self.show_median = show; }
-    pub fn clear(&mut self) { self.items.clear(); }
+    pub fn set_show_box(&mut self, show: bool) {
+        self.show_box = show;
+    }
+    pub fn set_show_median(&mut self, show: bool) {
+        self.show_median = show;
+    }
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
 
     fn update_plot_area(&mut self, rect: Rect) {
-        self.plot_area = PlotArea::new(rect.pos.x + self.left_margin, rect.pos.y + self.top_margin,
-            rect.pos.x + rect.size.x - self.right_margin, rect.pos.y + rect.size.y - self.bottom_margin);
+        self.plot_area = PlotArea::new(
+            rect.pos.x + self.left_margin,
+            rect.pos.y + self.top_margin,
+            rect.pos.x + rect.size.x - self.right_margin,
+            rect.pos.y + rect.size.y - self.bottom_margin,
+        );
     }
 
     fn get_value_range(&self) -> (f64, f64) {
-        let mut min = f64::MAX; let mut max = f64::MIN;
-        for item in &self.items { for &v in &item.values { min = min.min(v); max = max.max(v); } }
+        let mut min = f64::MAX;
+        let mut max = f64::MIN;
+        for item in &self.items {
+            for &v in &item.values {
+                min = min.min(v);
+                max = max.max(v);
+            }
+        }
         let padding = (max - min) * 0.1;
         (min - padding, max + padding)
     }
 
-    fn compute_kde(&self, values: &[f64], bw: f64, y_min: f64, y_max: f64, n: usize) -> Vec<(f64, f64)> {
+    fn compute_kde(
+        &self,
+        values: &[f64],
+        bw: f64,
+        y_min: f64,
+        y_max: f64,
+        n: usize,
+    ) -> Vec<(f64, f64)> {
         let step = (y_max - y_min) / (n - 1) as f64;
-        (0..n).map(|i| {
-            let y = y_min + i as f64 * step;
-            let density: f64 = values.iter().map(|&v| (-(y - v).powi(2) / (2.0 * bw * bw)).exp()).sum();
-            (y, density / (values.len() as f64 * bw * (2.0 * std::f64::consts::PI).sqrt()))
-        }).collect()
+        (0..n)
+            .map(|i| {
+                let y = y_min + i as f64 * step;
+                let density: f64 = values
+                    .iter()
+                    .map(|&v| (-(y - v).powi(2) / (2.0 * bw * bw)).exp())
+                    .sum();
+                (
+                    y,
+                    density / (values.len() as f64 * bw * (2.0 * std::f64::consts::PI).sqrt()),
+                )
+            })
+            .collect()
     }
 
     fn draw_violins(&mut self, cx: &mut Cx2d) {
         let n = self.items.len();
-        if n == 0 { return; }
+        if n == 0 {
+            return;
+        }
         let (y_min, y_max) = self.get_value_range();
         let band_w = self.plot_area.width() / n as f64;
-        let all: Vec<f64> = self.items.iter().flat_map(|i| i.values.iter().cloned()).collect();
+        let all: Vec<f64> = self
+            .items
+            .iter()
+            .flat_map(|i| i.values.iter().cloned())
+            .collect();
         let mean = all.iter().sum::<f64>() / all.len() as f64;
         let std = (all.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / all.len() as f64).sqrt();
-        let bw = if self.bandwidth > 0.0 { self.bandwidth } else { 1.06 * std * (all.len() as f64).powf(-0.2) };
+        let bw = if self.bandwidth > 0.0 {
+            self.bandwidth
+        } else {
+            1.06 * std * (all.len() as f64).powf(-0.2)
+        };
 
         self.draw_line.color = self.theme.axis_color;
-        self.draw_line.draw_line(cx, dvec2(self.plot_area.left, self.plot_area.bottom), dvec2(self.plot_area.right, self.plot_area.bottom), 1.0);
-        self.draw_line.draw_line(cx, dvec2(self.plot_area.left, self.plot_area.bottom), dvec2(self.plot_area.left, self.plot_area.top), 1.0);
+        self.draw_line.draw_line(
+            cx,
+            dvec2(self.plot_area.left, self.plot_area.bottom),
+            dvec2(self.plot_area.right, self.plot_area.bottom),
+            1.0,
+        );
+        self.draw_line.draw_line(
+            cx,
+            dvec2(self.plot_area.left, self.plot_area.bottom),
+            dvec2(self.plot_area.left, self.plot_area.top),
+            1.0,
+        );
 
         for (i, item) in self.items.iter().enumerate() {
-            if item.values.is_empty() { continue; }
+            if item.values.is_empty() {
+                continue;
+            }
             let x_c = self.plot_area.left + (i as f64 + 0.5) * band_w;
             let max_w = band_w * 0.4;
             let kde = self.compute_kde(&item.values, bw, y_min, y_max, 50);
             let max_d = kde.iter().map(|(_, d)| *d).fold(0.0f64, f64::max);
-            if max_d <= 0.0 { continue; }
+            if max_d <= 0.0 {
+                continue;
+            }
             let color = item.color.unwrap_or_else(|| get_color(i));
             self.draw_fill.color = vec4(color.x, color.y, color.z, 0.6);
 
             for j in 0..kde.len() - 1 {
-                let (y1, d1) = kde[j]; let (y2, d2) = kde[j + 1];
-                let py1 = self.plot_area.bottom - (y1 - y_min) / (y_max - y_min) * self.plot_area.height();
-                let py2 = self.plot_area.bottom - (y2 - y_min) / (y_max - y_min) * self.plot_area.height();
+                let (y1, d1) = kde[j];
+                let (y2, d2) = kde[j + 1];
+                let py1 = self.plot_area.bottom
+                    - (y1 - y_min) / (y_max - y_min) * self.plot_area.height();
+                let py2 = self.plot_area.bottom
+                    - (y2 - y_min) / (y_max - y_min) * self.plot_area.height();
                 let w = ((d1 + d2) / 2.0) / max_d * max_w;
-                self.draw_fill.draw_abs(cx, Rect { pos: dvec2(x_c - w, py2.min(py1)), size: dvec2(w * 2.0, (py1 - py2).abs()) });
+                self.draw_fill.draw_abs(
+                    cx,
+                    Rect {
+                        pos: dvec2(x_c - w, py2.min(py1)),
+                        size: dvec2(w * 2.0, (py1 - py2).abs()),
+                    },
+                );
             }
 
             self.draw_line.color = color;
             for j in 0..kde.len() - 1 {
-                let (y1, d1) = kde[j]; let (y2, d2) = kde[j + 1];
-                let py1 = self.plot_area.bottom - (y1 - y_min) / (y_max - y_min) * self.plot_area.height();
-                let py2 = self.plot_area.bottom - (y2 - y_min) / (y_max - y_min) * self.plot_area.height();
-                let w1 = d1 / max_d * max_w; let w2 = d2 / max_d * max_w;
-                self.draw_line.draw_line(cx, dvec2(x_c - w1, py1), dvec2(x_c - w2, py2), 1.5);
-                self.draw_line.draw_line(cx, dvec2(x_c + w1, py1), dvec2(x_c + w2, py2), 1.5);
+                let (y1, d1) = kde[j];
+                let (y2, d2) = kde[j + 1];
+                let py1 = self.plot_area.bottom
+                    - (y1 - y_min) / (y_max - y_min) * self.plot_area.height();
+                let py2 = self.plot_area.bottom
+                    - (y2 - y_min) / (y_max - y_min) * self.plot_area.height();
+                let w1 = d1 / max_d * max_w;
+                let w2 = d2 / max_d * max_w;
+                self.draw_line
+                    .draw_line(cx, dvec2(x_c - w1, py1), dvec2(x_c - w2, py2), 1.5);
+                self.draw_line
+                    .draw_line(cx, dvec2(x_c + w1, py1), dvec2(x_c + w2, py2), 1.5);
             }
 
             if self.show_box {
-                let mut s = item.values.clone(); s.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                let q1 = s[s.len() / 4]; let med = s[s.len() / 2]; let q3 = s[3 * s.len() / 4];
-                let py_q1 = self.plot_area.bottom - (q1 - y_min) / (y_max - y_min) * self.plot_area.height();
-                let py_m = self.plot_area.bottom - (med - y_min) / (y_max - y_min) * self.plot_area.height();
-                let py_q3 = self.plot_area.bottom - (q3 - y_min) / (y_max - y_min) * self.plot_area.height();
+                let mut s = item.values.clone();
+                s.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                let q1 = s[s.len() / 4];
+                let med = s[s.len() / 2];
+                let q3 = s[3 * s.len() / 4];
+                let py_q1 = self.plot_area.bottom
+                    - (q1 - y_min) / (y_max - y_min) * self.plot_area.height();
+                let py_m = self.plot_area.bottom
+                    - (med - y_min) / (y_max - y_min) * self.plot_area.height();
+                let py_q3 = self.plot_area.bottom
+                    - (q3 - y_min) / (y_max - y_min) * self.plot_area.height();
                 let bw = max_w * 0.15;
-                self.draw_fill.color = vec4(self.theme.label_color.x, self.theme.label_color.y, self.theme.label_color.z, 0.8);
-                self.draw_fill.draw_abs(cx, Rect { pos: dvec2(x_c - bw, py_q3), size: dvec2(bw * 2.0, py_q1 - py_q3) });
+                self.draw_fill.color = vec4(
+                    self.theme.label_color.x,
+                    self.theme.label_color.y,
+                    self.theme.label_color.z,
+                    0.8,
+                );
+                self.draw_fill.draw_abs(
+                    cx,
+                    Rect {
+                        pos: dvec2(x_c - bw, py_q3),
+                        size: dvec2(bw * 2.0, py_q1 - py_q3),
+                    },
+                );
                 self.draw_line.color = vec4(1.0, 1.0, 1.0, 1.0);
-                self.draw_line.draw_line(cx, dvec2(x_c - bw, py_m), dvec2(x_c + bw, py_m), 2.0);
+                self.draw_line
+                    .draw_line(cx, dvec2(x_c - bw, py_m), dvec2(x_c + bw, py_m), 2.0);
             }
         }
     }
@@ -544,22 +686,54 @@ impl ViolinPlot {
     fn draw_labels(&mut self, cx: &mut Cx2d) {
         self.label.set_color(self.theme.label_color);
         if !self.title.is_empty() {
-            self.label.draw_at(cx, dvec2((self.plot_area.left + self.plot_area.right) / 2.0, self.plot_area.top - 15.0), &self.title, TextAnchor::Center);
+            self.label.draw_at(
+                cx,
+                dvec2(
+                    (self.plot_area.left + self.plot_area.right) / 2.0,
+                    self.plot_area.top - 15.0,
+                ),
+                &self.title,
+                TextAnchor::Center,
+            );
         }
         let n = self.items.len();
         let band_w = self.plot_area.width() / n.max(1) as f64;
         for (i, item) in self.items.iter().enumerate() {
             let x = self.plot_area.left + (i as f64 + 0.5) * band_w;
-            self.label.draw_at(cx, dvec2(x, self.plot_area.bottom + 15.0), &item.label, TextAnchor::Center);
+            self.label.draw_at(
+                cx,
+                dvec2(x, self.plot_area.bottom + 15.0),
+                &item.label,
+                TextAnchor::Center,
+            );
         }
     }
 }
 
 impl ViolinPlotRef {
-    pub fn set_title(&self, title: impl Into<String>) { if let Some(mut inner) = self.borrow_mut() { inner.set_title(title); } }
-    pub fn add_from_values(&self, label: impl Into<String>, values: &[f64]) { if let Some(mut inner) = self.borrow_mut() { inner.add_from_values(label, values); } }
-    pub fn set_show_box(&self, show: bool) { if let Some(mut inner) = self.borrow_mut() { inner.set_show_box(show); } }
-    pub fn clear(&self) { if let Some(mut inner) = self.borrow_mut() { inner.clear(); } }
-    pub fn redraw(&self, cx: &mut Cx) { if let Some(mut inner) = self.borrow_mut() { inner.redraw(cx); } }
+    pub fn set_title(&self, title: impl Into<String>) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_title(title);
+        }
+    }
+    pub fn add_from_values(&self, label: impl Into<String>, values: &[f64]) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.add_from_values(label, values);
+        }
+    }
+    pub fn set_show_box(&self, show: bool) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_show_box(show);
+        }
+    }
+    pub fn clear(&self) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.clear();
+        }
+    }
+    pub fn redraw(&self, cx: &mut Cx) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.redraw(cx);
+        }
+    }
 }
-

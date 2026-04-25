@@ -1,20 +1,20 @@
-use makepad_widgets::*;
-use makepad_component::widgets::MpButtonWidgetRefExt;
-use makepad_component::widgets::MpButtonWidgetExt;
-use makepad_component::widgets::MpCheckboxWidgetRefExt;
-use makepad_component::widgets::MpSwitchWidgetRefExt;
-use makepad_component::widgets::MpRadioWidgetRefExt;
-use makepad_component::widgets::MpProgressWidgetRefExt;
-use makepad_component::widgets::MpSliderWidgetRefExt;
-use makepad_component::widgets::MpBadgeWidgetRefExt;
-use makepad_component::widgets::MpTabWidgetRefExt;
-use makepad_component::widgets::MpCardAction;
 use makepad_component::widgets::MpAvatarWidgetRefExt;
+use makepad_component::widgets::MpBadgeWidgetRefExt;
+use makepad_component::widgets::MpButtonWidgetExt;
+use makepad_component::widgets::MpButtonWidgetRefExt;
+use makepad_component::widgets::MpCardAction;
+use makepad_component::widgets::MpCheckboxWidgetRefExt;
 use makepad_component::widgets::MpModalAction;
 use makepad_component::widgets::MpModalWidgetWidgetRefExt;
 use makepad_component::widgets::MpNotificationWidgetWidgetRefExt;
-use makepad_component::widgets::MpSkeletonWidgetWidgetRefExt;
 use makepad_component::widgets::MpPopoverWidgetWidgetRefExt;
+use makepad_component::widgets::MpProgressWidgetRefExt;
+use makepad_component::widgets::MpRadioWidgetRefExt;
+use makepad_component::widgets::MpSkeletonWidgetWidgetRefExt;
+use makepad_component::widgets::MpSliderWidgetRefExt;
+use makepad_component::widgets::MpSwitchWidgetRefExt;
+use makepad_component::widgets::MpTabWidgetRefExt;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -4616,8 +4616,10 @@ app_main!(App);
 // ============================================================
 #[derive(Live, LiveHook, Widget)]
 pub struct ShaderCanvas {
-    #[deref] view: View,
-    #[animator] animator: Animator,
+    #[deref]
+    view: View,
+    #[animator]
+    animator: Animator,
 }
 
 impl Widget for ShaderCanvas {
@@ -4640,9 +4642,12 @@ impl Widget for ShaderCanvas {
 // ============================================================
 #[derive(Live, LiveHook, Widget)]
 pub struct ShaderArtCanvas {
-    #[deref] view: View,
-    #[animator] animator: Animator,
-    #[live] speed: f64,
+    #[deref]
+    view: View,
+    #[animator]
+    animator: Animator,
+    #[live]
+    speed: f64,
 }
 
 impl Widget for ShaderArtCanvas {
@@ -4655,24 +4660,29 @@ impl Widget for ShaderArtCanvas {
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         // Apply speed to shader
-        self.view.apply_over(cx, live!{
-            draw_bg: { speed: (self.speed) }
-        });
+        self.view.apply_over(
+            cx,
+            live! {
+                draw_bg: { speed: (self.speed) }
+            },
+        );
         // Start time animation
         self.animator_play(cx, ids!(anim.on));
         self.view.draw_walk(cx, scope, walk)
     }
 }
 
-
 // ============================================================
 // ShaderArt2Canvas - FBM noise art widget
 // ============================================================
 #[derive(Live, LiveHook, Widget)]
 pub struct ShaderArt2Canvas {
-    #[deref] view: View,
-    #[animator] animator: Animator,
-    #[live] speed: f64,
+    #[deref]
+    view: View,
+    #[animator]
+    animator: Animator,
+    #[live]
+    speed: f64,
 }
 
 impl Widget for ShaderArt2Canvas {
@@ -4684,9 +4694,12 @@ impl Widget for ShaderArt2Canvas {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
-        self.view.apply_over(cx, live!{
-            draw_bg: { speed: (self.speed) }
-        });
+        self.view.apply_over(
+            cx,
+            live! {
+                draw_bg: { speed: (self.speed) }
+            },
+        );
         self.animator_play(cx, ids!(anim.on));
         self.view.draw_walk(cx, scope, walk)
     }
@@ -4697,9 +4710,12 @@ impl Widget for ShaderArt2Canvas {
 // ============================================================
 #[derive(Live, LiveHook, Widget)]
 pub struct ShaderMathCanvas {
-    #[deref] view: View,
-    #[animator] animator: Animator,
-    #[live] speed: f64,
+    #[deref]
+    view: View,
+    #[animator]
+    animator: Animator,
+    #[live]
+    speed: f64,
 }
 
 impl Widget for ShaderMathCanvas {
@@ -4711,9 +4727,12 @@ impl Widget for ShaderMathCanvas {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
-        self.view.apply_over(cx, live!{
-            draw_bg: { speed: (self.speed) }
-        });
+        self.view.apply_over(
+            cx,
+            live! {
+                draw_bg: { speed: (self.speed) }
+            },
+        );
         self.animator_play(cx, ids!(anim.on));
         self.view.draw_walk(cx, scope, walk)
     }
@@ -4736,8 +4755,10 @@ pub enum GeneratedWidget {
 
 #[derive(Live, Widget)]
 pub struct SplashDemo {
-    #[deref] view: View,
-    #[rust] widgets: Vec<GeneratedWidget>,
+    #[deref]
+    view: View,
+    #[rust]
+    widgets: Vec<GeneratedWidget>,
 }
 
 impl LiveHook for SplashDemo {
@@ -4758,36 +4779,36 @@ impl SplashDemo {
             // Button: "add button Submit"
             if let Some(text) = rest.strip_prefix("button ") {
                 return Some(GeneratedWidget::Button {
-                    text: text.trim().to_string()
+                    text: text.trim().to_string(),
                 });
             }
             if rest == "button" {
                 return Some(GeneratedWidget::Button {
-                    text: "Button".to_string()
+                    text: "Button".to_string(),
                 });
             }
 
             // Label: "add label Hello World"
             if let Some(text) = rest.strip_prefix("label ") {
                 return Some(GeneratedWidget::Label {
-                    text: text.trim().to_string()
+                    text: text.trim().to_string(),
                 });
             }
             if rest == "label" {
                 return Some(GeneratedWidget::Label {
-                    text: "Label".to_string()
+                    text: "Label".to_string(),
                 });
             }
 
             // Card: "add card User Profile"
             if let Some(title) = rest.strip_prefix("card ") {
                 return Some(GeneratedWidget::Card {
-                    title: title.trim().to_string()
+                    title: title.trim().to_string(),
                 });
             }
             if rest == "card" {
                 return Some(GeneratedWidget::Card {
-                    title: "Card".to_string()
+                    title: "Card".to_string(),
                 });
             }
 
@@ -4795,7 +4816,7 @@ impl SplashDemo {
             if let Some(val) = rest.strip_prefix("progress ") {
                 if let Ok(v) = val.trim().parse::<f64>() {
                     return Some(GeneratedWidget::Progress {
-                        value: (v / 100.0).clamp(0.0, 1.0)
+                        value: (v / 100.0).clamp(0.0, 1.0),
                     });
                 }
             }
@@ -4806,24 +4827,24 @@ impl SplashDemo {
             // Switch: "add switch Dark Mode"
             if let Some(label) = rest.strip_prefix("switch ") {
                 return Some(GeneratedWidget::Switch {
-                    label: label.trim().to_string()
+                    label: label.trim().to_string(),
                 });
             }
             if rest == "switch" {
                 return Some(GeneratedWidget::Switch {
-                    label: "Toggle".to_string()
+                    label: "Toggle".to_string(),
                 });
             }
 
             // Input: "add input Email address"
             if let Some(placeholder) = rest.strip_prefix("input ") {
                 return Some(GeneratedWidget::Input {
-                    placeholder: placeholder.trim().to_string()
+                    placeholder: placeholder.trim().to_string(),
                 });
             }
             if rest == "input" {
                 return Some(GeneratedWidget::Input {
-                    placeholder: "Enter text...".to_string()
+                    placeholder: "Enter text...".to_string(),
                 });
             }
         }
@@ -4850,7 +4871,8 @@ impl Widget for SplashDemo {
             }
 
             // Update count label
-            self.view.label(ids!(widget_count_label))
+            self.view
+                .label(ids!(widget_count_label))
                 .set_text(cx, &format!("{} widgets", self.widgets.len()));
 
             // Clear input
@@ -4861,7 +4883,8 @@ impl Widget for SplashDemo {
         // Clear button clicked
         if self.view.mp_button(ids!(clear_btn)).clicked(&actions) {
             self.widgets.clear();
-            self.view.label(ids!(widget_count_label))
+            self.view
+                .label(ids!(widget_count_label))
                 .set_text(cx, "0 widgets");
             self.redraw(cx);
         }
@@ -4877,7 +4900,8 @@ impl Widget for SplashDemo {
                     self.widgets.push(widget);
                 }
 
-                self.view.label(ids!(widget_count_label))
+                self.view
+                    .label(ids!(widget_count_label))
                     .set_text(cx, &format!("{} widgets", self.widgets.len()));
                 self.view.text_input(ids!(command_input)).set_text(cx, "");
                 self.redraw(cx);
@@ -4911,9 +4935,12 @@ impl Widget for SplashDemo {
                             GeneratedWidget::Progress { value } => {
                                 let item_widget = list.item(cx, item_id, live_id!(GenProgress));
                                 let percent = (*value * 100.0) as u32;
-                                item_widget.label(ids!(progress_label))
+                                item_widget
+                                    .label(ids!(progress_label))
                                     .set_text(cx, &format!("Progress: {}%", percent));
-                                item_widget.mp_progress(ids!(gen_progress)).set_value(cx, percent as f64);
+                                item_widget
+                                    .mp_progress(ids!(gen_progress))
+                                    .set_value(cx, percent as f64);
                                 item_widget.draw_all(cx, &mut Scope::empty());
                             }
                             GeneratedWidget::Switch { label } => {
@@ -4923,7 +4950,9 @@ impl Widget for SplashDemo {
                             }
                             GeneratedWidget::Input { placeholder } => {
                                 let item_widget = list.item(cx, item_id, live_id!(GenInput));
-                                item_widget.label(ids!(input_label)).set_text(cx, placeholder);
+                                item_widget
+                                    .label(ids!(input_label))
+                                    .set_text(cx, placeholder);
                                 item_widget.draw_all(cx, &mut Scope::empty());
                             }
                         }
@@ -5093,8 +5122,10 @@ pub enum FlatWidget {
 
 #[derive(Live, Widget)]
 pub struct JsonRenderDemo {
-    #[deref] view: View,
-    #[rust] flat_widgets: Vec<FlatWidget>,
+    #[deref]
+    view: View,
+    #[rust]
+    flat_widgets: Vec<FlatWidget>,
 }
 
 impl LiveHook for JsonRenderDemo {
@@ -5122,16 +5153,15 @@ impl JsonRenderDemo {
             json.trim()
         };
 
-        serde_json::from_str(json_str)
-            .map_err(|e| format!("JSON Parse Error: {}", e))
+        serde_json::from_str(json_str).map_err(|e| format!("JSON Parse Error: {}", e))
     }
 
     /// Flatten widget tree for PortalList rendering
     fn flatten_widgets(widget: &JsonWidget, result: &mut Vec<FlatWidget>) {
         match widget {
-            JsonWidget::View { children, .. } |
-            JsonWidget::VStack { children, .. } |
-            JsonWidget::HStack { children, .. } => {
+            JsonWidget::View { children, .. }
+            | JsonWidget::VStack { children, .. }
+            | JsonWidget::HStack { children, .. } => {
                 for child in children {
                     Self::flatten_widgets(child, result);
                 }
@@ -5155,7 +5185,10 @@ impl JsonRenderDemo {
             JsonWidget::Progress { props } => {
                 result.push(FlatWidget::Progress {
                     value: props.value,
-                    label: props.label.clone().unwrap_or_else(|| format!("{}%", props.value as i32)),
+                    label: props
+                        .label
+                        .clone()
+                        .unwrap_or_else(|| format!("{}%", props.value as i32)),
                 });
             }
             JsonWidget::Switch { props } => {
@@ -5166,7 +5199,10 @@ impl JsonRenderDemo {
             JsonWidget::TextInput { props } => {
                 result.push(FlatWidget::Input {
                     label: props.label.clone().unwrap_or_default(),
-                    placeholder: props.placeholder.clone().unwrap_or_else(|| "Enter text...".to_string()),
+                    placeholder: props
+                        .placeholder
+                        .clone()
+                        .unwrap_or_else(|| "Enter text...".to_string()),
                 });
             }
             JsonWidget::Image { .. } => {
@@ -5263,11 +5299,13 @@ impl Widget for JsonRenderDemo {
                     self.flat_widgets.clear();
                     Self::flatten_widgets(&widget_tree, &mut self.flat_widgets);
 
-                    self.view.label(ids!(render_status))
+                    self.view
+                        .label(ids!(render_status))
                         .set_text(cx, &format!("{} widgets rendered", self.flat_widgets.len()));
                 }
                 Err(e) => {
-                    self.view.label(ids!(render_status))
+                    self.view
+                        .label(ids!(render_status))
                         .set_text(cx, &format!("Error: {}", e));
                 }
             }
@@ -5276,7 +5314,11 @@ impl Widget for JsonRenderDemo {
         }
 
         // Clear button clicked
-        if self.view.mp_button(ids!(clear_render_btn)).clicked(&actions) {
+        if self
+            .view
+            .mp_button(ids!(clear_render_btn))
+            .clicked(&actions)
+        {
             self.flat_widgets.clear();
             self.view.text_input(ids!(json_input)).set_text(cx, "");
             self.view.label(ids!(render_status)).set_text(cx, "Ready");
@@ -5284,18 +5326,32 @@ impl Widget for JsonRenderDemo {
         }
 
         // Load example button clicked
-        if self.view.mp_button(ids!(load_example_btn)).clicked(&actions) {
-            self.view.text_input(ids!(json_input))
+        if self
+            .view
+            .mp_button(ids!(load_example_btn))
+            .clicked(&actions)
+        {
+            self.view
+                .text_input(ids!(json_input))
                 .set_text(cx, Self::get_example_json());
-            self.view.label(ids!(render_status)).set_text(cx, "Basic example loaded");
+            self.view
+                .label(ids!(render_status))
+                .set_text(cx, "Basic example loaded");
             self.redraw(cx);
         }
 
         // Load Raycast example button clicked
-        if self.view.mp_button(ids!(load_raycast_btn)).clicked(&actions) {
-            self.view.text_input(ids!(json_input))
+        if self
+            .view
+            .mp_button(ids!(load_raycast_btn))
+            .clicked(&actions)
+        {
+            self.view
+                .text_input(ids!(json_input))
                 .set_text(cx, Self::get_raycast_example_json());
-            self.view.label(ids!(render_status)).set_text(cx, "Raycast example loaded");
+            self.view
+                .label(ids!(render_status))
+                .set_text(cx, "Raycast example loaded");
             self.redraw(cx);
         }
     }
@@ -5321,24 +5377,36 @@ impl Widget for JsonRenderDemo {
                             FlatWidget::Card { title, description } => {
                                 let item_widget = list.item(cx, item_id, live_id!(JsonCard));
                                 item_widget.label(ids!(json_card_title)).set_text(cx, title);
-                                item_widget.label(ids!(json_card_desc)).set_text(cx, description);
+                                item_widget
+                                    .label(ids!(json_card_desc))
+                                    .set_text(cx, description);
                                 item_widget.draw_all(cx, &mut Scope::empty());
                             }
                             FlatWidget::Progress { value, label } => {
                                 let item_widget = list.item(cx, item_id, live_id!(JsonProgress));
-                                item_widget.label(ids!(json_progress_label)).set_text(cx, label);
-                                item_widget.mp_progress(ids!(json_progress)).set_value(cx, *value);
+                                item_widget
+                                    .label(ids!(json_progress_label))
+                                    .set_text(cx, label);
+                                item_widget
+                                    .mp_progress(ids!(json_progress))
+                                    .set_value(cx, *value);
                                 item_widget.draw_all(cx, &mut Scope::empty());
                             }
                             FlatWidget::Switch { label } => {
                                 let item_widget = list.item(cx, item_id, live_id!(JsonSwitch));
-                                item_widget.label(ids!(json_switch_label)).set_text(cx, label);
+                                item_widget
+                                    .label(ids!(json_switch_label))
+                                    .set_text(cx, label);
                                 item_widget.draw_all(cx, &mut Scope::empty());
                             }
                             FlatWidget::Input { label, placeholder } => {
                                 let item_widget = list.item(cx, item_id, live_id!(JsonInput));
-                                item_widget.label(ids!(json_input_label)).set_text(cx, label);
-                                item_widget.text_input(ids!(json_text_input)).set_text(cx, "");
+                                item_widget
+                                    .label(ids!(json_input_label))
+                                    .set_text(cx, label);
+                                item_widget
+                                    .text_input(ids!(json_text_input))
+                                    .set_text(cx, "");
                                 item_widget.draw_all(cx, &mut Scope::empty());
                             }
                             FlatWidget::Image => {
@@ -5386,7 +5454,9 @@ impl MatchEvent for App {
         self.ui.mp_tab(ids!(cat_form)).set_selected(cx, true);
 
         // Initialize skeleton in loading state
-        self.ui.mp_skeleton_widget(ids!(interactive_skeleton)).set_loading(cx, true);
+        self.ui
+            .mp_skeleton_widget(ids!(interactive_skeleton))
+            .set_loading(cx, true);
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -5428,35 +5498,57 @@ impl MatchEvent for App {
         // Handle counter button
         if self.ui.mp_button(ids!(counter_btn)).clicked(&actions) {
             self.counter += 1;
-            self.ui.label(ids!(counter_label))
+            self.ui
+                .label(ids!(counter_label))
                 .set_text(cx, &format!("Clicked: {} times", self.counter));
         }
 
         // Handle PageFlip navigation
         if self.ui.mp_button(ids!(page_btn_a)).clicked(&actions) {
-            self.ui.page_flip(ids!(demo_page_flip)).set_active_page(cx, id!(page_a));
+            self.ui
+                .page_flip(ids!(demo_page_flip))
+                .set_active_page(cx, id!(page_a));
             self.current_page = 0;
             self.update_page_buttons(cx);
         }
         if self.ui.mp_button(ids!(page_btn_b)).clicked(&actions) {
-            self.ui.page_flip(ids!(demo_page_flip)).set_active_page(cx, id!(page_b));
+            self.ui
+                .page_flip(ids!(demo_page_flip))
+                .set_active_page(cx, id!(page_b));
             self.current_page = 1;
             self.update_page_buttons(cx);
         }
         if self.ui.mp_button(ids!(page_btn_c)).clicked(&actions) {
-            self.ui.page_flip(ids!(demo_page_flip)).set_active_page(cx, id!(page_c));
+            self.ui
+                .page_flip(ids!(demo_page_flip))
+                .set_active_page(cx, id!(page_c));
             self.current_page = 2;
             self.update_page_buttons(cx);
         }
 
         // Handle checkbox changes
-        if self.ui.mp_checkbox(ids!(checkbox1)).changed(&actions).is_some() {
+        if self
+            .ui
+            .mp_checkbox(ids!(checkbox1))
+            .changed(&actions)
+            .is_some()
+        {
             self.update_checkbox_status(cx);
         }
-        if self.ui.mp_checkbox(ids!(checkbox2)).changed(&actions).is_some() {
+        if self
+            .ui
+            .mp_checkbox(ids!(checkbox2))
+            .changed(&actions)
+            .is_some()
+        {
             self.update_checkbox_status(cx);
         }
-        if self.ui.mp_checkbox(ids!(checkbox3)).changed(&actions).is_some() {
+        if self
+            .ui
+            .mp_checkbox(ids!(checkbox3))
+            .changed(&actions)
+            .is_some()
+        {
             self.update_checkbox_status(cx);
         }
 
@@ -5467,94 +5559,158 @@ impl MatchEvent for App {
         if let Some(on) = self.ui.mp_switch(ids!(switch_bluetooth)).changed(&actions) {
             log!("Bluetooth: {}", if on { "ON" } else { "OFF" });
         }
-        if let Some(on) = self.ui.mp_switch(ids!(switch_notifications)).changed(&actions) {
+        if let Some(on) = self
+            .ui
+            .mp_switch(ids!(switch_notifications))
+            .changed(&actions)
+        {
             log!("Notifications: {}", if on { "ON" } else { "OFF" });
         }
 
         // Handle radio changes (mutually exclusive)
-        if self.ui.mp_radio(ids!(radio_small)).changed(&actions).is_some() {
+        if self
+            .ui
+            .mp_radio(ids!(radio_small))
+            .changed(&actions)
+            .is_some()
+        {
             self.ui.mp_radio(ids!(radio_medium)).set_checked(cx, false);
             self.ui.mp_radio(ids!(radio_large)).set_checked(cx, false);
-            self.ui.label(ids!(radio_status)).set_text(cx, "Selected: Small");
+            self.ui
+                .label(ids!(radio_status))
+                .set_text(cx, "Selected: Small");
         }
-        if self.ui.mp_radio(ids!(radio_medium)).changed(&actions).is_some() {
+        if self
+            .ui
+            .mp_radio(ids!(radio_medium))
+            .changed(&actions)
+            .is_some()
+        {
             self.ui.mp_radio(ids!(radio_small)).set_checked(cx, false);
             self.ui.mp_radio(ids!(radio_large)).set_checked(cx, false);
-            self.ui.label(ids!(radio_status)).set_text(cx, "Selected: Medium");
+            self.ui
+                .label(ids!(radio_status))
+                .set_text(cx, "Selected: Medium");
         }
-        if self.ui.mp_radio(ids!(radio_large)).changed(&actions).is_some() {
+        if self
+            .ui
+            .mp_radio(ids!(radio_large))
+            .changed(&actions)
+            .is_some()
+        {
             self.ui.mp_radio(ids!(radio_small)).set_checked(cx, false);
             self.ui.mp_radio(ids!(radio_medium)).set_checked(cx, false);
-            self.ui.label(ids!(radio_status)).set_text(cx, "Selected: Large");
+            self.ui
+                .label(ids!(radio_status))
+                .set_text(cx, "Selected: Large");
         }
 
         // Handle progress buttons
         if self.ui.mp_button(ids!(progress_inc_btn)).clicked(&actions) {
             let current = self.ui.mp_progress(ids!(interactive_progress)).value();
             let new_value = (current + 10.0).min(100.0);
-            self.ui.mp_progress(ids!(interactive_progress)).set_value(cx, new_value);
-            self.ui.label(ids!(progress_label)).set_text(cx, &format!("{}%", new_value as i32));
+            self.ui
+                .mp_progress(ids!(interactive_progress))
+                .set_value(cx, new_value);
+            self.ui
+                .label(ids!(progress_label))
+                .set_text(cx, &format!("{}%", new_value as i32));
         }
         if self.ui.mp_button(ids!(progress_dec_btn)).clicked(&actions) {
             let current = self.ui.mp_progress(ids!(interactive_progress)).value();
             let new_value = (current - 10.0).max(0.0);
-            self.ui.mp_progress(ids!(interactive_progress)).set_value(cx, new_value);
-            self.ui.label(ids!(progress_label)).set_text(cx, &format!("{}%", new_value as i32));
+            self.ui
+                .mp_progress(ids!(interactive_progress))
+                .set_value(cx, new_value);
+            self.ui
+                .label(ids!(progress_label))
+                .set_text(cx, &format!("{}%", new_value as i32));
         }
 
         // Handle slider changes
         if let Some(value) = self.ui.mp_slider(ids!(slider_default)).changed(&actions) {
             let v = value.end();
-            self.ui.label(ids!(slider_default_label)).set_text(cx, &format!("Value: {}", v as i32));
+            self.ui
+                .label(ids!(slider_default_label))
+                .set_text(cx, &format!("Value: {}", v as i32));
         }
 
         if let Some(value) = self.ui.mp_slider(ids!(slider_vert)).changed(&actions) {
             let v = value.end();
-            self.ui.label(ids!(slider_vert_label)).set_text(cx, &format!("Vertical value: {}", v as i32));
+            self.ui
+                .label(ids!(slider_vert_label))
+                .set_text(cx, &format!("Vertical value: {}", v as i32));
         }
 
         // Handle range slider changes
         if let Some(value) = self.ui.mp_slider(ids!(slider_range)).changed(&actions) {
             let start = value.start() as i32;
             let end = value.end() as i32;
-            self.ui.label(ids!(slider_range_label)).set_text(cx, &format!("Range: {} - {}", start, end));
+            self.ui
+                .label(ids!(slider_range_label))
+                .set_text(cx, &format!("Range: {} - {}", start, end));
         }
 
-        if let Some(value) = self.ui.mp_slider(ids!(slider_range_success)).changed(&actions) {
+        if let Some(value) = self
+            .ui
+            .mp_slider(ids!(slider_range_success))
+            .changed(&actions)
+        {
             let start = value.start() as i32;
             let end = value.end() as i32;
-            self.ui.label(ids!(slider_range_success_label)).set_text(cx, &format!("Range: {} - {} (step 5)", start, end));
+            self.ui
+                .label(ids!(slider_range_success_label))
+                .set_text(cx, &format!("Range: {} - {} (step 5)", start, end));
         }
 
         // Handle shader art speed slider
         if let Some(value) = self.ui.mp_slider(ids!(shader_art_speed)).changed(&actions) {
             let speed = value.end();
-            self.ui.label(ids!(shader_art_speed_label)).set_text(cx, &format!("{:.1}x", speed));
-            self.ui.view(ids!(shader_art_canvas)).apply_over(cx, live!{
-                speed: (speed)
-            });
+            self.ui
+                .label(ids!(shader_art_speed_label))
+                .set_text(cx, &format!("{:.1}x", speed));
+            self.ui.view(ids!(shader_art_canvas)).apply_over(
+                cx,
+                live! {
+                    speed: (speed)
+                },
+            );
         }
 
         // Handle shader art2 speed slider
         if let Some(value) = self.ui.mp_slider(ids!(shader_art2_speed)).changed(&actions) {
             let speed = value.end();
-            self.ui.label(ids!(shader_art2_speed_label)).set_text(cx, &format!("{:.1}x", speed));
-            self.ui.view(ids!(shader_art2_canvas)).apply_over(cx, live!{
-                speed: (speed)
-            });
+            self.ui
+                .label(ids!(shader_art2_speed_label))
+                .set_text(cx, &format!("{:.1}x", speed));
+            self.ui.view(ids!(shader_art2_canvas)).apply_over(
+                cx,
+                live! {
+                    speed: (speed)
+                },
+            );
         }
 
         // Handle shader math speed slider
         if let Some(value) = self.ui.mp_slider(ids!(shader_math_speed)).changed(&actions) {
             let speed = value.end();
-            self.ui.label(ids!(shader_math_speed_label)).set_text(cx, &format!("{:.1}x", speed));
-            self.ui.view(ids!(shader_math_canvas)).apply_over(cx, live!{
-                speed: (speed)
-            });
+            self.ui
+                .label(ids!(shader_math_speed_label))
+                .set_text(cx, &format!("{:.1}x", speed));
+            self.ui.view(ids!(shader_math_canvas)).apply_over(
+                cx,
+                live! {
+                    speed: (speed)
+                },
+            );
         }
 
         // Handle input changes
-        if let Some(text) = self.ui.text_input(ids!(input_interactive)).changed(&actions) {
+        if let Some(text) = self
+            .ui
+            .text_input(ids!(input_interactive))
+            .changed(&actions)
+        {
             let display = if text.is_empty() {
                 "Value: (empty)".to_string()
             } else {
@@ -5567,41 +5723,64 @@ impl MatchEvent for App {
         if self.ui.mp_button(ids!(badge_inc_btn)).clicked(&actions) {
             let current = self.ui.mp_badge(ids!(interactive_badge)).count();
             let new_count = current + 1;
-            self.ui.mp_badge(ids!(interactive_badge)).set_count(cx, new_count);
-            self.ui.label(ids!(badge_count_label)).set_text(cx, &format!("Count: {}", new_count));
+            self.ui
+                .mp_badge(ids!(interactive_badge))
+                .set_count(cx, new_count);
+            self.ui
+                .label(ids!(badge_count_label))
+                .set_text(cx, &format!("Count: {}", new_count));
         }
         if self.ui.mp_button(ids!(badge_dec_btn)).clicked(&actions) {
             let current = self.ui.mp_badge(ids!(interactive_badge)).count();
             let new_count = (current - 1).max(0);
-            self.ui.mp_badge(ids!(interactive_badge)).set_count(cx, new_count);
-            self.ui.label(ids!(badge_count_label)).set_text(cx, &format!("Count: {}", new_count));
+            self.ui
+                .mp_badge(ids!(interactive_badge))
+                .set_count(cx, new_count);
+            self.ui
+                .label(ids!(badge_count_label))
+                .set_text(cx, &format!("Count: {}", new_count));
         }
 
         // Handle avatar change button
         if self.ui.mp_button(ids!(avatar_change_btn)).clicked(&actions) {
-            let names = ["Alice Wang", "Bob Smith", "Carol Lee", "David Kim", "Emma Chen", "Frank Zhang"];
+            let names = [
+                "Alice Wang",
+                "Bob Smith",
+                "Carol Lee",
+                "David Kim",
+                "Emma Chen",
+                "Frank Zhang",
+            ];
             let idx = (cx.event_id() as usize) % names.len();
             let name = names[idx];
-            self.ui.mp_avatar(ids!(dynamic_avatar)).set_initials_from_name(cx, name);
+            self.ui
+                .mp_avatar(ids!(dynamic_avatar))
+                .set_initials_from_name(cx, name);
             self.ui.label(ids!(avatar_name_label)).set_text(cx, name);
         }
 
         // Handle clickable card clicks using as_widget_action().cast() pattern
         for action in actions {
             if let MpCardAction::Clicked = action.as_widget_action().cast() {
-                self.ui.label(ids!(card_click_status)).set_text(cx, "Card clicked!");
+                self.ui
+                    .label(ids!(card_click_status))
+                    .set_text(cx, "Card clicked!");
             }
             // Handle modal close request (backdrop or X button)
             if let MpModalAction::CloseRequested = action.as_widget_action().cast() {
                 self.ui.mp_modal_widget(ids!(demo_modal)).close(cx);
-                self.ui.label(ids!(modal_status)).set_text(cx, "Modal closed");
+                self.ui
+                    .label(ids!(modal_status))
+                    .set_text(cx, "Modal closed");
             }
         }
 
         // Handle open modal button
         if self.ui.mp_button(ids!(open_modal_btn)).clicked(&actions) {
             self.ui.mp_modal_widget(ids!(demo_modal)).open(cx);
-            self.ui.label(ids!(modal_status)).set_text(cx, "Modal opened");
+            self.ui
+                .label(ids!(modal_status))
+                .set_text(cx, "Modal opened");
         }
 
         // Handle modal cancel button
@@ -5617,46 +5796,68 @@ impl MatchEvent for App {
         }
 
         // Handle popover toggle button
-        if self.ui.mp_button(ids!(popover_trigger_btn)).clicked(&actions) {
-            self.ui.mp_popover_widget(ids!(interactive_popover)).toggle(cx);
+        if self
+            .ui
+            .mp_button(ids!(popover_trigger_btn))
+            .clicked(&actions)
+        {
+            self.ui
+                .mp_popover_widget(ids!(interactive_popover))
+                .toggle(cx);
         }
 
         // Handle skeleton toggle button
-        if self.ui.mp_button(ids!(skeleton_toggle_btn)).clicked(&actions) {
+        if self
+            .ui
+            .mp_button(ids!(skeleton_toggle_btn))
+            .clicked(&actions)
+        {
             let skeleton = self.ui.mp_skeleton_widget(ids!(interactive_skeleton));
             let is_loading = skeleton.is_loading();
             skeleton.set_loading(cx, !is_loading);
             let status = if !is_loading { "Loading" } else { "Loaded" };
-            self.ui.label(ids!(skeleton_status)).set_text(cx, &format!("Status: {}", status));
+            self.ui
+                .label(ids!(skeleton_status))
+                .set_text(cx, &format!("Status: {}", status));
         }
 
         // Handle notification buttons
-        if self.ui.mp_button(ids!(show_success_notif)).clicked(&actions) {
-            self.ui.mp_notification_widget(ids!(demo_notification)).show_message(
-                cx, "Success!", "Operation completed successfully!"
-            );
+        if self
+            .ui
+            .mp_button(ids!(show_success_notif))
+            .clicked(&actions)
+        {
+            self.ui
+                .mp_notification_widget(ids!(demo_notification))
+                .show_message(cx, "Success!", "Operation completed successfully!");
         }
         if self.ui.mp_button(ids!(show_error_notif)).clicked(&actions) {
-            self.ui.mp_notification_widget(ids!(demo_notification)).show_message(
-                cx, "Error", "Something went wrong. Please try again."
-            );
+            self.ui
+                .mp_notification_widget(ids!(demo_notification))
+                .show_message(cx, "Error", "Something went wrong. Please try again.");
         }
-        if self.ui.mp_button(ids!(show_warning_notif)).clicked(&actions) {
-            self.ui.mp_notification_widget(ids!(demo_notification)).show_message(
-                cx, "Warning", "Please review your input before continuing."
-            );
+        if self
+            .ui
+            .mp_button(ids!(show_warning_notif))
+            .clicked(&actions)
+        {
+            self.ui
+                .mp_notification_widget(ids!(demo_notification))
+                .show_message(cx, "Warning", "Please review your input before continuing.");
         }
         if self.ui.mp_button(ids!(show_info_notif)).clicked(&actions) {
-            self.ui.mp_notification_widget(ids!(demo_notification)).show_message(
-                cx, "Info", "Here's some helpful information for you."
-            );
+            self.ui
+                .mp_notification_widget(ids!(demo_notification))
+                .show_message(cx, "Info", "Here's some helpful information for you.");
         }
 
         // Handle dropdown changes
         let labels = ["Apple", "Banana", "Cherry", "Date", "Elderberry"];
         if let Some(idx) = self.ui.drop_down(ids!(dropdown_basic)).selected(&actions) {
             let label = labels.get(idx).unwrap_or(&"Unknown");
-            self.ui.label(ids!(dropdown_status)).set_text(cx, &format!("Selected: {}", label));
+            self.ui
+                .label(ids!(dropdown_status))
+                .set_text(cx, &format!("Selected: {}", label));
         }
 
         // Handle Tab clicks - Default style
@@ -5722,15 +5923,29 @@ impl App {
 
         // Update tab selected states
         self.ui.mp_tab(ids!(cat_form)).set_selected(cx, index == 0);
-        self.ui.mp_tab(ids!(cat_display)).set_selected(cx, index == 1);
+        self.ui
+            .mp_tab(ids!(cat_display))
+            .set_selected(cx, index == 1);
         self.ui.mp_tab(ids!(cat_nav)).set_selected(cx, index == 2);
-        self.ui.mp_tab(ids!(cat_feedback)).set_selected(cx, index == 3);
+        self.ui
+            .mp_tab(ids!(cat_feedback))
+            .set_selected(cx, index == 3);
         self.ui.mp_tab(ids!(cat_data)).set_selected(cx, index == 4);
-        self.ui.mp_tab(ids!(cat_shader)).set_selected(cx, index == 5);
-        self.ui.mp_tab(ids!(cat_shader_art)).set_selected(cx, index == 6);
-        self.ui.mp_tab(ids!(cat_shader_art2)).set_selected(cx, index == 7);
-        self.ui.mp_tab(ids!(cat_shader_math)).set_selected(cx, index == 8);
-        self.ui.mp_tab(ids!(cat_splash)).set_selected(cx, index == 9);
+        self.ui
+            .mp_tab(ids!(cat_shader))
+            .set_selected(cx, index == 5);
+        self.ui
+            .mp_tab(ids!(cat_shader_art))
+            .set_selected(cx, index == 6);
+        self.ui
+            .mp_tab(ids!(cat_shader_art2))
+            .set_selected(cx, index == 7);
+        self.ui
+            .mp_tab(ids!(cat_shader_math))
+            .set_selected(cx, index == 8);
+        self.ui
+            .mp_tab(ids!(cat_splash))
+            .set_selected(cx, index == 9);
         self.ui.mp_tab(ids!(cat_json)).set_selected(cx, index == 10);
 
         // Switch page
@@ -5748,7 +5963,9 @@ impl App {
             10 => id!(page_json),
             _ => id!(page_form),
         };
-        self.ui.page_flip(ids!(category_pages)).set_active_page(cx, page_id);
+        self.ui
+            .page_flip(ids!(category_pages))
+            .set_active_page(cx, page_id);
         self.ui.redraw(cx);
     }
 
@@ -5813,33 +6030,57 @@ impl App {
         match style {
             "default" => {
                 self.ui.mp_tab(ids!(tab_home)).set_selected(cx, index == 0);
-                self.ui.mp_tab(ids!(tab_profile)).set_selected(cx, index == 1);
-                self.ui.mp_tab(ids!(tab_settings)).set_selected(cx, index == 2);
+                self.ui
+                    .mp_tab(ids!(tab_profile))
+                    .set_selected(cx, index == 1);
+                self.ui
+                    .mp_tab(ids!(tab_settings))
+                    .set_selected(cx, index == 2);
             }
             "underline" => {
-                self.ui.mp_tab(ids!(tab_u_overview)).set_selected(cx, index == 0);
-                self.ui.mp_tab(ids!(tab_u_analytics)).set_selected(cx, index == 1);
-                self.ui.mp_tab(ids!(tab_u_reports)).set_selected(cx, index == 2);
+                self.ui
+                    .mp_tab(ids!(tab_u_overview))
+                    .set_selected(cx, index == 0);
+                self.ui
+                    .mp_tab(ids!(tab_u_analytics))
+                    .set_selected(cx, index == 1);
+                self.ui
+                    .mp_tab(ids!(tab_u_reports))
+                    .set_selected(cx, index == 2);
             }
             "pill" => {
                 self.ui.mp_tab(ids!(tab_p_all)).set_selected(cx, index == 0);
-                self.ui.mp_tab(ids!(tab_p_active)).set_selected(cx, index == 1);
-                self.ui.mp_tab(ids!(tab_p_completed)).set_selected(cx, index == 2);
+                self.ui
+                    .mp_tab(ids!(tab_p_active))
+                    .set_selected(cx, index == 1);
+                self.ui
+                    .mp_tab(ids!(tab_p_completed))
+                    .set_selected(cx, index == 2);
             }
             "outline" => {
                 self.ui.mp_tab(ids!(tab_o_day)).set_selected(cx, index == 0);
-                self.ui.mp_tab(ids!(tab_o_week)).set_selected(cx, index == 1);
-                self.ui.mp_tab(ids!(tab_o_month)).set_selected(cx, index == 2);
+                self.ui
+                    .mp_tab(ids!(tab_o_week))
+                    .set_selected(cx, index == 1);
+                self.ui
+                    .mp_tab(ids!(tab_o_month))
+                    .set_selected(cx, index == 2);
             }
             "segmented" => {
-                self.ui.mp_tab(ids!(tab_s_list)).set_selected(cx, index == 0);
-                self.ui.mp_tab(ids!(tab_s_grid)).set_selected(cx, index == 1);
+                self.ui
+                    .mp_tab(ids!(tab_s_list))
+                    .set_selected(cx, index == 0);
+                self.ui
+                    .mp_tab(ids!(tab_s_grid))
+                    .set_selected(cx, index == 1);
                 self.ui.mp_tab(ids!(tab_s_map)).set_selected(cx, index == 2);
             }
             _ => {}
         }
 
-        self.ui.label(ids!(tab_status)).set_text(cx, &format!("Selected: {}", label));
+        self.ui
+            .label(ids!(tab_status))
+            .set_text(cx, &format!("Selected: {}", label));
         self.ui.redraw(cx);
     }
 }

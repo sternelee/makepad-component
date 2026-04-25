@@ -1,7 +1,7 @@
-use makepad_widgets::*;
+use super::*;
 use crate::elements::*;
 use crate::text::*;
-use super::*;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -50,19 +50,33 @@ struct HexBin {
 
 #[derive(Live, LiveHook, Widget)]
 pub struct HexbinChart {
-    #[redraw] #[live] draw_bg: DrawQuad,
-    #[redraw] #[live] draw_triangle: DrawTriangle,
-    #[walk] walk: Walk,
-    #[layout] layout: Layout,
-    #[live] label: PlotLabel,
-    #[live] theme: ChartTheme,
+    #[redraw]
+    #[live]
+    draw_bg: DrawQuad,
+    #[redraw]
+    #[live]
+    draw_triangle: DrawTriangle,
+    #[walk]
+    walk: Walk,
+    #[layout]
+    layout: Layout,
+    #[live]
+    label: PlotLabel,
+    #[live]
+    theme: ChartTheme,
 
-    #[rust] points: Vec<HexbinPoint>,
-    #[rust] hex_radius: f64,
-    #[rust] color_low: Vec4,
-    #[rust] color_high: Vec4,
-    #[rust] title: String,
-    #[rust] area: Area,
+    #[rust]
+    points: Vec<HexbinPoint>,
+    #[rust]
+    hex_radius: f64,
+    #[rust]
+    color_low: Vec4,
+    #[rust]
+    color_high: Vec4,
+    #[rust]
+    title: String,
+    #[rust]
+    area: Area,
 }
 
 impl HexbinChart {
@@ -104,14 +118,25 @@ impl HexbinChart {
         (rq as i32, rr as i32, rs as i32)
     }
 
-    fn calculate_bins(&self, chart_x: f64, chart_y: f64, chart_w: f64, chart_h: f64) -> (Vec<HexBin>, i32) {
+    fn calculate_bins(
+        &self,
+        chart_x: f64,
+        chart_y: f64,
+        chart_w: f64,
+        chart_h: f64,
+    ) -> (Vec<HexBin>, i32) {
         let center_x = chart_x + chart_w / 2.0;
         let center_y = chart_y + chart_h / 2.0;
         let chart_size = chart_w.min(chart_h);
-        let hex_radius = if self.hex_radius > 0.0 { self.hex_radius } else { 14.0 };
+        let hex_radius = if self.hex_radius > 0.0 {
+            self.hex_radius
+        } else {
+            14.0
+        };
         let rings = ((chart_size / 2.0) / (hex_radius * 1.5)).floor() as i32;
 
-        let mut bin_data: std::collections::HashMap<(i32, i32, i32), (usize, i32)> = std::collections::HashMap::new();
+        let mut bin_data: std::collections::HashMap<(i32, i32, i32), (usize, i32)> =
+            std::collections::HashMap::new();
 
         // Generate hexagonal grid using cube coordinates
         for q in -rings..=rings {
@@ -124,10 +149,26 @@ impl HexbinChart {
 
         // Assign points to bins
         if !self.points.is_empty() {
-            let x_min = self.points.iter().map(|p| p.x).fold(f64::INFINITY, f64::min);
-            let x_max = self.points.iter().map(|p| p.x).fold(f64::NEG_INFINITY, f64::max);
-            let y_min = self.points.iter().map(|p| p.y).fold(f64::INFINITY, f64::min);
-            let y_max = self.points.iter().map(|p| p.y).fold(f64::NEG_INFINITY, f64::max);
+            let x_min = self
+                .points
+                .iter()
+                .map(|p| p.x)
+                .fold(f64::INFINITY, f64::min);
+            let x_max = self
+                .points
+                .iter()
+                .map(|p| p.x)
+                .fold(f64::NEG_INFINITY, f64::max);
+            let y_min = self
+                .points
+                .iter()
+                .map(|p| p.y)
+                .fold(f64::INFINITY, f64::min);
+            let y_max = self
+                .points
+                .iter()
+                .map(|p| p.y)
+                .fold(f64::NEG_INFINITY, f64::max);
 
             let x_range = (x_max - x_min).max(1.0);
             let y_range = (y_max - y_min).max(1.0);
@@ -155,7 +196,10 @@ impl HexbinChart {
             let py = hex_radius * (3.0 / 2.0 * r as f64);
 
             bins.push(HexBin {
-                center: DVec2 { x: center_x + px, y: center_y + py },
+                center: DVec2 {
+                    x: center_x + px,
+                    y: center_y + py,
+                },
                 count,
                 ring,
             });
@@ -188,7 +232,8 @@ impl HexbinChart {
         self.draw_triangle.color = color;
 
         for i in 0..6 {
-            self.draw_triangle.draw_triangle(cx, center, corners[i], corners[(i + 1) % 6]);
+            self.draw_triangle
+                .draw_triangle(cx, center, corners[i], corners[(i + 1) % 6]);
         }
     }
 }
@@ -205,7 +250,9 @@ impl Widget for HexbinChart {
             let chart_h = rect.size.y - padding * 2.0;
 
             // Initialize defaults if not set
-            if self.hex_radius <= 0.0 { self.hex_radius = 14.0; }
+            if self.hex_radius <= 0.0 {
+                self.hex_radius = 14.0;
+            }
             if self.color_high == Vec4::default() {
                 self.color_high = vec4(0.05, 0.15, 0.45, 1.0);
                 self.color_low = vec4(0.92, 0.95, 0.98, 1.0);
@@ -218,7 +265,11 @@ impl Widget for HexbinChart {
             sorted_bins.sort_by_key(|b| b.ring);
 
             for bin in sorted_bins {
-                let t = if max_ring > 0 { bin.ring as f64 / max_ring as f64 } else { 0.0 };
+                let t = if max_ring > 0 {
+                    bin.ring as f64 / max_ring as f64
+                } else {
+                    0.0
+                };
                 let t_eased = t * t * (3.0 - 2.0 * t); // smoothstep
                 let color = self.interpolate_color(t_eased);
                 self.draw_hexagon(cx, bin.center, self.hex_radius * 0.94, color);
@@ -226,7 +277,12 @@ impl Widget for HexbinChart {
 
             // Draw title
             if !self.title.is_empty() {
-                self.label.draw_at(cx, dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0), &self.title, TextAnchor::TopCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0),
+                    &self.title,
+                    TextAnchor::TopCenter,
+                );
             }
         }
 
@@ -238,19 +294,26 @@ impl Widget for HexbinChart {
 
 impl HexbinChartRef {
     pub fn set_data(&self, points: Vec<HexbinPoint>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_data(points); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_data(points);
+        }
     }
     pub fn set_hex_radius(&self, radius: f64) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_hex_radius(radius); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_hex_radius(radius);
+        }
     }
     pub fn set_colors(&self, low: Vec4, high: Vec4) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_colors(low, high); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_colors(low, high);
+        }
     }
     pub fn set_title(&self, title: impl Into<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_title(title); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_title(title);
+        }
     }
 }
-
 
 // =============================================================================
 // SankeyDiagram Widget
@@ -303,18 +366,32 @@ impl SankeyLink {
 
 #[derive(Live, LiveHook, Widget)]
 pub struct SankeyDiagram {
-    #[redraw] #[live] draw_bg: DrawQuad,
-    #[redraw] #[live] draw_triangle: DrawTriangle,
-    #[redraw] #[live] draw_line: DrawPlotLine,
-    #[walk] walk: Walk,
-    #[layout] layout: Layout,
-    #[live] label: PlotLabel,
-    #[live] theme: ChartTheme,
+    #[redraw]
+    #[live]
+    draw_bg: DrawQuad,
+    #[redraw]
+    #[live]
+    draw_triangle: DrawTriangle,
+    #[redraw]
+    #[live]
+    draw_line: DrawPlotLine,
+    #[walk]
+    walk: Walk,
+    #[layout]
+    layout: Layout,
+    #[live]
+    label: PlotLabel,
+    #[live]
+    theme: ChartTheme,
 
-    #[rust] nodes: Vec<SankeyNode>,
-    #[rust] links: Vec<SankeyLink>,
-    #[rust] title: String,
-    #[rust] area: Area,
+    #[rust]
+    nodes: Vec<SankeyNode>,
+    #[rust]
+    links: Vec<SankeyLink>,
+    #[rust]
+    title: String,
+    #[rust]
+    area: Area,
 }
 
 impl SankeyDiagram {
@@ -329,7 +406,9 @@ impl SankeyDiagram {
     }
 
     fn compute_layout(&mut self) {
-        if self.nodes.is_empty() { return; }
+        if self.nodes.is_empty() {
+            return;
+        }
 
         // Calculate incoming totals
         let mut incoming_totals: Vec<f64> = vec![0.0; self.nodes.len()];
@@ -348,24 +427,39 @@ impl SankeyDiagram {
 
         // Layout each layer
         for layer in 0..=max_layer {
-            let layer_nodes: Vec<usize> = self.nodes.iter()
+            let layer_nodes: Vec<usize> = self
+                .nodes
+                .iter()
                 .enumerate()
                 .filter(|(_, n)| n.layer == layer)
                 .map(|(i, _)| i)
                 .collect();
 
-            let total_value: f64 = layer_nodes.iter()
-                .map(|&i| if layer == 0 { self.nodes[i].value } else { incoming_totals[i] })
+            let total_value: f64 = layer_nodes
+                .iter()
+                .map(|&i| {
+                    if layer == 0 {
+                        self.nodes[i].value
+                    } else {
+                        incoming_totals[i]
+                    }
+                })
                 .sum();
 
             let mut y = 0.0;
             let gap_fraction = 0.08;
 
             for &idx in &layer_nodes {
-                let node_value = if layer == 0 { self.nodes[idx].value } else { incoming_totals[idx] };
+                let node_value = if layer == 0 {
+                    self.nodes[idx].value
+                } else {
+                    incoming_totals[idx]
+                };
                 let height = if total_value > 0.0 {
                     node_value / total_value * (1.0 - gap_fraction * (layer_nodes.len() - 1) as f64)
-                } else { 0.0 };
+                } else {
+                    0.0
+                };
                 self.nodes[idx].y = y;
                 self.nodes[idx].height = height;
                 y += height + gap_fraction;
@@ -373,9 +467,18 @@ impl SankeyDiagram {
         }
 
         // Compute source totals
-        let source_totals: Vec<f64> = self.nodes.iter().enumerate().map(|(i, node)| {
-            if node.layer == 0 { node.value } else { incoming_totals[i] }
-        }).collect();
+        let source_totals: Vec<f64> = self
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(i, node)| {
+                if node.layer == 0 {
+                    node.value
+                } else {
+                    incoming_totals[i]
+                }
+            })
+            .collect();
 
         // Compute link positions
         let mut source_offsets: Vec<f64> = vec![0.0; self.nodes.len()];
@@ -392,10 +495,12 @@ impl SankeyDiagram {
             let target_total = incoming_totals[target_idx];
 
             if source_total > 0.0 {
-                source_offsets[source_idx] += link.value / source_total * self.nodes[source_idx].height;
+                source_offsets[source_idx] +=
+                    link.value / source_total * self.nodes[source_idx].height;
             }
             if target_total > 0.0 {
-                target_offsets[target_idx] += link.value / target_total * self.nodes[target_idx].height;
+                target_offsets[target_idx] +=
+                    link.value / target_total * self.nodes[target_idx].height;
             }
         }
     }
@@ -412,13 +517,17 @@ impl Widget for SankeyDiagram {
             let chart_width = rect.size.x - padding * 2.0;
             let chart_height = rect.size.y - padding - 40.0;
 
-            if chart_width <= 0.0 || chart_height <= 0.0 { return DrawStep::done(); }
+            if chart_width <= 0.0 || chart_height <= 0.0 {
+                return DrawStep::done();
+            }
 
             let max_layer = self.nodes.iter().map(|n| n.layer).max().unwrap_or(0);
             let node_width = 24.0;
             let layer_spacing = if max_layer > 0 {
                 (chart_width - node_width) / max_layer as f64
-            } else { chart_width };
+            } else {
+                chart_width
+            };
 
             // Precompute totals
             let mut incoming_totals: Vec<f64> = vec![0.0; self.nodes.len()];
@@ -426,9 +535,18 @@ impl Widget for SankeyDiagram {
                 incoming_totals[link.target] += link.value;
             }
 
-            let source_totals: Vec<f64> = self.nodes.iter().enumerate().map(|(i, node)| {
-                if node.layer == 0 { node.value } else { incoming_totals[i] }
-            }).collect();
+            let source_totals: Vec<f64> = self
+                .nodes
+                .iter()
+                .enumerate()
+                .map(|(i, node)| {
+                    if node.layer == 0 {
+                        node.value
+                    } else {
+                        incoming_totals[i]
+                    }
+                })
+                .collect();
 
             // Draw links
             for link in &self.links {
@@ -445,10 +563,14 @@ impl Widget for SankeyDiagram {
 
                 let link_height_source = if source_total > 0.0 {
                     (link.value / source_total) * source.height * chart_height
-                } else { 0.0 };
+                } else {
+                    0.0
+                };
                 let link_height_target = if target_total > 0.0 {
                     (link.value / target_total) * target.height * chart_height
-                } else { 0.0 };
+                } else {
+                    0.0
+                };
 
                 // Draw curved flow
                 let segments = 24;
@@ -476,8 +598,18 @@ impl Widget for SankeyDiagram {
                     );
 
                     self.draw_triangle.color = color;
-                    self.draw_triangle.draw_triangle(cx, dvec2(x1, y1_top), dvec2(x2, y2_top), dvec2(x2, y2_top + h2));
-                    self.draw_triangle.draw_triangle(cx, dvec2(x1, y1_top), dvec2(x2, y2_top + h2), dvec2(x1, y1_top + h1));
+                    self.draw_triangle.draw_triangle(
+                        cx,
+                        dvec2(x1, y1_top),
+                        dvec2(x2, y2_top),
+                        dvec2(x2, y2_top + h2),
+                    );
+                    self.draw_triangle.draw_triangle(
+                        cx,
+                        dvec2(x1, y1_top),
+                        dvec2(x2, y2_top + h2),
+                        dvec2(x1, y1_top + h1),
+                    );
                 }
             }
 
@@ -488,13 +620,28 @@ impl Widget for SankeyDiagram {
                 let height = node.height * chart_height;
 
                 self.draw_triangle.color = node.color;
-                self.draw_triangle.draw_triangle(cx, dvec2(x, y), dvec2(x + node_width, y), dvec2(x + node_width, y + height));
-                self.draw_triangle.draw_triangle(cx, dvec2(x, y), dvec2(x + node_width, y + height), dvec2(x, y + height));
+                self.draw_triangle.draw_triangle(
+                    cx,
+                    dvec2(x, y),
+                    dvec2(x + node_width, y),
+                    dvec2(x + node_width, y + height),
+                );
+                self.draw_triangle.draw_triangle(
+                    cx,
+                    dvec2(x, y),
+                    dvec2(x + node_width, y + height),
+                    dvec2(x, y + height),
+                );
             }
 
             // Draw title
             if !self.title.is_empty() {
-                self.label.draw_at(cx, dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0), &self.title, TextAnchor::TopCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0),
+                    &self.title,
+                    TextAnchor::TopCenter,
+                );
             }
         }
 
@@ -506,9 +653,13 @@ impl Widget for SankeyDiagram {
 
 impl SankeyDiagramRef {
     pub fn set_data(&self, nodes: Vec<SankeyNode>, links: Vec<SankeyLink>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_data(nodes, links); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_data(nodes, links);
+        }
     }
     pub fn set_title(&self, title: impl Into<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_title(title); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_title(title);
+        }
     }
 }

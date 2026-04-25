@@ -10,7 +10,7 @@ use std::thread;
 use makepad_widgets::*;
 use serde_json::Value;
 
-use super::a2a_client::{A2aClient, A2aStreamEvent, A2aEventStream};
+use super::a2a_client::{A2aClient, A2aEventStream, A2aStreamEvent};
 use super::message::{A2uiMessage, UserAction};
 use super::processor::ProcessorEvent;
 use super::surface::{A2uiSurface, A2uiSurfaceAction};
@@ -110,7 +110,8 @@ impl A2uiHost {
                 match event {
                     SseEvent::Data(data) => {
                         // Parse A2UI messages from SSE data
-                        if let Ok(messages) = serde_json::from_str::<Vec<serde_json::Value>>(&data) {
+                        if let Ok(messages) = serde_json::from_str::<Vec<serde_json::Value>>(&data)
+                        {
                             for msg_value in messages {
                                 if let Ok(msg) = serde_json::from_value::<A2uiMessage>(msg_value) {
                                     if tx.send(A2uiHostEvent::Message(msg)).is_err() {
@@ -229,10 +230,7 @@ impl A2uiHost {
 }
 
 /// Helper function to process A2UI host events and update the surface
-pub fn process_host_events(
-    host: &mut A2uiHost,
-    surface: &mut A2uiSurface,
-) -> Vec<ProcessorEvent> {
+pub fn process_host_events(host: &mut A2uiHost, surface: &mut A2uiSurface) -> Vec<ProcessorEvent> {
     let mut all_events = Vec::new();
 
     // Poll all pending host events

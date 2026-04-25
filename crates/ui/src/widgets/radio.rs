@@ -158,14 +158,19 @@ impl Widget for MpRadio {
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         // Update label text
         if !self.text.as_ref().is_empty() {
-            self.view.label(ids!(label)).set_text(cx, self.text.as_ref());
+            self.view
+                .label(ids!(label))
+                .set_text(cx, self.text.as_ref());
         }
 
         // Sync initial checked state
         if self.checked {
-            self.view.view(ids!(radio_circle)).apply_over(cx, live! {
-                draw_bg: { checked: 1.0 }
-            });
+            self.view.view(ids!(radio_circle)).apply_over(
+                cx,
+                live! {
+                    draw_bg: { checked: 1.0 }
+                },
+            );
         }
 
         self.view.draw_walk(cx, scope, walk)

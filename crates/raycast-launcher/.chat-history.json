@@ -18,5 +18,9 @@
   {
     "role": "Assistant",
     "text": "Network error: The request timed out."
+  },
+  {
+    "role": "User",
+    "text": "帮我生成天气应用"
   }
 ]

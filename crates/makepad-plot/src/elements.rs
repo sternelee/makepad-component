@@ -375,15 +375,24 @@ pub enum MarkerStyle {
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawPlotLine {
-    #[deref] pub draw_super: DrawQuad,
-    #[live] pub color: Vec4,
-    #[live] pub line_x1: f32,
-    #[live] pub line_y1: f32,
-    #[live] pub line_x2: f32,
-    #[live] pub line_y2: f32,
-    #[live] pub line_width: f32,
-    #[live] pub line_style: f32,    // 0=solid, 1=dashed, 2=dotted, 3=dashdot
-    #[live] pub dash_offset: f32,   // Offset along line for continuous dash pattern
+    #[deref]
+    pub draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+    #[live]
+    pub line_x1: f32,
+    #[live]
+    pub line_y1: f32,
+    #[live]
+    pub line_x2: f32,
+    #[live]
+    pub line_y2: f32,
+    #[live]
+    pub line_width: f32,
+    #[live]
+    pub line_style: f32, // 0=solid, 1=dashed, 2=dotted, 3=dashdot
+    #[live]
+    pub dash_offset: f32, // Offset along line for continuous dash pattern
 }
 
 impl DrawPlotLine {
@@ -391,7 +400,15 @@ impl DrawPlotLine {
         self.draw_line_styled(cx, p1, p2, width, LineStyle::Solid, 0.0);
     }
 
-    pub fn draw_line_styled(&mut self, cx: &mut Cx2d, p1: DVec2, p2: DVec2, width: f64, style: LineStyle, dash_offset: f64) {
+    pub fn draw_line_styled(
+        &mut self,
+        cx: &mut Cx2d,
+        p1: DVec2,
+        p2: DVec2,
+        width: f64,
+        style: LineStyle,
+        dash_offset: f64,
+    ) {
         let dx = p2.x - p1.x;
         let dy = p2.y - p1.y;
         let len = (dx * dx + dy * dy).sqrt();
@@ -404,7 +421,10 @@ impl DrawPlotLine {
         let padding = width + 2.0; // Extra padding for anti-aliasing
         let rect = Rect {
             pos: dvec2(p1.x.min(p2.x) - padding, p1.y.min(p2.y) - padding),
-            size: dvec2((p2.x - p1.x).abs() + padding * 2.0, (p2.y - p1.y).abs() + padding * 2.0),
+            size: dvec2(
+                (p2.x - p1.x).abs() + padding * 2.0,
+                (p2.y - p1.y).abs() + padding * 2.0,
+            ),
         };
 
         // Set line endpoints in local coordinates (relative to rect)
@@ -423,9 +443,12 @@ impl DrawPlotLine {
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawPlotPoint {
-    #[deref] pub draw_super: DrawQuad,
-    #[live] pub color: Vec4,
-    #[live] pub marker_style: f32,  // 0=circle, 1=square, 2=tri_up, 3=tri_down, 4=diamond, 5=cross, 6=plus, 7=star
+    #[deref]
+    pub draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+    #[live]
+    pub marker_style: f32, // 0=circle, 1=square, 2=tri_up, 3=tri_down, 4=diamond, 5=cross, 6=plus, 7=star
 }
 
 impl DrawPlotPoint {
@@ -449,11 +472,16 @@ impl DrawPlotPoint {
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawPlotBar {
-    #[deref] pub draw_super: DrawQuad,
-    #[live] pub color: Vec4,
-    #[live(0.0)] pub gradient_enabled: f32,
-    #[live] pub gradient_bottom_color: Vec4,
-    #[live] pub gradient_top_color: Vec4,
+    #[deref]
+    pub draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+    #[live(0.0)]
+    pub gradient_enabled: f32,
+    #[live]
+    pub gradient_bottom_color: Vec4,
+    #[live]
+    pub gradient_top_color: Vec4,
 }
 
 impl DrawPlotBar {
@@ -462,7 +490,13 @@ impl DrawPlotBar {
         self.draw_abs(cx, rect);
     }
 
-    pub fn draw_bar_gradient(&mut self, cx: &mut Cx2d, rect: Rect, bottom_color: Vec4, top_color: Vec4) {
+    pub fn draw_bar_gradient(
+        &mut self,
+        cx: &mut Cx2d,
+        rect: Rect,
+        bottom_color: Vec4,
+        top_color: Vec4,
+    ) {
         self.gradient_enabled = 1.0;
         self.gradient_bottom_color = bottom_color;
         self.gradient_top_color = top_color;
@@ -473,11 +507,16 @@ impl DrawPlotBar {
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawPlotFill {
-    #[deref] pub draw_super: DrawQuad,
-    #[live] pub color: Vec4,
-    #[live(0.0)] pub gradient_enabled: f32,
-    #[live] pub gradient_bottom_color: Vec4,
-    #[live] pub gradient_top_color: Vec4,
+    #[deref]
+    pub draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+    #[live(0.0)]
+    pub gradient_enabled: f32,
+    #[live]
+    pub gradient_bottom_color: Vec4,
+    #[live]
+    pub gradient_top_color: Vec4,
 }
 
 impl DrawPlotFill {
@@ -494,7 +533,16 @@ impl DrawPlotFill {
     }
 
     /// Draw a filled strip with vertical gradient
-    pub fn draw_fill_strip_gradient(&mut self, cx: &mut Cx2d, x: f64, width: f64, y1: f64, y2: f64, bottom_color: Vec4, top_color: Vec4) {
+    pub fn draw_fill_strip_gradient(
+        &mut self,
+        cx: &mut Cx2d,
+        x: f64,
+        width: f64,
+        y1: f64,
+        y2: f64,
+        bottom_color: Vec4,
+        top_color: Vec4,
+    ) {
         self.gradient_enabled = 1.0;
         self.gradient_bottom_color = bottom_color;
         self.gradient_top_color = top_color;
@@ -511,17 +559,31 @@ impl DrawPlotFill {
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawPieSlice {
-    #[deref] pub draw_super: DrawQuad,
-    #[live] pub color: Vec4,
-    #[live] pub start_angle: f32,
-    #[live] pub end_angle: f32,
-    #[live(0.0)] pub gradient_enabled: f32,
-    #[live] pub gradient_center_color: Vec4,
-    #[live] pub gradient_outer_color: Vec4,
+    #[deref]
+    pub draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+    #[live]
+    pub start_angle: f32,
+    #[live]
+    pub end_angle: f32,
+    #[live(0.0)]
+    pub gradient_enabled: f32,
+    #[live]
+    pub gradient_center_color: Vec4,
+    #[live]
+    pub gradient_outer_color: Vec4,
 }
 
 impl DrawPieSlice {
-    pub fn draw_slice(&mut self, cx: &mut Cx2d, center: DVec2, radius: f64, start_angle: f64, end_angle: f64) {
+    pub fn draw_slice(
+        &mut self,
+        cx: &mut Cx2d,
+        center: DVec2,
+        radius: f64,
+        start_angle: f64,
+        end_angle: f64,
+    ) {
         self.gradient_enabled = 0.0;
         self.start_angle = start_angle as f32;
         self.end_angle = end_angle as f32;
@@ -533,7 +595,16 @@ impl DrawPieSlice {
         self.draw_abs(cx, rect);
     }
 
-    pub fn draw_slice_gradient(&mut self, cx: &mut Cx2d, center: DVec2, radius: f64, start_angle: f64, end_angle: f64, center_color: Vec4, outer_color: Vec4) {
+    pub fn draw_slice_gradient(
+        &mut self,
+        cx: &mut Cx2d,
+        center: DVec2,
+        radius: f64,
+        start_angle: f64,
+        end_angle: f64,
+        center_color: Vec4,
+        outer_color: Vec4,
+    ) {
         self.gradient_enabled = 1.0;
         self.gradient_center_color = center_color;
         self.gradient_outer_color = outer_color;
@@ -552,19 +623,36 @@ impl DrawPieSlice {
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawArc {
-    #[deref] pub draw_super: DrawQuad,
-    #[live] pub color: Vec4,
-    #[live] pub start_angle: f32,
-    #[live] pub end_angle: f32,
-    #[live(0.0)] pub inner_radius: f32,  // 0-1 ratio of outer radius
-    #[live(0.0)] pub gradient_enabled: f32,
-    #[live(0.0)] pub gradient_type: f32, // 0=radial, 1=angular
-    #[live] pub gradient_inner_color: Vec4,
-    #[live] pub gradient_outer_color: Vec4,
+    #[deref]
+    pub draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+    #[live]
+    pub start_angle: f32,
+    #[live]
+    pub end_angle: f32,
+    #[live(0.0)]
+    pub inner_radius: f32, // 0-1 ratio of outer radius
+    #[live(0.0)]
+    pub gradient_enabled: f32,
+    #[live(0.0)]
+    pub gradient_type: f32, // 0=radial, 1=angular
+    #[live]
+    pub gradient_inner_color: Vec4,
+    #[live]
+    pub gradient_outer_color: Vec4,
 }
 
 impl DrawArc {
-    pub fn draw_arc(&mut self, cx: &mut Cx2d, center: DVec2, outer_radius: f64, inner_radius_ratio: f64, start_angle: f64, end_angle: f64) {
+    pub fn draw_arc(
+        &mut self,
+        cx: &mut Cx2d,
+        center: DVec2,
+        outer_radius: f64,
+        inner_radius_ratio: f64,
+        start_angle: f64,
+        end_angle: f64,
+    ) {
         self.gradient_enabled = 0.0;
         self.start_angle = start_angle as f32;
         self.end_angle = end_angle as f32;
@@ -577,7 +665,18 @@ impl DrawArc {
         self.draw_abs(cx, rect);
     }
 
-    pub fn draw_arc_gradient(&mut self, cx: &mut Cx2d, center: DVec2, outer_radius: f64, inner_radius_ratio: f64, start_angle: f64, end_angle: f64, inner_color: Vec4, outer_color: Vec4, gradient_type: i32) {
+    pub fn draw_arc_gradient(
+        &mut self,
+        cx: &mut Cx2d,
+        center: DVec2,
+        outer_radius: f64,
+        inner_radius_ratio: f64,
+        start_angle: f64,
+        end_angle: f64,
+        inner_color: Vec4,
+        outer_color: Vec4,
+        gradient_type: i32,
+    ) {
         self.gradient_enabled = 1.0;
         self.gradient_type = gradient_type as f32;
         self.gradient_inner_color = inner_color;
@@ -598,11 +697,16 @@ impl DrawArc {
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawPlotPointGradient {
-    #[deref] pub draw_super: DrawQuad,
-    #[live] pub color: Vec4,
-    #[live(0.0)] pub gradient_enabled: f32,
-    #[live] pub gradient_center_color: Vec4,
-    #[live] pub gradient_outer_color: Vec4,
+    #[deref]
+    pub draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+    #[live(0.0)]
+    pub gradient_enabled: f32,
+    #[live]
+    pub gradient_center_color: Vec4,
+    #[live]
+    pub gradient_outer_color: Vec4,
 }
 
 impl DrawPlotPointGradient {
@@ -615,7 +719,14 @@ impl DrawPlotPointGradient {
         self.draw_abs(cx, rect);
     }
 
-    pub fn draw_point_gradient(&mut self, cx: &mut Cx2d, center: DVec2, radius: f64, center_color: Vec4, outer_color: Vec4) {
+    pub fn draw_point_gradient(
+        &mut self,
+        cx: &mut Cx2d,
+        center: DVec2,
+        radius: f64,
+        center_color: Vec4,
+        outer_color: Vec4,
+    ) {
         self.gradient_enabled = 1.0;
         self.gradient_center_color = center_color;
         self.gradient_outer_color = outer_color;
@@ -631,18 +742,30 @@ impl DrawPlotPointGradient {
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawTriangle {
-    #[deref] pub draw_super: DrawQuad,
-    #[live] pub color: Vec4,
-    #[live] pub v0x: f32,
-    #[live] pub v0y: f32,
-    #[live] pub v1x: f32,
-    #[live] pub v1y: f32,
-    #[live] pub v2x: f32,
-    #[live] pub v2y: f32,
-    #[live(0.0)] pub gradient_enabled: f32,
-    #[live(0.0)] pub gradient_type: f32, // 0 = center-to-vertices, 1 = top-to-bottom
-    #[live] pub gradient_center_color: Vec4,
-    #[live] pub gradient_outer_color: Vec4,
+    #[deref]
+    pub draw_super: DrawQuad,
+    #[live]
+    pub color: Vec4,
+    #[live]
+    pub v0x: f32,
+    #[live]
+    pub v0y: f32,
+    #[live]
+    pub v1x: f32,
+    #[live]
+    pub v1y: f32,
+    #[live]
+    pub v2x: f32,
+    #[live]
+    pub v2y: f32,
+    #[live(0.0)]
+    pub gradient_enabled: f32,
+    #[live(0.0)]
+    pub gradient_type: f32, // 0 = center-to-vertices, 1 = top-to-bottom
+    #[live]
+    pub gradient_center_color: Vec4,
+    #[live]
+    pub gradient_outer_color: Vec4,
 }
 
 impl DrawTriangle {
@@ -680,7 +803,15 @@ impl DrawTriangle {
     }
 
     /// Draw a filled triangle with gradient (center to vertices)
-    pub fn draw_triangle_gradient(&mut self, cx: &mut Cx2d, p0: DVec2, p1: DVec2, p2: DVec2, center_color: Vec4, outer_color: Vec4) {
+    pub fn draw_triangle_gradient(
+        &mut self,
+        cx: &mut Cx2d,
+        p0: DVec2,
+        p1: DVec2,
+        p2: DVec2,
+        center_color: Vec4,
+        outer_color: Vec4,
+    ) {
         // Calculate bounding box
         let min_x = p0.x.min(p1.x).min(p2.x);
         let min_y = p0.y.min(p1.y).min(p2.y);

@@ -1,7 +1,7 @@
-use makepad_widgets::*;
+use super::*;
 use crate::elements::*;
 use crate::text::*;
-use super::*;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -158,7 +158,8 @@ impl Widget for LinePlot {
                 self.initial_y_range = self.y_range;
             }
             Hit::FingerMove(fe) => {
-                if self.is_dragging && self.plot_area.width() > 0.0 && self.plot_area.height() > 0.0 {
+                if self.is_dragging && self.plot_area.width() > 0.0 && self.plot_area.height() > 0.0
+                {
                     // Calculate the delta in data coordinates
                     let dx_pixels = fe.abs.x - self.drag_start.x;
                     let dy_pixels = fe.abs.y - self.drag_start.y;
@@ -195,8 +196,10 @@ impl Widget for LinePlot {
                 let mouse_y = fe.abs.y;
 
                 // Check if mouse is in plot area
-                if mouse_x >= self.plot_area.left && mouse_x <= self.plot_area.right
-                    && mouse_y >= self.plot_area.top && mouse_y <= self.plot_area.bottom
+                if mouse_x >= self.plot_area.left
+                    && mouse_x <= self.plot_area.right
+                    && mouse_y >= self.plot_area.top
+                    && mouse_y <= self.plot_area.bottom
                 {
                     // Calculate the data point under the mouse
                     let rel_x = (mouse_x - self.plot_area.left) / self.plot_area.width();
@@ -305,13 +308,25 @@ impl LinePlot {
     /// Add a filled region between a curve and a constant baseline
     pub fn fill_between_baseline(&mut self, x: Vec<f64>, y: Vec<f64>, baseline: f64, color: Vec4) {
         let y2 = vec![baseline; x.len()];
-        self.fill_regions.push(FillRegion { x, y1: y, y2, color });
+        self.fill_regions.push(FillRegion {
+            x,
+            y1: y,
+            y2,
+            color,
+        });
         self.auto_range();
     }
 
     /// Add a text annotation at a specific data coordinate
     /// Add a plain text annotation at a specific data coordinate
-    pub fn annotate(&mut self, text: impl Into<String>, x: f64, y: f64, color: Vec4, font_size: f64) {
+    pub fn annotate(
+        &mut self,
+        text: impl Into<String>,
+        x: f64,
+        y: f64,
+        color: Vec4,
+        font_size: f64,
+    ) {
         self.annotations.push(TextAnnotation {
             text: text.into(),
             x,
@@ -323,7 +338,14 @@ impl LinePlot {
     }
 
     /// Add a LaTeX math annotation at a specific data coordinate
-    pub fn annotate_math(&mut self, latex: impl Into<String>, x: f64, y: f64, color: Vec4, font_size: f64) {
+    pub fn annotate_math(
+        &mut self,
+        latex: impl Into<String>,
+        x: f64,
+        y: f64,
+        color: Vec4,
+        font_size: f64,
+    ) {
         self.annotations.push(TextAnnotation {
             text: latex.into(),
             x,
@@ -336,12 +358,22 @@ impl LinePlot {
 
     /// Add a vertical line at x position (like matplotlib axvline)
     pub fn axvline(&mut self, x: f64, color: Vec4, line_width: f64, line_style: LineStyle) {
-        self.vlines.push(VLine { x, color, line_width, line_style });
+        self.vlines.push(VLine {
+            x,
+            color,
+            line_width,
+            line_style,
+        });
     }
 
     /// Add a horizontal line at y position (like matplotlib axhline)
     pub fn axhline(&mut self, y: f64, color: Vec4, line_width: f64, line_style: LineStyle) {
-        self.hlines.push(HLine { y, color, line_width, line_style });
+        self.hlines.push(HLine {
+            y,
+            color,
+            line_width,
+            line_style,
+        });
     }
 
     /// Add a vertical shaded span between x1 and x2 (like matplotlib axvspan)
@@ -360,8 +392,15 @@ impl LinePlot {
     }
 
     /// Add an arrow from text position to a data point
-    pub fn annotate_with_arrow(&mut self, text: impl Into<String>, text_x: f64, text_y: f64,
-                                point_x: f64, point_y: f64, color: Vec4) {
+    pub fn annotate_with_arrow(
+        &mut self,
+        text: impl Into<String>,
+        text_x: f64,
+        text_y: f64,
+        point_x: f64,
+        point_y: f64,
+        color: Vec4,
+    ) {
         // Add text annotation
         self.annotations.push(TextAnnotation {
             text: text.into(),
@@ -478,7 +517,8 @@ impl LinePlot {
         let ty_max = self.y_scale.transform(self.y_range.1);
 
         let px = self.plot_area.left + (tx - tx_min) / (tx_max - tx_min) * self.plot_area.width();
-        let py = self.plot_area.bottom - (ty - ty_min) / (ty_max - ty_min) * self.plot_area.height();
+        let py =
+            self.plot_area.bottom - (ty - ty_min) / (ty_max - ty_min) * self.plot_area.height();
         dvec2(px, py)
     }
 
@@ -490,7 +530,9 @@ impl LinePlot {
         self.draw_line.color = self.theme.grid_color;
 
         // Horizontal grid lines - use scale-aware tick generation
-        let y_ticks = self.y_scale.generate_ticks(self.y_range.0, self.y_range.1, 5);
+        let y_ticks = self
+            .y_scale
+            .generate_ticks(self.y_range.0, self.y_range.1, 5);
         for y in &y_ticks {
             let p1 = self.data_to_pixel(self.x_range.0, *y);
             let p2 = self.data_to_pixel(self.x_range.1, *y);
@@ -498,7 +540,9 @@ impl LinePlot {
         }
 
         // Vertical grid lines - use scale-aware tick generation
-        let x_ticks = self.x_scale.generate_ticks(self.x_range.0, self.x_range.1, 5);
+        let x_ticks = self
+            .x_scale
+            .generate_ticks(self.x_range.0, self.x_range.1, 5);
         for x in &x_ticks {
             let p1 = self.data_to_pixel(*x, self.y_range.0);
             let p2 = self.data_to_pixel(*x, self.y_range.1);
@@ -528,7 +572,13 @@ impl LinePlot {
             let p2 = self.data_to_pixel(self.x_range.1, hs.y2);
             let top = p1.y.min(p2.y);
             let bottom = p1.y.max(p2.y);
-            self.draw_fill.draw_fill_strip(cx, self.plot_area.left, self.plot_area.width(), top, bottom);
+            self.draw_fill.draw_fill_strip(
+                cx,
+                self.plot_area.left,
+                self.plot_area.width(),
+                top,
+                bottom,
+            );
         }
 
         // 2. Draw vertical spans (vspans) - background layer
@@ -538,7 +588,13 @@ impl LinePlot {
             let p2 = self.data_to_pixel(vs.x2, self.y_range.1);
             let left = p1.x.min(p2.x);
             let right = p1.x.max(p2.x);
-            self.draw_fill.draw_fill_strip(cx, left, right - left, self.plot_area.top, self.plot_area.bottom);
+            self.draw_fill.draw_fill_strip(
+                cx,
+                left,
+                right - left,
+                self.plot_area.top,
+                self.plot_area.bottom,
+            );
         }
 
         // 3. Draw fill regions (fill_between)
@@ -575,7 +631,8 @@ impl LinePlot {
                         let top = p_tl.y.min(p_tr.y).min(p_bl.y).min(p_br.y);
                         let bottom = p_tl.y.max(p_tr.y).max(p_bl.y).max(p_br.y);
 
-                        self.draw_fill.draw_fill_strip(cx, left, right - left, top, bottom);
+                        self.draw_fill
+                            .draw_fill_strip(cx, left, right - left, top, bottom);
                     }
                 }
             }
@@ -585,20 +642,28 @@ impl LinePlot {
         for hl in &self.hlines {
             self.draw_line.color = hl.color;
             let p = self.data_to_pixel(self.x_range.0, hl.y);
-            self.draw_line.draw_line_styled(cx,
+            self.draw_line.draw_line_styled(
+                cx,
                 dvec2(self.plot_area.left, p.y),
                 dvec2(self.plot_area.right, p.y),
-                hl.line_width, hl.line_style, 0.0);
+                hl.line_width,
+                hl.line_style,
+                0.0,
+            );
         }
 
         // 5. Draw vertical reference lines (vlines)
         for vl in &self.vlines {
             self.draw_line.color = vl.color;
             let p = self.data_to_pixel(vl.x, self.y_range.0);
-            self.draw_line.draw_line_styled(cx,
+            self.draw_line.draw_line_styled(
+                cx,
                 dvec2(p.x, self.plot_area.top),
                 dvec2(p.x, self.plot_area.bottom),
-                vl.line_width, vl.line_style, 0.0);
+                vl.line_width,
+                vl.line_style,
+                0.0,
+            );
         }
 
         // 6. Draw data series
@@ -611,14 +676,20 @@ impl LinePlot {
             self.draw_point.color = color;
 
             // Draw error bars first (behind the line)
-            if series.yerr_minus.is_some() || series.yerr_plus.is_some() || series.xerr_minus.is_some() || series.xerr_plus.is_some() {
+            if series.yerr_minus.is_some()
+                || series.yerr_plus.is_some()
+                || series.xerr_minus.is_some()
+                || series.xerr_plus.is_some()
+            {
                 let cap_width = 4.0;
                 for i in 0..series.x.len() {
                     let x = series.x[i];
                     let y = series.y[i];
 
                     // Y error bars
-                    if let (Some(ref err_minus), Some(ref err_plus)) = (&series.yerr_minus, &series.yerr_plus) {
+                    if let (Some(ref err_minus), Some(ref err_plus)) =
+                        (&series.yerr_minus, &series.yerr_plus)
+                    {
                         if i < err_minus.len() && i < err_plus.len() {
                             let y_low = y - err_minus[i];
                             let y_high = y + err_plus[i];
@@ -626,22 +697,39 @@ impl LinePlot {
                             let p_high = self.data_to_pixel(x, y_high);
 
                             // Vertical line
-                            self.draw_line.draw_line_styled(cx, p_low, p_high, 1.0, LineStyle::Solid, 0.0);
+                            self.draw_line.draw_line_styled(
+                                cx,
+                                p_low,
+                                p_high,
+                                1.0,
+                                LineStyle::Solid,
+                                0.0,
+                            );
                             // Bottom cap
-                            self.draw_line.draw_line_styled(cx,
+                            self.draw_line.draw_line_styled(
+                                cx,
                                 dvec2(p_low.x - cap_width, p_low.y),
                                 dvec2(p_low.x + cap_width, p_low.y),
-                                1.0, LineStyle::Solid, 0.0);
+                                1.0,
+                                LineStyle::Solid,
+                                0.0,
+                            );
                             // Top cap
-                            self.draw_line.draw_line_styled(cx,
+                            self.draw_line.draw_line_styled(
+                                cx,
                                 dvec2(p_high.x - cap_width, p_high.y),
                                 dvec2(p_high.x + cap_width, p_high.y),
-                                1.0, LineStyle::Solid, 0.0);
+                                1.0,
+                                LineStyle::Solid,
+                                0.0,
+                            );
                         }
                     }
 
                     // X error bars
-                    if let (Some(ref err_minus), Some(ref err_plus)) = (&series.xerr_minus, &series.xerr_plus) {
+                    if let (Some(ref err_minus), Some(ref err_plus)) =
+                        (&series.xerr_minus, &series.xerr_plus)
+                    {
                         if i < err_minus.len() && i < err_plus.len() {
                             let x_low = x - err_minus[i];
                             let x_high = x + err_plus[i];
@@ -649,17 +737,32 @@ impl LinePlot {
                             let p_high = self.data_to_pixel(x_high, y);
 
                             // Horizontal line
-                            self.draw_line.draw_line_styled(cx, p_low, p_high, 1.0, LineStyle::Solid, 0.0);
+                            self.draw_line.draw_line_styled(
+                                cx,
+                                p_low,
+                                p_high,
+                                1.0,
+                                LineStyle::Solid,
+                                0.0,
+                            );
                             // Left cap
-                            self.draw_line.draw_line_styled(cx,
+                            self.draw_line.draw_line_styled(
+                                cx,
                                 dvec2(p_low.x, p_low.y - cap_width),
                                 dvec2(p_low.x, p_low.y + cap_width),
-                                1.0, LineStyle::Solid, 0.0);
+                                1.0,
+                                LineStyle::Solid,
+                                0.0,
+                            );
                             // Right cap
-                            self.draw_line.draw_line_styled(cx,
+                            self.draw_line.draw_line_styled(
+                                cx,
                                 dvec2(p_high.x, p_high.y - cap_width),
                                 dvec2(p_high.x, p_high.y + cap_width),
-                                1.0, LineStyle::Solid, 0.0);
+                                1.0,
+                                LineStyle::Solid,
+                                0.0,
+                            );
                         }
                     }
                 }
@@ -680,22 +783,46 @@ impl LinePlot {
                             // First draw vertical segment
                             let p1 = self.data_to_pixel(series.x[i], series.y[i]);
                             let p2 = self.data_to_pixel(series.x[i], series.y[i + 1]);
-                            self.draw_line.draw_line_styled(cx, p1, p2, line_width, series.line_style, dash_offset);
+                            self.draw_line.draw_line_styled(
+                                cx,
+                                p1,
+                                p2,
+                                line_width,
+                                series.line_style,
+                                dash_offset,
+                            );
                             let seg_len = ((p2.x - p1.x).powi(2) + (p2.y - p1.y).powi(2)).sqrt();
                             dash_offset += seg_len;
                             // Then horizontal
-                            (series.x[i], series.y[i + 1], series.x[i + 1], series.y[i + 1])
+                            (
+                                series.x[i],
+                                series.y[i + 1],
+                                series.x[i + 1],
+                                series.y[i + 1],
+                            )
                         }
                         StepStyle::Post => {
                             // Step after: horizontal then vertical
                             // First draw horizontal segment
                             let p1 = self.data_to_pixel(series.x[i], series.y[i]);
                             let p2 = self.data_to_pixel(series.x[i + 1], series.y[i]);
-                            self.draw_line.draw_line_styled(cx, p1, p2, line_width, series.line_style, dash_offset);
+                            self.draw_line.draw_line_styled(
+                                cx,
+                                p1,
+                                p2,
+                                line_width,
+                                series.line_style,
+                                dash_offset,
+                            );
                             let seg_len = ((p2.x - p1.x).powi(2) + (p2.y - p1.y).powi(2)).sqrt();
                             dash_offset += seg_len;
                             // Then vertical
-                            (series.x[i + 1], series.y[i], series.x[i + 1], series.y[i + 1])
+                            (
+                                series.x[i + 1],
+                                series.y[i],
+                                series.x[i + 1],
+                                series.y[i + 1],
+                            )
                         }
                         StepStyle::Mid => {
                             // Step in middle: half horizontal, vertical, half horizontal
@@ -703,11 +830,25 @@ impl LinePlot {
                             // First half horizontal
                             let p1 = self.data_to_pixel(series.x[i], series.y[i]);
                             let p2 = self.data_to_pixel(mid_x, series.y[i]);
-                            self.draw_line.draw_line_styled(cx, p1, p2, line_width, series.line_style, dash_offset);
+                            self.draw_line.draw_line_styled(
+                                cx,
+                                p1,
+                                p2,
+                                line_width,
+                                series.line_style,
+                                dash_offset,
+                            );
                             dash_offset += ((p2.x - p1.x).powi(2) + (p2.y - p1.y).powi(2)).sqrt();
                             // Vertical
                             let p3 = self.data_to_pixel(mid_x, series.y[i + 1]);
-                            self.draw_line.draw_line_styled(cx, p2, p3, line_width, series.line_style, dash_offset);
+                            self.draw_line.draw_line_styled(
+                                cx,
+                                p2,
+                                p3,
+                                line_width,
+                                series.line_style,
+                                dash_offset,
+                            );
                             dash_offset += ((p3.x - p2.x).powi(2) + (p3.y - p2.y).powi(2)).sqrt();
                             // Second half horizontal
                             (mid_x, series.y[i + 1], series.x[i + 1], series.y[i + 1])
@@ -716,7 +857,14 @@ impl LinePlot {
 
                     let p1 = self.data_to_pixel(x1, y1);
                     let p2 = self.data_to_pixel(x2, y2);
-                    self.draw_line.draw_line_styled(cx, p1, p2, line_width, series.line_style, dash_offset);
+                    self.draw_line.draw_line_styled(
+                        cx,
+                        p1,
+                        p2,
+                        line_width,
+                        series.line_style,
+                        dash_offset,
+                    );
 
                     // Update dash offset for continuous pattern
                     let seg_len = ((p2.x - p1.x).powi(2) + (p2.y - p1.y).powi(2)).sqrt();
@@ -725,8 +873,8 @@ impl LinePlot {
             }
 
             // Draw markers
-            let should_draw_markers = series.marker_style != MarkerStyle::None ||
-                (self.show_points && series.marker_style == MarkerStyle::None);
+            let should_draw_markers = series.marker_style != MarkerStyle::None
+                || (self.show_points && series.marker_style == MarkerStyle::None);
 
             if should_draw_markers {
                 let marker = if series.marker_style != MarkerStyle::None {
@@ -747,25 +895,36 @@ impl LinePlot {
         self.label.set_color(self.theme.label_color);
 
         // X axis tick labels - use scale-aware tick generation and formatting
-        let x_ticks = self.x_scale.generate_ticks(self.x_range.0, self.x_range.1, 5);
+        let x_ticks = self
+            .x_scale
+            .generate_ticks(self.x_range.0, self.x_range.1, 5);
         for x in &x_ticks {
             let p = self.data_to_pixel(*x, self.y_range.0);
             let label = self.x_scale.format_tick(*x);
-            self.label.draw_at(cx, dvec2(p.x, p.y + 5.0), &label, TextAnchor::TopCenter);
+            self.label
+                .draw_at(cx, dvec2(p.x, p.y + 5.0), &label, TextAnchor::TopCenter);
         }
 
         // Y axis tick labels - use scale-aware tick generation and formatting
-        let y_ticks = self.y_scale.generate_ticks(self.y_range.0, self.y_range.1, 5);
+        let y_ticks = self
+            .y_scale
+            .generate_ticks(self.y_range.0, self.y_range.1, 5);
         for y in &y_ticks {
             let p = self.data_to_pixel(self.x_range.0, *y);
             let label = self.y_scale.format_tick(*y);
-            self.label.draw_at(cx, dvec2(p.x - 5.0, p.y), &label, TextAnchor::MiddleRight);
+            self.label
+                .draw_at(cx, dvec2(p.x - 5.0, p.y), &label, TextAnchor::MiddleRight);
         }
 
         // Title
         if !self.title.is_empty() {
             let center_x = (self.plot_area.left + self.plot_area.right) / 2.0;
-            self.label.draw_at(cx, dvec2(center_x, self.plot_area.top - 10.0), &self.title, TextAnchor::BottomCenter);
+            self.label.draw_at(
+                cx,
+                dvec2(center_x, self.plot_area.top - 10.0),
+                &self.title,
+                TextAnchor::BottomCenter,
+            );
         }
     }
 
@@ -839,7 +998,8 @@ impl LinePlot {
             if let Some(ref text) = arrow.text {
                 self.label.set_color(arrow.color);
                 self.label.set_font_size(11.0);
-                self.label.draw_at(cx, start, text, TextAnchor::BottomCenter);
+                self.label
+                    .draw_at(cx, start, text, TextAnchor::BottomCenter);
             }
         }
 
@@ -851,7 +1011,8 @@ impl LinePlot {
                 // Render math annotations as plain text (LaTeX not available without math_widget)
                 self.math_label.set_color(ann.color);
                 self.math_label.set_font_size(ann.font_size);
-                self.math_label.draw_at(cx, p, &ann.text, TextAnchor::Center);
+                self.math_label
+                    .draw_at(cx, p, &ann.text, TextAnchor::Center);
             } else {
                 // Use plain text label
                 self.label.set_color(ann.color);
@@ -880,10 +1041,7 @@ impl LinePlot {
                 self.plot_area.right - legend_width - 10.0,
                 self.plot_area.top + 10.0,
             ),
-            LegendPosition::TopLeft => (
-                self.plot_area.left + 10.0,
-                self.plot_area.top + 10.0,
-            ),
+            LegendPosition::TopLeft => (self.plot_area.left + 10.0, self.plot_area.top + 10.0),
             LegendPosition::BottomRight => (
                 self.plot_area.right - legend_width - 10.0,
                 self.plot_area.bottom - legend_height - 10.0,
@@ -906,13 +1064,33 @@ impl LinePlot {
         // Draw legend border
         self.draw_line.color = self.theme.legend_border_color;
         // Top border
-        self.draw_line.draw_line(cx, dvec2(legend_x, legend_y), dvec2(legend_x + legend_width, legend_y), 1.0);
+        self.draw_line.draw_line(
+            cx,
+            dvec2(legend_x, legend_y),
+            dvec2(legend_x + legend_width, legend_y),
+            1.0,
+        );
         // Bottom border
-        self.draw_line.draw_line(cx, dvec2(legend_x, legend_y + legend_height), dvec2(legend_x + legend_width, legend_y + legend_height), 1.0);
+        self.draw_line.draw_line(
+            cx,
+            dvec2(legend_x, legend_y + legend_height),
+            dvec2(legend_x + legend_width, legend_y + legend_height),
+            1.0,
+        );
         // Left border
-        self.draw_line.draw_line(cx, dvec2(legend_x, legend_y), dvec2(legend_x, legend_y + legend_height), 1.0);
+        self.draw_line.draw_line(
+            cx,
+            dvec2(legend_x, legend_y),
+            dvec2(legend_x, legend_y + legend_height),
+            1.0,
+        );
         // Right border
-        self.draw_line.draw_line(cx, dvec2(legend_x + legend_width, legend_y), dvec2(legend_x + legend_width, legend_y + legend_height), 1.0);
+        self.draw_line.draw_line(
+            cx,
+            dvec2(legend_x + legend_width, legend_y),
+            dvec2(legend_x + legend_width, legend_y + legend_height),
+            1.0,
+        );
 
         // Draw legend entries
         for (idx, series) in self.series.iter().enumerate() {
@@ -921,7 +1099,11 @@ impl LinePlot {
 
             // Draw color marker (small rectangle)
             self.draw_point.color = color;
-            self.draw_point.draw_point(cx, dvec2(legend_x + padding + marker_size / 2.0, entry_y), marker_size / 2.0);
+            self.draw_point.draw_point(
+                cx,
+                dvec2(legend_x + padding + marker_size / 2.0, entry_y),
+                marker_size / 2.0,
+            );
 
             // Draw label
             self.label.set_color(self.theme.label_color);
@@ -1039,7 +1221,14 @@ impl LinePlotRef {
     }
 
     /// Add a LaTeX math annotation
-    pub fn annotate_math(&self, latex: impl Into<String>, x: f64, y: f64, color: Vec4, font_size: f64) {
+    pub fn annotate_math(
+        &self,
+        latex: impl Into<String>,
+        x: f64,
+        y: f64,
+        color: Vec4,
+        font_size: f64,
+    ) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.annotate_math(latex, x, y, color, font_size);
         }
@@ -1081,8 +1270,15 @@ impl LinePlotRef {
     }
 
     /// Add an arrow from text position to a data point
-    pub fn annotate_with_arrow(&self, text: impl Into<String>, text_x: f64, text_y: f64,
-                                point_x: f64, point_y: f64, color: Vec4) {
+    pub fn annotate_with_arrow(
+        &self,
+        text: impl Into<String>,
+        text_x: f64,
+        text_y: f64,
+        point_x: f64,
+        point_y: f64,
+        color: Vec4,
+    ) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.annotate_with_arrow(text, text_x, text_y, point_x, point_y, color);
         }

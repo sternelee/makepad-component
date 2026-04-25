@@ -1,7 +1,7 @@
-use makepad_widgets::*;
+use super::*;
 use crate::elements::*;
 use crate::text::*;
-use super::*;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -31,7 +31,13 @@ pub struct BubblePoint {
 
 impl BubblePoint {
     pub fn new(x: f64, y: f64, size: f64) -> Self {
-        Self { x, y, size, color: None, label: None }
+        Self {
+            x,
+            y,
+            size,
+            color: None,
+            label: None,
+        }
     }
 
     pub fn with_color(mut self, color: Vec4) -> Self {
@@ -74,19 +80,33 @@ impl BubbleSeries {
 
 #[derive(Live, LiveHook, Widget)]
 pub struct BubbleChart {
-    #[deref] #[live] view: View,
-    #[live] draw_line: DrawPlotLine,
-    #[live] draw_bubble: DrawPlotPointGradient,
-    #[live] label: PlotLabel,
-    #[live] theme: ChartTheme,
-    #[rust] title: String,
-    #[rust] series: Vec<BubbleSeries>,
-    #[rust] x_label: String,
-    #[rust] y_label: String,
-    #[rust] show_grid: bool,
-    #[rust] max_bubble_radius: f64,
-    #[rust] min_bubble_radius: f64,
-    #[rust] use_gradient: bool,
+    #[deref]
+    #[live]
+    view: View,
+    #[live]
+    draw_line: DrawPlotLine,
+    #[live]
+    draw_bubble: DrawPlotPointGradient,
+    #[live]
+    label: PlotLabel,
+    #[live]
+    theme: ChartTheme,
+    #[rust]
+    title: String,
+    #[rust]
+    series: Vec<BubbleSeries>,
+    #[rust]
+    x_label: String,
+    #[rust]
+    y_label: String,
+    #[rust]
+    show_grid: bool,
+    #[rust]
+    max_bubble_radius: f64,
+    #[rust]
+    min_bubble_radius: f64,
+    #[rust]
+    use_gradient: bool,
 }
 
 impl BubbleChart {
@@ -134,18 +154,39 @@ impl BubbleChart {
 
         for series in &self.series {
             for point in &series.points {
-                if point.x < x_min { x_min = point.x; }
-                if point.x > x_max { x_max = point.x; }
-                if point.y < y_min { y_min = point.y; }
-                if point.y > y_max { y_max = point.y; }
-                if point.size < size_min { size_min = point.size; }
-                if point.size > size_max { size_max = point.size; }
+                if point.x < x_min {
+                    x_min = point.x;
+                }
+                if point.x > x_max {
+                    x_max = point.x;
+                }
+                if point.y < y_min {
+                    y_min = point.y;
+                }
+                if point.y > y_max {
+                    y_max = point.y;
+                }
+                if point.size < size_min {
+                    size_min = point.size;
+                }
+                if point.size > size_max {
+                    size_max = point.size;
+                }
             }
         }
 
-        if x_min == f64::MAX { x_min = 0.0; x_max = 1.0; }
-        if y_min == f64::MAX { y_min = 0.0; y_max = 1.0; }
-        if size_min == f64::MAX { size_min = 1.0; size_max = 1.0; }
+        if x_min == f64::MAX {
+            x_min = 0.0;
+            x_max = 1.0;
+        }
+        if y_min == f64::MAX {
+            y_min = 0.0;
+            y_max = 1.0;
+        }
+        if size_min == f64::MAX {
+            size_min = 1.0;
+            size_max = 1.0;
+        }
 
         let x_range = (x_max - x_min).max(0.001);
         let y_range = (y_max - y_min).max(0.001);
@@ -164,8 +205,12 @@ impl Widget for BubbleChart {
 
         if rect.size.x > 0.0 && rect.size.y > 0.0 {
             // Set defaults
-            if self.max_bubble_radius == 0.0 { self.max_bubble_radius = 40.0; }
-            if self.min_bubble_radius == 0.0 { self.min_bubble_radius = 5.0; }
+            if self.max_bubble_radius == 0.0 {
+                self.max_bubble_radius = 40.0;
+            }
+            if self.min_bubble_radius == 0.0 {
+                self.min_bubble_radius = 5.0;
+            }
 
             let padding_left = 60.0;
             let padding_right = 40.0;
@@ -191,15 +236,27 @@ impl Widget for BubbleChart {
                     let t = i as f64 / 5.0;
                     let x = plot_left + t * plot_width;
                     let y = plot_top + t * plot_height;
-                    self.draw_line.draw_line(cx, dvec2(x, plot_top), dvec2(x, plot_bottom), 1.0);
-                    self.draw_line.draw_line(cx, dvec2(plot_left, y), dvec2(plot_right, y), 1.0);
+                    self.draw_line
+                        .draw_line(cx, dvec2(x, plot_top), dvec2(x, plot_bottom), 1.0);
+                    self.draw_line
+                        .draw_line(cx, dvec2(plot_left, y), dvec2(plot_right, y), 1.0);
                 }
             }
 
             // Draw axes
             self.draw_line.color = self.theme.label_color;
-            self.draw_line.draw_line(cx, dvec2(plot_left, plot_bottom), dvec2(plot_right, plot_bottom), 1.5);
-            self.draw_line.draw_line(cx, dvec2(plot_left, plot_top), dvec2(plot_left, plot_bottom), 1.5);
+            self.draw_line.draw_line(
+                cx,
+                dvec2(plot_left, plot_bottom),
+                dvec2(plot_right, plot_bottom),
+                1.5,
+            );
+            self.draw_line.draw_line(
+                cx,
+                dvec2(plot_left, plot_top),
+                dvec2(plot_left, plot_bottom),
+                1.5,
+            );
 
             // Draw axis tick labels
             self.label.draw_text.color = self.theme.label_color;
@@ -210,8 +267,18 @@ impl Widget for BubbleChart {
                 let x = plot_left + t * plot_width;
                 let y = plot_top + t * plot_height;
 
-                self.label.draw_at(cx, dvec2(x, plot_bottom + 15.0), &format!("{:.1}", x_val), TextAnchor::TopCenter);
-                self.label.draw_at(cx, dvec2(plot_left - 10.0, y), &format!("{:.1}", y_val), TextAnchor::MiddleRight);
+                self.label.draw_at(
+                    cx,
+                    dvec2(x, plot_bottom + 15.0),
+                    &format!("{:.1}", x_val),
+                    TextAnchor::TopCenter,
+                );
+                self.label.draw_at(
+                    cx,
+                    dvec2(plot_left - 10.0, y),
+                    &format!("{:.1}", y_val),
+                    TextAnchor::MiddleRight,
+                );
             }
 
             // Draw bubbles
@@ -223,7 +290,8 @@ impl Widget for BubbleChart {
                     let py = plot_bottom - ((point.y - y_min) / y_range) * plot_height;
 
                     let size_norm = (point.size - size_min) / size_range;
-                    let radius = self.min_bubble_radius + size_norm * (self.max_bubble_radius - self.min_bubble_radius);
+                    let radius = self.min_bubble_radius
+                        + size_norm * (self.max_bubble_radius - self.min_bubble_radius);
 
                     let color = point.color.unwrap_or(base_color);
 
@@ -233,7 +301,13 @@ impl Widget for BubbleChart {
                         let center_color = vec4(center.x, center.y, center.z, 0.9);
                         let edge_color = vec4(outer.x, outer.y, outer.z, 0.85);
                         self.draw_bubble.color = color;
-                        self.draw_bubble.draw_point_gradient(cx, dvec2(px, py), radius, center_color, edge_color);
+                        self.draw_bubble.draw_point_gradient(
+                            cx,
+                            dvec2(px, py),
+                            radius,
+                            center_color,
+                            edge_color,
+                        );
                     } else {
                         // Draw bubble with solid color and slight transparency
                         let fill_color = vec4(color.x, color.y, color.z, 0.6);
@@ -246,18 +320,25 @@ impl Widget for BubbleChart {
                     let segments = 32;
                     for i in 0..segments {
                         let angle1 = (i as f64 / segments as f64) * 2.0 * std::f64::consts::PI;
-                        let angle2 = ((i + 1) as f64 / segments as f64) * 2.0 * std::f64::consts::PI;
+                        let angle2 =
+                            ((i + 1) as f64 / segments as f64) * 2.0 * std::f64::consts::PI;
                         let x1 = px + radius * angle1.cos();
                         let y1 = py + radius * angle1.sin();
                         let x2 = px + radius * angle2.cos();
                         let y2 = py + radius * angle2.sin();
-                        self.draw_line.draw_line(cx, dvec2(x1, y1), dvec2(x2, y2), 1.5);
+                        self.draw_line
+                            .draw_line(cx, dvec2(x1, y1), dvec2(x2, y2), 1.5);
                     }
 
                     // Draw label if present
                     if let Some(label) = &point.label {
                         self.label.draw_text.color = self.theme.label_color;
-                        self.label.draw_at(cx, dvec2(px, py - radius - 5.0), label, TextAnchor::BottomCenter);
+                        self.label.draw_at(
+                            cx,
+                            dvec2(px, py - radius - 5.0),
+                            label,
+                            TextAnchor::BottomCenter,
+                        );
                     }
                 }
             }
@@ -265,12 +346,25 @@ impl Widget for BubbleChart {
             // Draw title
             if !self.title.is_empty() {
                 self.label.draw_text.color = self.theme.label_color;
-                self.label.draw_at(cx, dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0), &self.title, TextAnchor::TopCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0),
+                    &self.title,
+                    TextAnchor::TopCenter,
+                );
             }
 
             // Draw x-axis label
             if !self.x_label.is_empty() {
-                self.label.draw_at(cx, dvec2((plot_left + plot_right) / 2.0, rect.pos.y + rect.size.y - 10.0), &self.x_label, TextAnchor::BottomCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(
+                        (plot_left + plot_right) / 2.0,
+                        rect.pos.y + rect.size.y - 10.0,
+                    ),
+                    &self.x_label,
+                    TextAnchor::BottomCenter,
+                );
             }
         }
 
@@ -290,31 +384,48 @@ impl BubbleChart {
 
 impl BubbleChartRef {
     pub fn set_title(&self, title: impl Into<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_title(title); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_title(title);
+        }
     }
     pub fn add_series(&self, series: BubbleSeries) {
-        if let Some(mut inner) = self.borrow_mut() { inner.add_series(series); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.add_series(series);
+        }
     }
     pub fn set_x_label(&self, label: impl Into<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_x_label(label); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_x_label(label);
+        }
     }
     pub fn set_y_label(&self, label: impl Into<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_y_label(label); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_y_label(label);
+        }
     }
     pub fn set_show_grid(&self, show: bool) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_show_grid(show); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_show_grid(show);
+        }
     }
     pub fn set_bubble_radius_range(&self, min: f64, max: f64) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_bubble_radius_range(min, max); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_bubble_radius_range(min, max);
+        }
     }
     pub fn set_use_gradient(&self, use_gradient: bool) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_use_gradient(use_gradient); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_use_gradient(use_gradient);
+        }
     }
     pub fn clear(&self) {
-        if let Some(mut inner) = self.borrow_mut() { inner.clear(); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.clear();
+        }
     }
     pub fn redraw(&self, cx: &mut Cx) {
-        if let Some(mut inner) = self.borrow_mut() { inner.redraw(cx); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.redraw(cx);
+        }
     }
 }
-

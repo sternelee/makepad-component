@@ -1,7 +1,7 @@
-use makepad_widgets::*;
+use super::*;
 use crate::elements::*;
 use crate::text::*;
-use super::*;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -19,13 +19,12 @@ live_design! {
     }
 }
 
-
 /// Camera/view settings for 3D plots
 #[derive(Clone, Debug, Default)]
 pub struct View3D {
-    pub azimuth: f64,     // Horizontal rotation (degrees)
-    pub elevation: f64,   // Vertical rotation (degrees)
-    pub distance: f64,    // Distance from origin
+    pub azimuth: f64,   // Horizontal rotation (degrees)
+    pub elevation: f64, // Vertical rotation (degrees)
+    pub distance: f64,  // Distance from origin
 }
 
 impl View3D {
@@ -135,13 +134,19 @@ impl Default for Surface3DChart {
 
 impl Surface3DChart {
     pub fn set_data(&mut self, z: Vec<Vec<f64>>) {
-        if z.is_empty() || z[0].is_empty() { return; }
+        if z.is_empty() || z[0].is_empty() {
+            return;
+        }
         let mut z_min = f64::MAX;
         let mut z_max = f64::MIN;
         for row in &z {
             for &val in row {
-                if val < z_min { z_min = val; }
-                if val > z_max { z_max = val; }
+                if val < z_min {
+                    z_min = val;
+                }
+                if val > z_max {
+                    z_max = val;
+                }
             }
         }
         self.x_range = (0.0, (z[0].len() - 1) as f64);
@@ -151,7 +156,9 @@ impl Surface3DChart {
     }
 
     fn normalize_z(&self, z: f64) -> f64 {
-        if self.z_range.1 == self.z_range.0 { return 0.5; }
+        if self.z_range.1 == self.z_range.0 {
+            return 0.5;
+        }
         (z - self.z_range.0) / (self.z_range.1 - self.z_range.0)
     }
 }
@@ -164,45 +171,75 @@ pub struct Surface3DCharts {
 
 #[derive(Live, LiveHook, Widget)]
 pub struct Surface3D {
-    #[deref] #[live] view: View,
-    #[live] draw_fill: DrawPlotFill,
-    #[live] draw_line: DrawPlotLine,
-    #[live] label: PlotLabel,
-    #[live] theme: ChartTheme,
+    #[deref]
+    #[live]
+    view: View,
+    #[live]
+    draw_fill: DrawPlotFill,
+    #[live]
+    draw_line: DrawPlotLine,
+    #[live]
+    label: PlotLabel,
+    #[live]
+    theme: ChartTheme,
     // Legacy single-chart fields (used when no chart_id is provided)
-    #[rust] title: String,
-    #[rust] z_data: Vec<Vec<f64>>,
-    #[rust] x_range: (f64, f64),
-    #[rust] y_range: (f64, f64),
-    #[rust] z_range: (f64, f64),
-    #[rust] view3d: View3D,
-    #[rust] colormap: Colormap,
-    #[rust] show_wireframe: bool,
-    #[rust] show_surface: bool,
-    #[rust] zoom: f64,
-    #[rust] drag_start: Option<DVec2>,
-    #[rust] start_azimuth: f64,
-    #[rust] start_elevation: f64,
-    #[rust] hit_rect: Rect,
+    #[rust]
+    title: String,
+    #[rust]
+    z_data: Vec<Vec<f64>>,
+    #[rust]
+    x_range: (f64, f64),
+    #[rust]
+    y_range: (f64, f64),
+    #[rust]
+    z_range: (f64, f64),
+    #[rust]
+    view3d: View3D,
+    #[rust]
+    colormap: Colormap,
+    #[rust]
+    show_wireframe: bool,
+    #[rust]
+    show_surface: bool,
+    #[rust]
+    zoom: f64,
+    #[rust]
+    drag_start: Option<DVec2>,
+    #[rust]
+    start_azimuth: f64,
+    #[rust]
+    start_elevation: f64,
+    #[rust]
+    hit_rect: Rect,
     // Multi-chart support: per-chart state keyed by chart component ID
-    #[rust] charts: Surface3DCharts,
+    #[rust]
+    charts: Surface3DCharts,
     // Which chart is currently being dragged (by chart_id)
-    #[rust] active_drag_id: String,
+    #[rust]
+    active_drag_id: String,
 }
 
 impl Surface3D {
-    pub fn set_title(&mut self, title: impl Into<String>) { self.title = title.into(); }
+    pub fn set_title(&mut self, title: impl Into<String>) {
+        self.title = title.into();
+    }
 
     pub fn set_data(&mut self, z: Vec<Vec<f64>>) {
-        if z.is_empty() || z[0].is_empty() { return; }
+        if z.is_empty() || z[0].is_empty() {
+            return;
+        }
 
         // Calculate z range
         let mut z_min = f64::MAX;
         let mut z_max = f64::MIN;
         for row in &z {
             for &val in row {
-                if val < z_min { z_min = val; }
-                if val > z_max { z_max = val; }
+                if val < z_min {
+                    z_min = val;
+                }
+                if val > z_max {
+                    z_max = val;
+                }
             }
         }
 
@@ -212,19 +249,41 @@ impl Surface3D {
         self.y_range = (0.0, (self.z_data.len() - 1) as f64);
     }
 
-    pub fn set_x_range(&mut self, min: f64, max: f64) { self.x_range = (min, max); }
-    pub fn set_y_range(&mut self, min: f64, max: f64) { self.y_range = (min, max); }
-    pub fn set_view(&mut self, view: View3D) { self.view3d = view; }
-    pub fn set_azimuth(&mut self, az: f64) { self.view3d.azimuth = az; }
-    pub fn set_elevation(&mut self, el: f64) { self.view3d.elevation = el; }
-    pub fn set_colormap(&mut self, cm: Colormap) { self.colormap = cm; }
-    pub fn set_wireframe(&mut self, show: bool) { self.show_wireframe = show; }
-    pub fn set_surface(&mut self, show: bool) { self.show_surface = show; }
-    pub fn clear(&mut self) { self.z_data.clear(); }
-    pub fn redraw(&mut self, cx: &mut Cx) { self.view.redraw(cx); }
+    pub fn set_x_range(&mut self, min: f64, max: f64) {
+        self.x_range = (min, max);
+    }
+    pub fn set_y_range(&mut self, min: f64, max: f64) {
+        self.y_range = (min, max);
+    }
+    pub fn set_view(&mut self, view: View3D) {
+        self.view3d = view;
+    }
+    pub fn set_azimuth(&mut self, az: f64) {
+        self.view3d.azimuth = az;
+    }
+    pub fn set_elevation(&mut self, el: f64) {
+        self.view3d.elevation = el;
+    }
+    pub fn set_colormap(&mut self, cm: Colormap) {
+        self.colormap = cm;
+    }
+    pub fn set_wireframe(&mut self, show: bool) {
+        self.show_wireframe = show;
+    }
+    pub fn set_surface(&mut self, show: bool) {
+        self.show_surface = show;
+    }
+    pub fn clear(&mut self) {
+        self.z_data.clear();
+    }
+    pub fn redraw(&mut self, cx: &mut Cx) {
+        self.view.redraw(cx);
+    }
 
     fn normalize_z(&self, z: f64) -> f64 {
-        if self.z_range.1 == self.z_range.0 { return 0.5; }
+        if self.z_range.1 == self.z_range.0 {
+            return 0.5;
+        }
         (z - self.z_range.0) / (self.z_range.1 - self.z_range.0)
     }
 
@@ -233,11 +292,20 @@ impl Surface3D {
     /// Get or create a per-chart instance by ID. Preserves interactive state
     /// (view angles, zoom) across redraws while allowing data updates.
     pub fn get_chart_mut(&mut self, chart_id: &str) -> &mut Surface3DChart {
-        self.charts.map.entry(chart_id.to_string()).or_insert_with(Surface3DChart::default)
+        self.charts
+            .map
+            .entry(chart_id.to_string())
+            .or_insert_with(Surface3DChart::default)
     }
 
     /// Draw a specific chart instance using its per-chart state.
-    pub fn draw_chart_instance(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk, chart_id: &str) -> DrawStep {
+    pub fn draw_chart_instance(
+        &mut self,
+        cx: &mut Cx2d,
+        _scope: &mut Scope,
+        walk: Walk,
+        chart_id: &str,
+    ) -> DrawStep {
         let rect = cx.walk_turtle(walk);
 
         // Store hit_rect in the per-chart state
@@ -247,21 +315,34 @@ impl Surface3D {
 
         // Get chart data (need to clone to avoid borrow issues with self.draw_*)
         let chart_data = match self.charts.map.get(chart_id) {
-            Some(c) if !c.z_data.is_empty() && rect.size.x > 0.0 && rect.size.y > 0.0 => {
-                Some((
-                    c.z_data.clone(),
-                    c.x_range, c.y_range, c.z_range,
-                    c.view3d.clone(),
-                    c.colormap.clone(),
-                    c.show_wireframe, c.show_surface,
-                    c.zoom,
-                    c.title.clone(),
-                ))
-            }
+            Some(c) if !c.z_data.is_empty() && rect.size.x > 0.0 && rect.size.y > 0.0 => Some((
+                c.z_data.clone(),
+                c.x_range,
+                c.y_range,
+                c.z_range,
+                c.view3d.clone(),
+                c.colormap.clone(),
+                c.show_wireframe,
+                c.show_surface,
+                c.zoom,
+                c.title.clone(),
+            )),
             _ => None,
         };
 
-        if let Some((z_data, x_range, y_range, z_range, view3d, colormap, show_wireframe, show_surface, zoom, title)) = chart_data {
+        if let Some((
+            z_data,
+            x_range,
+            y_range,
+            z_range,
+            view3d,
+            colormap,
+            show_wireframe,
+            show_surface,
+            zoom,
+            title,
+        )) = chart_data
+        {
             let cx_center = rect.pos.x + rect.size.x * 0.5;
             let cy_center = rect.pos.y + rect.size.y * 0.5;
             let zoom_val = if zoom == 0.0 { 1.0 } else { zoom };
@@ -272,19 +353,31 @@ impl Surface3D {
 
             let x_scale = 2.0 / (cols - 1).max(1) as f64;
             let y_scale = 2.0 / (rows - 1).max(1) as f64;
-            let z_scale = if z_range.1 != z_range.0 { 1.5 / (z_range.1 - z_range.0) } else { 1.0 };
+            let z_scale = if z_range.1 != z_range.0 {
+                1.5 / (z_range.1 - z_range.0)
+            } else {
+                1.0
+            };
             let z_offset = (z_range.0 + z_range.1) * 0.5;
 
             let normalize_z = |z: f64| -> f64 {
-                if z_range.1 == z_range.0 { 0.5 } else { (z - z_range.0) / (z_range.1 - z_range.0) }
+                if z_range.1 == z_range.0 {
+                    0.5
+                } else {
+                    (z - z_range.0) / (z_range.1 - z_range.0)
+                }
             };
 
             // Draw filled surface quads with depth sorting
             if show_surface {
                 let mut quads: Vec<(f64, usize, usize, Vec4)> = Vec::new();
-                for i in 0..rows-1 {
-                    for j in 0..cols-1 {
-                        let avg_z = (z_data[i][j] + z_data[i+1][j] + z_data[i][j+1] + z_data[i+1][j+1]) * 0.25;
+                for i in 0..rows - 1 {
+                    for j in 0..cols - 1 {
+                        let avg_z = (z_data[i][j]
+                            + z_data[i + 1][j]
+                            + z_data[i][j + 1]
+                            + z_data[i + 1][j + 1])
+                            * 0.25;
                         let t = normalize_z(avg_z);
                         let color = colormap.sample(t);
                         let cx_q = (j as f64 + 0.5) * x_scale - 1.0;
@@ -297,7 +390,7 @@ impl Surface3D {
                 quads.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
 
                 for (_, i, j, color) in quads {
-                    let corners = [(j, i), (j+1, i), (j+1, i+1), (j, i+1)];
+                    let corners = [(j, i), (j + 1, i), (j + 1, i + 1), (j, i + 1)];
                     let mut pts: Vec<DVec2> = Vec::new();
                     for &(cj, ci) in &corners {
                         let x = cj as f64 * x_scale - 1.0;
@@ -311,23 +404,30 @@ impl Surface3D {
                     let max_x = pts.iter().map(|p| p.x).fold(f64::MIN, f64::max);
                     let min_y = pts.iter().map(|p| p.y).fold(f64::MAX, f64::min);
                     let max_y = pts.iter().map(|p| p.y).fold(f64::MIN, f64::max);
-                    self.draw_fill.draw_abs(cx, Rect {
-                        pos: dvec2(min_x, min_y),
-                        size: dvec2(max_x - min_x + 1.0, max_y - min_y + 1.0),
-                    });
+                    self.draw_fill.draw_abs(
+                        cx,
+                        Rect {
+                            pos: dvec2(min_x, min_y),
+                            size: dvec2(max_x - min_x + 1.0, max_y - min_y + 1.0),
+                        },
+                    );
                 }
             }
 
             // Draw wireframe
             if show_wireframe {
-                let wire_color = if show_surface { vec4(0.0, 0.0, 0.0, 0.5) } else { vec4(0.2, 0.4, 0.8, 1.0) };
+                let wire_color = if show_surface {
+                    vec4(0.0, 0.0, 0.0, 0.5)
+                } else {
+                    vec4(0.2, 0.4, 0.8, 1.0)
+                };
                 self.draw_line.color = wire_color;
-                for i in 0..rows-1 {
-                    for j in 0..cols-1 {
-                        let corners = [(j, i), (j+1, i), (j+1, i+1), (j, i+1), (j, i)];
+                for i in 0..rows - 1 {
+                    for j in 0..cols - 1 {
+                        let corners = [(j, i), (j + 1, i), (j + 1, i + 1), (j, i + 1), (j, i)];
                         for k in 0..4 {
                             let (j0, i0) = corners[k];
-                            let (j1, i1) = corners[k+1];
+                            let (j1, i1) = corners[k + 1];
                             let x0 = j0 as f64 * x_scale - 1.0;
                             let y0 = i0 as f64 * y_scale - 1.0;
                             let z0 = (z_data[i0][j0] - z_offset) * z_scale;
@@ -336,10 +436,12 @@ impl Surface3D {
                             let y1 = i1 as f64 * y_scale - 1.0;
                             let z1 = (z_data[i1][j1] - z_offset) * z_scale;
                             let (sx1, sy1) = view3d.project(x1, y1, z1);
-                            self.draw_line.draw_line(cx,
+                            self.draw_line.draw_line(
+                                cx,
                                 dvec2(cx_center + sx0 * scale, cy_center - sy0 * scale),
                                 dvec2(cx_center + sx1 * scale, cy_center - sy1 * scale),
-                                1.0);
+                                1.0,
+                            );
                         }
                     }
                 }
@@ -356,15 +458,22 @@ impl Surface3D {
             for ((x0, y0, z0), (x1, y1, z1)) in axes {
                 let (sx0, sy0) = view3d.project(x0, y0, z0);
                 let (sx1, sy1) = view3d.project(x1, y1, z1);
-                self.draw_line.draw_line(cx,
+                self.draw_line.draw_line(
+                    cx,
                     dvec2(cx_center + sx0 * scale, cy_center - sy0 * scale),
                     dvec2(cx_center + sx1 * scale, cy_center - sy1 * scale),
-                    1.0);
+                    1.0,
+                );
             }
 
             // Draw title
             if !title.is_empty() {
-                self.label.draw_at(cx, dvec2(rect.pos.x + 10.0, rect.pos.y + 5.0), &title, TextAnchor::TopLeft);
+                self.label.draw_at(
+                    cx,
+                    dvec2(rect.pos.x + 10.0, rect.pos.y + 5.0),
+                    &title,
+                    TextAnchor::TopLeft,
+                );
             }
         }
 
@@ -393,7 +502,8 @@ impl Surface3D {
                         if let Some(start) = chart.drag_start {
                             let delta = me.abs - start;
                             chart.view3d.azimuth = chart.start_azimuth + delta.x * 0.5;
-                            chart.view3d.elevation = (chart.start_elevation - delta.y * 0.5).clamp(-89.0, 89.0);
+                            chart.view3d.elevation =
+                                (chart.start_elevation - delta.y * 0.5).clamp(-89.0, 89.0);
                             cx.redraw_all();
                         }
                     }
@@ -411,7 +521,9 @@ impl Surface3D {
                 for (_chart_id, chart) in self.charts.map.iter_mut() {
                     let r = chart.hit_rect;
                     if r.size.x > 0.0 && r.size.y > 0.0 && r.contains(se.abs) {
-                        if chart.zoom == 0.0 { chart.zoom = 1.0; }
+                        if chart.zoom == 0.0 {
+                            chart.zoom = 1.0;
+                        }
                         let zoom_delta = 1.0 + se.scroll.y * 0.001;
                         chart.zoom = (chart.zoom * zoom_delta).clamp(0.2, 5.0);
                         cx.redraw_all();
@@ -427,13 +539,19 @@ impl Surface3D {
 impl Widget for Surface3D {
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
         let rect = cx.walk_turtle(walk);
-        self.hit_rect = rect;  // Store for manual hit testing
+        self.hit_rect = rect; // Store for manual hit testing
 
         if rect.size.x > 0.0 && rect.size.y > 0.0 && !self.z_data.is_empty() {
             // Initialize defaults
-            if self.view3d.distance == 0.0 { self.view3d = View3D::new(); }
-            if !self.show_wireframe && !self.show_surface { self.show_wireframe = true; }
-            if self.zoom == 0.0 { self.zoom = 1.0; }
+            if self.view3d.distance == 0.0 {
+                self.view3d = View3D::new();
+            }
+            if !self.show_wireframe && !self.show_surface {
+                self.show_wireframe = true;
+            }
+            if self.zoom == 0.0 {
+                self.zoom = 1.0;
+            }
 
             let cx_center = rect.pos.x + rect.size.x * 0.5;
             let cy_center = rect.pos.y + rect.size.y * 0.5;
@@ -447,17 +565,22 @@ impl Widget for Surface3D {
             let y_scale = 2.0 / (rows - 1).max(1) as f64;
             let z_scale = if self.z_range.1 != self.z_range.0 {
                 1.5 / (self.z_range.1 - self.z_range.0)
-            } else { 1.0 };
+            } else {
+                1.0
+            };
             let z_offset = (self.z_range.0 + self.z_range.1) * 0.5;
 
             // Draw filled surface quads with depth sorting (painter's algorithm)
             if self.show_surface {
                 // Collect all quads with their depth for sorting
                 let mut quads: Vec<(f64, usize, usize, Vec4)> = Vec::new();
-                for i in 0..rows-1 {
-                    for j in 0..cols-1 {
-                        let avg_z = (self.z_data[i][j] + self.z_data[i+1][j] +
-                                     self.z_data[i][j+1] + self.z_data[i+1][j+1]) * 0.25;
+                for i in 0..rows - 1 {
+                    for j in 0..cols - 1 {
+                        let avg_z = (self.z_data[i][j]
+                            + self.z_data[i + 1][j]
+                            + self.z_data[i][j + 1]
+                            + self.z_data[i + 1][j + 1])
+                            * 0.25;
                         let t = self.normalize_z(avg_z);
                         let color = self.colormap.sample(t);
 
@@ -477,7 +600,7 @@ impl Widget for Surface3D {
                 // Draw quads in sorted order
                 for (_, i, j, color) in quads {
                     // Get projected corners
-                    let corners = [(j, i), (j+1, i), (j+1, i+1), (j, i+1)];
+                    let corners = [(j, i), (j + 1, i), (j + 1, i + 1), (j, i + 1)];
                     let mut pts: Vec<DVec2> = Vec::new();
                     for &(cj, ci) in &corners {
                         let x = cj as f64 * x_scale - 1.0;
@@ -493,24 +616,31 @@ impl Widget for Surface3D {
                     let max_x = pts.iter().map(|p| p.x).fold(f64::MIN, f64::max);
                     let min_y = pts.iter().map(|p| p.y).fold(f64::MAX, f64::min);
                     let max_y = pts.iter().map(|p| p.y).fold(f64::MIN, f64::max);
-                    self.draw_fill.draw_abs(cx, Rect {
-                        pos: dvec2(min_x, min_y),
-                        size: dvec2(max_x - min_x + 1.0, max_y - min_y + 1.0),
-                    });
+                    self.draw_fill.draw_abs(
+                        cx,
+                        Rect {
+                            pos: dvec2(min_x, min_y),
+                            size: dvec2(max_x - min_x + 1.0, max_y - min_y + 1.0),
+                        },
+                    );
                 }
             }
 
             // Draw wireframe
             if self.show_wireframe {
-                let wire_color = if self.show_surface { vec4(0.0, 0.0, 0.0, 0.5) } else { vec4(0.2, 0.4, 0.8, 1.0) };
+                let wire_color = if self.show_surface {
+                    vec4(0.0, 0.0, 0.0, 0.5)
+                } else {
+                    vec4(0.2, 0.4, 0.8, 1.0)
+                };
                 self.draw_line.color = wire_color;
 
-                for i in 0..rows-1 {
-                    for j in 0..cols-1 {
-                        let corners = [(j, i), (j+1, i), (j+1, i+1), (j, i+1), (j, i)];
+                for i in 0..rows - 1 {
+                    for j in 0..cols - 1 {
+                        let corners = [(j, i), (j + 1, i), (j + 1, i + 1), (j, i + 1), (j, i)];
                         for k in 0..4 {
                             let (j0, i0) = corners[k];
-                            let (j1, i1) = corners[k+1];
+                            let (j1, i1) = corners[k + 1];
 
                             let x0 = j0 as f64 * x_scale - 1.0;
                             let y0 = i0 as f64 * y_scale - 1.0;
@@ -522,10 +652,12 @@ impl Widget for Surface3D {
                             let z1 = (self.z_data[i1][j1] - z_offset) * z_scale;
                             let (sx1, sy1) = self.view3d.project(x1, y1, z1);
 
-                            self.draw_line.draw_line(cx,
+                            self.draw_line.draw_line(
+                                cx,
                                 dvec2(cx_center + sx0 * scale, cy_center - sy0 * scale),
                                 dvec2(cx_center + sx1 * scale, cy_center - sy1 * scale),
-                                1.0);
+                                1.0,
+                            );
                         }
                     }
                 }
@@ -542,15 +674,22 @@ impl Widget for Surface3D {
             for ((x0, y0, z0), (x1, y1, z1)) in axes {
                 let (sx0, sy0) = self.view3d.project(x0, y0, z0);
                 let (sx1, sy1) = self.view3d.project(x1, y1, z1);
-                self.draw_line.draw_line(cx,
+                self.draw_line.draw_line(
+                    cx,
                     dvec2(cx_center + sx0 * scale, cy_center - sy0 * scale),
                     dvec2(cx_center + sx1 * scale, cy_center - sy1 * scale),
-                    1.0);
+                    1.0,
+                );
             }
 
             // Draw title
             if !self.title.is_empty() {
-                self.label.draw_at(cx, dvec2(rect.pos.x + 10.0, rect.pos.y + 5.0), &self.title, TextAnchor::TopLeft);
+                self.label.draw_at(
+                    cx,
+                    dvec2(rect.pos.x + 10.0, rect.pos.y + 5.0),
+                    &self.title,
+                    TextAnchor::TopLeft,
+                );
             }
         }
 
@@ -566,7 +705,9 @@ impl Widget for Surface3D {
 
         // Legacy single-chart path (used when Surface3D is used standalone)
         let r = self.hit_rect;
-        if r.size.x <= 0.0 || r.size.y <= 0.0 { return; }
+        if r.size.x <= 0.0 || r.size.y <= 0.0 {
+            return;
+        }
 
         match event {
             Event::MouseDown(me) => {
@@ -580,7 +721,8 @@ impl Widget for Surface3D {
                 if let Some(start) = self.drag_start {
                     let delta = me.abs - start;
                     self.view3d.azimuth = self.start_azimuth + delta.x * 0.5;
-                    self.view3d.elevation = (self.start_elevation - delta.y * 0.5).clamp(-89.0, 89.0);
+                    self.view3d.elevation =
+                        (self.start_elevation - delta.y * 0.5).clamp(-89.0, 89.0);
                     cx.redraw_all();
                 }
             }
@@ -589,7 +731,9 @@ impl Widget for Surface3D {
             }
             Event::Scroll(se) => {
                 if r.contains(se.abs) {
-                    if self.zoom == 0.0 { self.zoom = 1.0; }
+                    if self.zoom == 0.0 {
+                        self.zoom = 1.0;
+                    }
                     let zoom_delta = 1.0 + se.scroll.y * 0.001;
                     self.zoom = (self.zoom * zoom_delta).clamp(0.2, 5.0);
                     cx.redraw_all();
@@ -601,17 +745,64 @@ impl Widget for Surface3D {
 }
 
 impl Surface3DRef {
-    pub fn set_title(&self, title: impl Into<String>) { if let Some(mut inner) = self.borrow_mut() { inner.set_title(title); } }
-    pub fn set_data(&self, z: Vec<Vec<f64>>) { if let Some(mut inner) = self.borrow_mut() { inner.set_data(z); } }
-    pub fn set_x_range(&self, min: f64, max: f64) { if let Some(mut inner) = self.borrow_mut() { inner.set_x_range(min, max); } }
-    pub fn set_y_range(&self, min: f64, max: f64) { if let Some(mut inner) = self.borrow_mut() { inner.set_y_range(min, max); } }
-    pub fn set_view(&self, view: View3D) { if let Some(mut inner) = self.borrow_mut() { inner.set_view(view); } }
-    pub fn set_azimuth(&self, az: f64) { if let Some(mut inner) = self.borrow_mut() { inner.set_azimuth(az); } }
-    pub fn set_elevation(&self, el: f64) { if let Some(mut inner) = self.borrow_mut() { inner.set_elevation(el); } }
-    pub fn set_colormap(&self, cm: Colormap) { if let Some(mut inner) = self.borrow_mut() { inner.set_colormap(cm); } }
-    pub fn set_wireframe(&self, show: bool) { if let Some(mut inner) = self.borrow_mut() { inner.set_wireframe(show); } }
-    pub fn set_surface(&self, show: bool) { if let Some(mut inner) = self.borrow_mut() { inner.set_surface(show); } }
-    pub fn clear(&self) { if let Some(mut inner) = self.borrow_mut() { inner.clear(); } }
-    pub fn redraw(&self, cx: &mut Cx) { if let Some(mut inner) = self.borrow_mut() { inner.redraw(cx); } }
+    pub fn set_title(&self, title: impl Into<String>) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_title(title);
+        }
+    }
+    pub fn set_data(&self, z: Vec<Vec<f64>>) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_data(z);
+        }
+    }
+    pub fn set_x_range(&self, min: f64, max: f64) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_x_range(min, max);
+        }
+    }
+    pub fn set_y_range(&self, min: f64, max: f64) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_y_range(min, max);
+        }
+    }
+    pub fn set_view(&self, view: View3D) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_view(view);
+        }
+    }
+    pub fn set_azimuth(&self, az: f64) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_azimuth(az);
+        }
+    }
+    pub fn set_elevation(&self, el: f64) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_elevation(el);
+        }
+    }
+    pub fn set_colormap(&self, cm: Colormap) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_colormap(cm);
+        }
+    }
+    pub fn set_wireframe(&self, show: bool) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_wireframe(show);
+        }
+    }
+    pub fn set_surface(&self, show: bool) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_surface(show);
+        }
+    }
+    pub fn clear(&self) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.clear();
+        }
+    }
+    pub fn redraw(&self, cx: &mut Cx) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.redraw(cx);
+        }
+    }
 }
-

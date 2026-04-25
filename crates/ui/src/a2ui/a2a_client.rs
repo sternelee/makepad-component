@@ -89,8 +89,7 @@ impl A2aClient {
             .map_err(|e| format!("Failed to serialize request: {}", e))?;
 
         // Build SSE client
-        let mut client = SseClient::new(&self.url)
-            .header("X-A2A-Extensions", A2UI_EXTENSION_URI);
+        let mut client = SseClient::new(&self.url).header("X-A2A-Extensions", A2UI_EXTENSION_URI);
 
         if let Some(token) = &self.auth_token {
             client = client.auth(token);
@@ -229,7 +228,10 @@ impl A2aEventStream {
                                 return Some(A2aStreamEvent::A2uiMessage(msg));
                             }
                             // Log parse error but continue
-                            warn!("Failed to parse SSE data as A2UI message: {}", &data[..data.len().min(200)]);
+                            warn!(
+                                "Failed to parse SSE data as A2UI message: {}",
+                                &data[..data.len().min(200)]
+                            );
                             continue;
                         }
                     }
@@ -272,7 +274,10 @@ impl A2aEventStream {
             ResultValue::Event(event) => {
                 // Check for A2UI messages in data
                 if let Some(data) = event.data {
-                    debug!("Event data: {}", serde_json::to_string_pretty(&data).unwrap_or_default());
+                    debug!(
+                        "Event data: {}",
+                        serde_json::to_string_pretty(&data).unwrap_or_default()
+                    );
 
                     // Try to parse as array of A2UI messages first (A2UI bridge format)
                     if let Ok(msgs) = serde_json::from_value::<Vec<A2uiMessage>>(data.clone()) {
@@ -281,7 +286,10 @@ impl A2aEventStream {
                             let first = msgs.remove(0);
                             msgs.reverse();
                             self.pending_messages = msgs;
-                            debug!("Parsed {} A2uiMessages from array", self.pending_messages.len() + 1);
+                            debug!(
+                                "Parsed {} A2uiMessages from array",
+                                self.pending_messages.len() + 1
+                            );
                             return Some(A2aStreamEvent::A2uiMessage(first));
                         }
                     }

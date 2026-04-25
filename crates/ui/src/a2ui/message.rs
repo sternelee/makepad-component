@@ -1496,9 +1496,18 @@ mod tests {
                 assert_eq!(su.components[0].id, "player1");
                 match &su.components[0].component {
                     ComponentType::AudioPlayer(player) => {
-                        assert_eq!(player.url.as_literal(), Some("https://example.com/song.mp3"));
-                        assert_eq!(player.title.as_ref().and_then(|t| t.as_literal()), Some("My Song"));
-                        assert_eq!(player.artist.as_ref().and_then(|a| a.as_literal()), Some("Artist Name"));
+                        assert_eq!(
+                            player.url.as_literal(),
+                            Some("https://example.com/song.mp3")
+                        );
+                        assert_eq!(
+                            player.title.as_ref().and_then(|t| t.as_literal()),
+                            Some("My Song")
+                        );
+                        assert_eq!(
+                            player.artist.as_ref().and_then(|a| a.as_literal()),
+                            Some("Artist Name")
+                        );
                     }
                     _ => panic!("Expected AudioPlayer"),
                 }
@@ -1529,7 +1538,10 @@ mod tests {
                 match &su.components[0].component {
                     ComponentType::AudioPlayer(player) => {
                         assert_eq!(player.url.as_path(), Some("/currentSong/audioUrl"));
-                        assert_eq!(player.title.as_ref().and_then(|t| t.as_path()), Some("/currentSong/title"));
+                        assert_eq!(
+                            player.title.as_ref().and_then(|t| t.as_path()),
+                            Some("/currentSong/title")
+                        );
                     }
                     _ => panic!("Expected AudioPlayer"),
                 }

@@ -1,10 +1,10 @@
-use makepad_widgets::*;
-use makepad_plot::*;
-use crate::a2ui::message::*;
 use crate::a2ui::data_model::DataModel;
+use crate::a2ui::message::*;
 use crate::a2ui::processor::resolve_string_value_scoped;
+use makepad_plot::*;
+use makepad_widgets::*;
 
-use super::{get_bridge_color, resolve_title, parse_colormap};
+use super::{get_bridge_color, parse_colormap, resolve_title};
 
 pub fn render_waterfall(
     plot: &mut WaterfallChart,
@@ -20,7 +20,10 @@ pub fn render_waterfall(
         let count = chart.labels.len().min(first_series.values.len());
         let mut entries = Vec::with_capacity(count);
         for i in 0..count {
-            entries.push(WaterfallEntry::new(&chart.labels[i], first_series.values[i]));
+            entries.push(WaterfallEntry::new(
+                &chart.labels[i],
+                first_series.values[i],
+            ));
         }
         plot.set_data(entries);
     }
@@ -83,8 +86,10 @@ pub fn render_step(
     plot.clear();
 
     for (i, series) in chart.series.iter().enumerate() {
-        let x = series.x_values.clone().unwrap_or_else(||
-            (0..series.values.len()).map(|j| j as f64).collect());
+        let x = series
+            .x_values
+            .clone()
+            .unwrap_or_else(|| (0..series.values.len()).map(|j| j as f64).collect());
         let s = StepSeries::new(series.name.as_deref().unwrap_or(""))
             .with_data(x, series.values.clone())
             .with_color(get_bridge_color(chart, i));
@@ -111,10 +116,15 @@ pub fn render_stackplot(
     data_model: &DataModel,
     current_scope: Option<&str>,
 ) {
-    let series: Vec<StackSeries> = chart.series.iter().enumerate().map(|(i, s)| {
-        StackSeries::new(s.name.as_deref().unwrap_or(""), s.values.clone())
-            .with_color(get_bridge_color(chart, i))
-    }).collect();
+    let series: Vec<StackSeries> = chart
+        .series
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            StackSeries::new(s.name.as_deref().unwrap_or(""), s.values.clone())
+                .with_color(get_bridge_color(chart, i))
+        })
+        .collect();
 
     plot.set_data(series, chart.labels.clone());
 
@@ -169,10 +179,15 @@ pub fn render_streamgraph(
     data_model: &DataModel,
     current_scope: Option<&str>,
 ) {
-    let series: Vec<StreamSeries> = chart.series.iter().enumerate().map(|(i, s)| {
-        StreamSeries::new(s.name.as_deref().unwrap_or(""), s.values.clone())
-            .with_color(get_bridge_color(chart, i))
-    }).collect();
+    let series: Vec<StreamSeries> = chart
+        .series
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            StreamSeries::new(s.name.as_deref().unwrap_or(""), s.values.clone())
+                .with_color(get_bridge_color(chart, i))
+        })
+        .collect();
 
     plot.set_data(series, chart.labels.clone());
 
@@ -197,8 +212,13 @@ pub fn render_surface3d(
     current_scope: Option<&str>,
     chart_id: &str,
 ) {
-    log!("[render_surface3d] Rendering 3D surface '{}' with {} series, size {}x{}",
-         chart_id, chart.series.len(), chart.width, chart.height);
+    log!(
+        "[render_surface3d] Rendering 3D surface '{}' with {} series, size {}x{}",
+        chart_id,
+        chart.series.len(),
+        chart.width,
+        chart.height
+    );
 
     // Use per-chart instance state (preserves view angles/zoom across redraws)
     let instance = plot.get_chart_mut(chart_id);

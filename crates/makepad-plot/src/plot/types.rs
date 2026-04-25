@@ -18,21 +18,26 @@ live_design! {
 /// override individual colors in DSL or at runtime.
 #[derive(Live, LiveHook, LiveRegister)]
 pub struct ChartTheme {
-    #[live] pub label_color: Vec4,
-    #[live] pub axis_color: Vec4,
-    #[live] pub grid_color: Vec4,
-    #[live] pub legend_bg_color: Vec4,
-    #[live] pub legend_border_color: Vec4,
+    #[live]
+    pub label_color: Vec4,
+    #[live]
+    pub axis_color: Vec4,
+    #[live]
+    pub grid_color: Vec4,
+    #[live]
+    pub legend_bg_color: Vec4,
+    #[live]
+    pub legend_border_color: Vec4,
 }
 
 /// Step plot style - where to place the step
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum StepStyle {
     #[default]
-    None,   // Normal line (no step)
-    Pre,    // Step before the point (y value changes at x)
-    Post,   // Step after the point (y value changes at next x)
-    Mid,    // Step in the middle between points
+    None, // Normal line (no step)
+    Pre,  // Step before the point (y value changes at x)
+    Post, // Step after the point (y value changes at next x)
+    Mid,  // Step in the middle between points
 }
 
 /// Vertical line annotation
@@ -109,8 +114,8 @@ pub fn darken(color: Vec4, amount: f32) -> Vec4 {
 /// Get a gradient color pair (center, outer) for radial gradients
 /// Creates a nice visual depth effect with lighter center and darker edge
 pub fn gradient_pair(color: Vec4) -> (Vec4, Vec4) {
-    let center = lighten(color, 0.4);  // Bright center
-    let outer = darken(color, 0.15);   // Slightly darker edge
+    let center = lighten(color, 0.4); // Bright center
+    let outer = darken(color, 0.15); // Slightly darker edge
     (center, outer)
 }
 
@@ -235,7 +240,12 @@ pub struct PlotArea {
 
 impl PlotArea {
     pub fn new(left: f64, top: f64, right: f64, bottom: f64) -> Self {
-        Self { left, top, right, bottom }
+        Self {
+            left,
+            top,
+            right,
+            bottom,
+        }
     }
 
     pub fn width(&self) -> f64 {
@@ -268,7 +278,7 @@ pub struct TextAnnotation {
     pub y: f64,
     pub color: Vec4,
     pub font_size: f64,
-    pub is_math: bool,  // If true, render as LaTeX using Math widget
+    pub is_math: bool, // If true, render as LaTeX using Math widget
 }
 
 /// Arrow annotation pointing from one location to another
@@ -281,7 +291,7 @@ pub struct ArrowAnnotation {
     pub color: Vec4,
     pub line_width: f64,
     pub head_size: f64,
-    pub text: Option<String>,  // Optional label near the arrow start
+    pub text: Option<String>, // Optional label near the arrow start
 }
 
 impl ArrowAnnotation {

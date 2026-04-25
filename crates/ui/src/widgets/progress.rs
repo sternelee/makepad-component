@@ -154,15 +154,17 @@ pub struct MpProgress {
 }
 
 impl Widget for MpProgress {
-    fn handle_event(&mut self, _cx: &mut Cx, _event: &Event, _scope: &mut Scope) {
-    }
+    fn handle_event(&mut self, _cx: &mut Cx, _event: &Event, _scope: &mut Scope) {}
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
         // Set progress via apply_over
         let progress = (self.value / 100.0).clamp(0.0, 1.0);
-        self.draw_bg.apply_over(cx, live! {
-            progress: (progress)
-        });
+        self.draw_bg.apply_over(
+            cx,
+            live! {
+                progress: (progress)
+            },
+        );
 
         self.draw_bg.draw_walk(cx, walk);
         DrawStep::done()

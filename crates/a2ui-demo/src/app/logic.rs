@@ -1,23 +1,27 @@
 use makepad_component::a2ui::*;
 use makepad_component::widgets::button::MpButtonAction;
-use makepad_widgets::*;
 use makepad_widgets::makepad_platform::live_atomic::AtomicGetSet;
-use std::hash::{Hash, Hasher};
+use makepad_widgets::*;
 use std::collections::hash_map::DefaultHasher;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::Ordering;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, Mutex};
 
+use super::audio_player::{decode_audio_file, start_audio_output, AudioPlaybackState};
+use super::sample_data::{get_sample_music_player, get_sample_product_catalog};
 use super::theme::Theme;
-use super::sample_data::{get_sample_product_catalog, get_sample_music_player};
-use super::audio_player::{AudioPlaybackState, decode_audio_file, start_audio_output};
 
 /// Compute the local cache path for an audio URL.
 /// Files are cached in `crates/a2ui-demo/resources/` by sanitized title + extension.
 fn audio_cache_path(title: &str, url: &str) -> String {
-    let ext = if url.contains(".mp4") || url.contains(".m4a") { "mp4" }
-        else if url.contains(".mp3") { "mp3" }
-        else { "mp3" };
+    let ext = if url.contains(".mp4") || url.contains(".m4a") {
+        "mp4"
+    } else if url.contains(".mp3") {
+        "mp3"
+    } else {
+        "mp3"
+    };
     let sanitized: String = title.chars().filter(|c| c.is_alphanumeric()).collect();
     format!("crates/a2ui-demo/resources/audio_{}.{}", sanitized, ext)
 }
@@ -43,14 +47,25 @@ fn preload_audio_urls(urls: Vec<(String, String)>, pcm_cache: PcmCache) {
                     .status();
                 match status {
                     Ok(s) if s.success() => log!("Pre-download complete: {}", cache_path),
-                    _ => { log!("Pre-download failed: {}", url); return; }
+                    _ => {
+                        log!("Pre-download failed: {}", url);
+                        return;
+                    }
                 }
             }
             // Pre-decode to PCM and store in memory cache
             match decode_audio_file(&cache_path) {
                 Ok((samples, sample_rate, channels)) => {
-                    log!("Pre-decoded: {} ({} samples, {}Hz)", cache_path, samples.len(), sample_rate);
-                    pcm_cache.lock().unwrap().insert(cache_path, (samples, sample_rate, channels));
+                    log!(
+                        "Pre-decoded: {} ({} samples, {}Hz)",
+                        cache_path,
+                        samples.len(),
+                        sample_rate
+                    );
+                    pcm_cache
+                        .lock()
+                        .unwrap()
+                        .insert(cache_path, (samples, sample_rate, channels));
                 }
                 Err(e) => log!("Pre-decode failed: {} - {}", cache_path, e),
             }
@@ -319,29 +334,44 @@ impl App {
         let colors = self.current_theme.colors();
 
         // Apply body background (main container)
-        self.ui.view(ids!(body)).apply_over(cx, live! {
-            draw_bg: { color: (colors.bg_primary) }
-        });
+        self.ui.view(ids!(body)).apply_over(
+            cx,
+            live! {
+                draw_bg: { color: (colors.bg_primary) }
+            },
+        );
 
         // Apply header row background (in case it needs distinction)
-        self.ui.view(ids!(header_row)).apply_over(cx, live! {
-            draw_bg: { color: (colors.bg_primary) }
-        });
+        self.ui.view(ids!(header_row)).apply_over(
+            cx,
+            live! {
+                draw_bg: { color: (colors.bg_primary) }
+            },
+        );
 
         // Apply controls row background
-        self.ui.view(ids!(controls_row)).apply_over(cx, live! {
-            draw_bg: { color: (colors.bg_primary) }
-        });
+        self.ui.view(ids!(controls_row)).apply_over(
+            cx,
+            live! {
+                draw_bg: { color: (colors.bg_primary) }
+            },
+        );
 
         // Apply title color
-        self.ui.label(ids!(title_label)).apply_over(cx, live! {
-            draw_text: { color: (colors.text_primary) }
-        });
+        self.ui.label(ids!(title_label)).apply_over(
+            cx,
+            live! {
+                draw_text: { color: (colors.text_primary) }
+            },
+        );
 
         // Apply description color
-        self.ui.label(ids!(desc_label)).apply_over(cx, live! {
-            draw_text: { color: (colors.text_secondary) }
-        });
+        self.ui.label(ids!(desc_label)).apply_over(
+            cx,
+            live! {
+                draw_text: { color: (colors.text_secondary) }
+            },
+        );
 
         // Apply button colors - keep text white for contrast
         let white = vec4(1.0, 1.0, 1.0, 1.0);
@@ -351,85 +381,103 @@ impl App {
             colors.accent.x * 0.85,
             colors.accent.y * 0.85,
             colors.accent.z * 0.85,
-            1.0
+            1.0,
         );
         let accent_pressed = vec4(
             colors.accent.x * 0.7,
             colors.accent.y * 0.7,
             colors.accent.z * 0.7,
-            1.0
+            1.0,
         );
         let secondary_hover = vec4(
             colors.accent_secondary.x * 0.85,
             colors.accent_secondary.y * 0.85,
             colors.accent_secondary.z * 0.85,
-            1.0
+            1.0,
         );
         let secondary_pressed = vec4(
             colors.accent_secondary.x * 0.7,
             colors.accent_secondary.y * 0.7,
             colors.accent_secondary.z * 0.7,
-            1.0
+            1.0,
         );
 
-        self.ui.button(ids!(load_btn)).apply_over(cx, live! {
-            draw_bg: {
-                color: (colors.accent)
-                color_hover: (accent_hover)
-                color_pressed: (accent_pressed)
-            }
-            draw_text: { color: (white) }
-        });
+        self.ui.button(ids!(load_btn)).apply_over(
+            cx,
+            live! {
+                draw_bg: {
+                    color: (colors.accent)
+                    color_hover: (accent_hover)
+                    color_pressed: (accent_pressed)
+                }
+                draw_text: { color: (white) }
+            },
+        );
 
-        self.ui.button(ids!(connect_btn)).apply_over(cx, live! {
-            draw_bg: {
-                color: (colors.accent_secondary)
-                color_hover: (secondary_hover)
-                color_pressed: (secondary_pressed)
-            }
-            draw_text: { color: (white) }
-        });
+        self.ui.button(ids!(connect_btn)).apply_over(
+            cx,
+            live! {
+                draw_bg: {
+                    color: (colors.accent_secondary)
+                    color_hover: (secondary_hover)
+                    color_pressed: (secondary_pressed)
+                }
+                draw_text: { color: (white) }
+            },
+        );
 
         // Apply server URL label color
-        self.ui.label(ids!(server_url)).apply_over(cx, live! {
-            draw_text: { color: (colors.text_secondary) }
-        });
+        self.ui.label(ids!(server_url)).apply_over(
+            cx,
+            live! {
+                draw_text: { color: (colors.text_secondary) }
+            },
+        );
 
         // Apply status label color
-        self.ui.label(ids!(status_label)).apply_over(cx, live! {
-            draw_text: { color: (colors.status_color) }
-        });
+        self.ui.label(ids!(status_label)).apply_over(
+            cx,
+            live! {
+                draw_text: { color: (colors.status_color) }
+            },
+        );
 
         // Apply surface container background
-        self.ui.view(ids!(surface_container)).apply_over(cx, live! {
-            draw_bg: { color: (colors.bg_surface) }
-        });
+        self.ui.view(ids!(surface_container)).apply_over(
+            cx,
+            live! {
+                draw_bg: { color: (colors.bg_surface) }
+            },
+        );
 
         // Apply theme-appropriate dropdown styling
         let is_light = self.current_theme == Theme::Light;
         let dropdown_text = if is_light {
-            vec4(0.04, 0.04, 0.04, 1.0)  // dark text
+            vec4(0.04, 0.04, 0.04, 1.0) // dark text
         } else {
-            vec4(1.0, 1.0, 1.0, 1.0)     // white text
+            vec4(1.0, 1.0, 1.0, 1.0) // white text
         };
         let dropdown_bg = if is_light {
-            vec4(1.0, 1.0, 1.0, 1.0)     // white bg
+            vec4(1.0, 1.0, 1.0, 1.0) // white bg
         } else {
-            vec4(0.2, 0.2, 0.33, 1.0)    // dark purple bg
+            vec4(0.2, 0.2, 0.33, 1.0) // dark purple bg
         };
         let dropdown_border = if is_light {
-            vec4(0.83, 0.83, 0.83, 1.0)  // light border
+            vec4(0.83, 0.83, 0.83, 1.0) // light border
         } else {
-            vec4(0.33, 0.33, 0.47, 1.0)  // dark border
+            vec4(0.33, 0.33, 0.47, 1.0) // dark border
         };
 
-        self.ui.drop_down(ids!(theme_dropdown)).apply_over(cx, live! {
-            draw_text: { color: (dropdown_text) }
-            draw_bg: {
-                color: (dropdown_bg)
-                border_color: (dropdown_border)
-            }
-        });
+        self.ui.drop_down(ids!(theme_dropdown)).apply_over(
+            cx,
+            live! {
+                draw_text: { color: (dropdown_text) }
+                draw_bg: {
+                    color: (dropdown_bg)
+                    border_color: (dropdown_border)
+                }
+            },
+        );
 
         // Apply theme to A2UI surface content
         let surface_ref = self.ui.widget(ids!(a2ui_surface));
@@ -521,16 +569,14 @@ impl App {
                         // Handle payment actions
                         match user_action.action.name.as_str() {
                             "confirmPayment" => {
-                                self.ui.label(ids!(status_label)).set_text(
-                                    cx,
-                                    "✅ Processing payment...",
-                                );
+                                self.ui
+                                    .label(ids!(status_label))
+                                    .set_text(cx, "✅ Processing payment...");
                             }
                             "cancelPayment" => {
-                                self.ui.label(ids!(status_label)).set_text(
-                                    cx,
-                                    "❌ Payment cancelled",
-                                );
+                                self.ui
+                                    .label(ids!(status_label))
+                                    .set_text(cx, "❌ Payment cancelled");
                             }
                             _ => {
                                 self.ui.label(ids!(status_label)).set_text(
@@ -543,10 +589,9 @@ impl App {
                         // Handle locally (static mode)
                         if user_action.action.name == "addToCart" {
                             if let Some(product_id) = user_action.action.context.get("productId") {
-                                self.ui.label(ids!(status_label)).set_text(
-                                    cx,
-                                    &format!("🛒 Added {} to cart!", product_id),
-                                );
+                                self.ui
+                                    .label(ids!(status_label))
+                                    .set_text(cx, &format!("🛒 Added {} to cart!", product_id));
                             }
                         } else if user_action.action.name == "switchEffect" {
                             // Update DataModel /shaderEffect to switch the active shader
@@ -554,21 +599,33 @@ impl App {
                                 let effect_str = effect.as_str().unwrap_or("aurora");
                                 if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
                                     if let Some(processor) = surface.processor_mut() {
-                                        if let Some(data_model) = processor.get_data_model_mut(&user_action.surface_id) {
-                                            data_model.set("/shaderEffect", serde_json::Value::String(effect_str.to_string()));
+                                        if let Some(data_model) =
+                                            processor.get_data_model_mut(&user_action.surface_id)
+                                        {
+                                            data_model.set(
+                                                "/shaderEffect",
+                                                serde_json::Value::String(effect_str.to_string()),
+                                            );
                                         }
                                     }
                                 }
-                                self.ui.label(ids!(status_label)).set_text(
-                                    cx,
-                                    &format!("🎨 Effect: {}", effect_str),
-                                );
+                                self.ui
+                                    .label(ids!(status_label))
+                                    .set_text(cx, &format!("🎨 Effect: {}", effect_str));
                             }
                         } else if user_action.action.name == "calendarCellClick" {
-                            let row = user_action.action.context.get("row")
-                                .and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                            let col = user_action.action.context.get("col")
-                                .and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                            let row = user_action
+                                .action
+                                .context
+                                .get("row")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0) as usize;
+                            let col = user_action
+                                .action
+                                .context
+                                .get("col")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0) as usize;
 
                             // Read cell content from DataModel
                             let mut detail = String::new();
@@ -576,12 +633,18 @@ impl App {
                             if let Some(surface) = surface_ref.borrow::<A2uiSurface>() {
                                 if let Some(processor) = surface.processor() {
                                     if let Some(dm) = processor.get_data_model(sid) {
-                                        let line1 = dm.get_string(
-                                            &format!("/calendar/cells/{}/{}/line1", row, col)
-                                        ).unwrap_or("");
-                                        let line2 = dm.get_string(
-                                            &format!("/calendar/cells/{}/{}/line2", row, col)
-                                        ).unwrap_or("");
+                                        let line1 = dm
+                                            .get_string(&format!(
+                                                "/calendar/cells/{}/{}/line1",
+                                                row, col
+                                            ))
+                                            .unwrap_or("");
+                                        let line2 = dm
+                                            .get_string(&format!(
+                                                "/calendar/cells/{}/{}/line2",
+                                                row, col
+                                            ))
+                                            .unwrap_or("");
                                         if !line1.is_empty() {
                                             detail = if line2.is_empty() {
                                                 line1.to_string()
@@ -602,21 +665,30 @@ impl App {
                                 _ => "?",
                             };
                             let status = if detail.is_empty() {
-                                format!("📅 Day {} | {} (row={}, col={})", col + 1, time_slot, row, col)
+                                format!(
+                                    "📅 Day {} | {} (row={}, col={})",
+                                    col + 1,
+                                    time_slot,
+                                    row,
+                                    col
+                                )
                             } else {
                                 format!("📅 Day {} | {} | {}", col + 1, time_slot, detail)
                             };
                             self.ui.label(ids!(status_label)).set_text(cx, &status);
                         } else {
-                            self.ui.label(ids!(status_label)).set_text(
-                                cx,
-                                &format!("🎯 Action: {}", user_action.action.name),
-                            );
+                            self.ui
+                                .label(ids!(status_label))
+                                .set_text(cx, &format!("🎯 Action: {}", user_action.action.name));
                         }
                     }
                     self.ui.redraw(cx);
                 }
-                A2uiSurfaceAction::PlayAudio { component_id, url, title } => {
+                A2uiSurfaceAction::PlayAudio {
+                    component_id,
+                    url,
+                    title,
+                } => {
                     // Toggle: if same component is playing, stop it
                     if self.playing_audio_component_id.as_ref() == Some(&component_id) {
                         // Stop native audio playback
@@ -628,10 +700,9 @@ impl App {
                         surface.set_playing_component(None);
                         surface.set_audio_amplitude(0.0);
 
-                        self.ui.label(ids!(status_label)).set_text(
-                            cx,
-                            &format!("⏹ Stopped: {}", title),
-                        );
+                        self.ui
+                            .label(ids!(status_label))
+                            .set_text(cx, &format!("⏹ Stopped: {}", title));
                         log!("Stopped: {}", title);
                     } else {
                         // Stop any current playback first
@@ -646,7 +717,11 @@ impl App {
 
                         // Ensure audio output callback is registered
                         if !self.audio_output_registered {
-                            start_audio_output(cx, self.audio_state.clone(), self.audio_signal.clone());
+                            start_audio_output(
+                                cx,
+                                self.audio_state.clone(),
+                                self.audio_signal.clone(),
+                            );
                             self.audio_output_registered = true;
                         }
 
@@ -657,15 +732,19 @@ impl App {
                         if let Some((samples, sample_rate, channels)) = pcm_hit {
                             // Instant playback from memory cache
                             log!("Instant playback from PCM cache: {}", cache_path);
-                            self.ui.label(ids!(status_label)).set_text(
-                                cx,
-                                &format!("▶ {}", title),
-                            );
+                            self.ui
+                                .label(ids!(status_label))
+                                .set_text(cx, &format!("▶ {}", title));
                             if !self.audio_output_registered {
-                                start_audio_output(cx, self.audio_state.clone(), self.audio_signal.clone());
+                                start_audio_output(
+                                    cx,
+                                    self.audio_state.clone(),
+                                    self.audio_signal.clone(),
+                                );
                                 self.audio_output_registered = true;
                             }
-                            self.audio_state.load_samples(samples, sample_rate, channels);
+                            self.audio_state
+                                .load_samples(samples, sample_rate, channels);
                             self.audio_state.play();
                             self.audio_signal.set();
                         } else {
@@ -685,7 +764,11 @@ impl App {
                             self.ui.label(ids!(status_label)).set_text(cx, &status_msg);
 
                             if !self.audio_output_registered {
-                                start_audio_output(cx, self.audio_state.clone(), self.audio_signal.clone());
+                                start_audio_output(
+                                    cx,
+                                    self.audio_state.clone(),
+                                    self.audio_signal.clone(),
+                                );
                                 self.audio_output_registered = true;
                             }
 
@@ -700,16 +783,25 @@ impl App {
                                         .status();
                                     match status {
                                         Ok(s) if s.success() => cache_path_clone.clone(),
-                                        _ => { log!("Download failed for {}", url_clone); return; }
+                                        _ => {
+                                            log!("Download failed for {}", url_clone);
+                                            return;
+                                        }
                                     }
                                 };
 
                                 match decode_audio_file(&path) {
                                     Ok((samples, sample_rate, channels)) => {
-                                        log!("Decoded: {} samples, {}Hz, {} ch", samples.len(), sample_rate, channels);
+                                        log!(
+                                            "Decoded: {} samples, {}Hz, {} ch",
+                                            samples.len(),
+                                            sample_rate,
+                                            channels
+                                        );
                                         // Store in PCM cache for next time
                                         pcm_cache.lock().unwrap().insert(
-                                            cache_path_clone, (samples.clone(), sample_rate, channels)
+                                            cache_path_clone,
+                                            (samples.clone(), sample_rate, channels),
                                         );
                                         audio_state.load_samples(samples, sample_rate, channels);
                                         audio_state.play();
@@ -722,8 +814,17 @@ impl App {
                     }
                     self.ui.redraw(cx);
                 }
-                A2uiSurfaceAction::DataModelChanged { surface_id, path, value } => {
-                    log!("[DataModelChanged] surface={}, path={}, value={}", surface_id, path, value);
+                A2uiSurfaceAction::DataModelChanged {
+                    surface_id,
+                    path,
+                    value,
+                } => {
+                    log!(
+                        "[DataModelChanged] surface={}, path={}, value={}",
+                        surface_id,
+                        path,
+                        value
+                    );
                     // Update the data model with the new value
                     if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
                         if let Some(processor) = surface.processor_mut() {
@@ -741,7 +842,8 @@ impl App {
                                     if value == serde_json::Value::Bool(true) {
                                         for method in &payment_methods {
                                             if *method != path {
-                                                data_model.set(method, serde_json::Value::Bool(false));
+                                                data_model
+                                                    .set(method, serde_json::Value::Bool(false));
                                             }
                                         }
                                     }
@@ -754,7 +856,12 @@ impl App {
                                     if let Some(vol) = value.as_f64() {
                                         let normalized = (vol / 100.0).clamp(0.0, 1.0);
                                         self.audio_state.volume.set(normalized);
-                                        log!("[volume] path={}, raw={}, normalized={:.2}", path, vol, normalized);
+                                        log!(
+                                            "[volume] path={}, raw={}, normalized={:.2}",
+                                            path,
+                                            vol,
+                                            normalized
+                                        );
                                     }
                                 }
 
@@ -762,17 +869,19 @@ impl App {
                                 if path == "/filters/maxPrice" {
                                     if let Some(price) = value.as_f64() {
                                         let display = format!("${:.0}", price);
-                                        data_model.set("/filters/maxPriceDisplay", serde_json::Value::String(display));
+                                        data_model.set(
+                                            "/filters/maxPriceDisplay",
+                                            serde_json::Value::String(display),
+                                        );
                                     }
                                 }
                             }
                         }
                     }
                     // Update status to show the change
-                    self.ui.label(ids!(status_label)).set_text(
-                        cx,
-                        &format!("📝 Updated {}", path),
-                    );
+                    self.ui
+                        .label(ids!(status_label))
+                        .set_text(cx, &format!("📝 Updated {}", path));
                     self.ui.redraw(cx);
                 }
                 _ => {}
@@ -799,7 +908,9 @@ impl App {
         }
 
         // Update title for streaming mode
-        self.ui.label(ids!(title_label)).set_text(cx, "🎨 Live A2UI Editor");
+        self.ui
+            .label(ids!(title_label))
+            .set_text(cx, "🎨 Live A2UI Editor");
 
         // Connect to /rpc for initial UI load
         let config = A2uiHostConfig {
@@ -811,7 +922,9 @@ impl App {
 
         match host.connect("Live mode") {
             Ok(()) => {
-                self.ui.label(ids!(status_label)).set_text(cx, "🔗 Connecting to live server...");
+                self.ui
+                    .label(ids!(status_label))
+                    .set_text(cx, "🔗 Connecting to live server...");
                 self.host = Some(host);
                 self.is_streaming = true;
                 self.live_mode = true;
@@ -823,7 +936,9 @@ impl App {
                 self.connect_live_stream(cx);
             }
             Err(e) => {
-                self.ui.label(ids!(status_label)).set_text(cx, &format!("❌ Connection failed: {}", e));
+                self.ui
+                    .label(ids!(status_label))
+                    .set_text(cx, &format!("❌ Connection failed: {}", e));
             }
         }
 
@@ -874,7 +989,9 @@ impl App {
     fn disconnect(&mut self, cx: &mut Cx) {
         self.host = None;
         self.is_streaming = false;
-        self.ui.label(ids!(status_label)).set_text(cx, "🔌 Disconnected from server");
+        self.ui
+            .label(ids!(status_label))
+            .set_text(cx, "🔌 Disconnected from server");
         self.ui.redraw(cx);
     }
 
@@ -949,11 +1066,15 @@ impl App {
                 }
 
                 if self.live_mode {
-                    self.ui.label(ids!(status_label)).set_text(cx, "🎨 Live UI Updated");
+                    self.ui
+                        .label(ids!(status_label))
+                        .set_text(cx, "🎨 Live UI Updated");
                     self.loaded = true;
                     // Keep polling for new content updates
                 } else {
-                    self.ui.label(ids!(status_label)).set_text(cx, "💳 Streaming payment UI...");
+                    self.ui
+                        .label(ids!(status_label))
+                        .set_text(cx, "💳 Streaming payment UI...");
                 }
                 needs_redraw = true;
             }
@@ -962,16 +1083,22 @@ impl App {
         if let Some(state) = task_state {
             if !self.live_mode {
                 if state == "completed" {
-                    self.ui.label(ids!(status_label)).set_text(cx, "✅ Payment page ready");
+                    self.ui
+                        .label(ids!(status_label))
+                        .set_text(cx, "✅ Payment page ready");
                 } else {
-                    self.ui.label(ids!(status_label)).set_text(cx, &format!("💳 {}", state));
+                    self.ui
+                        .label(ids!(status_label))
+                        .set_text(cx, &format!("💳 {}", state));
                 }
                 needs_redraw = true;
             }
         }
 
         if had_error {
-            self.ui.label(ids!(status_label)).set_text(cx, &format!("❌ Error: {}", error_msg));
+            self.ui
+                .label(ids!(status_label))
+                .set_text(cx, &format!("❌ Error: {}", error_msg));
             needs_redraw = true;
         }
 
@@ -979,7 +1106,9 @@ impl App {
             self.host = None;
             self.is_streaming = false;
             if !self.live_mode {
-                self.ui.label(ids!(status_label)).set_text(cx, "⚫ Disconnected from server");
+                self.ui
+                    .label(ids!(status_label))
+                    .set_text(cx, "⚫ Disconnected from server");
                 needs_redraw = true;
             }
         }
@@ -1014,7 +1143,9 @@ impl App {
                         let events = surface.process_message(msg);
                         log!("🔴 LIVE: Processed {} events", events.len());
                     }
-                    self.ui.label(ids!(status_label)).set_text(cx, "🔴 Streaming component...");
+                    self.ui
+                        .label(ids!(status_label))
+                        .set_text(cx, "🔴 Streaming component...");
                     needs_redraw = true;
                 }
                 A2uiHostEvent::TaskStatus { task_id: _, state } => {
@@ -1049,7 +1180,9 @@ impl App {
         }
 
         // Update title for static mode
-        self.ui.label(ids!(title_label)).set_text(cx, "🛒 Product Catalog");
+        self.ui
+            .label(ids!(title_label))
+            .set_text(cx, "🛒 Product Catalog");
 
         // Sample A2UI JSON for a product catalog
         let a2ui_json = get_sample_product_catalog();
@@ -1079,11 +1212,13 @@ impl App {
 
         // Update status label - use emoji to highlight static data mode
         if let Some(count) = result {
-            self.ui.label(ids!(status_label))
+            self.ui
+                .label(ids!(status_label))
                 .set_text(cx, &format!("🟢 Static Mode | {} events loaded", count));
             self.loaded = true;
         } else {
-            self.ui.label(ids!(status_label))
+            self.ui
+                .label(ids!(status_label))
                 .set_text(cx, "🔴 Error loading A2UI data");
         }
 
@@ -1103,13 +1238,16 @@ impl App {
             surface.clear();
         }
 
-        self.ui.label(ids!(title_label)).set_text(cx, "Personal Travel Planner");
+        self.ui
+            .label(ids!(title_label))
+            .set_text(cx, "Personal Travel Planner");
 
         // Load travel_app.json from current directory
         let json_str = match std::fs::read_to_string("travel_app.json") {
             Ok(s) => s,
             Err(e) => {
-                self.ui.label(ids!(status_label))
+                self.ui
+                    .label(ids!(status_label))
                     .set_text(cx, &format!("Error: travel_app.json not found ({})", e));
                 self.ui.redraw(cx);
                 return;
@@ -1135,11 +1273,14 @@ impl App {
         };
 
         if let Some(count) = result {
-            self.ui.label(ids!(status_label))
-                .set_text(cx, &format!("Travel Planner | {} events | Tokyo 7-Day Trip", count));
+            self.ui.label(ids!(status_label)).set_text(
+                cx,
+                &format!("Travel Planner | {} events | Tokyo 7-Day Trip", count),
+            );
             self.loaded = true;
         } else {
-            self.ui.label(ids!(status_label))
+            self.ui
+                .label(ids!(status_label))
                 .set_text(cx, "Error loading travel app data");
         }
 
@@ -1159,14 +1300,18 @@ impl App {
             surface.clear();
         }
 
-        self.ui.label(ids!(title_label)).set_text(cx, "🗼 Tokyo 7-Day Travel Planner");
+        self.ui
+            .label(ids!(title_label))
+            .set_text(cx, "🗼 Tokyo 7-Day Travel Planner");
 
         // Load calendar_travel.json from current directory
         let json_str = match std::fs::read_to_string("calendar_travel.json") {
             Ok(s) => s,
             Err(e) => {
-                self.ui.label(ids!(status_label))
-                    .set_text(cx, &format!("Error: calendar_travel.json not found ({})", e));
+                self.ui.label(ids!(status_label)).set_text(
+                    cx,
+                    &format!("Error: calendar_travel.json not found ({})", e),
+                );
                 self.ui.redraw(cx);
                 return;
             }
@@ -1191,11 +1336,14 @@ impl App {
         };
 
         if let Some(count) = result {
-            self.ui.label(ids!(status_label))
-                .set_text(cx, &format!("Calendar View | {} events | Tokyo 7-Day Trip", count));
+            self.ui.label(ids!(status_label)).set_text(
+                cx,
+                &format!("Calendar View | {} events | Tokyo 7-Day Trip", count),
+            );
             self.loaded = true;
         } else {
-            self.ui.label(ids!(status_label))
+            self.ui
+                .label(ids!(status_label))
                 .set_text(cx, "Error loading calendar travel data");
         }
 
@@ -1218,7 +1366,8 @@ impl App {
         let json_str = match std::fs::read_to_string(path) {
             Ok(s) => s,
             Err(e) => {
-                self.ui.label(ids!(status_label))
+                self.ui
+                    .label(ids!(status_label))
                     .set_text(cx, &format!("Error: {} not found ({})", path, e));
                 self.ui.redraw(cx);
                 return;
@@ -1252,11 +1401,13 @@ impl App {
                     preload_audio_urls(urls, self.pcm_cache.clone());
                 }
             }
-            self.ui.label(ids!(status_label))
+            self.ui
+                .label(ids!(status_label))
                 .set_text(cx, &format!("Ready to play | {} events loaded", count));
             self.loaded = true;
         } else {
-            self.ui.label(ids!(status_label))
+            self.ui
+                .label(ids!(status_label))
                 .set_text(cx, &format!("Error loading {}", path));
         }
 
@@ -1276,7 +1427,9 @@ impl App {
             surface.clear();
         }
 
-        self.ui.label(ids!(title_label)).set_text(cx, "🎵 Makepad Music Player");
+        self.ui
+            .label(ids!(title_label))
+            .set_text(cx, "🎵 Makepad Music Player");
 
         let a2ui_json = get_sample_music_player();
 
@@ -1307,11 +1460,14 @@ impl App {
                     preload_audio_urls(urls, self.pcm_cache.clone());
                 }
             }
-            self.ui.label(ids!(status_label))
-                .set_text(cx, &format!("🎵 Music Player | {} events | 3 songs ready", count));
+            self.ui.label(ids!(status_label)).set_text(
+                cx,
+                &format!("🎵 Music Player | {} events | 3 songs ready", count),
+            );
             self.loaded = true;
         } else {
-            self.ui.label(ids!(status_label))
+            self.ui
+                .label(ids!(status_label))
                 .set_text(cx, "Error loading music player data");
         }
 
@@ -1331,7 +1487,9 @@ impl App {
             surface.clear();
         }
 
-        self.ui.label(ids!(title_label)).set_text(cx, "Famous Mathematical Functions");
+        self.ui
+            .label(ids!(title_label))
+            .set_text(cx, "Famous Mathematical Functions");
 
         // Try to load math_test.json from current directory
         let json_str = match std::fs::read_to_string("math_test.json") {
@@ -1367,7 +1525,8 @@ impl App {
                 .set_text(cx, &format!("Math Demo | {} events | Chebyshev, Fourier, Rosenbrock, Himmelblau, Legendre, Rastrigin", count));
             self.loaded = true;
         } else {
-            self.ui.label(ids!(status_label))
+            self.ui
+                .label(ids!(status_label))
                 .set_text(cx, "Error loading math charts data");
         }
 
@@ -1405,15 +1564,16 @@ impl AppMain for App {
                     surface.set_playing_component(None);
                     surface.set_audio_amplitude(0.0);
                     self.playing_audio_component_id = None;
-                    self.ui.label(ids!(status_label)).set_text(cx, "⏹ Playback finished");
+                    self.ui
+                        .label(ids!(status_label))
+                        .set_text(cx, "⏹ Playback finished");
                 } else if is_playing {
                     // Update status with playback position
                     let pos = self.audio_state.position_secs.get();
                     let dur = self.audio_state.duration_secs.get();
-                    self.ui.label(ids!(status_label)).set_text(
-                        cx,
-                        &format!("🎵 Playing {:.0}s / {:.0}s", pos, dur),
-                    );
+                    self.ui
+                        .label(ids!(status_label))
+                        .set_text(cx, &format!("🎵 Playing {:.0}s / {:.0}s", pos, dur));
                 }
 
                 self.ui.redraw(cx);

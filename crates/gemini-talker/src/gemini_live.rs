@@ -3,9 +3,8 @@
 //! Provides real-time communication with Gemini Live via the `gemini-live` crate.
 
 use ::gemini_live::prelude::{
-    connect, recv_event, Content as LiveContent, GeminiModel as LiveGeminiModel,
-    Part as LivePart, Role as LiveRole, SessionConfig, SessionEvent, SessionHandle,
-    SessionPhase, TransportConfig,
+    connect, recv_event, Content as LiveContent, GeminiModel as LiveGeminiModel, Part as LivePart,
+    Role as LiveRole, SessionConfig, SessionEvent, SessionHandle, SessionPhase, TransportConfig,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use serde::{Deserialize, Serialize};
@@ -158,9 +157,9 @@ impl GeminiLiveClient {
                 }
                 Ok(Ok(SessionEvent::Disconnected(reason))) => {
                     let _ = session.disconnect().await;
-                    let message = reason
-                        .filter(|s| !s.is_empty())
-                        .unwrap_or_else(|| "Gemini Live disconnected before setupComplete".to_string());
+                    let message = reason.filter(|s| !s.is_empty()).unwrap_or_else(|| {
+                        "Gemini Live disconnected before setupComplete".to_string()
+                    });
                     return Err(message);
                 }
                 Ok(Ok(SessionEvent::PhaseChanged(SessionPhase::Disconnected))) => {
@@ -275,14 +274,11 @@ impl GeminiLiveClient {
                         Ok(bytes) => session_for_send.send_audio(bytes).await,
                         Err(e) => {
                             let _ = event_tx
-                                .send(GeminiEvent::Error(format!(
-                                    "Invalid base64 audio: {}",
-                                    e
-                                )))
+                                .send(GeminiEvent::Error(format!("Invalid base64 audio: {}", e)))
                                 .await;
                             continue;
                         }
-                    }
+                    },
                     OutgoingMessage::Disconnect => {
                         let _ = session_for_send.disconnect().await;
                         break;

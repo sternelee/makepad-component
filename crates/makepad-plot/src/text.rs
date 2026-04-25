@@ -32,13 +32,16 @@ pub enum TextAnchor {
 
 #[derive(Live, LiveHook, LiveRegister)]
 pub struct PlotLabel {
-    #[live] pub draw_text: DrawText,
+    #[live]
+    pub draw_text: DrawText,
 }
 
 impl PlotLabel {
     pub fn draw_at(&mut self, cx: &mut Cx2d, pos: DVec2, text: &str, anchor: TextAnchor) {
         // Layout text to get dimensions
-        let layout = self.draw_text.layout(cx, 0.0, 0.0, None, false, Align::default(), text);
+        let layout = self
+            .draw_text
+            .layout(cx, 0.0, 0.0, None, false, Align::default(), text);
         let text_width = layout.size_in_lpxs.width as f64 * self.draw_text.font_scale as f64;
         let text_height = layout.size_in_lpxs.height as f64 * self.draw_text.font_scale as f64;
 

@@ -9,7 +9,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use log::{info, error};
+use log::{error, info};
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
@@ -28,7 +28,6 @@ fn sample_messages() -> Vec<serde_json::Value> {
                 "status": {"state": "running"}
             }
         }),
-
         // 2. Begin rendering - initialize surface
         serde_json::json!({
             "jsonrpc": "2.0",
@@ -43,7 +42,6 @@ fn sample_messages() -> Vec<serde_json::Value> {
                 }
             }
         }),
-
         // 3. First wave: Root structure + Title
         serde_json::json!({
             "jsonrpc": "2.0",
@@ -92,7 +90,6 @@ fn sample_messages() -> Vec<serde_json::Value> {
                 }
             }
         }),
-
         // 4. Second wave: Order Card with items
         serde_json::json!({
             "jsonrpc": "2.0",
@@ -217,7 +214,6 @@ fn sample_messages() -> Vec<serde_json::Value> {
                 }
             }
         }),
-
         // 5. Third wave: Payment method selection
         serde_json::json!({
             "jsonrpc": "2.0",
@@ -332,7 +328,6 @@ fn sample_messages() -> Vec<serde_json::Value> {
                 }
             }
         }),
-
         // 6. Fourth wave: Summary card with totals
         serde_json::json!({
             "jsonrpc": "2.0",
@@ -461,7 +456,6 @@ fn sample_messages() -> Vec<serde_json::Value> {
                 }
             }
         }),
-
         // 7. Fifth wave: Action buttons
         serde_json::json!({
             "jsonrpc": "2.0",
@@ -521,7 +515,6 @@ fn sample_messages() -> Vec<serde_json::Value> {
                 }
             }
         }),
-
         // 8. Data model update with all values
         serde_json::json!({
             "jsonrpc": "2.0",
@@ -564,7 +557,6 @@ fn sample_messages() -> Vec<serde_json::Value> {
                 }
             }
         }),
-
         // 9. Payment methods data
         serde_json::json!({
             "jsonrpc": "2.0",
@@ -585,7 +577,6 @@ fn sample_messages() -> Vec<serde_json::Value> {
                 }
             }
         }),
-
         // 10. Summary data
         serde_json::json!({
             "jsonrpc": "2.0",
@@ -606,7 +597,6 @@ fn sample_messages() -> Vec<serde_json::Value> {
                 }
             }
         }),
-
         // 11. Task completed
         serde_json::json!({
             "jsonrpc": "2.0",
@@ -643,7 +633,10 @@ async fn handle_request(req: Request<Incoming>) -> Result<Response<Full<Bytes>>,
             // Read request body
             let body_bytes = req.collect().await.unwrap().to_bytes();
             let body_str = String::from_utf8_lossy(&body_bytes);
-            info!("Received request: {}...", &body_str[..body_str.len().min(100)]);
+            info!(
+                "Received request: {}...",
+                &body_str[..body_str.len().min(100)]
+            );
 
             // Build SSE response body
             let messages = sample_messages();

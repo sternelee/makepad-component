@@ -1,10 +1,10 @@
-use makepad_widgets::*;
-use makepad_plot::*;
-use crate::a2ui::message::*;
 use crate::a2ui::data_model::DataModel;
+use crate::a2ui::message::*;
 use crate::a2ui::processor::resolve_string_value_scoped;
+use makepad_plot::*;
+use makepad_widgets::*;
 
-use super::{get_bridge_color, parse_hex_color, resolve_title, parse_colormap};
+use super::{get_bridge_color, parse_colormap, parse_hex_color, resolve_title};
 
 // ============================================================================
 // Line Chart Bridge
@@ -21,10 +21,12 @@ pub fn render_line(
     plot.clear();
 
     for (i, series) in chart.series.iter().enumerate() {
-        let x = series.x_values.clone().unwrap_or_else(||
-            (0..series.values.len()).map(|j| j as f64).collect());
-        let mut s = Series::new(series.name.as_deref().unwrap_or(""))
-            .with_data(x, series.values.clone());
+        let x = series
+            .x_values
+            .clone()
+            .unwrap_or_else(|| (0..series.values.len()).map(|j| j as f64).collect());
+        let mut s =
+            Series::new(series.name.as_deref().unwrap_or("")).with_data(x, series.values.clone());
         s = s.with_color(get_bridge_color(chart, i));
         plot.add_series(s);
     }
@@ -73,10 +75,15 @@ pub fn render_bar(
     } else {
         // Multiple series → grouped bar chart
         let categories = chart.labels.clone();
-        let groups: Vec<BarGroup> = chart.series.iter().enumerate().map(|(i, s)| {
-            BarGroup::new(s.name.as_deref().unwrap_or(""), s.values.clone())
-                .with_color(get_bridge_color(chart, i))
-        }).collect();
+        let groups: Vec<BarGroup> = chart
+            .series
+            .iter()
+            .enumerate()
+            .map(|(i, s)| {
+                BarGroup::new(s.name.as_deref().unwrap_or(""), s.values.clone())
+                    .with_color(get_bridge_color(chart, i))
+            })
+            .collect();
         plot.set_groups(categories, groups);
     }
 
@@ -105,10 +112,12 @@ pub fn render_scatter(
     plot.clear();
 
     for (i, series) in chart.series.iter().enumerate() {
-        let x = series.x_values.clone().unwrap_or_else(||
-            (0..series.values.len()).map(|j| j as f64).collect());
-        let mut s = Series::new(series.name.as_deref().unwrap_or(""))
-            .with_data(x, series.values.clone());
+        let x = series
+            .x_values
+            .clone()
+            .unwrap_or_else(|| (0..series.values.len()).map(|j| j as f64).collect());
+        let mut s =
+            Series::new(series.name.as_deref().unwrap_or("")).with_data(x, series.values.clone());
         s = s.with_color(get_bridge_color(chart, i));
         plot.add_series(s);
     }
@@ -181,8 +190,10 @@ pub fn render_area(
     plot.clear();
 
     for (i, series) in chart.series.iter().enumerate() {
-        let x = series.x_values.clone().unwrap_or_else(||
-            (0..series.values.len()).map(|j| j as f64).collect());
+        let x = series
+            .x_values
+            .clone()
+            .unwrap_or_else(|| (0..series.values.len()).map(|j| j as f64).collect());
         let color = get_bridge_color(chart, i);
         let s = AreaSeries::new(series.name.as_deref().unwrap_or(""))
             .with_data(x, series.values.clone())
@@ -298,9 +309,12 @@ pub fn render_bubble(
         for (si, series) in chart.series.iter().enumerate() {
             let color = get_bridge_color(chart, si);
             let mut bs = BubbleSeries::new(series.name.as_deref().unwrap_or(""));
-            let points: Vec<BubblePoint> = series.values.iter().enumerate().map(|(i, &v)| {
-                BubblePoint::new(i as f64, v, v.abs().sqrt().max(2.0))
-            }).collect();
+            let points: Vec<BubblePoint> = series
+                .values
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| BubblePoint::new(i as f64, v, v.abs().sqrt().max(2.0)))
+                .collect();
             bs = bs.with_points(points).with_color(color);
             plot.add_series(bs);
         }
@@ -335,7 +349,11 @@ pub fn render_candlestick(
         let highs = &chart.series[1].values;
         let lows = &chart.series[2].values;
         let closes = &chart.series[3].values;
-        let count = opens.len().min(highs.len()).min(lows.len()).min(closes.len());
+        let count = opens
+            .len()
+            .min(highs.len())
+            .min(lows.len())
+            .min(closes.len());
 
         let mut candles = Vec::with_capacity(count);
         for i in 0..count {
@@ -379,7 +397,9 @@ pub fn render_heatmap(
     }
 
     // Y labels from series names
-    let y_labels: Vec<String> = chart.series.iter()
+    let y_labels: Vec<String> = chart
+        .series
+        .iter()
         .map(|s| s.name.as_deref().unwrap_or("").to_string())
         .collect();
     if y_labels.iter().any(|l| !l.is_empty()) {
@@ -387,7 +407,13 @@ pub fn render_heatmap(
     }
 
     plot.set_show_values(false);
-    plot.set_colormap(chart.colormap.as_ref().map(|cm| parse_colormap(cm)).unwrap_or(Colormap::Viridis));
+    plot.set_colormap(
+        chart
+            .colormap
+            .as_ref()
+            .map(|cm| parse_colormap(cm))
+            .unwrap_or(Colormap::Viridis),
+    );
 
     if let Some(title) = resolve_title(&chart.title, data_model, current_scope) {
         plot.set_title(title);
@@ -482,7 +508,9 @@ pub fn render_sankey(
         // Calculate outgoing
         if i < chart.series.len() {
             for &v in &chart.series[i].values {
-                if v > 0.0 { value += v; }
+                if v > 0.0 {
+                    value += v;
+                }
             }
         }
         // Calculate incoming
@@ -500,7 +528,9 @@ pub fn render_sankey(
 
     // Create links
     for (i, series) in chart.series.iter().enumerate() {
-        if i >= node_count { break; }
+        if i >= node_count {
+            break;
+        }
         for (j, &val) in series.values.iter().enumerate() {
             if val > 0.0 && i != j && j < node_count {
                 links.push(SankeyLink::new(i, j, val));
@@ -521,4 +551,3 @@ pub fn render_sankey(
 // ============================================================================
 // Histogram Bridge
 // ============================================================================
-

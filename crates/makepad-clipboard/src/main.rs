@@ -1,7 +1,7 @@
-use makepad_widgets::*;
 use makepad_clipboard::ClipboardMonitor;
-use std::fs;
+use makepad_widgets::*;
 use std::env;
+use std::fs;
 
 live_design! {
     use link::theme::*;
@@ -45,16 +45,25 @@ live_design! {
 
 #[derive(Live, LiveHook)]
 pub struct App {
-    #[live] ui: WidgetRef,
-    #[rust] monitor: ClipboardMonitor,
-    #[rust] last_entry_count: usize,
-    #[rust] auto_refresh: bool,
-    #[rust] current_image_path: Option<String>,
-    #[rust] poll_timer: u32,
+    #[live]
+    ui: WidgetRef,
+    #[rust]
+    monitor: ClipboardMonitor,
+    #[rust]
+    last_entry_count: usize,
+    #[rust]
+    auto_refresh: bool,
+    #[rust]
+    current_image_path: Option<String>,
+    #[rust]
+    poll_timer: u32,
 }
 
 impl LiveRegister for App {
-    fn live_register(cx: &mut Cx) { makepad_widgets::live_design(cx); makepad_component::live_design(cx); }
+    fn live_register(cx: &mut Cx) {
+        makepad_widgets::live_design(cx);
+        makepad_component::live_design(cx);
+    }
 }
 
 impl AppMain for App {
@@ -62,17 +71,43 @@ impl AppMain for App {
         match event {
             Event::Startup => self.poll_clipboard(cx),
             Event::KeyDown(ke) => {
-                if ke.key_code == KeyCode::Space || ke.key_code == KeyCode::ReturnKey { self.poll_clipboard(cx); }
-                if ke.key_code == KeyCode::Escape { self.auto_refresh = false; self.ui.button(ids!(btn_auto)).set_text(cx, "Auto: OFF"); }
+                if ke.key_code == KeyCode::Space || ke.key_code == KeyCode::ReturnKey {
+                    self.poll_clipboard(cx);
+                }
+                if ke.key_code == KeyCode::Escape {
+                    self.auto_refresh = false;
+                    self.ui.button(ids!(btn_auto)).set_text(cx, "Auto: OFF");
+                }
             }
             _ => {}
         }
-        if self.auto_refresh { self.poll_timer += 1; if self.poll_timer >= 30 { self.poll_timer = 0; self.poll_clipboard(cx); } }
+        if self.auto_refresh {
+            self.poll_timer += 1;
+            if self.poll_timer >= 30 {
+                self.poll_timer = 0;
+                self.poll_clipboard(cx);
+            }
+        }
 
         let actions = cx.capture_actions(|cx| self.ui.handle_event(cx, event, &mut Scope::empty()));
-        if self.ui.button(ids!(btn_refresh)).clicked(&actions) { self.poll_clipboard(cx); }
-        if self.ui.button(ids!(btn_auto)).clicked(&actions) { self.auto_refresh = !self.auto_refresh; self.ui.button(ids!(btn_auto)).set_text(cx, if self.auto_refresh { "⏸ Auto: ON" } else { "Auto: OFF" }); self.poll_timer = 0; }
-        if self.ui.button(ids!(btn_clear)).clicked(&actions) { self.clear_all(cx); }
+        if self.ui.button(ids!(btn_refresh)).clicked(&actions) {
+            self.poll_clipboard(cx);
+        }
+        if self.ui.button(ids!(btn_auto)).clicked(&actions) {
+            self.auto_refresh = !self.auto_refresh;
+            self.ui.button(ids!(btn_auto)).set_text(
+                cx,
+                if self.auto_refresh {
+                    "⏸ Auto: ON"
+                } else {
+                    "Auto: OFF"
+                },
+            );
+            self.poll_timer = 0;
+        }
+        if self.ui.button(ids!(btn_clear)).clicked(&actions) {
+            self.clear_all(cx);
+        }
     }
 }
 
@@ -81,7 +116,9 @@ impl App {
         if let Some(entry) = self.monitor.poll_clipboard() {
             self.monitor.add_entry(entry.clone());
             self.last_entry_count = self.monitor.get_entries().len();
-            self.ui.label(ids!(lbl_status)).set_text(cx, &format!("{} entries", self.last_entry_count));
+            self.ui
+                .label(ids!(lbl_status))
+                .set_text(cx, &format!("{} entries", self.last_entry_count));
             self.update_display(cx);
         }
     }
@@ -89,10 +126,14 @@ impl App {
     fn clear_all(&mut self, cx: &mut Cx) {
         self.monitor.clear();
         self.last_entry_count = 0;
-        if let Some(ref path) = self.current_image_path { let _ = fs::remove_file(path); }
+        if let Some(ref path) = self.current_image_path {
+            let _ = fs::remove_file(path);
+        }
         self.current_image_path = None;
         self.ui.label(ids!(lbl_status)).set_text(cx, "Cleared");
-        self.ui.label(ids!(latest_txt)).set_text(cx, "No entries yet. Click Refresh!");
+        self.ui
+            .label(ids!(latest_txt))
+            .set_text(cx, "No entries yet. Click Refresh!");
         self.ui.view(ids!(img_box)).set_visible(cx, false);
         self.ui.image(ids!(img_preview)).set_visible(cx, false);
         self.ui.label(ids!(img_info)).set_visible(cx, false);
@@ -102,7 +143,9 @@ impl App {
     fn update_display(&mut self, cx: &mut Cx) {
         let entries = self.monitor.get_entries();
         if entries.is_empty() {
-            self.ui.label(ids!(latest_txt)).set_text(cx, "No entries yet. Click Refresh!");
+            self.ui
+                .label(ids!(latest_txt))
+                .set_text(cx, "No entries yet. Click Refresh!");
             self.ui.view(ids!(img_box)).set_visible(cx, false);
             self.ui.image(ids!(img_preview)).set_visible(cx, false);
             self.ui.label(ids!(img_info)).set_visible(cx, false);
@@ -112,27 +155,53 @@ impl App {
 
         // History
         if entries.len() > 1 {
-            let history: Vec<String> = entries.iter().skip(1).take(15).map(|e| self.fmt(e)).collect();
-            self.ui.label(ids!(history_list)).set_text(cx, &history.join("\n\n"));
+            let history: Vec<String> = entries
+                .iter()
+                .skip(1)
+                .take(15)
+                .map(|e| self.fmt(e))
+                .collect();
+            self.ui
+                .label(ids!(history_list))
+                .set_text(cx, &history.join("\n\n"));
         } else {
-            self.ui.label(ids!(history_list)).set_text(cx, "(No history)");
+            self.ui
+                .label(ids!(history_list))
+                .set_text(cx, "(No history)");
         }
 
         // Latest
         if let Some(latest) = entries.first() {
             match &latest.content {
-                makepad_clipboard::ClipboardContent::Image { width, height, data } => {
+                makepad_clipboard::ClipboardContent::Image {
+                    width,
+                    height,
+                    data,
+                } => {
                     self.ui.label(ids!(latest_txt)).set_visible(cx, false);
                     self.ui.view(ids!(img_box)).set_visible(cx, true);
                     self.ui.image(ids!(img_preview)).set_visible(cx, true);
                     self.ui.label(ids!(img_info)).set_visible(cx, true);
-                    self.ui.label(ids!(img_info)).set_text(cx, &format!("{}x{}", width, height));
+                    self.ui
+                        .label(ids!(img_info))
+                        .set_text(cx, &format!("{}x{}", width, height));
                     if !data.is_empty() {
-                        if let Some(ref old) = self.current_image_path { let _ = fs::remove_file(old); }
-                        let path = env::temp_dir().join(format!("clip_{}.png", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis()));
+                        if let Some(ref old) = self.current_image_path {
+                            let _ = fs::remove_file(old);
+                        }
+                        let path = env::temp_dir().join(format!(
+                            "clip_{}.png",
+                            std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_millis()
+                        ));
                         if fs::write(&path, data).is_ok() {
                             self.current_image_path = Some(path.to_string_lossy().to_string());
-                            let _ = self.ui.image(ids!(img_preview)).load_image_file_by_path(cx, std::path::Path::new(&self.current_image_path.as_ref().unwrap()));
+                            let _ = self.ui.image(ids!(img_preview)).load_image_file_by_path(
+                                cx,
+                                std::path::Path::new(&self.current_image_path.as_ref().unwrap()),
+                            );
                         }
                     }
                 }
@@ -151,28 +220,55 @@ impl App {
                 makepad_clipboard::ClipboardContent::Files(files) => {
                     self.ui.label(ids!(latest_txt)).set_visible(cx, true);
                     self.ui.view(ids!(img_box)).set_visible(cx, false);
-                    self.ui.label(ids!(latest_txt)).set_text(cx, &format!("Files: {}", files.join(", ")));
+                    self.ui
+                        .label(ids!(latest_txt))
+                        .set_text(cx, &format!("Files: {}", files.join(", ")));
                 }
                 makepad_clipboard::ClipboardContent::Unknown => {
                     self.ui.label(ids!(latest_txt)).set_visible(cx, true);
                     self.ui.view(ids!(img_box)).set_visible(cx, false);
-                    self.ui.label(ids!(latest_txt)).set_text(cx, &latest.formats.join(", "));
+                    self.ui
+                        .label(ids!(latest_txt))
+                        .set_text(cx, &latest.formats.join(", "));
                 }
             }
         }
     }
 
     fn fmt(&self, e: &makepad_clipboard::ClipboardEntry) -> String {
-        let ts = if e.timestamp.len() > 10 { &e.timestamp[e.timestamp.len()-8..] } else { &e.timestamp };
+        let ts = if e.timestamp.len() > 10 {
+            &e.timestamp[e.timestamp.len() - 8..]
+        } else {
+            &e.timestamp
+        };
         match &e.content {
-            makepad_clipboard::ClipboardContent::Text(t) => { let s = t.replace('\n', " "); format!("[{}] TEXT: {}", ts, if s.len() <= 50 { s } else { format!("{}...", &s[..50]) }) }
-            makepad_clipboard::ClipboardContent::Image { width, height, .. } => format!("[{}] IMAGE: {}x{}", ts, width, height),
+            makepad_clipboard::ClipboardContent::Text(t) => {
+                let s = t.replace('\n', " ");
+                format!(
+                    "[{}] TEXT: {}",
+                    ts,
+                    if s.len() <= 50 {
+                        s
+                    } else {
+                        format!("{}...", &s[..50])
+                    }
+                )
+            }
+            makepad_clipboard::ClipboardContent::Image { width, height, .. } => {
+                format!("[{}] IMAGE: {}x{}", ts, width, height)
+            }
             makepad_clipboard::ClipboardContent::Html(_) => format!("[{}] HTML", ts),
-            makepad_clipboard::ClipboardContent::Files(fs) => format!("[{}] FILES: {}", ts, fs.join(", ")),
-            makepad_clipboard::ClipboardContent::Unknown => format!("[{}] {}", ts, e.formats.join(", ")),
+            makepad_clipboard::ClipboardContent::Files(fs) => {
+                format!("[{}] FILES: {}", ts, fs.join(", "))
+            }
+            makepad_clipboard::ClipboardContent::Unknown => {
+                format!("[{}] {}", ts, e.formats.join(", "))
+            }
         }
     }
 }
 
 app_main!(App);
-fn main() { app_main() }
+fn main() {
+    app_main()
+}

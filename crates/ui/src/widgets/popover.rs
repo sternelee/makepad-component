@@ -680,9 +680,12 @@ impl Widget for MpPopoverWidget {
                 }
 
                 // Apply opacity to content's draw_bg
-                self.view.view(ids!(content)).apply_over(cx, live! {
-                    draw_bg: { opacity: (self.opacity) }
-                });
+                self.view.view(ids!(content)).apply_over(
+                    cx,
+                    live! {
+                        draw_bg: { opacity: (self.opacity) }
+                    },
+                );
 
                 self.redraw(cx);
 
@@ -695,17 +698,15 @@ impl Widget for MpPopoverWidget {
 
         // Handle trigger-specific events
         match self.trigger {
-            MpPopoverTrigger::Hover => {
-                match event.hits(cx, self.view.area()) {
-                    Hit::FingerHoverIn(_) => {
-                        self.open(cx);
-                    }
-                    Hit::FingerHoverOut(_) => {
-                        self.close(cx);
-                    }
-                    _ => {}
+            MpPopoverTrigger::Hover => match event.hits(cx, self.view.area()) {
+                Hit::FingerHoverIn(_) => {
+                    self.open(cx);
                 }
-            }
+                Hit::FingerHoverOut(_) => {
+                    self.close(cx);
+                }
+                _ => {}
+            },
             MpPopoverTrigger::Focus => {
                 match event.hits(cx, self.view.area()) {
                     Hit::FingerDown(_) => {
@@ -749,9 +750,12 @@ impl MpPopoverWidget {
         } else {
             // Instant show
             self.opacity = 1.0;
-            self.view.view(ids!(content)).apply_over(cx, live! {
-                draw_bg: { opacity: 1.0 }
-            });
+            self.view.view(ids!(content)).apply_over(
+                cx,
+                live! {
+                    draw_bg: { opacity: 1.0 }
+                },
+            );
         }
         self.redraw(cx);
     }
@@ -832,16 +836,20 @@ impl Widget for MpPopoverMenuItemWidget {
 
         match event.hits(cx, self.view.area()) {
             Hit::FingerHoverIn(_) => {
-                self.view.apply_over(cx, live!{ draw_bg: { hover: 1.0 } });
+                self.view.apply_over(cx, live! { draw_bg: { hover: 1.0 } });
                 self.redraw(cx);
             }
             Hit::FingerHoverOut(_) => {
-                self.view.apply_over(cx, live!{ draw_bg: { hover: 0.0 } });
+                self.view.apply_over(cx, live! { draw_bg: { hover: 0.0 } });
                 self.redraw(cx);
             }
             Hit::FingerUp(fe) => {
                 if fe.is_over {
-                    cx.widget_action(self.widget_uid(), &scope.path, MpPopoverMenuItemAction::Clicked);
+                    cx.widget_action(
+                        self.widget_uid(),
+                        &scope.path,
+                        MpPopoverMenuItemAction::Clicked,
+                    );
                 }
             }
             _ => {}
@@ -870,7 +878,10 @@ impl MpPopoverMenuItemWidgetRef {
     pub fn clicked(&self, actions: &Actions) -> bool {
         if let Some(inner) = self.borrow() {
             if let Some(item) = actions.find_widget_action(inner.widget_uid()) {
-                return matches!(item.cast::<MpPopoverMenuItemAction>(), MpPopoverMenuItemAction::Clicked);
+                return matches!(
+                    item.cast::<MpPopoverMenuItemAction>(),
+                    MpPopoverMenuItemAction::Clicked
+                );
             }
         }
         false

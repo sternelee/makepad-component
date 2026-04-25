@@ -619,11 +619,11 @@ impl Widget for MpNotificationWidget {
         let close_btn = self.view.view(ids!(close));
         match event.hits(cx, close_btn.area()) {
             Hit::FingerHoverIn(_) => {
-                close_btn.apply_over(cx, live!{ draw_bg: { hover: 1.0 } });
+                close_btn.apply_over(cx, live! { draw_bg: { hover: 1.0 } });
                 close_btn.redraw(cx);
             }
             Hit::FingerHoverOut(_) => {
-                close_btn.apply_over(cx, live!{ draw_bg: { hover: 0.0 } });
+                close_btn.apply_over(cx, live! { draw_bg: { hover: 0.0 } });
                 close_btn.redraw(cx);
             }
             Hit::FingerUp(fe) => {

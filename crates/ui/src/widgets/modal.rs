@@ -406,7 +406,11 @@ impl Widget for MpModalWidget {
         let backdrop = self.view.view(ids!(backdrop));
         if let Hit::FingerUp(fe) = event.hits(cx, backdrop.area()) {
             if fe.is_over {
-                cx.widget_action(self.widget_uid(), &scope.path, MpModalAction::CloseRequested);
+                cx.widget_action(
+                    self.widget_uid(),
+                    &scope.path,
+                    MpModalAction::CloseRequested,
+                );
             }
         }
 
@@ -414,16 +418,20 @@ impl Widget for MpModalWidget {
         let close_btn = self.view.view(ids!(content.dialog.header.close));
         match event.hits(cx, close_btn.area()) {
             Hit::FingerHoverIn(_) => {
-                close_btn.apply_over(cx, live!{ draw_bg: { hover: 1.0 } });
+                close_btn.apply_over(cx, live! { draw_bg: { hover: 1.0 } });
                 close_btn.redraw(cx);
             }
             Hit::FingerHoverOut(_) => {
-                close_btn.apply_over(cx, live!{ draw_bg: { hover: 0.0 } });
+                close_btn.apply_over(cx, live! { draw_bg: { hover: 0.0 } });
                 close_btn.redraw(cx);
             }
             Hit::FingerUp(fe) => {
                 if fe.is_over {
-                    cx.widget_action(self.widget_uid(), &scope.path, MpModalAction::CloseRequested);
+                    cx.widget_action(
+                        self.widget_uid(),
+                        &scope.path,
+                        MpModalAction::CloseRequested,
+                    );
                 }
             }
             _ => {}
@@ -458,7 +466,9 @@ impl MpModalWidget {
 
     /// Set the modal title
     pub fn set_title(&mut self, cx: &mut Cx, title: &str) {
-        self.view.label(ids!(content.dialog.header.title)).set_text(cx, title);
+        self.view
+            .label(ids!(content.dialog.header.title))
+            .set_text(cx, title);
     }
 }
 

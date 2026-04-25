@@ -8,10 +8,10 @@ pub enum Colormap {
     Plasma,
     Inferno,
     Magma,
-    Cividis,  // Colorblind-friendly
+    Cividis, // Colorblind-friendly
     // Diverging
     Coolwarm,
-    RdBu,     // Red-Blue diverging
+    RdBu, // Red-Blue diverging
     Spectral,
     // Sequential
     Blues,
@@ -20,11 +20,11 @@ pub enum Colormap {
     Reds,
     Greys,
     // Classic
-    Jet,      // Rainbow (legacy)
-    Hot,      // Black-Red-Yellow-White
+    Jet, // Rainbow (legacy)
+    Hot, // Black-Red-Yellow-White
     // Special
-    Turbo,    // Improved rainbow
-    Custom(Vec<(f64, Vec4)>),  // User-defined color stops
+    Turbo,                    // Improved rainbow
+    Custom(Vec<(f64, Vec4)>), // User-defined color stops
 }
 
 impl Default for Colormap {
@@ -43,49 +43,95 @@ impl Colormap {
                 let r = 0.267 + t * 0.329 - t * t * 0.5 + t * t * t * 0.9;
                 let g = 0.004 + t * 0.873;
                 let b = 0.329 + t * 0.5 - t * t * 0.6;
-                vec4(r.clamp(0.0, 1.0) as f32, g.clamp(0.0, 1.0) as f32, b.clamp(0.0, 1.0) as f32, 1.0)
+                vec4(
+                    r.clamp(0.0, 1.0) as f32,
+                    g.clamp(0.0, 1.0) as f32,
+                    b.clamp(0.0, 1.0) as f32,
+                    1.0,
+                )
             }
             Colormap::Plasma => {
                 // Purple-red-yellow
                 let r = 0.05 + t * 0.9 + t * t * 0.05;
                 let g = t * t * 0.9;
                 let b = 0.53 + (1.0 - t) * 0.47 - t * t * 0.6;
-                vec4(r.clamp(0.0, 1.0) as f32, g.clamp(0.0, 1.0) as f32, b.clamp(0.0, 1.0) as f32, 1.0)
+                vec4(
+                    r.clamp(0.0, 1.0) as f32,
+                    g.clamp(0.0, 1.0) as f32,
+                    b.clamp(0.0, 1.0) as f32,
+                    1.0,
+                )
             }
             Colormap::Inferno => {
                 // Black-purple-red-yellow
                 let r = t * t * 1.2;
                 let g = t * t * t * 1.5;
                 let b = (1.0 - t) * t * 2.0 + 0.1 * t;
-                vec4(r.clamp(0.0, 1.0) as f32, g.clamp(0.0, 1.0) as f32, b.clamp(0.0, 1.0) as f32, 1.0)
+                vec4(
+                    r.clamp(0.0, 1.0) as f32,
+                    g.clamp(0.0, 1.0) as f32,
+                    b.clamp(0.0, 1.0) as f32,
+                    1.0,
+                )
             }
             Colormap::Magma => {
                 // Black-purple-pink-white
                 let r = t * t * 0.8 + t * 0.2;
                 let g = t * t * t * 1.2;
                 let b = t * 0.5 + (1.0 - t) * t * 1.0;
-                vec4(r.clamp(0.0, 1.0) as f32, g.clamp(0.0, 1.0) as f32, b.clamp(0.0, 1.0) as f32, 1.0)
+                vec4(
+                    r.clamp(0.0, 1.0) as f32,
+                    g.clamp(0.0, 1.0) as f32,
+                    b.clamp(0.0, 1.0) as f32,
+                    1.0,
+                )
             }
             Colormap::Cividis => {
                 // Colorblind-friendly blue-yellow
                 let r = -0.01 + t * 1.0 + t * t * 0.01;
                 let g = 0.14 + t * 0.72;
                 let b = 0.35 + t * 0.1 - t * t * 0.35;
-                vec4(r.clamp(0.0, 1.0) as f32, g.clamp(0.0, 1.0) as f32, b.clamp(0.0, 1.0) as f32, 1.0)
+                vec4(
+                    r.clamp(0.0, 1.0) as f32,
+                    g.clamp(0.0, 1.0) as f32,
+                    b.clamp(0.0, 1.0) as f32,
+                    1.0,
+                )
             }
             Colormap::Coolwarm => {
                 // Blue-white-red diverging
                 let r = if t < 0.5 { 0.2 + t * 1.6 } else { 1.0 };
-                let g = if t < 0.5 { 0.2 + t * 1.0 } else { 1.0 - (t - 0.5) * 1.6 };
+                let g = if t < 0.5 {
+                    0.2 + t * 1.0
+                } else {
+                    1.0 - (t - 0.5) * 1.6
+                };
                 let b = if t < 0.5 { 1.0 } else { 1.0 - (t - 0.5) * 1.6 };
                 vec4(r as f32, g as f32, b as f32, 1.0)
             }
             Colormap::RdBu => {
                 // Red-white-blue diverging (red=high, blue=low)
-                let r = if t < 0.5 { 0.1 + t * 1.8 } else { 1.0 - (t - 0.5) * 1.4 };
-                let g = if t < 0.5 { t * 1.8 } else { 0.9 - (t - 0.5) * 1.6 };
-                let b = if t < 0.5 { 1.0 - t * 0.2 } else { 0.9 - (t - 0.5) * 1.0 };
-                vec4(r.clamp(0.0, 1.0) as f32, g.clamp(0.0, 1.0) as f32, b.clamp(0.0, 1.0) as f32, 1.0)
+                let r = if t < 0.5 {
+                    0.1 + t * 1.8
+                } else {
+                    1.0 - (t - 0.5) * 1.4
+                };
+                let g = if t < 0.5 {
+                    t * 1.8
+                } else {
+                    0.9 - (t - 0.5) * 1.6
+                };
+                let b = if t < 0.5 {
+                    1.0 - t * 0.2
+                } else {
+                    0.9 - (t - 0.5) * 1.0
+                };
+                vec4(
+                    r.clamp(0.0, 1.0) as f32,
+                    g.clamp(0.0, 1.0) as f32,
+                    b.clamp(0.0, 1.0) as f32,
+                    1.0,
+                )
             }
             Colormap::Spectral => {
                 // Red-orange-yellow-green-blue (diverging rainbow)
@@ -166,10 +212,18 @@ impl Colormap {
             }
             Colormap::Turbo => {
                 // Improved rainbow with better perceptual uniformity
-                let r = 0.13572 + t * (4.6153 + t * (-42.66 + t * (132.13 + t * (-152.95 + t * 56.31))));
-                let g = 0.09140 + t * (2.1745 + t * (4.8321 + t * (-36.60 + t * (43.05 + t * (-13.22)))));
-                let b = 0.10667 + t * (12.755 + t * (-60.58 + t * (109.33 + t * (-87.15 + t * 25.25))));
-                vec4(r.clamp(0.0, 1.0) as f32, g.clamp(0.0, 1.0) as f32, b.clamp(0.0, 1.0) as f32, 1.0)
+                let r = 0.13572
+                    + t * (4.6153 + t * (-42.66 + t * (132.13 + t * (-152.95 + t * 56.31))));
+                let g = 0.09140
+                    + t * (2.1745 + t * (4.8321 + t * (-36.60 + t * (43.05 + t * (-13.22)))));
+                let b =
+                    0.10667 + t * (12.755 + t * (-60.58 + t * (109.33 + t * (-87.15 + t * 25.25))));
+                vec4(
+                    r.clamp(0.0, 1.0) as f32,
+                    g.clamp(0.0, 1.0) as f32,
+                    b.clamp(0.0, 1.0) as f32,
+                    1.0,
+                )
             }
             Colormap::Custom(stops) => {
                 if stops.is_empty() {
@@ -265,7 +319,11 @@ pub struct Normalize {
 
 impl Normalize {
     pub fn new(vmin: f64, vmax: f64) -> Self {
-        Self { vmin, vmax, clip: true }
+        Self {
+            vmin,
+            vmax,
+            clip: true,
+        }
     }
 
     pub fn with_clip(mut self, clip: bool) -> Self {
@@ -279,7 +337,11 @@ impl Normalize {
             return 0.5;
         }
         let t = (value - self.vmin) / (self.vmax - self.vmin);
-        if self.clip { t.clamp(0.0, 1.0) } else { t }
+        if self.clip {
+            t.clamp(0.0, 1.0)
+        } else {
+            t
+        }
     }
 
     /// Inverse: convert [0, 1] back to original scale
@@ -290,7 +352,11 @@ impl Normalize {
 
 impl Default for Normalize {
     fn default() -> Self {
-        Self { vmin: 0.0, vmax: 1.0, clip: true }
+        Self {
+            vmin: 0.0,
+            vmax: 1.0,
+            clip: true,
+        }
     }
 }
 
@@ -307,7 +373,7 @@ pub struct LogNorm {
 
 impl LogNorm {
     pub fn new(vmin: f64, vmax: f64) -> Self {
-        let vmin = vmin.max(1e-10);  // Ensure positive
+        let vmin = vmin.max(1e-10); // Ensure positive
         let vmax = vmax.max(vmin + 1e-10);
         Self {
             vmin,
@@ -330,7 +396,11 @@ impl LogNorm {
         }
         let log_val = value.log10();
         let t = (log_val - self.log_vmin) / (self.log_vmax - self.log_vmin);
-        if self.clip { t.clamp(0.0, 1.0) } else { t }
+        if self.clip {
+            t.clamp(0.0, 1.0)
+        } else {
+            t
+        }
     }
 
     /// Inverse: convert [0, 1] back to original scale
@@ -350,7 +420,7 @@ impl Default for LogNorm {
 pub struct SymLogNorm {
     pub vmin: f64,
     pub vmax: f64,
-    pub linthresh: f64,  // Linear threshold
+    pub linthresh: f64, // Linear threshold
     pub clip: bool,
 }
 
@@ -389,7 +459,11 @@ impl SymLogNorm {
         }
 
         let t = (t_val - t_min) / (t_max - t_min);
-        if self.clip { t.clamp(0.0, 1.0) } else { t }
+        if self.clip {
+            t.clamp(0.0, 1.0)
+        } else {
+            t
+        }
     }
 }
 
@@ -398,4 +472,3 @@ impl Default for SymLogNorm {
         Self::new(-10.0, 10.0, 1.0)
     }
 }
-

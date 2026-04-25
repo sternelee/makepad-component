@@ -4,13 +4,12 @@
 //! and the makepad-plot library's widget API. Each A2UI chart type maps
 //! to a corresponding makepad-plot widget.
 
-use makepad_widgets::*;
-use makepad_plot::*;
-use super::message::*;
-use super::value::StringValue;
 use super::data_model::DataModel;
+use super::message::*;
 use super::processor::resolve_string_value_scoped;
-
+use super::value::StringValue;
+use makepad_plot::*;
+use makepad_widgets::*;
 
 /// Get chart color from ChartComponent palette or fallback to makepad-plot default
 pub(crate) fn get_bridge_color(chart: &ChartComponent, index: usize) -> Vec4 {
@@ -25,16 +24,29 @@ pub(crate) fn get_bridge_color(chart: &ChartComponent, index: usize) -> Vec4 {
 /// Parse a hex color string to Vec4
 pub(crate) fn parse_hex_color(hex: &str) -> Option<Vec4> {
     let hex = hex.trim_start_matches('#');
-    if hex.len() != 6 { return None; }
+    if hex.len() != 6 {
+        return None;
+    }
     let r = u8::from_str_radix(&hex[0..2], 16).ok()? as f32 / 255.0;
     let g = u8::from_str_radix(&hex[2..4], 16).ok()? as f32 / 255.0;
     let b = u8::from_str_radix(&hex[4..6], 16).ok()? as f32 / 255.0;
-    Some(Vec4 { x: r, y: g, z: b, w: 1.0 })
+    Some(Vec4 {
+        x: r,
+        y: g,
+        z: b,
+        w: 1.0,
+    })
 }
 
 /// Resolve a chart title from StringValue
-pub(crate) fn resolve_title(title: &Option<StringValue>, data_model: &DataModel, scope: Option<&str>) -> Option<String> {
-    title.as_ref().map(|sv| resolve_string_value_scoped(sv, data_model, scope))
+pub(crate) fn resolve_title(
+    title: &Option<StringValue>,
+    data_model: &DataModel,
+    scope: Option<&str>,
+) -> Option<String> {
+    title
+        .as_ref()
+        .map(|sv| resolve_string_value_scoped(sv, data_model, scope))
 }
 
 /// Parse a colormap name string to Colormap enum
@@ -60,10 +72,10 @@ pub(crate) fn parse_colormap(name: &str) -> Colormap {
     }
 }
 
+mod advanced;
 mod basic;
 mod statistical;
-mod advanced;
 
+pub use advanced::*;
 pub use basic::*;
 pub use statistical::*;
-pub use advanced::*;

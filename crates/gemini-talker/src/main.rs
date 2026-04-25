@@ -4,7 +4,13 @@ fn format_timestamp(timestamp: f64) -> String {
     let total_seconds = timestamp as u64;
     let hours = (total_seconds % 86400) / 3600;
     let minutes = (total_seconds % 3600) / 60;
-    let hour_12 = if hours == 0 { 12 } else if hours > 12 { hours - 12 } else { hours };
+    let hour_12 = if hours == 0 {
+        12
+    } else if hours > 12 {
+        hours - 12
+    } else {
+        hours
+    };
     let am_pm = if hours >= 12 { "PM" } else { "AM" };
     format!(
         "{:02}/{:02}/{:02} {:02}:{:02}{}",
@@ -425,9 +431,13 @@ impl MatchEvent for App {
                         self.ui
                             .label(cx, ids!(speech_label))
                             .set_text(cx, &self.pending_response);
-                        self.ui.label(cx, ids!(status_label)).set_text(cx, "● Speaking");
+                        self.ui
+                            .label(cx, ids!(status_label))
+                            .set_text(cx, "● Speaking");
                         self.ui.button(cx, ids!(replay_btn)).set_visible(cx, true);
-                        self.ui.button(cx, ids!(translate_btn)).set_visible(cx, true);
+                        self.ui
+                            .button(cx, ids!(translate_btn))
+                            .set_visible(cx, true);
                     }
                     GeminiAction::TurnComplete => {
                         self.session_state = "idle".to_string();
@@ -454,7 +464,9 @@ impl MatchEvent for App {
                         let short = format!("Error: {}", e);
                         eprintln!("{}", short);
                         self.ui.label(cx, ids!(speech_label)).set_text(cx, &short);
-                        self.ui.label(cx, ids!(status_label)).set_text(cx, &format!("⚠ {}", short));
+                        self.ui
+                            .label(cx, ids!(status_label))
+                            .set_text(cx, &format!("⚠ {}", short));
                         self.ui.label(cx, ids!(conn_status)).set_text(cx, &short);
                         self.ui.button(cx, ids!(connect_btn)).set_visible(cx, true);
                         self.ui
@@ -558,9 +570,20 @@ impl MatchEvent for App {
                                         caption,
                                     } => {
                                         if content_type == "pdf" {
-                                            client_sender.send_image("application/pdf", &data, caption.as_deref()).await
+                                            client_sender
+                                                .send_image(
+                                                    "application/pdf",
+                                                    &data,
+                                                    caption.as_deref(),
+                                                )
+                                                .await
                                         } else {
-                                            client_sender.send_text(&format!("[Context from {}]:\n{}", content_type, data)).await
+                                            client_sender
+                                                .send_text(&format!(
+                                                    "[Context from {}]:\n{}",
+                                                    content_type, data
+                                                ))
+                                                .await
                                         }
                                     }
                                     UiToGemini::Disconnect => break,
@@ -585,8 +608,13 @@ impl MatchEvent for App {
                                             }
                                             Part::InlineData { inline_data } => {
                                                 if inline_data.mime_type.contains("audio") {
-                                                    if let Ok(pcm) = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &inline_data.data) {
-                                                        Cx::post_action(GeminiAction::AudioReceived(pcm));
+                                                    if let Ok(pcm) = base64::Engine::decode(
+                                                        &base64::engine::general_purpose::STANDARD,
+                                                        &inline_data.data,
+                                                    ) {
+                                                        Cx::post_action(
+                                                            GeminiAction::AudioReceived(pcm),
+                                                        );
                                                     }
                                                 }
                                             }
@@ -644,11 +672,17 @@ impl MatchEvent for App {
                     if mic.has_microphone() {
                         self.session_state = "listening".to_string();
                         self.ui.button(cx, ids!(mic_btn)).set_text(cx, "⏹ Stop");
-                        self.ui.label(cx, ids!(status_label)).set_text(cx, "● Listening... (Voice input active)");
-                        self.ui.label(cx, ids!(conn_status)).set_text(cx, "Listening + Voice");
+                        self.ui
+                            .label(cx, ids!(status_label))
+                            .set_text(cx, "● Listening... (Voice input active)");
+                        self.ui
+                            .label(cx, ids!(conn_status))
+                            .set_text(cx, "Listening + Voice");
                     } else {
                         self.is_recording = false;
-                        self.ui.label(cx, ids!(status_label)).set_text(cx, "No microphone detected");
+                        self.ui
+                            .label(cx, ids!(status_label))
+                            .set_text(cx, "No microphone detected");
                     }
                 }
             } else {
@@ -658,7 +692,9 @@ impl MatchEvent for App {
                 self.session_state = "idle".to_string();
                 self.ui.button(cx, ids!(mic_btn)).set_text(cx, "🎤 Mic");
                 self.ui.label(cx, ids!(status_label)).set_text(cx, "Ready");
-                self.ui.label(cx, ids!(conn_status)).set_text(cx, "Connected");
+                self.ui
+                    .label(cx, ids!(conn_status))
+                    .set_text(cx, "Connected");
             }
         }
 
@@ -679,32 +715,50 @@ impl MatchEvent for App {
                     .as_secs_f64();
                 let id = format!("memory_{}", now as u64);
                 let api_key = std::env::var("GEMINI_API_KEY").unwrap_or_default();
-                let messages_for_ai: Vec<storage::Message> = self.conversation.iter().map(|m| storage::Message {
-                    role: m.role.clone(),
-                    content: m.content.clone(),
-                    timestamp: m.timestamp,
-                }).collect();
-                let (title, summary, mood) = if !api_key.is_empty() && !messages_for_ai.is_empty() {
-                    storage.summarize_with_ai(&messages_for_ai, &api_key).unwrap_or_else(|_| {
-                        let title = messages_for_ai.iter()
-                            .find(|m| m.role == "user")
-                            .map(|m| m.content.chars().take(25).collect::<String>())
-                            .unwrap_or_else(|| "Conversation".to_string());
-                        let summary = messages_for_ai.iter().take(3)
-                            .map(|m| m.content.chars().take(40).collect::<String>())
-                            .collect::<Vec<_>>()
-                            .join(" | ");
-                        (title, summary, None)
+                let messages_for_ai: Vec<storage::Message> = self
+                    .conversation
+                    .iter()
+                    .map(|m| storage::Message {
+                        role: m.role.clone(),
+                        content: m.content.clone(),
+                        timestamp: m.timestamp,
                     })
+                    .collect();
+                let (title, summary, mood) = if !api_key.is_empty() && !messages_for_ai.is_empty() {
+                    storage
+                        .summarize_with_ai(&messages_for_ai, &api_key)
+                        .unwrap_or_else(|_| {
+                            let title = messages_for_ai
+                                .iter()
+                                .find(|m| m.role == "user")
+                                .map(|m| m.content.chars().take(25).collect::<String>())
+                                .unwrap_or_else(|| "Conversation".to_string());
+                            let summary = messages_for_ai
+                                .iter()
+                                .take(3)
+                                .map(|m| m.content.chars().take(40).collect::<String>())
+                                .collect::<Vec<_>>()
+                                .join(" | ");
+                            (title, summary, None)
+                        })
                 } else {
-                    let title = self.conversation.iter()
+                    let title = self
+                        .conversation
+                        .iter()
                         .find(|m| m.role == "user")
                         .map(|m| {
                             let text = m.content.chars().take(30).collect::<String>();
-                            if m.content.len() > 30 { format!("{}...", text) } else { text }
+                            if m.content.len() > 30 {
+                                format!("{}...", text)
+                            } else {
+                                text
+                            }
                         })
                         .unwrap_or_else(|| "Conversation".to_string());
-                    let summary = self.conversation.iter().take(3)
+                    let summary = self
+                        .conversation
+                        .iter()
+                        .take(3)
                         .map(|m| m.content.chars().take(50).collect::<String>())
                         .collect::<Vec<_>>()
                         .join(" | ");
@@ -751,13 +805,18 @@ impl MatchEvent for App {
                     .to_string();
 
                     let dithered = if mime_type != "image/gif" {
-                        use std::io::Cursor;
                         use ::image::ImageReader;
-                        let img = ImageReader::new(Cursor::new(&bytes)).with_guessed_format().ok().and_then(|r| r.decode().ok());
+                        use std::io::Cursor;
+                        let img = ImageReader::new(Cursor::new(&bytes))
+                            .with_guessed_format()
+                            .ok()
+                            .and_then(|r| r.decode().ok());
                         if let Some(img) = img {
                             let dithered_img = dithering::apply_floyd_steinberg(&img);
                             let mut buf = Vec::new();
-                            dithered_img.write_to(&mut Cursor::new(&mut buf), ::image::ImageFormat::Png).ok();
+                            dithered_img
+                                .write_to(&mut Cursor::new(&mut buf), ::image::ImageFormat::Png)
+                                .ok();
                             buf
                         } else {
                             bytes.clone()
@@ -766,12 +825,18 @@ impl MatchEvent for App {
                         bytes.clone()
                     };
 
-                    let b64 =
-                        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &dithered);
+                    let b64 = base64::Engine::encode(
+                        &base64::engine::general_purpose::STANDARD,
+                        &dithered,
+                    );
                     self.current_image = Some(("image/png".to_string(), b64.clone()));
                     self.current_dithered_image = Some(b64);
-                    self.ui.image(cx, ids!(scene_background)).load_png_from_data(cx, &dithered);
-                    self.ui.view(cx, ids!(scene_background)).set_visible(cx, true);
+                    self.ui
+                        .image(cx, ids!(scene_background))
+                        .load_png_from_data(cx, &dithered);
+                    self.ui
+                        .view(cx, ids!(scene_background))
+                        .set_visible(cx, true);
                     self.ui
                         .label(cx, ids!(speech_label))
                         .set_text(cx, "Dithered ✓ Type a message.");
@@ -790,7 +855,9 @@ impl MatchEvent for App {
             self.is_recording = false;
             self.ui.label(cx, ids!(speech_label)).set_text(cx, "");
             self.ui.button(cx, ids!(mic_btn)).set_text(cx, "🎤 Mic");
-            self.ui.view(cx, ids!(scene_background)).set_visible(cx, false);
+            self.ui
+                .view(cx, ids!(scene_background))
+                .set_visible(cx, false);
             self.ui
                 .label(cx, ids!(status_label))
                 .set_text(cx, "Stopped");
@@ -803,8 +870,12 @@ impl MatchEvent for App {
                     url: url.clone(),
                     title: url.chars().take(30).collect(),
                 });
-                self.ui.label(cx, ids!(speech_label)).set_text(cx, &format!("🔗 URL: {}", url));
-                self.ui.label(cx, ids!(status_label)).set_text(cx, "URL scene ready");
+                self.ui
+                    .label(cx, ids!(speech_label))
+                    .set_text(cx, &format!("🔗 URL: {}", url));
+                self.ui
+                    .label(cx, ids!(status_label))
+                    .set_text(cx, "URL scene ready");
             }
         }
 
@@ -816,18 +887,29 @@ impl MatchEvent for App {
             {
                 if let Ok(bytes) = std::fs::read(&path) {
                     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-                    let filename = path.file_name()
+                    let filename = path
+                        .file_name()
                         .and_then(|n| n.to_str())
                         .unwrap_or("document")
                         .to_string();
-                    
+
                     self.scene_content = Some(match ext.to_lowercase().as_str() {
-                        "pdf" => SceneContent::Pdf { data: bytes, title: filename.clone() },
-                        _ => SceneContent::Text { content: String::from_utf8_lossy(&bytes).to_string(), title: filename.clone() },
+                        "pdf" => SceneContent::Pdf {
+                            data: bytes,
+                            title: filename.clone(),
+                        },
+                        _ => SceneContent::Text {
+                            content: String::from_utf8_lossy(&bytes).to_string(),
+                            title: filename.clone(),
+                        },
                     });
-                    
-                    self.ui.label(cx, ids!(speech_label)).set_text(cx, &format!("📄 Loaded: {}", filename));
-                    self.ui.label(cx, ids!(status_label)).set_text(cx, "Document scene ready");
+
+                    self.ui
+                        .label(cx, ids!(speech_label))
+                        .set_text(cx, &format!("📄 Loaded: {}", filename));
+                    self.ui
+                        .label(cx, ids!(status_label))
+                        .set_text(cx, "Document scene ready");
                 }
             }
         }
@@ -839,8 +921,12 @@ impl MatchEvent for App {
                     content: text.clone(),
                     title: text.chars().take(30).collect(),
                 });
-                self.ui.label(cx, ids!(speech_label)).set_text(cx, "📋 Text scene ready - speak or type to discuss");
-                self.ui.label(cx, ids!(status_label)).set_text(cx, "Text scene ready");
+                self.ui
+                    .label(cx, ids!(speech_label))
+                    .set_text(cx, "📋 Text scene ready - speak or type to discuss");
+                self.ui
+                    .label(cx, ids!(status_label))
+                    .set_text(cx, "Text scene ready");
             }
         }
 
@@ -908,7 +994,8 @@ impl MatchEvent for App {
         }
         if self.ui.button(cx, ids!(next_card_btn)).clicked(actions) {
             if !self.memory_summaries.is_empty() {
-                self.selected_memory_index = (self.selected_memory_index + 1).min(self.memory_summaries.len() - 1);
+                self.selected_memory_index =
+                    (self.selected_memory_index + 1).min(self.memory_summaries.len() - 1);
                 self.update_carousel(cx);
             }
         }
@@ -922,8 +1009,12 @@ impl App {
             return;
         }
 
-        let user_msg = if text.is_empty() { "Setting scene context".to_string() } else { text.clone() };
-        
+        let user_msg = if text.is_empty() {
+            "Setting scene context".to_string()
+        } else {
+            text.clone()
+        };
+
         self.ui.text_input(cx, ids!(msg_input)).set_text(cx, "");
         self.ui.text_input(cx, ids!(msg_input)).set_key_focus(cx);
         self.conversation.push(Message {
@@ -949,7 +1040,10 @@ impl App {
                         });
                     }
                     SceneContent::Pdf { data, title: _ } => {
-                        let b64_data = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &data);
+                        let b64_data = base64::Engine::encode(
+                            &base64::engine::general_purpose::STANDARD,
+                            &data,
+                        );
                         let _ = sender.try_send(UiToGemini::SceneContent {
                             content_type: "pdf".to_string(),
                             data: b64_data,
@@ -1086,7 +1180,11 @@ impl App {
                     } else {
                         m.title.clone()
                     };
-                    let mood_tag = m.mood.as_ref().map(|m| format!("[{}]", m)).unwrap_or_default();
+                    let mood_tag = m
+                        .mood
+                        .as_ref()
+                        .map(|m| format!("[{}]", m))
+                        .unwrap_or_default();
                     format!(
                         "{} #{} [{}] {}\n{}\n{}",
                         marker,
@@ -1166,8 +1264,12 @@ impl App {
 
     fn toggle_calendar_view(&mut self, cx: &mut Cx, show_calendar: bool) {
         self.calendar_view_visible = show_calendar;
-        self.ui.view(cx, ids!(memory_list)).set_visible(cx, !show_calendar);
-        self.ui.view(cx, ids!(calendar_view)).set_visible(cx, show_calendar);
+        self.ui
+            .view(cx, ids!(memory_list))
+            .set_visible(cx, !show_calendar);
+        self.ui
+            .view(cx, ids!(calendar_view))
+            .set_visible(cx, show_calendar);
         self.update_calendar_view(cx);
     }
 
@@ -1176,9 +1278,15 @@ impl App {
         let show_carousel = view_type == "carousel";
         let show_calendar = view_type == "calendar";
 
-        self.ui.view(cx, ids!(memory_list)).set_visible(cx, show_list);
-        self.ui.view(cx, ids!(carousel_view)).set_visible(cx, show_carousel);
-        self.ui.view(cx, ids!(calendar_view)).set_visible(cx, show_calendar);
+        self.ui
+            .view(cx, ids!(memory_list))
+            .set_visible(cx, show_list);
+        self.ui
+            .view(cx, ids!(carousel_view))
+            .set_visible(cx, show_carousel);
+        self.ui
+            .view(cx, ids!(calendar_view))
+            .set_visible(cx, show_calendar);
 
         if show_carousel {
             self.update_carousel(cx);
@@ -1190,10 +1298,18 @@ impl App {
             return;
         }
         let selected = &self.memory_summaries[self.selected_memory_index];
-        self.ui.label(cx, ids!(card_title)).set_text(cx, &selected.title);
-        self.ui.label(cx, ids!(card_summary)).set_text(cx, &selected.summary);
-        self.ui.label(cx, ids!(card_date)).set_text(cx, &selected.date);
-        self.ui.label(cx, ids!(card_mood)).set_text(cx, "Tap for details");
+        self.ui
+            .label(cx, ids!(card_title))
+            .set_text(cx, &selected.title);
+        self.ui
+            .label(cx, ids!(card_summary))
+            .set_text(cx, &selected.summary);
+        self.ui
+            .label(cx, ids!(card_date))
+            .set_text(cx, &selected.date);
+        self.ui
+            .label(cx, ids!(card_mood))
+            .set_text(cx, "Tap for details");
     }
 
     fn update_memory_action_button_labels(&mut self, cx: &mut Cx) {

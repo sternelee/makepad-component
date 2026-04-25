@@ -35,7 +35,8 @@ pub fn read_clipboard(monitor: &ClipboardMonitor) -> Option<ClipboardEntry> {
         let cf_dib = 8i32; // CF_DIB
 
         // Try to get text (Unicode first, then ANSI)
-        let text_data = GetClipboardData(windows::Win32::System::DataExchange::CLIPFORMAT(cf_unicode));
+        let text_data =
+            GetClipboardData(windows::Win32::System::DataExchange::CLIPFORMAT(cf_unicode));
         if !text_data.is_null() {
             formats.push("text/plain;charset=utf-16".to_string());
             let text = {
@@ -56,7 +57,8 @@ pub fn read_clipboard(monitor: &ClipboardMonitor) -> Option<ClipboardEntry> {
 
         // Try CF_TEXT as fallback
         if matches!(content, ClipboardContent::Unknown) {
-            let text_data = GetClipboardData(windows::Win32::System::DataExchange::CLIPFORMAT(cf_text));
+            let text_data =
+                GetClipboardData(windows::Win32::System::DataExchange::CLIPFORMAT(cf_text));
             if !text_data.is_null() {
                 formats.push("text/plain".to_string());
                 let text = {
@@ -76,7 +78,8 @@ pub fn read_clipboard(monitor: &ClipboardMonitor) -> Option<ClipboardEntry> {
 
         // Check for bitmap image
         if matches!(content, ClipboardContent::Unknown) {
-            let bitmap_data = GetClipboardData(windows::Win32::System::DataExchange::CLIPFORMAT(cf_bitmap));
+            let bitmap_data =
+                GetClipboardData(windows::Win32::System::DataExchange::CLIPFORMAT(cf_bitmap));
             if !bitmap_data.is_null() {
                 formats.push("image/bmp".to_string());
                 // For now, just indicate it's an image without extracting pixels
@@ -90,7 +93,8 @@ pub fn read_clipboard(monitor: &ClipboardMonitor) -> Option<ClipboardEntry> {
 
         // Check for DIB (device independent bitmap)
         if matches!(content, ClipboardContent::Unknown) {
-            let dib_data = GetClipboardData(windows::Win32::System::DataExchange::CLIPFORMAT(cf_dib));
+            let dib_data =
+                GetClipboardData(windows::Win32::System::DataExchange::CLIPFORMAT(cf_dib));
             if !dib_data.is_null() {
                 formats.push("image/dib".to_string());
                 content = ClipboardContent::Image {

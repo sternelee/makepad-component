@@ -1,7 +1,7 @@
-use makepad_widgets::*;
+use super::*;
 use crate::elements::*;
 use crate::text::*;
-use super::*;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -42,14 +42,23 @@ impl TreemapNode {
 
 #[derive(Live, LiveHook, Widget)]
 pub struct Treemap {
-    #[deref] #[live] view: View,
-    #[live] draw_fill: DrawPlotFill,
-    #[live] draw_line: DrawPlotLine,
-    #[live] label: PlotLabel,
-    #[live] theme: ChartTheme,
-    #[rust] title: String,
-    #[rust] nodes: Vec<TreemapNode>,
-    #[rust] show_labels: bool,
+    #[deref]
+    #[live]
+    view: View,
+    #[live]
+    draw_fill: DrawPlotFill,
+    #[live]
+    draw_line: DrawPlotLine,
+    #[live]
+    label: PlotLabel,
+    #[live]
+    theme: ChartTheme,
+    #[rust]
+    title: String,
+    #[rust]
+    nodes: Vec<TreemapNode>,
+    #[rust]
+    show_labels: bool,
 }
 
 impl Treemap {
@@ -91,14 +100,22 @@ impl Widget for Treemap {
                 for (i, node) in self.nodes.iter().enumerate() {
                     let node_area = (node.value / total) * area;
                     let (node_x, node_y, node_w, node_h) = if horizontal {
-                        let w = if remaining_height > 0.0 { node_area / remaining_height } else { 0.0 };
+                        let w = if remaining_height > 0.0 {
+                            node_area / remaining_height
+                        } else {
+                            0.0
+                        };
                         let w = w.min(remaining_width);
                         let result = (x, y, w, remaining_height);
                         x += w;
                         remaining_width -= w;
                         result
                     } else {
-                        let h = if remaining_width > 0.0 { node_area / remaining_width } else { 0.0 };
+                        let h = if remaining_width > 0.0 {
+                            node_area / remaining_width
+                        } else {
+                            0.0
+                        };
                         let h = h.min(remaining_height);
                         let result = (x, y, remaining_width, h);
                         y += h;
@@ -111,10 +128,13 @@ impl Widget for Treemap {
 
                         // Draw filled rectangle
                         self.draw_fill.color = color;
-                        self.draw_fill.draw_abs(cx, Rect {
-                            pos: dvec2(node_x, node_y),
-                            size: dvec2(node_w - 2.0, node_h - 2.0),
-                        });
+                        self.draw_fill.draw_abs(
+                            cx,
+                            Rect {
+                                pos: dvec2(node_x, node_y),
+                                size: dvec2(node_w - 2.0, node_h - 2.0),
+                            },
+                        );
 
                         // Draw border
                         self.draw_line.color = vec4(1.0, 1.0, 1.0, 0.8);
@@ -125,15 +145,21 @@ impl Widget for Treemap {
                             dvec2(node_x, node_y + node_h - 2.0),
                         ];
                         for j in 0..4 {
-                            self.draw_line.draw_line(cx, corners[j], corners[(j + 1) % 4], 1.0);
+                            self.draw_line
+                                .draw_line(cx, corners[j], corners[(j + 1) % 4], 1.0);
                         }
 
                         // Draw label
                         if self.show_labels && node_w > 40.0 && node_h > 25.0 {
                             let center = dvec2(node_x + node_w / 2.0, node_y + node_h / 2.0);
                             let brightness = color.x * 0.299 + color.y * 0.587 + color.z * 0.114;
-                            self.label.draw_text.color = if brightness > 0.5 { vec4(0.0, 0.0, 0.0, 1.0) } else { vec4(1.0, 1.0, 1.0, 1.0) };
-                            self.label.draw_at(cx, center, &node.label, TextAnchor::Center);
+                            self.label.draw_text.color = if brightness > 0.5 {
+                                vec4(0.0, 0.0, 0.0, 1.0)
+                            } else {
+                                vec4(1.0, 1.0, 1.0, 1.0)
+                            };
+                            self.label
+                                .draw_at(cx, center, &node.label, TextAnchor::Center);
                         }
                     }
                 }
@@ -142,7 +168,12 @@ impl Widget for Treemap {
             // Draw title
             if !self.title.is_empty() {
                 self.label.draw_text.color = self.theme.label_color;
-                self.label.draw_at(cx, dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0), &self.title, TextAnchor::TopCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0),
+                    &self.title,
+                    TextAnchor::TopCenter,
+                );
             }
         }
 
@@ -162,16 +193,23 @@ impl Treemap {
 
 impl TreemapRef {
     pub fn set_title(&self, title: impl Into<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_title(title); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_title(title);
+        }
     }
     pub fn set_data(&self, nodes: Vec<TreemapNode>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_data(nodes); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_data(nodes);
+        }
     }
     pub fn set_show_labels(&self, show: bool) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_show_labels(show); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_show_labels(show);
+        }
     }
     pub fn redraw(&self, cx: &mut Cx) {
-        if let Some(mut inner) = self.borrow_mut() { inner.redraw(cx); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.redraw(cx);
+        }
     }
 }
-

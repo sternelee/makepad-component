@@ -4,8 +4,8 @@
 //! Uses `LiveAtomic` (f64a) for lock-free volume/amplitude sharing between
 //! the audio thread and the UI thread, following the Makepad audio example pattern.
 
-use makepad_widgets::*;
 use makepad_widgets::makepad_platform::live_atomic::{f64a, AtomicGetSet};
+use makepad_widgets::*;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -139,11 +139,7 @@ pub fn decode_audio_file(path: &str) -> Result<(Vec<f32>, u32, usize), String> {
         .codec_params
         .sample_rate
         .ok_or("No sample rate in track")?;
-    let channels = track
-        .codec_params
-        .channels
-        .map(|c| c.count())
-        .unwrap_or(2);
+    let channels = track.codec_params.channels.map(|c| c.count()).unwrap_or(2);
 
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())

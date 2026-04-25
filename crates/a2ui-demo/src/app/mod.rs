@@ -4,10 +4,10 @@
 //! - Static mode: Load product catalog JSON data directly
 //! - Streaming mode: Connect to A2A server for payment checkout UI
 
-mod theme;
+pub mod audio_player;
 mod logic;
 mod sample_data;
-pub mod audio_player;
+mod theme;
 
-pub use theme::*;
 pub use logic::*;
+pub use theme::*;

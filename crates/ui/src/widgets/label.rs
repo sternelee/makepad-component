@@ -250,13 +250,19 @@ impl Widget for MpLabel {
         if !highlight_str.is_empty() && !self.masked {
             self.draw_highlighted_text(cx, &main_text, &highlight_str);
         } else {
-            self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), &main_text);
+            self.draw_text
+                .draw_walk(cx, Walk::fit(), Align::default(), &main_text);
         }
 
         // Draw secondary text if present
         if has_secondary {
             // Add a space separator
-            self.draw_secondary.draw_walk(cx, Walk::fit(), Align::default(), &format!(" {}", secondary_text));
+            self.draw_secondary.draw_walk(
+                cx,
+                Walk::fit(),
+                Align::default(),
+                &format!(" {}", secondary_text),
+            );
         }
 
         cx.end_turtle_with_area(&mut self.area);
@@ -278,7 +284,8 @@ impl MpLabel {
     /// Draw text with highlighting
     fn draw_highlighted_text(&mut self, cx: &mut Cx2d, text: &str, highlight: &str) {
         if highlight.is_empty() {
-            self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), text);
+            self.draw_text
+                .draw_walk(cx, Walk::fit(), Align::default(), text);
             return;
         }
 
@@ -295,7 +302,8 @@ impl MpLabel {
             // Draw text before match
             if match_start > last_end {
                 let before = &text[last_end..match_start];
-                self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), before);
+                self.draw_text
+                    .draw_walk(cx, Walk::fit(), Align::default(), before);
             }
 
             // Draw highlighted text
@@ -310,7 +318,8 @@ impl MpLabel {
             } else {
                 self.draw_text.color = vec4(0.231, 0.51, 0.965, 1.0); // PRIMARY color
             }
-            self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), matched);
+            self.draw_text
+                .draw_walk(cx, Walk::fit(), Align::default(), matched);
             self.draw_text.color = original_color;
 
             last_end = match_end;
@@ -325,7 +334,8 @@ impl MpLabel {
         // Draw remaining text
         if last_end < text.len() {
             let remaining = &text[last_end..];
-            self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), remaining);
+            self.draw_text
+                .draw_walk(cx, Walk::fit(), Align::default(), remaining);
         }
     }
 

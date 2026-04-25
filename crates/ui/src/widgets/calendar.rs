@@ -284,12 +284,8 @@ impl Widget for MpCalendar {
                 },
             );
             self.draw_header_text.text_style.font_size = 16.0;
-            self.draw_header_text.draw_walk(
-                cx,
-                Walk::fit(),
-                Align::default(),
-                &self.config.title,
-            );
+            self.draw_header_text
+                .draw_walk(cx, Walk::fit(), Align::default(), &self.config.title);
             self.draw_cell.end(cx);
         }
 
@@ -371,29 +367,18 @@ impl Widget for MpCalendar {
                         .unwrap_or_default();
 
                     self.draw_header_text.text_style.font_size = 13.0;
-                    self.draw_header_text.draw_walk(
-                        cx,
-                        Walk::fit(),
-                        Align::default(),
-                        &header,
-                    );
+                    self.draw_header_text
+                        .draw_walk(cx, Walk::fit(), Align::default(), &header);
 
                     if !subtitle.is_empty() {
                         self.draw_text.text_style.font_size = 10.0;
                         self.draw_text.color = vec4(0.7, 0.8, 0.9, 1.0);
-                        self.draw_text.draw_walk(
-                            cx,
-                            Walk::fit(),
-                            Align::default(),
-                            &subtitle,
-                        );
+                        self.draw_text
+                            .draw_walk(cx, Walk::fit(), Align::default(), &subtitle);
                     }
                 } else {
                     // Data cell: show row_label + cell data
-                    let cell_data = self
-                        .cells
-                        .get(row_idx)
-                        .and_then(|row| row.get(col_idx));
+                    let cell_data = self.cells.get(row_idx).and_then(|row| row.get(col_idx));
 
                     let line1 = cell_data.map(|c| c.line1.as_str()).unwrap_or("");
                     let line2 = cell_data.map(|c| c.line2.as_str()).unwrap_or("");
@@ -401,33 +386,21 @@ impl Widget for MpCalendar {
                     if !row_label.is_empty() {
                         self.draw_text.text_style.font_size = 9.0;
                         self.draw_text.color = vec4(0.6, 0.7, 0.8, 0.8);
-                        self.draw_text.draw_walk(
-                            cx,
-                            Walk::fit(),
-                            Align::default(),
-                            &row_label,
-                        );
+                        self.draw_text
+                            .draw_walk(cx, Walk::fit(), Align::default(), &row_label);
                     }
 
                     if !line1.is_empty() {
                         self.draw_header_text.text_style.font_size = 11.0;
-                        self.draw_header_text.draw_walk(
-                            cx,
-                            Walk::fit(),
-                            Align::default(),
-                            line1,
-                        );
+                        self.draw_header_text
+                            .draw_walk(cx, Walk::fit(), Align::default(), line1);
                     }
 
                     if !line2.is_empty() {
                         self.draw_text.text_style.font_size = 9.0;
                         self.draw_text.color = vec4(0.7, 0.8, 0.9, 0.9);
-                        self.draw_text.draw_walk(
-                            cx,
-                            Walk::fit(),
-                            Align::default(),
-                            line2,
-                        );
+                        self.draw_text
+                            .draw_walk(cx, Walk::fit(), Align::default(), line2);
                     }
                 }
 
@@ -456,12 +429,8 @@ impl Widget for MpCalendar {
                 },
             );
             self.draw_header_text.text_style.font_size = 14.0;
-            self.draw_header_text.draw_walk(
-                cx,
-                Walk::fit(),
-                Align::default(),
-                &self.config.footer,
-            );
+            self.draw_header_text
+                .draw_walk(cx, Walk::fit(), Align::default(), &self.config.footer);
             self.draw_cell.end(cx);
         }
 
@@ -485,13 +454,7 @@ impl Widget for MpCalendar {
 
 impl MpCalendar {
     /// Render the detail panel below the calendar showing the full day schedule
-    fn render_detail(
-        &mut self,
-        cx: &mut Cx2d,
-        sel_row: usize,
-        sel_col: usize,
-        total_width: f64,
-    ) {
+    fn render_detail(&mut self, cx: &mut Cx2d, sel_row: usize, sel_col: usize, total_width: f64) {
         let num_rows = self.config.row_labels.len();
         let content_width = total_width - 32.0;
 

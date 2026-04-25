@@ -1,10 +1,10 @@
-use makepad_widgets::*;
-use makepad_plot::*;
-use crate::a2ui::message::*;
 use crate::a2ui::data_model::DataModel;
+use crate::a2ui::message::*;
 use crate::a2ui::processor::resolve_string_value_scoped;
+use makepad_plot::*;
+use makepad_widgets::*;
 
-use super::{get_bridge_color, resolve_title, parse_colormap};
+use super::{get_bridge_color, parse_colormap, resolve_title};
 
 pub fn render_histogram(
     plot: &mut HistogramChart,
@@ -44,7 +44,9 @@ pub fn render_boxplot(
     plot.clear();
 
     for (i, series) in chart.series.iter().enumerate() {
-        let label = series.name.as_deref()
+        let label = series
+            .name
+            .as_deref()
             .or(chart.labels.get(i).map(|s| s.as_str()))
             .unwrap_or("");
         plot.add_from_values(label, &series.values);
@@ -109,8 +111,10 @@ pub fn render_stem(
     plot.clear();
 
     for (i, series) in chart.series.iter().enumerate() {
-        let x = series.x_values.clone().unwrap_or_else(||
-            (0..series.values.len()).map(|j| j as f64).collect());
+        let x = series
+            .x_values
+            .clone()
+            .unwrap_or_else(|| (0..series.values.len()).map(|j| j as f64).collect());
         let s = Series::new(series.name.as_deref().unwrap_or(""))
             .with_data(x, series.values.clone())
             .with_color(get_bridge_color(chart, i));
@@ -140,7 +144,9 @@ pub fn render_violin(
     plot.clear();
 
     for (i, series) in chart.series.iter().enumerate() {
-        let label = series.name.as_deref()
+        let label = series
+            .name
+            .as_deref()
             .or(chart.labels.get(i).map(|s| s.as_str()))
             .unwrap_or("");
         plot.add_from_values(label, &series.values);
@@ -248,4 +254,3 @@ pub fn render_contour(
 // ============================================================================
 // Waterfall Chart Bridge
 // ============================================================================
-

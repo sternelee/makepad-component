@@ -272,7 +272,6 @@ impl std::fmt::Display for SliderValue {
     }
 }
 
-
 #[derive(Clone, Debug, DefaultNone)]
 pub enum MpSliderAction {
     Changed(SliderValue),
@@ -402,20 +401,29 @@ impl Widget for MpSlider {
         let vertical_f = if self.vertical { 1.0 } else { 0.0 };
 
         // Update track
-        self.draw_track.apply_over(cx, live! {
-            progress_start: (progress_start),
-            progress_end: (progress_end),
-            disabled: (disabled_f),
-            vertical: (vertical_f)
-        });
+        self.draw_track.apply_over(
+            cx,
+            live! {
+                progress_start: (progress_start),
+                progress_end: (progress_end),
+                disabled: (disabled_f),
+                vertical: (vertical_f)
+            },
+        );
 
         // Update thumbs disabled state
-        self.draw_thumb.apply_over(cx, live! {
-            disabled: (disabled_f)
-        });
-        self.draw_thumb_start.apply_over(cx, live! {
-            disabled: (disabled_f)
-        });
+        self.draw_thumb.apply_over(
+            cx,
+            live! {
+                disabled: (disabled_f)
+            },
+        );
+        self.draw_thumb_start.apply_over(
+            cx,
+            live! {
+                disabled: (disabled_f)
+            },
+        );
 
         // Get the rect for drawing
         let rect = cx.walk_turtle(walk);
@@ -425,7 +433,10 @@ impl Widget for MpSlider {
             // Vertical layout - draw track at full rect size for hit testing
             let track_rect = Rect {
                 pos: rect.pos,
-                size: DVec2 { x: rect.size.x, y: rect.size.y },
+                size: DVec2 {
+                    x: rect.size.x,
+                    y: rect.size.y,
+                },
             };
             self.draw_track.draw_abs(cx, track_rect);
             self.track_area = self.draw_track.area();
@@ -434,22 +445,40 @@ impl Widget for MpSlider {
             let thumb_padding = thumb_size / 2.0;
             let track_height = rect.size.y - thumb_size;
             // For vertical, progress 0 is at bottom, 1 is at top
-            let thumb_y = rect.pos.y + rect.size.y - thumb_padding - (track_height * progress_end) - (thumb_size / 2.0);
+            let thumb_y = rect.pos.y + rect.size.y
+                - thumb_padding
+                - (track_height * progress_end)
+                - (thumb_size / 2.0);
             let thumb_x = rect.pos.x + (rect.size.x - thumb_size) / 2.0;
 
             let thumb_rect = Rect {
-                pos: DVec2 { x: thumb_x, y: thumb_y },
-                size: DVec2 { x: thumb_size, y: thumb_size },
+                pos: DVec2 {
+                    x: thumb_x,
+                    y: thumb_y,
+                },
+                size: DVec2 {
+                    x: thumb_size,
+                    y: thumb_size,
+                },
             };
             self.draw_thumb.draw_abs(cx, thumb_rect);
             self.thumb_area = self.draw_thumb.area();
 
             // Draw start thumb if range mode
             if self.range_mode {
-                let start_thumb_y = rect.pos.y + rect.size.y - thumb_padding - (track_height * progress_start) - (thumb_size / 2.0);
+                let start_thumb_y = rect.pos.y + rect.size.y
+                    - thumb_padding
+                    - (track_height * progress_start)
+                    - (thumb_size / 2.0);
                 let start_thumb_rect = Rect {
-                    pos: DVec2 { x: thumb_x, y: start_thumb_y },
-                    size: DVec2 { x: thumb_size, y: thumb_size },
+                    pos: DVec2 {
+                        x: thumb_x,
+                        y: start_thumb_y,
+                    },
+                    size: DVec2 {
+                        x: thumb_size,
+                        y: thumb_size,
+                    },
                 };
                 self.draw_thumb_start.draw_abs(cx, start_thumb_rect);
                 self.thumb_start_area = self.draw_thumb_start.area();
@@ -459,7 +488,10 @@ impl Widget for MpSlider {
             // Draw track at full rect height for hit testing; shader renders visual track centered
             let track_rect = Rect {
                 pos: rect.pos,
-                size: DVec2 { x: rect.size.x, y: rect.size.y },
+                size: DVec2 {
+                    x: rect.size.x,
+                    y: rect.size.y,
+                },
             };
             self.draw_track.draw_abs(cx, track_rect);
             self.track_area = self.draw_track.area();
@@ -467,22 +499,36 @@ impl Widget for MpSlider {
             // Draw end thumb (main value)
             let thumb_padding = thumb_size / 2.0;
             let track_width = rect.size.x - thumb_size;
-            let thumb_x = rect.pos.x + thumb_padding + (track_width * progress_end) - (thumb_size / 2.0);
+            let thumb_x =
+                rect.pos.x + thumb_padding + (track_width * progress_end) - (thumb_size / 2.0);
             let thumb_y = rect.pos.y + (rect.size.y - thumb_size) / 2.0;
 
             let thumb_rect = Rect {
-                pos: DVec2 { x: thumb_x, y: thumb_y },
-                size: DVec2 { x: thumb_size, y: thumb_size },
+                pos: DVec2 {
+                    x: thumb_x,
+                    y: thumb_y,
+                },
+                size: DVec2 {
+                    x: thumb_size,
+                    y: thumb_size,
+                },
             };
             self.draw_thumb.draw_abs(cx, thumb_rect);
             self.thumb_area = self.draw_thumb.area();
 
             // Draw start thumb if range mode
             if self.range_mode {
-                let start_thumb_x = rect.pos.x + thumb_padding + (track_width * progress_start) - (thumb_size / 2.0);
+                let start_thumb_x = rect.pos.x + thumb_padding + (track_width * progress_start)
+                    - (thumb_size / 2.0);
                 let start_thumb_rect = Rect {
-                    pos: DVec2 { x: start_thumb_x, y: thumb_y },
-                    size: DVec2 { x: thumb_size, y: thumb_size },
+                    pos: DVec2 {
+                        x: start_thumb_x,
+                        y: thumb_y,
+                    },
+                    size: DVec2 {
+                        x: thumb_size,
+                        y: thumb_size,
+                    },
                 };
                 self.draw_thumb_start.draw_abs(cx, start_thumb_rect);
                 self.thumb_start_area = self.draw_thumb_start.area();
@@ -529,7 +575,8 @@ impl MpSlider {
                 return 0.0;
             }
             // Invert for vertical (bottom = 0, top = 1)
-            let relative_y = (rect.pos.y + rect.size.y - thumb_radius - pos.y).clamp(0.0, track_height);
+            let relative_y =
+                (rect.pos.y + rect.size.y - thumb_radius - pos.y).clamp(0.0, track_height);
             relative_y / track_height
         } else {
             let thumb_radius = 10.0;

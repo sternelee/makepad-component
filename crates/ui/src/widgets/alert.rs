@@ -580,14 +580,18 @@ impl Widget for MpAlert {
 impl MpAlert {
     /// Sync visibility of close button
     fn sync_visibility(&mut self, cx: &mut Cx) {
-        self.view.view(ids!(close_button)).set_visible(cx, self.closable);
+        self.view
+            .view(ids!(close_button))
+            .set_visible(cx, self.closable);
     }
 
     /// Set the alert title
     pub fn set_title(&mut self, cx: &mut Cx, title: &str) {
         let title_label = self.view.label(ids!(content.title_wrapper.title));
         title_label.set_text(cx, title);
-        self.view.view(ids!(content.title_wrapper)).set_visible(cx, !title.is_empty());
+        self.view
+            .view(ids!(content.title_wrapper))
+            .set_visible(cx, !title.is_empty());
         self.redraw(cx);
     }
 

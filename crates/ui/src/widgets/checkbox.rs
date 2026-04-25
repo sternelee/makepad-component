@@ -192,7 +192,8 @@ impl Widget for MpCheckbox {
 
         // Draw label text
         if !self.text.as_ref().is_empty() {
-            self.draw_label.draw_walk(cx, Walk::fit(), Align::default(), self.text.as_ref());
+            self.draw_label
+                .draw_walk(cx, Walk::fit(), Align::default(), self.text.as_ref());
         }
 
         self.draw_bg.end(cx);

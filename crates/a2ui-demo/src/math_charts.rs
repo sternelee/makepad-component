@@ -23,7 +23,9 @@ fn main() {
     // Also copy to ui_live.json for live preview
     std::fs::write("ui_live.json", &json_str).unwrap();
     println!("Written ui_live.json ({} bytes)", json_str.len());
-    println!("\nTo view: run watch-server + a2ui-demo, or just run a2ui-demo and click 'Live Editor'");
+    println!(
+        "\nTo view: run watch-server + a2ui-demo, or just run a2ui-demo and click 'Live Editor'"
+    );
 }
 
 fn generate_math_ui() -> Vec<Value> {
@@ -127,16 +129,21 @@ fn generate_math_ui() -> Vec<Value> {
 
     // Compute Chebyshev T0-T4 over [-1, 1]
     let n_points = 201;
-    let x_cheb: Vec<f64> = (0..n_points).map(|i| -1.0 + 2.0 * i as f64 / (n_points - 1) as f64).collect();
+    let x_cheb: Vec<f64> = (0..n_points)
+        .map(|i| -1.0 + 2.0 * i as f64 / (n_points - 1) as f64)
+        .collect();
 
     let t0: Vec<f64> = x_cheb.iter().map(|_| 1.0).collect();
     let t1: Vec<f64> = x_cheb.iter().map(|&x| x).collect();
     let t2: Vec<f64> = x_cheb.iter().map(|&x| 2.0 * x * x - 1.0).collect();
     let t3: Vec<f64> = x_cheb.iter().map(|&x| 4.0 * x * x * x - 3.0 * x).collect();
-    let t4: Vec<f64> = x_cheb.iter().map(|&x| {
-        let x2 = x * x;
-        8.0 * x2 * x2 - 8.0 * x2 + 1.0
-    }).collect();
+    let t4: Vec<f64> = x_cheb
+        .iter()
+        .map(|&x| {
+            let x2 = x * x;
+            8.0 * x2 * x2 - 8.0 * x2 + 1.0
+        })
+        .collect();
 
     components.push(json!({
         "id": "cheb-chart",
@@ -197,7 +204,9 @@ fn generate_math_ui() -> Vec<Value> {
 
     // Compute Fourier square wave with 1, 3, 7, 15 harmonics
     let n_pts = 401;
-    let x_four: Vec<f64> = (0..n_pts).map(|i| -PI + 2.0 * PI * i as f64 / (n_pts - 1) as f64).collect();
+    let x_four: Vec<f64> = (0..n_pts)
+        .map(|i| -PI + 2.0 * PI * i as f64 / (n_pts - 1) as f64)
+        .collect();
 
     let fourier_sum = |x: f64, n_terms: usize| -> f64 {
         let mut s = 0.0;
@@ -213,7 +222,10 @@ fn generate_math_ui() -> Vec<Value> {
     let f7: Vec<f64> = x_four.iter().map(|&x| fourier_sum(x, 7)).collect();
     let f15: Vec<f64> = x_four.iter().map(|&x| fourier_sum(x, 15)).collect();
     // The target square wave
-    let sq: Vec<f64> = x_four.iter().map(|&x| if x.sin() >= 0.0 { 1.0 } else { -1.0 }).collect();
+    let sq: Vec<f64> = x_four
+        .iter()
+        .map(|&x| if x.sin() >= 0.0 { 1.0 } else { -1.0 })
+        .collect();
 
     components.push(json!({
         "id": "fourier-chart",
@@ -294,11 +306,13 @@ fn generate_math_ui() -> Vec<Value> {
     let mut rosen_grid: Vec<Value> = Vec::new();
     for j in 0..grid_size {
         let y = y_min + (y_max - y_min) * j as f64 / (grid_size - 1) as f64;
-        let row: Vec<f64> = (0..grid_size).map(|i| {
-            let x = x_min + (x_max - x_min) * i as f64 / (grid_size - 1) as f64;
-            let f = (1.0 - x).powi(2) + 100.0 * (y - x * x).powi(2);
-            (1.0 + f).ln() // log scale for better visualization
-        }).collect();
+        let row: Vec<f64> = (0..grid_size)
+            .map(|i| {
+                let x = x_min + (x_max - x_min) * i as f64 / (grid_size - 1) as f64;
+                let f = (1.0 - x).powi(2) + 100.0 * (y - x * x).powi(2);
+                (1.0 + f).ln() // log scale for better visualization
+            })
+            .collect();
         rosen_grid.push(json!({
             "values": row
         }));
@@ -356,11 +370,13 @@ fn generate_math_ui() -> Vec<Value> {
     let mut himmel_series: Vec<Value> = Vec::new();
     for j in 0..hgrid {
         let y = -hrange + 2.0 * hrange * j as f64 / (hgrid - 1) as f64;
-        let row: Vec<f64> = (0..hgrid).map(|i| {
-            let x = -hrange + 2.0 * hrange * i as f64 / (hgrid - 1) as f64;
-            let f = (x * x + y - 11.0).powi(2) + (x + y * y - 7.0).powi(2);
-            (1.0 + f).ln()
-        }).collect();
+        let row: Vec<f64> = (0..hgrid)
+            .map(|i| {
+                let x = -hrange + 2.0 * hrange * i as f64 / (hgrid - 1) as f64;
+                let f = (x * x + y - 11.0).powi(2) + (x + y * y - 7.0).powi(2);
+                (1.0 + f).ln()
+            })
+            .collect();
         himmel_series.push(json!({
             "name": format!("y={:.1}", y),
             "values": row
@@ -426,15 +442,23 @@ fn generate_math_ui() -> Vec<Value> {
         }
     }));
 
-    let x_leg: Vec<f64> = (0..n_points).map(|i| -1.0 + 2.0 * i as f64 / (n_points - 1) as f64).collect();
+    let x_leg: Vec<f64> = (0..n_points)
+        .map(|i| -1.0 + 2.0 * i as f64 / (n_points - 1) as f64)
+        .collect();
     let p0: Vec<f64> = x_leg.iter().map(|_| 1.0).collect();
     let p1: Vec<f64> = x_leg.iter().map(|&x| x).collect();
     let p2: Vec<f64> = x_leg.iter().map(|&x| 0.5 * (3.0 * x * x - 1.0)).collect();
-    let p3: Vec<f64> = x_leg.iter().map(|&x| 0.5 * (5.0 * x * x * x - 3.0 * x)).collect();
-    let p4: Vec<f64> = x_leg.iter().map(|&x| {
-        let x2 = x * x;
-        0.125 * (35.0 * x2 * x2 - 30.0 * x2 + 3.0)
-    }).collect();
+    let p3: Vec<f64> = x_leg
+        .iter()
+        .map(|&x| 0.5 * (5.0 * x * x * x - 3.0 * x))
+        .collect();
+    let p4: Vec<f64> = x_leg
+        .iter()
+        .map(|&x| {
+            let x2 = x * x;
+            0.125 * (35.0 * x2 * x2 - 30.0 * x2 + 3.0)
+        })
+        .collect();
 
     components.push(json!({
         "id": "leg-chart",
@@ -498,10 +522,12 @@ fn generate_math_ui() -> Vec<Value> {
     let mut rast_series: Vec<Value> = Vec::new();
     for j in 0..rgrid {
         let y = -rrange + 2.0 * rrange * j as f64 / (rgrid - 1) as f64;
-        let row: Vec<f64> = (0..rgrid).map(|i| {
-            let x = -rrange + 2.0 * rrange * i as f64 / (rgrid - 1) as f64;
-            20.0 + (x * x - 10.0 * (2.0 * PI * x).cos()) + (y * y - 10.0 * (2.0 * PI * y).cos())
-        }).collect();
+        let row: Vec<f64> = (0..rgrid)
+            .map(|i| {
+                let x = -rrange + 2.0 * rrange * i as f64 / (rgrid - 1) as f64;
+                20.0 + (x * x - 10.0 * (2.0 * PI * x).cos()) + (y * y - 10.0 * (2.0 * PI * y).cos())
+            })
+            .collect();
         rast_series.push(json!({
             "values": row
         }));

@@ -222,10 +222,9 @@ impl StreamingApp {
                             log!("Failed to send action: {}", e);
                         }
                     }
-                    self.ui.label(ids!(status_label)).set_text(
-                        cx,
-                        &format!("Action: {}", user_action.action.name),
-                    );
+                    self.ui
+                        .label(ids!(status_label))
+                        .set_text(cx, &format!("Action: {}", user_action.action.name));
                     self.ui.redraw(cx);
                 }
                 A2uiSurfaceAction::DataModelChanged {
@@ -251,7 +250,8 @@ impl StreamingApp {
                                     if value == serde_json::Value::Bool(true) {
                                         for method in &payment_methods {
                                             if *method != path {
-                                                data_model.set(method, serde_json::Value::Bool(false));
+                                                data_model
+                                                    .set(method, serde_json::Value::Bool(false));
                                             }
                                         }
                                     }

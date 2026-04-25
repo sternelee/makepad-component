@@ -1,5 +1,5 @@
-use makepad_widgets::*;
 use crate::a2ui::message::UserAction;
+use makepad_widgets::*;
 
 live_design! {
     use link::shaders::*;
@@ -691,17 +691,17 @@ impl Default for A2uiThemeColors {
     fn default() -> Self {
         // Default dark purple theme
         Self {
-            bg_surface: vec4(0.102, 0.102, 0.180, 1.0),      // #1a1a2e
-            bg_card: vec4(0.165, 0.227, 0.353, 1.0),         // #2a3a5a
-            border_color: vec4(0.333, 0.533, 0.733, 1.0),    // #5588bb
-            text_primary: vec4(1.0, 1.0, 1.0, 1.0),          // #FFFFFF
-            text_secondary: vec4(0.533, 0.533, 0.533, 1.0),  // #888888
-            accent: vec4(0.231, 0.51, 0.965, 1.0),           // #3B82F6
-            accent_hover: vec4(0.145, 0.388, 0.922, 1.0),    // slightly darker
-            accent_pressed: vec4(0.114, 0.306, 0.847, 1.0),  // even darker
-            input_bg: vec4(0.165, 0.227, 0.353, 1.0),        // #2a3a5a
-            slider_track: vec4(0.227, 0.290, 0.416, 1.0),    // #3a4a6a
-            control_fill: vec4(0.231, 0.51, 0.965, 1.0),     // #3B82F6
+            bg_surface: vec4(0.102, 0.102, 0.180, 1.0),     // #1a1a2e
+            bg_card: vec4(0.165, 0.227, 0.353, 1.0),        // #2a3a5a
+            border_color: vec4(0.333, 0.533, 0.733, 1.0),   // #5588bb
+            text_primary: vec4(1.0, 1.0, 1.0, 1.0),         // #FFFFFF
+            text_secondary: vec4(0.533, 0.533, 0.533, 1.0), // #888888
+            accent: vec4(0.231, 0.51, 0.965, 1.0),          // #3B82F6
+            accent_hover: vec4(0.145, 0.388, 0.922, 1.0),   // slightly darker
+            accent_pressed: vec4(0.114, 0.306, 0.847, 1.0), // even darker
+            input_bg: vec4(0.165, 0.227, 0.353, 1.0),       // #2a3a5a
+            slider_track: vec4(0.227, 0.290, 0.416, 1.0),   // #3a4a6a
+            control_fill: vec4(0.231, 0.51, 0.965, 1.0),    // #3B82F6
         }
     }
 }
@@ -715,34 +715,34 @@ impl A2uiThemeColors {
     /// Create light iOS-like theme colors
     pub fn light() -> Self {
         Self {
-            bg_surface: vec4(1.0, 1.0, 1.0, 1.0),            // #FFFFFF
-            bg_card: vec4(0.96, 0.96, 0.97, 1.0),            // #f5f5f8
-            border_color: vec4(0.85, 0.85, 0.87, 1.0),       // #d9d9de
-            text_primary: vec4(0.11, 0.11, 0.118, 1.0),      // #1c1c1e
-            text_secondary: vec4(0.557, 0.557, 0.576, 1.0),  // #8e8e93
-            accent: vec4(0.0, 0.478, 1.0, 1.0),              // #007AFF
-            accent_hover: vec4(0.0, 0.4, 0.85, 1.0),         // slightly darker
-            accent_pressed: vec4(0.0, 0.35, 0.75, 1.0),      // even darker
-            input_bg: vec4(0.95, 0.95, 0.97, 1.0),           // light gray
-            slider_track: vec4(0.9, 0.9, 0.92, 1.0),         // light gray
-            control_fill: vec4(0.0, 0.478, 1.0, 1.0),        // #007AFF
+            bg_surface: vec4(1.0, 1.0, 1.0, 1.0),           // #FFFFFF
+            bg_card: vec4(0.96, 0.96, 0.97, 1.0),           // #f5f5f8
+            border_color: vec4(0.85, 0.85, 0.87, 1.0),      // #d9d9de
+            text_primary: vec4(0.11, 0.11, 0.118, 1.0),     // #1c1c1e
+            text_secondary: vec4(0.557, 0.557, 0.576, 1.0), // #8e8e93
+            accent: vec4(0.0, 0.478, 1.0, 1.0),             // #007AFF
+            accent_hover: vec4(0.0, 0.4, 0.85, 1.0),        // slightly darker
+            accent_pressed: vec4(0.0, 0.35, 0.75, 1.0),     // even darker
+            input_bg: vec4(0.95, 0.95, 0.97, 1.0),          // light gray
+            slider_track: vec4(0.9, 0.9, 0.92, 1.0),        // light gray
+            control_fill: vec4(0.0, 0.478, 1.0, 1.0),       // #007AFF
         }
     }
 
     /// Create soft gray mid-tone theme colors
     pub fn soft() -> Self {
         Self {
-            bg_surface: vec4(0.533, 0.553, 0.588, 1.0),      // #888d96
-            bg_card: vec4(0.6, 0.62, 0.66, 1.0),             // slightly lighter
-            border_color: vec4(0.7, 0.72, 0.76, 1.0),        // light border
-            text_primary: vec4(1.0, 1.0, 1.0, 1.0),          // #FFFFFF
-            text_secondary: vec4(0.2, 0.2, 0.25, 1.0),       // dark gray for contrast
-            accent: vec4(0.231, 0.51, 0.965, 1.0),           // #3B82F6 (vibrant blue)
-            accent_hover: vec4(0.145, 0.388, 0.922, 1.0),    // slightly darker
-            accent_pressed: vec4(0.114, 0.306, 0.847, 1.0),  // even darker
-            input_bg: vec4(0.5, 0.52, 0.56, 1.0),            // medium gray
-            slider_track: vec4(0.45, 0.47, 0.51, 1.0),       // darker gray
-            control_fill: vec4(0.231, 0.51, 0.965, 1.0),     // #3B82F6 (vibrant blue)
+            bg_surface: vec4(0.533, 0.553, 0.588, 1.0),     // #888d96
+            bg_card: vec4(0.6, 0.62, 0.66, 1.0),            // slightly lighter
+            border_color: vec4(0.7, 0.72, 0.76, 1.0),       // light border
+            text_primary: vec4(1.0, 1.0, 1.0, 1.0),         // #FFFFFF
+            text_secondary: vec4(0.2, 0.2, 0.25, 1.0),      // dark gray for contrast
+            accent: vec4(0.231, 0.51, 0.965, 1.0),          // #3B82F6 (vibrant blue)
+            accent_hover: vec4(0.145, 0.388, 0.922, 1.0),   // slightly darker
+            accent_pressed: vec4(0.114, 0.306, 0.847, 1.0), // even darker
+            input_bg: vec4(0.5, 0.52, 0.56, 1.0),           // medium gray
+            slider_track: vec4(0.45, 0.47, 0.51, 1.0),      // darker gray
+            control_fill: vec4(0.231, 0.51, 0.965, 1.0),    // #3B82F6 (vibrant blue)
         }
     }
 }
@@ -875,67 +875,103 @@ pub struct DrawAudioBars {
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawAurora {
-    #[deref] draw_super: DrawQuad,
-    #[live(0.0)] pub amplitude: f32,
-    #[live(1.0)] pub speed: f32,
-    #[live(1.0)] pub zoom: f32,
-    #[live(1.0)] pub glow: f32,
-    #[live(0.0)] pub color_shift: f32,
+    #[deref]
+    draw_super: DrawQuad,
+    #[live(0.0)]
+    pub amplitude: f32,
+    #[live(1.0)]
+    pub speed: f32,
+    #[live(1.0)]
+    pub zoom: f32,
+    #[live(1.0)]
+    pub glow: f32,
+    #[live(0.0)]
+    pub color_shift: f32,
 }
 
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawReef {
-    #[deref] draw_super: DrawQuad,
-    #[live(0.0)] pub amplitude: f32,
-    #[live(1.0)] pub speed: f32,
-    #[live(1.0)] pub zoom: f32,
-    #[live(1.0)] pub glow: f32,
-    #[live(0.0)] pub color_shift: f32,
+    #[deref]
+    draw_super: DrawQuad,
+    #[live(0.0)]
+    pub amplitude: f32,
+    #[live(1.0)]
+    pub speed: f32,
+    #[live(1.0)]
+    pub zoom: f32,
+    #[live(1.0)]
+    pub glow: f32,
+    #[live(0.0)]
+    pub color_shift: f32,
 }
 
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawFractalRainbow {
-    #[deref] draw_super: DrawQuad,
-    #[live(0.0)] pub amplitude: f32,
-    #[live(1.0)] pub speed: f32,
-    #[live(1.0)] pub zoom: f32,
-    #[live(1.0)] pub glow: f32,
-    #[live(0.0)] pub color_shift: f32,
+    #[deref]
+    draw_super: DrawQuad,
+    #[live(0.0)]
+    pub amplitude: f32,
+    #[live(1.0)]
+    pub speed: f32,
+    #[live(1.0)]
+    pub zoom: f32,
+    #[live(1.0)]
+    pub glow: f32,
+    #[live(0.0)]
+    pub color_shift: f32,
 }
 
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawGlowingLattice {
-    #[deref] draw_super: DrawQuad,
-    #[live(0.0)] pub amplitude: f32,
-    #[live(1.0)] pub speed: f32,
-    #[live(1.0)] pub zoom: f32,
-    #[live(1.0)] pub glow: f32,
-    #[live(0.0)] pub color_shift: f32,
+    #[deref]
+    draw_super: DrawQuad,
+    #[live(0.0)]
+    pub amplitude: f32,
+    #[live(1.0)]
+    pub speed: f32,
+    #[live(1.0)]
+    pub zoom: f32,
+    #[live(1.0)]
+    pub glow: f32,
+    #[live(0.0)]
+    pub color_shift: f32,
 }
 
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawJellyfish {
-    #[deref] draw_super: DrawQuad,
-    #[live(0.0)] pub amplitude: f32,
-    #[live(1.0)] pub speed: f32,
-    #[live(1.0)] pub zoom: f32,
-    #[live(1.0)] pub glow: f32,
-    #[live(0.0)] pub color_shift: f32,
+    #[deref]
+    draw_super: DrawQuad,
+    #[live(0.0)]
+    pub amplitude: f32,
+    #[live(1.0)]
+    pub speed: f32,
+    #[live(1.0)]
+    pub zoom: f32,
+    #[live(1.0)]
+    pub glow: f32,
+    #[live(0.0)]
+    pub color_shift: f32,
 }
 
 #[derive(Live, LiveHook, LiveRegister)]
 #[repr(C)]
 pub struct DrawTurbulenceFire {
-    #[deref] draw_super: DrawQuad,
-    #[live(0.0)] pub amplitude: f32,
-    #[live(1.0)] pub speed: f32,
-    #[live(1.0)] pub zoom: f32,
-    #[live(1.0)] pub glow: f32,
-    #[live(0.0)] pub color_shift: f32,
+    #[deref]
+    draw_super: DrawQuad,
+    #[live(0.0)]
+    pub amplitude: f32,
+    #[live(1.0)]
+    pub speed: f32,
+    #[live(1.0)]
+    pub zoom: f32,
+    #[live(1.0)]
+    pub glow: f32,
+    #[live(0.0)]
+    pub color_shift: f32,
 }
 
 #[derive(Live, LiveHook, LiveRegister)]

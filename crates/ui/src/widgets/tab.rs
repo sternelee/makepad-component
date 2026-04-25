@@ -411,7 +411,8 @@ impl Widget for MpTab {
         }
 
         self.draw_bg.begin(cx, walk, self.layout);
-        self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), self.text.as_ref());
+        self.draw_text
+            .draw_walk(cx, Walk::fit(), Align::default(), self.text.as_ref());
         self.draw_bg.end(cx);
         DrawStep::done()
     }
@@ -432,12 +433,18 @@ impl MpTab {
             self.selected = selected;
             // Directly apply the selected state to shader variables
             let val = if selected { 1.0f64 } else { 0.0f64 };
-            self.draw_bg.apply_over(cx, live! {
-                selected: (val)
-            });
-            self.draw_text.apply_over(cx, live! {
-                selected: (val)
-            });
+            self.draw_bg.apply_over(
+                cx,
+                live! {
+                    selected: (val)
+                },
+            );
+            self.draw_text.apply_over(
+                cx,
+                live! {
+                    selected: (val)
+                },
+            );
             self.redraw(cx);
         }
     }

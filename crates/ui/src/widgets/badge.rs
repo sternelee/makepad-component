@@ -240,9 +240,12 @@ impl MpBadge {
     /// Apply badge_offset to indicator margin
     fn apply_badge_offset(&mut self, cx: &mut Cx) {
         let indicator = self.view.view(ids!(badge_wrapper.indicator));
-        indicator.apply_over(cx, live! {
-            margin: { top: (self.badge_offset.y), right: (-self.badge_offset.x) }
-        });
+        indicator.apply_over(
+            cx,
+            live! {
+                margin: { top: (self.badge_offset.y), right: (-self.badge_offset.x) }
+            },
+        );
     }
 
     /// Sync badge visibility and text (called when dirty)
@@ -266,7 +269,9 @@ impl MpBadge {
             } else {
                 self.count.to_string()
             };
-            self.view.label(ids!(badge_wrapper.indicator.label)).set_text(cx, &text);
+            self.view
+                .label(ids!(badge_wrapper.indicator.label))
+                .set_text(cx, &text);
         }
     }
 

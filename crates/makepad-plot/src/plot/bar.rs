@@ -1,7 +1,7 @@
-use makepad_widgets::*;
+use super::*;
 use crate::elements::*;
 use crate::text::*;
-use super::*;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -31,7 +31,11 @@ pub struct BarGroup {
 
 impl BarGroup {
     pub fn new(label: impl Into<String>, values: Vec<f64>) -> Self {
-        Self { label: label.into(), values, color: None }
+        Self {
+            label: label.into(),
+            values,
+            color: None,
+        }
     }
 
     pub fn with_color(mut self, color: Vec4) -> Self {
@@ -175,8 +179,16 @@ impl BarPlot {
     }
 
     fn update_plot_area(&mut self, rect: Rect) {
-        let left_margin = if self.horizontal { 80.0 } else { self.left_margin };
-        let bottom_margin = if self.horizontal { self.bottom_margin } else { 40.0 };
+        let left_margin = if self.horizontal {
+            80.0
+        } else {
+            self.left_margin
+        };
+        let bottom_margin = if self.horizontal {
+            self.bottom_margin
+        } else {
+            40.0
+        };
         self.plot_area = PlotArea::new(
             rect.pos.x + left_margin,
             rect.pos.y + self.top_margin,
@@ -192,7 +204,9 @@ impl BarPlot {
                 let num_cats = self.categories.len();
                 let mut max = 0.0f64;
                 for cat_idx in 0..num_cats {
-                    let sum: f64 = self.groups.iter()
+                    let sum: f64 = self
+                        .groups
+                        .iter()
                         .filter_map(|g| g.values.get(cat_idx))
                         .sum();
                     max = max.max(sum);
@@ -200,7 +214,9 @@ impl BarPlot {
                 (0.0, max * 1.1)
             } else {
                 // For grouped, find max across all values
-                let max = self.groups.iter()
+                let max = self
+                    .groups
+                    .iter()
                     .flat_map(|g| g.values.iter())
                     .cloned()
                     .fold(0.0f64, f64::max);
@@ -221,7 +237,8 @@ impl BarPlot {
         if self.horizontal {
             // Vertical grid lines for horizontal bars
             for v in &v_ticks {
-                let x_pixel = self.plot_area.left + (*v - v_min) / (v_max - v_min) * self.plot_area.width();
+                let x_pixel =
+                    self.plot_area.left + (*v - v_min) / (v_max - v_min) * self.plot_area.width();
                 let p1 = dvec2(x_pixel, self.plot_area.top);
                 let p2 = dvec2(x_pixel, self.plot_area.bottom);
                 self.draw_line.draw_line(cx, p1, p2, 0.5);
@@ -229,7 +246,8 @@ impl BarPlot {
         } else {
             // Horizontal grid lines for vertical bars
             for v in &v_ticks {
-                let y_pixel = self.plot_area.bottom - (*v - v_min) / (v_max - v_min) * self.plot_area.height();
+                let y_pixel = self.plot_area.bottom
+                    - (*v - v_min) / (v_max - v_min) * self.plot_area.height();
                 let p1 = dvec2(self.plot_area.left, y_pixel);
                 let p2 = dvec2(self.plot_area.right, y_pixel);
                 self.draw_line.draw_line(cx, p1, p2, 0.5);
@@ -300,7 +318,12 @@ impl BarPlot {
                 if self.show_bar_labels {
                     self.label.set_color(self.theme.label_color);
                     let label = format!("{:.1}", value);
-                    self.label.draw_at(cx, dvec2(self.plot_area.left + bar_width + 5.0, y_center), &label, TextAnchor::MiddleLeft);
+                    self.label.draw_at(
+                        cx,
+                        dvec2(self.plot_area.left + bar_width + 5.0, y_center),
+                        &label,
+                        TextAnchor::MiddleLeft,
+                    );
                 }
             }
         } else {
@@ -325,7 +348,12 @@ impl BarPlot {
                 if self.show_bar_labels {
                     self.label.set_color(self.theme.label_color);
                     let label = format!("{:.1}", value);
-                    self.label.draw_at(cx, dvec2(x_center, bar_top - 5.0), &label, TextAnchor::BottomCenter);
+                    self.label.draw_at(
+                        cx,
+                        dvec2(x_center, bar_top - 5.0),
+                        &label,
+                        TextAnchor::BottomCenter,
+                    );
                 }
             }
         }
@@ -384,7 +412,8 @@ impl BarPlot {
                         let color = group.color.unwrap_or_else(|| get_color(group_idx));
                         self.draw_bar.color = color;
 
-                        let bar_height = (value - v_min) / (v_max - v_min) * self.plot_area.height();
+                        let bar_height =
+                            (value - v_min) / (v_max - v_min) * self.plot_area.height();
                         let bar_top = y_bottom - bar_height;
                         let rect = Rect {
                             pos: dvec2(x_center - bar_width / 2.0, bar_top),
@@ -439,7 +468,8 @@ impl BarPlot {
                         self.draw_bar.color = color;
 
                         let x_pos = x_start + group_idx as f64 * group_width;
-                        let bar_height = (value - v_min) / (v_max - v_min) * self.plot_area.height();
+                        let bar_height =
+                            (value - v_min) / (v_max - v_min) * self.plot_area.height();
                         let bar_top = self.plot_area.bottom - bar_height;
                         let rect = Rect {
                             pos: dvec2(x_pos, bar_top),
@@ -463,37 +493,64 @@ impl BarPlot {
             let band_height = self.plot_area.height() / n as f64;
             for (i, cat) in self.categories.iter().enumerate() {
                 let y = self.plot_area.top + (i as f64 + 0.5) * band_height;
-                self.label.draw_at(cx, dvec2(self.plot_area.left - 5.0, y), cat, TextAnchor::MiddleRight);
+                self.label.draw_at(
+                    cx,
+                    dvec2(self.plot_area.left - 5.0, y),
+                    cat,
+                    TextAnchor::MiddleRight,
+                );
             }
 
             // Value tick labels on X axis
             let v_ticks = self.generate_ticks(v_min, v_max, 5);
             for v in &v_ticks {
-                let x_pixel = self.plot_area.left + (*v - v_min) / (v_max - v_min) * self.plot_area.width();
+                let x_pixel =
+                    self.plot_area.left + (*v - v_min) / (v_max - v_min) * self.plot_area.width();
                 let label = format!("{:.0}", v);
-                self.label.draw_at(cx, dvec2(x_pixel, self.plot_area.bottom + 5.0), &label, TextAnchor::TopCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(x_pixel, self.plot_area.bottom + 5.0),
+                    &label,
+                    TextAnchor::TopCenter,
+                );
             }
         } else {
             // Category labels on X axis
             let band_width = self.plot_area.width() / n as f64;
             for (i, cat) in self.categories.iter().enumerate() {
                 let x = self.plot_area.left + (i as f64 + 0.5) * band_width;
-                self.label.draw_at(cx, dvec2(x, self.plot_area.bottom + 5.0), cat, TextAnchor::TopCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(x, self.plot_area.bottom + 5.0),
+                    cat,
+                    TextAnchor::TopCenter,
+                );
             }
 
             // Value tick labels on Y axis
             let v_ticks = self.generate_ticks(v_min, v_max, 5);
             for v in &v_ticks {
-                let y_pixel = self.plot_area.bottom - (*v - v_min) / (v_max - v_min) * self.plot_area.height();
+                let y_pixel = self.plot_area.bottom
+                    - (*v - v_min) / (v_max - v_min) * self.plot_area.height();
                 let label = format!("{:.0}", v);
-                self.label.draw_at(cx, dvec2(self.plot_area.left - 5.0, y_pixel), &label, TextAnchor::MiddleRight);
+                self.label.draw_at(
+                    cx,
+                    dvec2(self.plot_area.left - 5.0, y_pixel),
+                    &label,
+                    TextAnchor::MiddleRight,
+                );
             }
         }
 
         // Title
         if !self.title.is_empty() {
             let center_x = (self.plot_area.left + self.plot_area.right) / 2.0;
-            self.label.draw_at(cx, dvec2(center_x, self.plot_area.top - 10.0), &self.title, TextAnchor::BottomCenter);
+            self.label.draw_at(
+                cx,
+                dvec2(center_x, self.plot_area.top - 10.0),
+                &self.title,
+                TextAnchor::BottomCenter,
+            );
         }
     }
 
@@ -564,4 +621,3 @@ impl BarPlotRef {
         }
     }
 }
-

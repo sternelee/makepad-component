@@ -1,7 +1,7 @@
-use makepad_widgets::*;
+use super::*;
 use crate::elements::*;
 use crate::text::*;
-use super::*;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -118,7 +118,11 @@ impl PieChart {
     }
 
     pub fn set_data(&mut self, labels: Vec<String>, values: Vec<f64>) {
-        self.slices = labels.into_iter().zip(values).map(|(l, v)| PieSlice::new(l, v)).collect();
+        self.slices = labels
+            .into_iter()
+            .zip(values)
+            .map(|(l, v)| PieSlice::new(l, v))
+            .collect();
     }
 
     pub fn clear(&mut self) {
@@ -170,7 +174,8 @@ impl PieChart {
 
             let color = slice.color.unwrap_or_else(|| get_color(idx));
             self.draw_slice.color = color;
-            self.draw_slice.draw_slice(cx, center, radius, shader_start, shader_end);
+            self.draw_slice
+                .draw_slice(cx, center, radius, shader_start, shader_end);
 
             if self.show_percentages {
                 let mid_angle = start_angle + slice_angle / 2.0;
@@ -182,7 +187,8 @@ impl PieChart {
                 let label_text = format!("{:.1}%", percentage);
 
                 self.label.set_color(vec4(1.0, 1.0, 1.0, 1.0));
-                self.label.draw_at(cx, dvec2(label_x, label_y), &label_text, TextAnchor::Center);
+                self.label
+                    .draw_at(cx, dvec2(label_x, label_y), &label_text, TextAnchor::Center);
             }
 
             start_angle = end_angle;
@@ -193,7 +199,12 @@ impl PieChart {
         if !self.title.is_empty() {
             let center_x = rect.pos.x + rect.size.x / 2.0;
             self.label.set_color(self.theme.label_color);
-            self.label.draw_at(cx, dvec2(center_x, rect.pos.y + 10.0), &self.title, TextAnchor::TopCenter);
+            self.label.draw_at(
+                cx,
+                dvec2(center_x, rect.pos.y + 10.0),
+                &self.title,
+                TextAnchor::TopCenter,
+            );
         }
     }
 
@@ -208,21 +219,16 @@ impl PieChart {
         let marker_text_gap = 6.0;
         let legend_height = self.slices.len() as f64 * line_height + padding * 2.0;
         // Calculate legend width based on longest label
-        let max_label_len = self.slices.iter()
-            .map(|s| s.label.len())
-            .max()
-            .unwrap_or(0);
-        let legend_width = (padding * 2.0 + marker_size + marker_text_gap + max_label_len as f64 * 7.0).max(100.0);
+        let max_label_len = self.slices.iter().map(|s| s.label.len()).max().unwrap_or(0);
+        let legend_width =
+            (padding * 2.0 + marker_size + marker_text_gap + max_label_len as f64 * 7.0).max(100.0);
 
         let (legend_x, legend_y) = match self.legend_position {
             LegendPosition::TopRight => (
                 rect.pos.x + rect.size.x - legend_width - 10.0,
                 rect.pos.y + 30.0,
             ),
-            LegendPosition::TopLeft => (
-                rect.pos.x + 10.0,
-                rect.pos.y + 30.0,
-            ),
+            LegendPosition::TopLeft => (rect.pos.x + 10.0, rect.pos.y + 30.0),
             LegendPosition::BottomRight => (
                 rect.pos.x + rect.size.x - legend_width - 10.0,
                 rect.pos.y + rect.size.y - legend_height - 10.0,
@@ -242,10 +248,30 @@ impl PieChart {
         self.draw_line.draw_abs(cx, bg_rect);
 
         self.draw_line.color = self.theme.legend_border_color;
-        self.draw_line.draw_line(cx, dvec2(legend_x, legend_y), dvec2(legend_x + legend_width, legend_y), 1.0);
-        self.draw_line.draw_line(cx, dvec2(legend_x, legend_y + legend_height), dvec2(legend_x + legend_width, legend_y + legend_height), 1.0);
-        self.draw_line.draw_line(cx, dvec2(legend_x, legend_y), dvec2(legend_x, legend_y + legend_height), 1.0);
-        self.draw_line.draw_line(cx, dvec2(legend_x + legend_width, legend_y), dvec2(legend_x + legend_width, legend_y + legend_height), 1.0);
+        self.draw_line.draw_line(
+            cx,
+            dvec2(legend_x, legend_y),
+            dvec2(legend_x + legend_width, legend_y),
+            1.0,
+        );
+        self.draw_line.draw_line(
+            cx,
+            dvec2(legend_x, legend_y + legend_height),
+            dvec2(legend_x + legend_width, legend_y + legend_height),
+            1.0,
+        );
+        self.draw_line.draw_line(
+            cx,
+            dvec2(legend_x, legend_y),
+            dvec2(legend_x, legend_y + legend_height),
+            1.0,
+        );
+        self.draw_line.draw_line(
+            cx,
+            dvec2(legend_x + legend_width, legend_y),
+            dvec2(legend_x + legend_width, legend_y + legend_height),
+            1.0,
+        );
 
         for (idx, slice) in self.slices.iter().enumerate() {
             let color = slice.color.unwrap_or_else(|| get_color(idx));
@@ -319,7 +345,6 @@ impl PieChartRef {
     }
 }
 
-
 // =============================================================================
 // DonutChart Widget
 // =============================================================================
@@ -333,7 +358,11 @@ pub struct DonutSlice {
 
 impl DonutSlice {
     pub fn new(label: impl Into<String>, value: f64) -> Self {
-        Self { label: label.into(), value, color: None }
+        Self {
+            label: label.into(),
+            value,
+            color: None,
+        }
     }
 
     pub fn with_color(mut self, color: Vec4) -> Self {
@@ -344,17 +373,29 @@ impl DonutSlice {
 
 #[derive(Live, LiveHook, Widget)]
 pub struct DonutChart {
-    #[deref] #[live] view: View,
-    #[live] draw_arc: DrawArc,
-    #[live] label: PlotLabel,
-    #[live] theme: ChartTheme,
-    #[rust] title: String,
-    #[rust] slices: Vec<DonutSlice>,
-    #[rust] inner_radius_ratio: f64,
-    #[rust] center_label: String,
-    #[rust] show_labels: bool,
-    #[rust] show_percentages: bool,
-    #[rust] use_gradient: bool,
+    #[deref]
+    #[live]
+    view: View,
+    #[live]
+    draw_arc: DrawArc,
+    #[live]
+    label: PlotLabel,
+    #[live]
+    theme: ChartTheme,
+    #[rust]
+    title: String,
+    #[rust]
+    slices: Vec<DonutSlice>,
+    #[rust]
+    inner_radius_ratio: f64,
+    #[rust]
+    center_label: String,
+    #[rust]
+    show_labels: bool,
+    #[rust]
+    show_percentages: bool,
+    #[rust]
+    use_gradient: bool,
 }
 
 impl DonutChart {
@@ -401,14 +442,21 @@ impl Widget for DonutChart {
 
         if rect.size.x > 0.0 && rect.size.y > 0.0 && !self.slices.is_empty() {
             // Set defaults
-            if self.inner_radius_ratio == 0.0 { self.inner_radius_ratio = 0.5; }
+            if self.inner_radius_ratio == 0.0 {
+                self.inner_radius_ratio = 0.5;
+            }
             // Enable gradient by default for better visuals
             self.use_gradient = true;
 
             let total: f64 = self.slices.iter().map(|s| s.value).sum();
-            if total <= 0.0 { return DrawStep::done(); }
+            if total <= 0.0 {
+                return DrawStep::done();
+            }
 
-            let center = dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + rect.size.y / 2.0);
+            let center = dvec2(
+                rect.pos.x + rect.size.x / 2.0,
+                rect.pos.y + rect.size.y / 2.0,
+            );
             let outer_radius = (rect.size.x.min(rect.size.y) / 2.0 - 40.0).max(20.0);
 
             let mut start_angle = -std::f64::consts::PI / 2.0;
@@ -426,21 +474,38 @@ impl Widget for DonutChart {
                         (color.x * 1.3).min(1.0),
                         (color.y * 1.3).min(1.0),
                         (color.z * 1.3).min(1.0),
-                        color.w
+                        color.w,
                     );
                     self.draw_arc.draw_arc_gradient(
-                        cx, center, outer_radius, self.inner_radius_ratio,
-                        start_angle, end_angle, lighter, color, 0  // radial gradient
+                        cx,
+                        center,
+                        outer_radius,
+                        self.inner_radius_ratio,
+                        start_angle,
+                        end_angle,
+                        lighter,
+                        color,
+                        0, // radial gradient
                     );
                 } else {
-                    self.draw_arc.draw_arc(cx, center, outer_radius, self.inner_radius_ratio, start_angle, end_angle);
+                    self.draw_arc.draw_arc(
+                        cx,
+                        center,
+                        outer_radius,
+                        self.inner_radius_ratio,
+                        start_angle,
+                        end_angle,
+                    );
                 }
 
                 // Draw label
                 if self.show_labels || self.show_percentages {
                     let mid_angle = start_angle + sweep_angle / 2.0;
                     let label_radius = outer_radius + 15.0;
-                    let label_pos = dvec2(center.x + label_radius * mid_angle.cos(), center.y + label_radius * mid_angle.sin());
+                    let label_pos = dvec2(
+                        center.x + label_radius * mid_angle.cos(),
+                        center.y + label_radius * mid_angle.sin(),
+                    );
 
                     let label_text = if self.show_percentages {
                         let pct = (slice.value / total) * 100.0;
@@ -454,7 +519,11 @@ impl Widget for DonutChart {
                     };
 
                     self.label.draw_text.color = self.theme.label_color;
-                    let anchor = if mid_angle.cos() > 0.0 { TextAnchor::MiddleLeft } else { TextAnchor::MiddleRight };
+                    let anchor = if mid_angle.cos() > 0.0 {
+                        TextAnchor::MiddleLeft
+                    } else {
+                        TextAnchor::MiddleRight
+                    };
                     self.label.draw_at(cx, label_pos, &label_text, anchor);
                 }
 
@@ -464,12 +533,18 @@ impl Widget for DonutChart {
             // Draw center label
             if !self.center_label.is_empty() {
                 self.label.draw_text.color = self.theme.label_color;
-                self.label.draw_at(cx, center, &self.center_label, TextAnchor::Center);
+                self.label
+                    .draw_at(cx, center, &self.center_label, TextAnchor::Center);
             }
 
             // Draw title
             if !self.title.is_empty() {
-                self.label.draw_at(cx, dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0), &self.title, TextAnchor::TopCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0),
+                    &self.title,
+                    TextAnchor::TopCenter,
+                );
             }
         }
 
@@ -489,34 +564,53 @@ impl DonutChart {
 
 impl DonutChartRef {
     pub fn set_title(&self, title: impl Into<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_title(title); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_title(title);
+        }
     }
     pub fn set_data(&self, slices: Vec<DonutSlice>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_data(slices); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_data(slices);
+        }
     }
     pub fn add_slice(&self, slice: DonutSlice) {
-        if let Some(mut inner) = self.borrow_mut() { inner.add_slice(slice); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.add_slice(slice);
+        }
     }
     pub fn set_inner_radius_ratio(&self, ratio: f64) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_inner_radius_ratio(ratio); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_inner_radius_ratio(ratio);
+        }
     }
     pub fn set_center_label(&self, label: impl Into<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_center_label(label); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_center_label(label);
+        }
     }
     pub fn set_show_labels(&self, show: bool) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_show_labels(show); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_show_labels(show);
+        }
     }
     pub fn set_show_percentages(&self, show: bool) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_show_percentages(show); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_show_percentages(show);
+        }
     }
     pub fn set_use_gradient(&self, use_gradient: bool) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_use_gradient(use_gradient); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_use_gradient(use_gradient);
+        }
     }
     pub fn clear(&self) {
-        if let Some(mut inner) = self.borrow_mut() { inner.clear(); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.clear();
+        }
     }
     pub fn redraw(&self, cx: &mut Cx) {
-        if let Some(mut inner) = self.borrow_mut() { inner.redraw(cx); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.redraw(cx);
+        }
     }
 }
-

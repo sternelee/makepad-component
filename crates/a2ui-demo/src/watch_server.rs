@@ -11,14 +11,14 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use log::{info, error, warn};
+use log::{error, info, warn};
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
+use tokio::fs;
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
-use tokio::fs;
 
 const JSON_FILE: &str = "ui_live.json";
 
@@ -44,7 +44,9 @@ async fn watch_file(tx: broadcast::Sender<String>) {
             Err(_) => continue,
         };
 
-        let modified = metadata.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        let modified = metadata
+            .modified()
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
 
         if modified > last_modified {
             // Read file content
@@ -125,7 +127,10 @@ async fn handle_request(
                 .status(StatusCode::OK)
                 .header("Access-Control-Allow-Origin", "*")
                 .header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-                .header("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization")
+                .header(
+                    "Access-Control-Allow-Headers",
+                    "Content-Type, Accept, Authorization",
+                )
                 .body(Full::new(Bytes::new()))
                 .unwrap();
             Ok(response)
@@ -152,7 +157,10 @@ async fn handle_request(
                     "status": {"state": "running"}
                 }
             });
-            sse_body.push_str(&format!("data: {}\n\n", serde_json::to_string(&task_start).unwrap()));
+            sse_body.push_str(&format!(
+                "data: {}\n\n",
+                serde_json::to_string(&task_start).unwrap()
+            ));
 
             // Send current content
             sse_body.push_str(&json_to_sse(&content));
@@ -176,19 +184,17 @@ async fn handle_request(
             let mut rx = tx.subscribe();
 
             // Wait for next update (with timeout)
-            let sse_body = match tokio::time::timeout(
-                tokio::time::Duration::from_secs(30),
-                rx.recv()
-            ).await {
-                Ok(Ok(content)) => {
-                    info!("Sending live update to client");
-                    json_to_sse(&content)
-                }
-                _ => {
-                    // Timeout - send keepalive
-                    "data: {\"keepalive\": true}\n\n".to_string()
-                }
-            };
+            let sse_body =
+                match tokio::time::timeout(tokio::time::Duration::from_secs(30), rx.recv()).await {
+                    Ok(Ok(content)) => {
+                        info!("Sending live update to client");
+                        json_to_sse(&content)
+                    }
+                    _ => {
+                        // Timeout - send keepalive
+                        "data: {\"keepalive\": true}\n\n".to_string()
+                    }
+                };
 
             let response = Response::builder()
                 .status(StatusCode::OK)
@@ -215,7 +221,9 @@ async fn handle_request(
             let response = Response::builder()
                 .status(StatusCode::OK)
                 .header("Content-Type", "application/json")
-                .body(Full::new(Bytes::from(serde_json::to_string_pretty(&status).unwrap())))
+                .body(Full::new(Bytes::from(
+                    serde_json::to_string_pretty(&status).unwrap(),
+                )))
                 .unwrap();
             Ok(response)
         }
@@ -276,10 +284,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 async move { handle_request(req, tx).await }
             });
 
-            if let Err(err) = http1::Builder::new()
-                .serve_connection(io, service)
-                .await
-            {
+            if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
                 error!("Connection error: {:?}", err);
             }
         });

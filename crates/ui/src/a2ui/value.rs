@@ -21,9 +21,7 @@ pub enum StringValue {
         literal_string: String,
     },
     /// A path reference to the data model
-    Path {
-        path: String,
-    },
+    Path { path: String },
 }
 
 impl StringValue {
@@ -89,9 +87,7 @@ pub enum NumberValue {
         literal_number: f64,
     },
     /// A path reference to the data model
-    Path {
-        path: String,
-    },
+    Path { path: String },
 }
 
 impl NumberValue {
@@ -150,9 +146,7 @@ pub enum BooleanValue {
         literal_boolean: bool,
     },
     /// A path reference to the data model
-    Path {
-        path: String,
-    },
+    Path { path: String },
 }
 
 impl BooleanValue {

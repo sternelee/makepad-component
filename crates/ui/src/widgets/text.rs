@@ -233,12 +233,14 @@ impl Widget for MpText {
 
         if self.show_bg {
             self.draw_bg.begin(cx, walk, self.layout);
-            self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), text);
+            self.draw_text
+                .draw_walk(cx, Walk::fit(), Align::default(), text);
             self.draw_bg.end(cx);
             self.area = self.draw_bg.area();
         } else {
             cx.begin_turtle(walk, self.layout);
-            self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), text);
+            self.draw_text
+                .draw_walk(cx, Walk::fit(), Align::default(), text);
             cx.end_turtle_with_area(&mut self.area);
         }
 

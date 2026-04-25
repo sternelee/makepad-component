@@ -14,7 +14,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use log::{info, warn, error, debug};
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -45,8 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let llm_api_url = std::env::var("LLM_API_URL")
         .unwrap_or_else(|_| "https://api.moonshot.ai/v1/chat/completions".to_string());
 
-    let llm_model = std::env::var("LLM_MODEL")
-        .unwrap_or_else(|_| "kimi-k2.5".to_string());
+    let llm_model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "kimi-k2.5".to_string());
 
     let api_key = std::env::var("LLM_API_KEY")
         .or_else(|_| std::env::var("MOONSHOT_API_KEY"))
@@ -59,12 +58,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Optional: Get Mureka API key for music generation (only with mureka feature)
     #[cfg(feature = "mureka")]
-    let mureka_client = std::env::var("MUREKA_API_KEY")
-        .ok()
-        .map(|key| {
-            info!("Mureka API key found - music generation enabled");
-            MurekaClient::new(key)
-        });
+    let mureka_client = std::env::var("MUREKA_API_KEY").ok().map(|key| {
+        info!("Mureka API key found - music generation enabled");
+        MurekaClient::new(key)
+    });
 
     #[cfg(feature = "mureka")]
     if mureka_client.is_none() {
@@ -98,8 +95,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("LLM API:  {}", state.llm_api_url);
     println!("Model:    {}", state.llm_model);
     #[cfg(feature = "mureka")]
-    println!("Music:    {} (set MUREKA_API_KEY to enable)",
-        if state.mureka_client.is_some() { "enabled" } else { "disabled" });
+    println!(
+        "Music:    {} (set MUREKA_API_KEY to enable)",
+        if state.mureka_client.is_some() {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
     #[cfg(not(feature = "mureka"))]
     println!("Music:    disabled (compile with --features mureka)");
     println!();
@@ -133,9 +136,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
         tokio::task::spawn(async move {
             if let Err(err) = http1::Builder::new()
-                .serve_connection(io, service_fn(move |req| {
-                    handle_request(req, state.clone())
-                }))
+                .serve_connection(
+                    io,
+                    service_fn(move |req| handle_request(req, state.clone())),
+                )
                 .await
             {
                 error!("Error serving connection: {:?}", err);

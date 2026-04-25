@@ -4,8 +4,8 @@
 //! It manages the A2uiMessageProcessor and dynamically renders components.
 
 mod draw_types;
-mod widget;
 mod helpers;
+mod widget;
 
 pub use draw_types::*;
 pub use widget::*;

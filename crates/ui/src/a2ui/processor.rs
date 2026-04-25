@@ -196,8 +196,12 @@ impl A2uiMessageProcessor {
             for (_id, comp) in surface.components.iter() {
                 if let ComponentType::AudioPlayer(player) = &comp.component {
                     let url = resolve_string_value(&player.url, dm);
-                    if url.is_empty() { continue; }
-                    let title = player.title.as_ref()
+                    if url.is_empty() {
+                        continue;
+                    }
+                    let title = player
+                        .title
+                        .as_ref()
                         .map(|t| resolve_string_value(t, dm))
                         .unwrap_or_else(|| "Audio".to_string());
                     result.push((title, url));

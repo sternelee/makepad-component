@@ -34,26 +34,26 @@
 //! processor.process_message(message);
 //! ```
 
-mod message;
+mod a2a_client;
+pub mod chart_bridge;
 mod data_model;
+mod host;
+mod message;
 mod processor;
 mod registry;
+mod sse;
 mod surface;
 mod value;
-mod sse;
-mod a2a_client;
-mod host;
-pub mod chart_bridge;
 
-pub use message::*;
+pub use a2a_client::*;
 pub use data_model::*;
+pub use host::*;
+pub use message::*;
 pub use processor::*;
 pub use registry::*;
+pub use sse::*;
 pub use surface::*;
 pub use value::*;
-pub use sse::*;
-pub use a2a_client::*;
-pub use host::*;
 
 use makepad_widgets::Cx;
 

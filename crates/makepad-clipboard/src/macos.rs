@@ -47,9 +47,9 @@ pub fn read_clipboard(monitor: &ClipboardMonitor) -> Option<ClipboardEntry> {
             "public.heic",
         ];
 
-        let has_image_type = formats.iter().any(|f| {
-            image_types.iter().any(|t| f.contains(t) || f == *t)
-        });
+        let has_image_type = formats
+            .iter()
+            .any(|f| image_types.iter().any(|t| f.contains(t) || f == *t));
 
         if has_image_type {
             // Get image data and dimensions
@@ -108,16 +108,19 @@ unsafe fn get_image_data(pasteboard: &NSPasteboard) -> (u32, u32, Vec<u8>) {
 
         if data_vec.len() >= 24 {
             let ptr = bytes.as_ptr() as *const u8;
-            if *ptr.offset(0) == 0x89 && *ptr.offset(1) == 0x50 &&
-               *ptr.offset(2) == 0x4E && *ptr.offset(3) == 0x47 {
-                let width = ((*ptr.offset(16) as u32) << 24) |
-                           ((*ptr.offset(17) as u32) << 16) |
-                           ((*ptr.offset(18) as u32) << 8) |
-                           (*ptr.offset(19) as u32);
-                let height = ((*ptr.offset(20) as u32) << 24) |
-                            ((*ptr.offset(21) as u32) << 16) |
-                            ((*ptr.offset(22) as u32) << 8) |
-                            (*ptr.offset(23) as u32);
+            if *ptr.offset(0) == 0x89
+                && *ptr.offset(1) == 0x50
+                && *ptr.offset(2) == 0x4E
+                && *ptr.offset(3) == 0x47
+            {
+                let width = ((*ptr.offset(16) as u32) << 24)
+                    | ((*ptr.offset(17) as u32) << 16)
+                    | ((*ptr.offset(18) as u32) << 8)
+                    | (*ptr.offset(19) as u32);
+                let height = ((*ptr.offset(20) as u32) << 24)
+                    | ((*ptr.offset(21) as u32) << 16)
+                    | ((*ptr.offset(22) as u32) << 8)
+                    | (*ptr.offset(23) as u32);
                 if width > 0 && height > 0 && width < 32768 && height < 32768 {
                     return (width, height, data_vec);
                 }
@@ -164,9 +167,16 @@ unsafe fn get_image_data(pasteboard: &NSPasteboard) -> (u32, u32, Vec<u8>) {
             for i in 0..len.saturating_sub(8) {
                 if *ptr.offset(i as isize) == 0xFF {
                     let marker = *ptr.offset(i as isize + 1);
-                    if marker >= 0xC0 && marker <= 0xCF && marker != 0xC4 && marker != 0xC8 && marker != 0xCC {
-                        let height = (*ptr.offset(i as isize + 5) as u32) << 8 | (*ptr.offset(i as isize + 6) as u32);
-                        let width = (*ptr.offset(i as isize + 7) as u32) << 8 | (*ptr.offset(i as isize + 8) as u32);
+                    if marker >= 0xC0
+                        && marker <= 0xCF
+                        && marker != 0xC4
+                        && marker != 0xC8
+                        && marker != 0xCC
+                    {
+                        let height = (*ptr.offset(i as isize + 5) as u32) << 8
+                            | (*ptr.offset(i as isize + 6) as u32);
+                        let width = (*ptr.offset(i as isize + 7) as u32) << 8
+                            | (*ptr.offset(i as isize + 8) as u32);
                         if width > 0 && height > 0 && width < 32768 && height < 32768 {
                             return (width, height, data_vec);
                         }
@@ -184,10 +194,14 @@ unsafe fn get_image_data(pasteboard: &NSPasteboard) -> (u32, u32, Vec<u8>) {
 
         if data_vec.len() >= 26 {
             let ptr = bytes.as_ptr() as *const u8;
-            let width = (*ptr.offset(18) as u32) | ((*ptr.offset(19) as u32) << 8) |
-                       ((*ptr.offset(20) as u32) << 16) | ((*ptr.offset(21) as u32) << 24);
-            let height = (*ptr.offset(22) as u32) | ((*ptr.offset(23) as u32) << 8) |
-                        ((*ptr.offset(24) as u32) << 16) | ((*ptr.offset(25) as u32) << 24);
+            let width = (*ptr.offset(18) as u32)
+                | ((*ptr.offset(19) as u32) << 8)
+                | ((*ptr.offset(20) as u32) << 16)
+                | ((*ptr.offset(21) as u32) << 24);
+            let height = (*ptr.offset(22) as u32)
+                | ((*ptr.offset(23) as u32) << 8)
+                | ((*ptr.offset(24) as u32) << 16)
+                | ((*ptr.offset(25) as u32) << 24);
             if width > 0 && height > 0 && width < 32768 && height < 32768 {
                 return (width, height, data_vec);
             }

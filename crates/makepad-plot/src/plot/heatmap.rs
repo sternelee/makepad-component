@@ -1,7 +1,7 @@
-use makepad_widgets::*;
+use super::*;
 use crate::elements::*;
 use crate::text::*;
-use super::*;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -231,7 +231,8 @@ impl HeatmapChart {
             for (i, label) in labels.iter().enumerate().take(cols) {
                 let x = self.plot_area.left + (i as f64 + 0.5) * cell_width;
                 let y = self.plot_area.bottom + 5.0;
-                self.label.draw_at(cx, dvec2(x, y), label, TextAnchor::TopCenter);
+                self.label
+                    .draw_at(cx, dvec2(x, y), label, TextAnchor::TopCenter);
             }
         }
 
@@ -240,14 +241,20 @@ impl HeatmapChart {
             for (i, label) in labels.iter().enumerate().take(rows) {
                 let x = self.plot_area.left - 5.0;
                 let y = self.plot_area.top + (i as f64 + 0.5) * cell_height;
-                self.label.draw_at(cx, dvec2(x, y), label, TextAnchor::MiddleRight);
+                self.label
+                    .draw_at(cx, dvec2(x, y), label, TextAnchor::MiddleRight);
             }
         }
 
         // Title
         if !self.title.is_empty() {
             let center_x = (self.plot_area.left + self.plot_area.right) / 2.0;
-            self.label.draw_at(cx, dvec2(center_x, self.plot_area.top - 10.0), &self.title, TextAnchor::BottomCenter);
+            self.label.draw_at(
+                cx,
+                dvec2(center_x, self.plot_area.top - 10.0),
+                &self.title,
+                TextAnchor::BottomCenter,
+            );
         }
     }
 
@@ -281,9 +288,24 @@ impl HeatmapChart {
         let label_min = format!("{:.1}", vmin);
         let label_mid = format!("{:.1}", (vmin + vmax) / 2.0);
 
-        self.label.draw_at(cx, dvec2(bar_x + bar_width + 3.0, bar_top), &label_max, TextAnchor::MiddleLeft);
-        self.label.draw_at(cx, dvec2(bar_x + bar_width + 3.0, bar_top + bar_height / 2.0), &label_mid, TextAnchor::MiddleLeft);
-        self.label.draw_at(cx, dvec2(bar_x + bar_width + 3.0, bar_top + bar_height), &label_min, TextAnchor::MiddleLeft);
+        self.label.draw_at(
+            cx,
+            dvec2(bar_x + bar_width + 3.0, bar_top),
+            &label_max,
+            TextAnchor::MiddleLeft,
+        );
+        self.label.draw_at(
+            cx,
+            dvec2(bar_x + bar_width + 3.0, bar_top + bar_height / 2.0),
+            &label_mid,
+            TextAnchor::MiddleLeft,
+        );
+        self.label.draw_at(
+            cx,
+            dvec2(bar_x + bar_width + 3.0, bar_top + bar_height),
+            &label_min,
+            TextAnchor::MiddleLeft,
+        );
     }
 }
 
@@ -337,25 +359,37 @@ impl HeatmapChartRef {
     }
 }
 
-
 // =============================================================================
 // Heatmap Widget (alias)
 // =============================================================================
 
 #[derive(Live, LiveHook, Widget)]
 pub struct Heatmap {
-    #[deref] #[live] view: View,
-    #[live] draw_fill: DrawPlotFill,
-    #[live] label: PlotLabel,
-    #[live] theme: ChartTheme,
-    #[rust] title: String,
-    #[rust] data: Vec<Vec<f64>>,
-    #[rust] x_labels: Vec<String>,
-    #[rust] y_labels: Vec<String>,
-    #[rust] colormap: Colormap,
-    #[rust] show_values: bool,
-    #[rust] min_value: Option<f64>,
-    #[rust] max_value: Option<f64>,
+    #[deref]
+    #[live]
+    view: View,
+    #[live]
+    draw_fill: DrawPlotFill,
+    #[live]
+    label: PlotLabel,
+    #[live]
+    theme: ChartTheme,
+    #[rust]
+    title: String,
+    #[rust]
+    data: Vec<Vec<f64>>,
+    #[rust]
+    x_labels: Vec<String>,
+    #[rust]
+    y_labels: Vec<String>,
+    #[rust]
+    colormap: Colormap,
+    #[rust]
+    show_values: bool,
+    #[rust]
+    min_value: Option<f64>,
+    #[rust]
+    max_value: Option<f64>,
 }
 
 impl Heatmap {
@@ -393,12 +427,20 @@ impl Heatmap {
         let mut max = f64::MIN;
         for row in &self.data {
             for &val in row {
-                if val < min { min = val; }
-                if val > max { max = val; }
+                if val < min {
+                    min = val;
+                }
+                if val > max {
+                    max = val;
+                }
             }
         }
-        if min == f64::MAX { min = 0.0; }
-        if max == f64::MIN { max = 1.0; }
+        if min == f64::MAX {
+            min = 0.0;
+        }
+        if max == f64::MIN {
+            max = 1.0;
+        }
         (min, max)
     }
 }
@@ -427,7 +469,11 @@ impl Widget for Heatmap {
                 let cell_width = plot_width / cols as f64;
                 let cell_height = plot_height / rows as f64;
                 let (min_val, max_val) = self.get_data_range();
-                let range = if (max_val - min_val).abs() < 1e-10 { 1.0 } else { max_val - min_val };
+                let range = if (max_val - min_val).abs() < 1e-10 {
+                    1.0
+                } else {
+                    max_val - min_val
+                };
 
                 // Draw cells
                 for (row_idx, row) in self.data.iter().enumerate() {
@@ -439,10 +485,13 @@ impl Widget for Heatmap {
                         let color = self.colormap.sample(normalized);
 
                         self.draw_fill.color = color;
-                        self.draw_fill.draw_abs(cx, Rect {
-                            pos: dvec2(x, y),
-                            size: dvec2(cell_width - 1.0, cell_height - 1.0),
-                        });
+                        self.draw_fill.draw_abs(
+                            cx,
+                            Rect {
+                                pos: dvec2(x, y),
+                                size: dvec2(cell_width - 1.0, cell_height - 1.0),
+                            },
+                        );
 
                         // Draw value text
                         if self.show_values && cell_width > 25.0 && cell_height > 15.0 {
@@ -452,8 +501,17 @@ impl Widget for Heatmap {
                                 format!("{:.0}", val)
                             };
                             let brightness = color.x * 0.299 + color.y * 0.587 + color.z * 0.114;
-                            self.label.draw_text.color = if brightness > 0.5 { vec4(0.0, 0.0, 0.0, 1.0) } else { vec4(1.0, 1.0, 1.0, 1.0) };
-                            self.label.draw_at(cx, dvec2(x + cell_width / 2.0, y + cell_height / 2.0), &text, TextAnchor::Center);
+                            self.label.draw_text.color = if brightness > 0.5 {
+                                vec4(0.0, 0.0, 0.0, 1.0)
+                            } else {
+                                vec4(1.0, 1.0, 1.0, 1.0)
+                            };
+                            self.label.draw_at(
+                                cx,
+                                dvec2(x + cell_width / 2.0, y + cell_height / 2.0),
+                                &text,
+                                TextAnchor::Center,
+                            );
                         }
                     }
                 }
@@ -463,7 +521,12 @@ impl Widget for Heatmap {
                 for (i, label) in self.x_labels.iter().enumerate() {
                     if i < cols {
                         let x = plot_left + (i as f64 + 0.5) * cell_width;
-                        self.label.draw_at(cx, dvec2(x, plot_bottom + 15.0), label, TextAnchor::TopCenter);
+                        self.label.draw_at(
+                            cx,
+                            dvec2(x, plot_bottom + 15.0),
+                            label,
+                            TextAnchor::TopCenter,
+                        );
                     }
                 }
 
@@ -471,7 +534,12 @@ impl Widget for Heatmap {
                 for (i, label) in self.y_labels.iter().enumerate() {
                     if i < rows {
                         let y = plot_top + (i as f64 + 0.5) * cell_height;
-                        self.label.draw_at(cx, dvec2(plot_left - 10.0, y), label, TextAnchor::MiddleRight);
+                        self.label.draw_at(
+                            cx,
+                            dvec2(plot_left - 10.0, y),
+                            label,
+                            TextAnchor::MiddleRight,
+                        );
                     }
                 }
             }
@@ -479,7 +547,12 @@ impl Widget for Heatmap {
             // Draw title
             if !self.title.is_empty() {
                 self.label.draw_text.color = self.theme.label_color;
-                self.label.draw_at(cx, dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0), &self.title, TextAnchor::TopCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0),
+                    &self.title,
+                    TextAnchor::TopCenter,
+                );
             }
         }
 
@@ -499,25 +572,38 @@ impl Heatmap {
 
 impl HeatmapRef {
     pub fn set_title(&self, title: impl Into<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_title(title); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_title(title);
+        }
     }
     pub fn set_data(&self, data: Vec<Vec<f64>>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_data(data); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_data(data);
+        }
     }
     pub fn set_labels(&self, x_labels: Vec<String>, y_labels: Vec<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_labels(x_labels, y_labels); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_labels(x_labels, y_labels);
+        }
     }
     pub fn set_colormap(&self, colormap: Colormap) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_colormap(colormap); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_colormap(colormap);
+        }
     }
     pub fn set_show_values(&self, show: bool) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_show_values(show); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_show_values(show);
+        }
     }
     pub fn set_range(&self, min: f64, max: f64) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_range(min, max); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_range(min, max);
+        }
     }
     pub fn redraw(&self, cx: &mut Cx) {
-        if let Some(mut inner) = self.borrow_mut() { inner.redraw(cx); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.redraw(cx);
+        }
     }
 }
-

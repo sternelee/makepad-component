@@ -24,7 +24,7 @@ fn dft(signal: &[f64]) -> Vec<f64> {
     let n = signal.len();
     let mut magnitude = Vec::with_capacity(n / 2);
 
-    for k in 0..n/2 {
+    for k in 0..n / 2 {
         let mut re = 0.0;
         let mut im = 0.0;
         for (t, &x) in signal.iter().enumerate() {
@@ -47,14 +47,14 @@ fn generate_voice_waveform(samples: usize, sample_rate: f64) -> Vec<f64> {
 
     // Add harmonics (voice has rich harmonic content)
     let harmonics = [
-        (1.0, 1.0),    // Fundamental
-        (2.0, 0.7),    // 2nd harmonic
-        (3.0, 0.5),    // 3rd harmonic
-        (4.0, 0.3),    // 4th harmonic
-        (5.0, 0.2),    // 5th harmonic
-        (6.0, 0.15),   // 6th harmonic
-        (7.0, 0.1),    // 7th harmonic
-        (8.0, 0.08),   // 8th harmonic
+        (1.0, 1.0),  // Fundamental
+        (2.0, 0.7),  // 2nd harmonic
+        (3.0, 0.5),  // 3rd harmonic
+        (4.0, 0.3),  // 4th harmonic
+        (5.0, 0.2),  // 5th harmonic
+        (6.0, 0.15), // 6th harmonic
+        (7.0, 0.1),  // 7th harmonic
+        (8.0, 0.08), // 8th harmonic
     ];
 
     for i in 0..samples {
@@ -295,8 +295,8 @@ fn generate_fft_ui() -> Vec<Value> {
 
     // Find peaks in spectrum
     let mut peaks: Vec<(f64, f64)> = Vec::new();
-    for i in 1..spectrum.len()-1 {
-        if spectrum[i] > spectrum[i-1] && spectrum[i] > spectrum[i+1] && spectrum[i] > 0.1 {
+    for i in 1..spectrum.len() - 1 {
+        if spectrum[i] > spectrum[i - 1] && spectrum[i] > spectrum[i + 1] && spectrum[i] > 0.1 {
             peaks.push((frequencies[i], spectrum[i]));
         }
     }
@@ -304,7 +304,8 @@ fn generate_fft_ui() -> Vec<Value> {
     peaks.truncate(8);
     peaks.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
-    let peaks_str = peaks.iter()
+    let peaks_str = peaks
+        .iter()
         .map(|(f, m)| format!("{:.0}Hz ({:.2})", f, m))
         .collect::<Vec<_>>()
         .join(", ");

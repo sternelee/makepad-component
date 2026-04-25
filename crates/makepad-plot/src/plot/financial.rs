@@ -1,7 +1,7 @@
-use makepad_widgets::*;
+use super::*;
 use crate::elements::*;
 use crate::text::*;
-use super::*;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -31,7 +31,7 @@ live_design! {
 }
 
 pub struct Candle {
-    pub timestamp: f64,  // X position (can be index or actual timestamp)
+    pub timestamp: f64, // X position (can be index or actual timestamp)
     pub open: f64,
     pub high: f64,
     pub low: f64,
@@ -41,7 +41,14 @@ pub struct Candle {
 
 impl Candle {
     pub fn new(timestamp: f64, open: f64, high: f64, low: f64, close: f64) -> Self {
-        Self { timestamp, open, high, low, close, volume: None }
+        Self {
+            timestamp,
+            open,
+            high,
+            low,
+            close,
+            volume: None,
+        }
     }
 
     pub fn with_volume(mut self, volume: f64) -> Self {
@@ -56,22 +63,39 @@ impl Candle {
 
 #[derive(Live, LiveHook, Widget)]
 pub struct CandlestickChart {
-    #[deref] #[live] view: View,
-    #[live] draw_fill: DrawPlotFill,
-    #[live] draw_line: DrawPlotLine,
-    #[live] label: PlotLabel,
-    #[live] theme: ChartTheme,
-    #[rust] title: String,
-    #[rust] candles: Vec<Candle>,
-    #[rust] plot_area: PlotArea,
-    #[rust] bullish_color: Vec4,
-    #[rust] bearish_color: Vec4,
-    #[rust] show_volume: bool,
-    #[rust] candle_width: f64,
-    #[rust(50.0)] left_margin: f64,
-    #[rust(30.0)] bottom_margin: f64,
-    #[rust(20.0)] right_margin: f64,
-    #[rust(30.0)] top_margin: f64,
+    #[deref]
+    #[live]
+    view: View,
+    #[live]
+    draw_fill: DrawPlotFill,
+    #[live]
+    draw_line: DrawPlotLine,
+    #[live]
+    label: PlotLabel,
+    #[live]
+    theme: ChartTheme,
+    #[rust]
+    title: String,
+    #[rust]
+    candles: Vec<Candle>,
+    #[rust]
+    plot_area: PlotArea,
+    #[rust]
+    bullish_color: Vec4,
+    #[rust]
+    bearish_color: Vec4,
+    #[rust]
+    show_volume: bool,
+    #[rust]
+    candle_width: f64,
+    #[rust(50.0)]
+    left_margin: f64,
+    #[rust(30.0)]
+    bottom_margin: f64,
+    #[rust(20.0)]
+    right_margin: f64,
+    #[rust(30.0)]
+    top_margin: f64,
 }
 
 impl CandlestickChart {
@@ -115,8 +139,12 @@ impl CandlestickChart {
         let mut y_min = f64::MAX;
         let mut y_max = f64::MIN;
         for c in &self.candles {
-            if c.low < y_min { y_min = c.low; }
-            if c.high > y_max { y_max = c.high; }
+            if c.low < y_min {
+                y_min = c.low;
+            }
+            if c.high > y_max {
+                y_max = c.high;
+            }
         }
 
         // Add padding
@@ -137,11 +165,15 @@ impl Widget for CandlestickChart {
                 pos: dvec2(rect.pos.x + self.left_margin, rect.pos.y + self.top_margin),
                 size: dvec2(
                     rect.size.x - self.left_margin - self.right_margin,
-                    rect.size.y - self.top_margin - self.bottom_margin
+                    rect.size.y - self.top_margin - self.bottom_margin,
                 ),
             };
-            self.plot_area = PlotArea::new(plot_rect.pos.x, plot_rect.pos.y,
-                plot_rect.pos.x + plot_rect.size.x, plot_rect.pos.y + plot_rect.size.y);
+            self.plot_area = PlotArea::new(
+                plot_rect.pos.x,
+                plot_rect.pos.y,
+                plot_rect.pos.x + plot_rect.size.x,
+                plot_rect.pos.y + plot_rect.size.y,
+            );
 
             // Initialize colors if not set
             if self.bullish_color == Vec4::default() {
@@ -155,18 +187,31 @@ impl Widget for CandlestickChart {
 
             // Draw title
             if !self.title.is_empty() {
-                self.label.draw_at(cx, dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 5.0),
-                    &self.title, TextAnchor::TopCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 5.0),
+                    &self.title,
+                    TextAnchor::TopCenter,
+                );
             }
 
             // Draw axes
             self.draw_line.color = self.theme.label_color;
-            self.draw_line.draw_line(cx,
+            self.draw_line.draw_line(
+                cx,
                 dvec2(plot_rect.pos.x, plot_rect.pos.y + plot_rect.size.y),
-                dvec2(plot_rect.pos.x + plot_rect.size.x, plot_rect.pos.y + plot_rect.size.y), 1.0);
-            self.draw_line.draw_line(cx,
+                dvec2(
+                    plot_rect.pos.x + plot_rect.size.x,
+                    plot_rect.pos.y + plot_rect.size.y,
+                ),
+                1.0,
+            );
+            self.draw_line.draw_line(
+                cx,
                 dvec2(plot_rect.pos.x, plot_rect.pos.y),
-                dvec2(plot_rect.pos.x, plot_rect.pos.y + plot_rect.size.y), 1.0);
+                dvec2(plot_rect.pos.x, plot_rect.pos.y + plot_rect.size.y),
+                1.0,
+            );
 
             // Draw Y axis labels
             let num_ticks = 5;
@@ -174,15 +219,21 @@ impl Widget for CandlestickChart {
                 let t = i as f64 / num_ticks as f64;
                 let y_val = y_min + (y_max - y_min) * t;
                 let y_pos = plot_rect.pos.y + plot_rect.size.y - t * plot_rect.size.y;
-                self.label.draw_at(cx, dvec2(plot_rect.pos.x - 5.0, y_pos),
-                    &format!("{:.1}", y_val), TextAnchor::MiddleRight);
+                self.label.draw_at(
+                    cx,
+                    dvec2(plot_rect.pos.x - 5.0, y_pos),
+                    &format!("{:.1}", y_val),
+                    TextAnchor::MiddleRight,
+                );
             }
 
             // Calculate candle width based on number of candles
             let candle_width = if self.candle_width > 0.0 {
                 self.candle_width
             } else if !self.candles.is_empty() {
-                (plot_rect.size.x / self.candles.len() as f64 * 0.7).min(20.0).max(3.0)
+                (plot_rect.size.x / self.candles.len() as f64 * 0.7)
+                    .min(20.0)
+                    .max(3.0)
             } else {
                 10.0
             };
@@ -190,13 +241,15 @@ impl Widget for CandlestickChart {
             // Draw candles
             for candle in &self.candles {
                 let x = if x_max > x_min {
-                    plot_rect.pos.x + (candle.timestamp - x_min) / (x_max - x_min) * plot_rect.size.x
+                    plot_rect.pos.x
+                        + (candle.timestamp - x_min) / (x_max - x_min) * plot_rect.size.x
                 } else {
                     plot_rect.pos.x + plot_rect.size.x / 2.0
                 };
 
                 let data_to_y = |v: f64| {
-                    plot_rect.pos.y + plot_rect.size.y - (v - y_min) / (y_max - y_min) * plot_rect.size.y
+                    plot_rect.pos.y + plot_rect.size.y
+                        - (v - y_min) / (y_max - y_min) * plot_rect.size.y
                 };
 
                 let open_y = data_to_y(candle.open);
@@ -204,21 +257,29 @@ impl Widget for CandlestickChart {
                 let high_y = data_to_y(candle.high);
                 let low_y = data_to_y(candle.low);
 
-                let color = if candle.is_bullish() { self.bullish_color } else { self.bearish_color };
+                let color = if candle.is_bullish() {
+                    self.bullish_color
+                } else {
+                    self.bearish_color
+                };
 
                 // Draw wick (high-low line)
                 self.draw_line.color = color;
-                self.draw_line.draw_line(cx, dvec2(x, high_y), dvec2(x, low_y), 1.0);
+                self.draw_line
+                    .draw_line(cx, dvec2(x, high_y), dvec2(x, low_y), 1.0);
 
                 // Draw body
                 let body_top = open_y.min(close_y);
                 let body_height = (open_y - close_y).abs().max(1.0);
 
                 self.draw_fill.color = color;
-                self.draw_fill.draw_abs(cx, Rect {
-                    pos: dvec2(x - candle_width / 2.0, body_top),
-                    size: dvec2(candle_width, body_height),
-                });
+                self.draw_fill.draw_abs(
+                    cx,
+                    Rect {
+                        pos: dvec2(x - candle_width / 2.0, body_top),
+                        size: dvec2(candle_width, body_height),
+                    },
+                );
             }
         }
 
@@ -232,31 +293,46 @@ impl Widget for CandlestickChart {
 
 impl CandlestickChartRef {
     pub fn set_title(&self, title: impl Into<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_title(title); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_title(title);
+        }
     }
     pub fn set_data(&self, candles: Vec<Candle>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_data(candles); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_data(candles);
+        }
     }
     pub fn add_candle(&self, candle: Candle) {
-        if let Some(mut inner) = self.borrow_mut() { inner.add_candle(candle); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.add_candle(candle);
+        }
     }
     pub fn set_colors(&self, bullish: Vec4, bearish: Vec4) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_colors(bullish, bearish); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_colors(bullish, bearish);
+        }
     }
     pub fn set_show_volume(&self, show: bool) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_show_volume(show); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_show_volume(show);
+        }
     }
     pub fn set_candle_width(&self, width: f64) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_candle_width(width); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_candle_width(width);
+        }
     }
     pub fn clear(&self) {
-        if let Some(mut inner) = self.borrow_mut() { inner.clear(); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.clear();
+        }
     }
     pub fn redraw(&self, cx: &mut Cx) {
-        if let Some(mut inner) = self.borrow_mut() { inner.redraw(cx); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.redraw(cx);
+        }
     }
 }
-
 
 // =============================================================================
 // WaterfallChart Widget
@@ -265,36 +341,60 @@ impl CandlestickChartRef {
 pub struct WaterfallEntry {
     pub label: String,
     pub value: f64,
-    pub is_total: bool,  // If true, shows absolute value from baseline
+    pub is_total: bool, // If true, shows absolute value from baseline
 }
 
 impl WaterfallEntry {
     pub fn new(label: impl Into<String>, value: f64) -> Self {
-        Self { label: label.into(), value, is_total: false }
+        Self {
+            label: label.into(),
+            value,
+            is_total: false,
+        }
     }
 
     pub fn total(label: impl Into<String>, value: f64) -> Self {
-        Self { label: label.into(), value, is_total: true }
+        Self {
+            label: label.into(),
+            value,
+            is_total: true,
+        }
     }
 }
 
 #[derive(Live, LiveHook, Widget)]
 pub struct WaterfallChart {
-    #[deref] #[live] view: View,
-    #[live] draw_fill: DrawPlotFill,
-    #[live] draw_line: DrawPlotLine,
-    #[live] label: PlotLabel,
-    #[live] theme: ChartTheme,
-    #[rust] title: String,
-    #[rust] entries: Vec<WaterfallEntry>,
-    #[rust] positive_color: Vec4,
-    #[rust] negative_color: Vec4,
-    #[rust] total_color: Vec4,
-    #[rust] connector_color: Vec4,
-    #[rust(50.0)] left_margin: f64,
-    #[rust(50.0)] bottom_margin: f64,
-    #[rust(20.0)] right_margin: f64,
-    #[rust(30.0)] top_margin: f64,
+    #[deref]
+    #[live]
+    view: View,
+    #[live]
+    draw_fill: DrawPlotFill,
+    #[live]
+    draw_line: DrawPlotLine,
+    #[live]
+    label: PlotLabel,
+    #[live]
+    theme: ChartTheme,
+    #[rust]
+    title: String,
+    #[rust]
+    entries: Vec<WaterfallEntry>,
+    #[rust]
+    positive_color: Vec4,
+    #[rust]
+    negative_color: Vec4,
+    #[rust]
+    total_color: Vec4,
+    #[rust]
+    connector_color: Vec4,
+    #[rust(50.0)]
+    left_margin: f64,
+    #[rust(50.0)]
+    bottom_margin: f64,
+    #[rust(20.0)]
+    right_margin: f64,
+    #[rust(30.0)]
+    top_margin: f64,
 }
 
 impl WaterfallChart {
@@ -344,7 +444,7 @@ impl Widget for WaterfallChart {
                 pos: dvec2(rect.pos.x + self.left_margin, rect.pos.y + self.top_margin),
                 size: dvec2(
                     rect.size.x - self.left_margin - self.right_margin,
-                    rect.size.y - self.top_margin - self.bottom_margin
+                    rect.size.y - self.top_margin - self.bottom_margin,
                 ),
             };
 
@@ -375,26 +475,43 @@ impl Widget for WaterfallChart {
 
             // Draw title
             if !self.title.is_empty() {
-                self.label.draw_at(cx, dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 5.0),
-                    &self.title, TextAnchor::TopCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 5.0),
+                    &self.title,
+                    TextAnchor::TopCenter,
+                );
             }
 
             // Draw axes
             self.draw_line.color = self.theme.label_color;
-            self.draw_line.draw_line(cx,
+            self.draw_line.draw_line(
+                cx,
                 dvec2(plot_rect.pos.x, plot_rect.pos.y + plot_rect.size.y),
-                dvec2(plot_rect.pos.x + plot_rect.size.x, plot_rect.pos.y + plot_rect.size.y), 1.0);
-            self.draw_line.draw_line(cx,
+                dvec2(
+                    plot_rect.pos.x + plot_rect.size.x,
+                    plot_rect.pos.y + plot_rect.size.y,
+                ),
+                1.0,
+            );
+            self.draw_line.draw_line(
+                cx,
                 dvec2(plot_rect.pos.x, plot_rect.pos.y),
-                dvec2(plot_rect.pos.x, plot_rect.pos.y + plot_rect.size.y), 1.0);
+                dvec2(plot_rect.pos.x, plot_rect.pos.y + plot_rect.size.y),
+                1.0,
+            );
 
             // Draw zero line if in range
             if min_val < 0.0 && max_val > 0.0 {
-                let zero_y = plot_rect.pos.y + plot_rect.size.y - (-min_val) / (max_val - min_val) * plot_rect.size.y;
+                let zero_y = plot_rect.pos.y + plot_rect.size.y
+                    - (-min_val) / (max_val - min_val) * plot_rect.size.y;
                 self.draw_line.color = vec4(0.5, 0.5, 0.5, 0.5);
-                self.draw_line.draw_line(cx,
+                self.draw_line.draw_line(
+                    cx,
                     dvec2(plot_rect.pos.x, zero_y),
-                    dvec2(plot_rect.pos.x + plot_rect.size.x, zero_y), 1.0);
+                    dvec2(plot_rect.pos.x + plot_rect.size.x, zero_y),
+                    1.0,
+                );
             }
 
             let num_bars = self.entries.len();
@@ -402,12 +519,15 @@ impl Widget for WaterfallChart {
             let bar_spacing = plot_rect.size.x / num_bars as f64;
 
             let value_to_y = |v: f64| {
-                plot_rect.pos.y + plot_rect.size.y - (v - min_val) / (max_val - min_val) * plot_rect.size.y
+                plot_rect.pos.y + plot_rect.size.y
+                    - (v - min_val) / (max_val - min_val) * plot_rect.size.y
             };
 
             // Draw bars and connectors
             let mut prev_end_y = None;
-            for (i, ((start, end, is_total, value), entry)) in bar_data.iter().zip(self.entries.iter()).enumerate() {
+            for (i, ((start, end, is_total, value), entry)) in
+                bar_data.iter().zip(self.entries.iter()).enumerate()
+            {
                 let x = plot_rect.pos.x + i as f64 * bar_spacing + (bar_spacing - bar_width) / 2.0;
                 let start_y = value_to_y(*start);
                 let end_y = value_to_y(*end);
@@ -416,9 +536,12 @@ impl Widget for WaterfallChart {
                 if let Some(prev_y) = prev_end_y {
                     if !is_total {
                         self.draw_line.color = self.connector_color;
-                        self.draw_line.draw_line(cx,
+                        self.draw_line.draw_line(
+                            cx,
                             dvec2(x - (bar_spacing - bar_width) / 2.0, prev_y),
-                            dvec2(x, prev_y), 1.0);
+                            dvec2(x, prev_y),
+                            1.0,
+                        );
                     }
                 }
 
@@ -435,20 +558,37 @@ impl Widget for WaterfallChart {
                 let bar_height = (start_y - end_y).abs().max(1.0);
 
                 self.draw_fill.color = color;
-                self.draw_fill.draw_abs(cx, Rect {
-                    pos: dvec2(x, bar_top),
-                    size: dvec2(bar_width, bar_height),
-                });
+                self.draw_fill.draw_abs(
+                    cx,
+                    Rect {
+                        pos: dvec2(x, bar_top),
+                        size: dvec2(bar_width, bar_height),
+                    },
+                );
 
                 // Draw label
-                self.label.draw_at(cx,
-                    dvec2(x + bar_width / 2.0, plot_rect.pos.y + plot_rect.size.y + 5.0),
-                    &entry.label, TextAnchor::TopCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(
+                        x + bar_width / 2.0,
+                        plot_rect.pos.y + plot_rect.size.y + 5.0,
+                    ),
+                    &entry.label,
+                    TextAnchor::TopCenter,
+                );
 
                 // Draw value
-                let value_y = if *value >= 0.0 { bar_top - 3.0 } else { bar_top + bar_height + 12.0 };
-                self.label.draw_at(cx, dvec2(x + bar_width / 2.0, value_y),
-                    &format!("{:.0}", value), TextAnchor::BottomCenter);
+                let value_y = if *value >= 0.0 {
+                    bar_top - 3.0
+                } else {
+                    bar_top + bar_height + 12.0
+                };
+                self.label.draw_at(
+                    cx,
+                    dvec2(x + bar_width / 2.0, value_y),
+                    &format!("{:.0}", value),
+                    TextAnchor::BottomCenter,
+                );
 
                 prev_end_y = Some(end_y);
             }
@@ -464,22 +604,33 @@ impl Widget for WaterfallChart {
 
 impl WaterfallChartRef {
     pub fn set_title(&self, title: impl Into<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_title(title); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_title(title);
+        }
     }
     pub fn set_data(&self, entries: Vec<WaterfallEntry>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_data(entries); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_data(entries);
+        }
     }
     pub fn add_entry(&self, entry: WaterfallEntry) {
-        if let Some(mut inner) = self.borrow_mut() { inner.add_entry(entry); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.add_entry(entry);
+        }
     }
     pub fn set_colors(&self, positive: Vec4, negative: Vec4, total: Vec4) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_colors(positive, negative, total); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_colors(positive, negative, total);
+        }
     }
     pub fn clear(&self) {
-        if let Some(mut inner) = self.borrow_mut() { inner.clear(); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.clear();
+        }
     }
     pub fn redraw(&self, cx: &mut Cx) {
-        if let Some(mut inner) = self.borrow_mut() { inner.redraw(cx); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.redraw(cx);
+        }
     }
 }
-

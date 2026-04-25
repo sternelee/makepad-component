@@ -3,9 +3,9 @@
 pub enum ScaleType {
     #[default]
     Linear,
-    Log,      // Logarithmic (base 10)
-    SymLog,   // Symmetric log (handles negative values)
-    Time,     // Time axis (values are Unix timestamps in seconds)
+    Log,    // Logarithmic (base 10)
+    SymLog, // Symmetric log (handles negative values)
+    Time,   // Time axis (values are Unix timestamps in seconds)
 }
 
 impl ScaleType {
@@ -50,24 +50,24 @@ impl ScaleType {
             ScaleType::Time => {
                 // Time intervals in seconds
                 let intervals = [
-                    1.0,           // 1 second
-                    5.0,           // 5 seconds
-                    10.0,          // 10 seconds
-                    30.0,          // 30 seconds
-                    60.0,          // 1 minute
-                    300.0,         // 5 minutes
-                    600.0,         // 10 minutes
-                    1800.0,        // 30 minutes
-                    3600.0,        // 1 hour
-                    7200.0,        // 2 hours
-                    21600.0,       // 6 hours
-                    43200.0,       // 12 hours
-                    86400.0,       // 1 day
-                    172800.0,      // 2 days
-                    604800.0,      // 1 week
-                    2592000.0,     // 30 days
-                    7776000.0,     // 90 days
-                    31536000.0,    // 1 year
+                    1.0,        // 1 second
+                    5.0,        // 5 seconds
+                    10.0,       // 10 seconds
+                    30.0,       // 30 seconds
+                    60.0,       // 1 minute
+                    300.0,      // 5 minutes
+                    600.0,      // 10 minutes
+                    1800.0,     // 30 minutes
+                    3600.0,     // 1 hour
+                    7200.0,     // 2 hours
+                    21600.0,    // 6 hours
+                    43200.0,    // 12 hours
+                    86400.0,    // 1 day
+                    172800.0,   // 2 days
+                    604800.0,   // 1 week
+                    2592000.0,  // 30 days
+                    7776000.0,  // 90 days
+                    31536000.0, // 1 year
                 ];
 
                 let range = max - min;
@@ -153,7 +153,12 @@ impl ScaleType {
 
                 // Advance years
                 while days_left >= 365 {
-                    let days_in_year: i64 = if (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 { 366 } else { 365 };
+                    let days_in_year: i64 = if (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+                    {
+                        366
+                    } else {
+                        365
+                    };
                     if days_left < days_in_year {
                         break;
                     }
@@ -163,7 +168,20 @@ impl ScaleType {
 
                 // Days in each month
                 let is_leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
-                let days_in_months: [i64; 12] = [31, if is_leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+                let days_in_months: [i64; 12] = [
+                    31,
+                    if is_leap { 29 } else { 28 },
+                    31,
+                    30,
+                    31,
+                    30,
+                    31,
+                    31,
+                    30,
+                    31,
+                    30,
+                    31,
+                ];
 
                 let mut month: i64 = 1;
                 for &days in &days_in_months {

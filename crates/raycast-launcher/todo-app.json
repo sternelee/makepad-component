@@ -5,29 +5,59 @@
   },
   "splash_code": "flow: Down\nspacing: 6\n\nif mod.state.app.count == 0 {\n  View{\n    width: Fill\n    height: Fit\n    align: Center\n    padding: Inset{top: 28 bottom: 28}\n    Label{\n      text: \"No tasks yet — type above and press Add\"\n      draw_text +: {\n        text_style: theme.font_regular {font_size: 12}\n        color: #x64748b\n      }\n    }\n  }\n}\n\nlet i = 0\nwhile i < mod.state.app.count {\n  let item_index = i\n  let todo = mod.state.app.todos[item_index]\n  if todo.done {\n    View{\n      width: Fill\n      height: Fit\n      flow: Right\n      spacing: 8\n      align: VCenter\n      padding: Inset{left: 12 right: 12 top: 9 bottom: 9}\n      show_bg: true\n      new_batch: true\n      draw_bg +: {\n        color: #x14291e\n        radius: 8.0\n      }\n      Button{\n        text: \"Done\"\n        padding: Inset{left: 8 right: 8 top: 4 bottom: 4}\n        draw_bg +: { color: #x16a34a radius: 5.0 }\n        draw_text +: { text_style: theme.font_regular {font_size: 10} color: #xffffff }\n        on_click: ||{\n          mod.state.app.todos[item_index].done = false\n          mod.state.app.version = mod.state.app.version + 1\n        }\n      }\n      Label{\n        width: Fill\n        text: todo.text\n        draw_text +: {\n          text_style: theme.font_regular {font_size: 12}\n          color: #x6db885\n        }\n      }\n      Button{\n        text: \"Remove\"\n        padding: Inset{left: 8 right: 8 top: 4 bottom: 4}\n        draw_bg +: { color: #x374151 radius: 5.0 }\n        draw_text +: { text_style: theme.font_regular {font_size: 10} color: #x9ca3af }\n        on_click: ||{\n          mod.state.app.todos.remove(item_index)\n          mod.state.app.count = mod.state.app.count - 1\n          mod.state.app.version = mod.state.app.version + 1\n        }\n      }\n    }\n  }\n  else {\n    View{\n      width: Fill\n      height: Fit\n      flow: Right\n      spacing: 8\n      align: VCenter\n      padding: Inset{left: 12 right: 12 top: 9 bottom: 9}\n      show_bg: true\n      new_batch: true\n      draw_bg +: {\n        color: #x1e2430\n        radius: 8.0\n      }\n      Button{\n        text: \"Todo\"\n        padding: Inset{left: 8 right: 8 top: 4 bottom: 4}\n        draw_bg +: { color: #x334155 radius: 5.0 }\n        draw_text +: { text_style: theme.font_regular {font_size: 10} color: #x94a3b8 }\n        on_click: ||{\n          mod.state.app.todos[item_index].done = true\n          mod.state.app.version = mod.state.app.version + 1\n        }\n      }\n      Label{\n        width: Fill\n        text: todo.text\n        draw_text +: {\n          text_style: theme.font_regular {font_size: 12}\n          color: #xe2e8f0\n        }\n      }\n      Button{\n        text: \"Remove\"\n        padding: Inset{left: 8 right: 8 top: 4 bottom: 4}\n        draw_bg +: { color: #x374151 radius: 5.0 }\n        draw_text +: { text_style: theme.font_regular {font_size: 10} color: #x9ca3af }\n        on_click: ||{\n          mod.state.app.todos.remove(item_index)\n          mod.state.app.count = mod.state.app.count - 1\n          mod.state.app.version = mod.state.app.version + 1\n        }\n      }\n    }\n  }\n  i = i + 1\n}",
   "state": {
-    "count": 4,
-    "version": 0,
+    "count": 10,
     "todos": [
       {
-        "text": "Review launcher UX and interaction flow",
+        "00003b572cfe7675": "design",
         "done": false,
-        "tag": "design"
+        "text": "Review launcher UX and interaction flow"
       },
       {
-        "text": "Polish icon rendering with dithering effect",
+        "00003b572cfe7675": "ui",
         "done": true,
-        "tag": "ui"
+        "text": "Polish icon rendering with dithering effect"
       },
       {
-        "text": "Fix memory leak in icon cache system",
+        "00003b572cfe7675": "bug",
         "done": false,
-        "tag": "bug"
+        "text": "Fix memory leak in icon cache system"
       },
       {
-        "text": "Integrate AI chat with local LLM inference",
+        "00003b572cfe7675": "ai",
         "done": false,
-        "tag": "ai"
+        "text": "Integrate AI chat with local LLM inference"
+      },
+      {
+        "00003b572cfe7675": "",
+        "done": false,
+        "text": "nihao"
+      },
+      {
+        "00003b572cfe7675": "",
+        "done": false,
+        "text": "haha"
+      },
+      {
+        "00003b572cfe7675": "",
+        "done": false,
+        "text": "hahah"
+      },
+      {
+        "00003b572cfe7675": "",
+        "done": false,
+        "text": "hahah"
+      },
+      {
+        "00003b572cfe7675": "",
+        "done": false,
+        "text": "lee"
+      },
+      {
+        "00003b572cfe7675": "",
+        "done": false,
+        "text": "haha"
       }
-    ]
+    ],
+    "version": 6
   }
 }

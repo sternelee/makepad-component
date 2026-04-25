@@ -1,7 +1,7 @@
-use makepad_widgets::*;
+use super::*;
 use crate::elements::*;
 use crate::text::*;
-use super::*;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -158,18 +158,31 @@ impl HistogramChart {
         let min = self.values.iter().cloned().fold(f64::MAX, f64::min);
         let max = self.values.iter().cloned().fold(f64::MIN, f64::max);
 
-        let num_bins = self.num_bins.unwrap_or_else(|| {
-            let n = self.values.len() as f64;
-            (1.0 + 3.322 * n.log10()).ceil() as usize
-        }).max(1);
+        let num_bins = self
+            .num_bins
+            .unwrap_or_else(|| {
+                let n = self.values.len() as f64;
+                (1.0 + 3.322 * n.log10()).ceil() as usize
+            })
+            .max(1);
 
         let bin_width = (max - min) / num_bins as f64;
 
-        self.bins = (0..num_bins).map(|i| {
-            let left = min + i as f64 * bin_width;
-            let right = if i == num_bins - 1 { max } else { min + (i + 1) as f64 * bin_width };
-            HistogramBin { left, right, count: 0 }
-        }).collect();
+        self.bins = (0..num_bins)
+            .map(|i| {
+                let left = min + i as f64 * bin_width;
+                let right = if i == num_bins - 1 {
+                    max
+                } else {
+                    min + (i + 1) as f64 * bin_width
+                };
+                HistogramBin {
+                    left,
+                    right,
+                    count: 0,
+                }
+            })
+            .collect();
 
         for &value in &self.values {
             let bin_idx = ((value - min) / bin_width).floor() as usize;
@@ -259,19 +272,26 @@ impl HistogramChart {
         for x in &x_ticks {
             let p = self.data_to_pixel(*x, y_min);
             let label = format!("{:.1}", x);
-            self.label.draw_at(cx, dvec2(p.x, p.y + 5.0), &label, TextAnchor::TopCenter);
+            self.label
+                .draw_at(cx, dvec2(p.x, p.y + 5.0), &label, TextAnchor::TopCenter);
         }
 
         let y_ticks = self.generate_ticks(y_min, y_max, 5);
         for y in &y_ticks {
             let p = self.data_to_pixel(x_min, *y);
             let label = format!("{:.0}", y);
-            self.label.draw_at(cx, dvec2(p.x - 5.0, p.y), &label, TextAnchor::MiddleRight);
+            self.label
+                .draw_at(cx, dvec2(p.x - 5.0, p.y), &label, TextAnchor::MiddleRight);
         }
 
         if !self.title.is_empty() {
             let center_x = (self.plot_area.left + self.plot_area.right) / 2.0;
-            self.label.draw_at(cx, dvec2(center_x, self.plot_area.top - 10.0), &self.title, TextAnchor::BottomCenter);
+            self.label.draw_at(
+                cx,
+                dvec2(center_x, self.plot_area.top - 10.0),
+                &self.title,
+                TextAnchor::BottomCenter,
+            );
         }
     }
 
@@ -371,13 +391,23 @@ impl BoxPlotStats {
         let lower_fence = q1 - 1.5 * iqr;
         let upper_fence = q3 + 1.5 * iqr;
 
-        let outliers: Vec<f64> = sorted.iter()
+        let outliers: Vec<f64> = sorted
+            .iter()
             .filter(|&&v| v < lower_fence || v > upper_fence)
             .cloned()
             .collect();
 
-        let whisker_min = sorted.iter().find(|&&v| v >= lower_fence).cloned().unwrap_or(q1);
-        let whisker_max = sorted.iter().rev().find(|&&v| v <= upper_fence).cloned().unwrap_or(q3);
+        let whisker_min = sorted
+            .iter()
+            .find(|&&v| v >= lower_fence)
+            .cloned()
+            .unwrap_or(q1);
+        let whisker_max = sorted
+            .iter()
+            .rev()
+            .find(|&&v| v <= upper_fence)
+            .cloned()
+            .unwrap_or(q3);
 
         Some(BoxPlotStats {
             min: whisker_min,
@@ -545,7 +575,8 @@ impl BoxPlotChart {
 
         let y_ticks = self.generate_ticks(y_min, y_max, 5);
         for y in &y_ticks {
-            let y_pixel = self.plot_area.bottom - (*y - y_min) / (y_max - y_min) * self.plot_area.height();
+            let y_pixel =
+                self.plot_area.bottom - (*y - y_min) / (y_max - y_min) * self.plot_area.height();
             let p1 = dvec2(self.plot_area.left, y_pixel);
             let p2 = dvec2(self.plot_area.right, y_pixel);
             self.draw_line.draw_line(cx, p1, p2, 0.5);
@@ -602,40 +633,32 @@ impl BoxPlotChart {
                 cx,
                 dvec2(x_center - box_width / 2.0, median_y),
                 dvec2(x_center + box_width / 2.0, median_y),
-                2.0
+                2.0,
             );
 
             // Draw whiskers
             self.draw_line.color = self.theme.label_color;
 
             // Lower whisker
-            self.draw_line.draw_line(
-                cx,
-                dvec2(x_center, q1_y),
-                dvec2(x_center, min_y),
-                1.0
-            );
+            self.draw_line
+                .draw_line(cx, dvec2(x_center, q1_y), dvec2(x_center, min_y), 1.0);
             // Lower whisker cap
             self.draw_line.draw_line(
                 cx,
                 dvec2(x_center - box_width / 4.0, min_y),
                 dvec2(x_center + box_width / 4.0, min_y),
-                1.0
+                1.0,
             );
 
             // Upper whisker
-            self.draw_line.draw_line(
-                cx,
-                dvec2(x_center, q3_y),
-                dvec2(x_center, max_y),
-                1.0
-            );
+            self.draw_line
+                .draw_line(cx, dvec2(x_center, q3_y), dvec2(x_center, max_y), 1.0);
             // Upper whisker cap
             self.draw_line.draw_line(
                 cx,
                 dvec2(x_center - box_width / 4.0, max_y),
                 dvec2(x_center + box_width / 4.0, max_y),
-                1.0
+                1.0,
             );
 
             // Draw outliers
@@ -643,7 +666,8 @@ impl BoxPlotChart {
                 self.draw_point.color = color;
                 for &outlier in &item.stats.outliers {
                     let outlier_y = y_to_pixel(outlier);
-                    self.draw_point.draw_point(cx, dvec2(x_center, outlier_y), 3.0);
+                    self.draw_point
+                        .draw_point(cx, dvec2(x_center, outlier_y), 3.0);
                 }
             }
         }
@@ -659,22 +683,34 @@ impl BoxPlotChart {
         for (i, item) in self.items.iter().enumerate() {
             let x = self.plot_area.left + (i as f64 + 0.5) * band_width;
             let y = self.plot_area.bottom + 5.0;
-            self.label.draw_at(cx, dvec2(x, y), &item.label, TextAnchor::TopCenter);
+            self.label
+                .draw_at(cx, dvec2(x, y), &item.label, TextAnchor::TopCenter);
         }
 
         // Y axis tick labels
         let (y_min, y_max) = self.get_y_range();
         let y_ticks = self.generate_ticks(y_min, y_max, 5);
         for y in &y_ticks {
-            let y_pixel = self.plot_area.bottom - (*y - y_min) / (y_max - y_min) * self.plot_area.height();
+            let y_pixel =
+                self.plot_area.bottom - (*y - y_min) / (y_max - y_min) * self.plot_area.height();
             let label = format!("{:.0}", y);
-            self.label.draw_at(cx, dvec2(self.plot_area.left - 5.0, y_pixel), &label, TextAnchor::MiddleRight);
+            self.label.draw_at(
+                cx,
+                dvec2(self.plot_area.left - 5.0, y_pixel),
+                &label,
+                TextAnchor::MiddleRight,
+            );
         }
 
         // Title
         if !self.title.is_empty() {
             let center_x = (self.plot_area.left + self.plot_area.right) / 2.0;
-            self.label.draw_at(cx, dvec2(center_x, self.plot_area.top - 10.0), &self.title, TextAnchor::BottomCenter);
+            self.label.draw_at(
+                cx,
+                dvec2(center_x, self.plot_area.top - 10.0),
+                &self.title,
+                TextAnchor::BottomCenter,
+            );
         }
     }
 
@@ -721,4 +757,3 @@ impl BoxPlotChartRef {
         }
     }
 }
-

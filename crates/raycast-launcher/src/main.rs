@@ -1737,10 +1737,16 @@ impl Widget for LauncherPanel {
                         let current_len = msg.text.len();
                         let target_len = self.stream_buffer.len();
                         if current_len < target_len {
-                            // Append next char(s) — batch a few for speed
-                            let batch = (target_len - current_len).min(3);
+                            // Advance by up to 3 Unicode characters (not bytes).
+                            // Slicing by raw bytes panics on multi-byte chars (e.g. CJK = 3 bytes).
+                            let safe_end = self.stream_buffer[current_len..]
+                                .char_indices()
+                                .nth(2) // take up to 3 chars (index 0,1,2 → nth(2))
+                                .map(|(i, c)| current_len + i + c.len_utf8())
+                                .unwrap_or(target_len)
+                                .min(target_len);
                             msg.text
-                                .push_str(&self.stream_buffer[current_len..current_len + batch]);
+                                .push_str(&self.stream_buffer[current_len..safe_end]);
                             {
                                 let mut data = chat::CHAT_DATA.write().unwrap();
                                 if let Some(dm) = data.messages.get_mut(self.stream_msg_index) {

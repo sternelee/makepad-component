@@ -1,7 +1,7 @@
-use makepad_widgets::*;
+use super::*;
 use crate::elements::*;
 use crate::text::*;
-use super::*;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -106,21 +106,38 @@ impl StackedPoint {
 
 #[derive(Live, LiveHook, Widget)]
 pub struct Stackplot {
-    #[redraw] #[live] draw_bg: DrawQuad,
-    #[redraw] #[live] draw_triangle: DrawTriangle,
-    #[redraw] #[live] draw_line: DrawPlotLine,
-    #[walk] walk: Walk,
-    #[layout] layout: Layout,
-    #[live] label: PlotLabel,
-    #[live] theme: ChartTheme,
+    #[redraw]
+    #[live]
+    draw_bg: DrawQuad,
+    #[redraw]
+    #[live]
+    draw_triangle: DrawTriangle,
+    #[redraw]
+    #[live]
+    draw_line: DrawPlotLine,
+    #[walk]
+    walk: Walk,
+    #[layout]
+    layout: Layout,
+    #[live]
+    label: PlotLabel,
+    #[live]
+    theme: ChartTheme,
 
-    #[rust] series: Vec<StackSeries>,
-    #[rust] x_labels: Vec<String>,
-    #[rust] title: String,
-    #[rust] order: StackOrder,
-    #[rust] offset: StackOffset,
-    #[rust] show_lines: bool,
-    #[rust] area: Area,
+    #[rust]
+    series: Vec<StackSeries>,
+    #[rust]
+    x_labels: Vec<String>,
+    #[rust]
+    title: String,
+    #[rust]
+    order: StackOrder,
+    #[rust]
+    offset: StackOffset,
+    #[rust]
+    show_lines: bool,
+    #[rust]
+    area: Area,
 }
 
 impl Stackplot {
@@ -155,13 +172,24 @@ impl Stackplot {
 
     fn compute_stacked(&self) -> Vec<Vec<StackedPoint>> {
         let n_series = self.series.len();
-        if n_series == 0 { return vec![]; }
+        if n_series == 0 {
+            return vec![];
+        }
 
-        let n_points = self.series.iter().map(|s| s.values.len()).max().unwrap_or(0);
-        if n_points == 0 { return vec![]; }
+        let n_points = self
+            .series
+            .iter()
+            .map(|s| s.values.len())
+            .max()
+            .unwrap_or(0);
+        if n_points == 0 {
+            return vec![];
+        }
 
         // Initialize result
-        let mut result: Vec<Vec<StackedPoint>> = self.series.iter()
+        let mut result: Vec<Vec<StackedPoint>> = self
+            .series
+            .iter()
             .map(|_| vec![StackedPoint::new(0.0, 0.0); n_points])
             .collect();
 
@@ -172,7 +200,11 @@ impl Stackplot {
         for i in 0..n_points {
             let mut y0 = 0.0;
             for &series_idx in &order {
-                let y = self.series[series_idx].values.get(i).copied().unwrap_or(0.0);
+                let y = self.series[series_idx]
+                    .values
+                    .get(i)
+                    .copied()
+                    .unwrap_or(0.0);
                 result[series_idx][i] = StackedPoint::new(y0, y0 + y);
                 y0 += y;
             }
@@ -192,20 +224,36 @@ impl Stackplot {
             StackOrder::None => {}
             StackOrder::Ascending => {
                 let sums: Vec<f64> = self.series.iter().map(|s| s.values.iter().sum()).collect();
-                indices.sort_by(|&a, &b| sums[a].partial_cmp(&sums[b]).unwrap_or(std::cmp::Ordering::Equal));
+                indices.sort_by(|&a, &b| {
+                    sums[a]
+                        .partial_cmp(&sums[b])
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
             }
             StackOrder::Descending => {
                 let sums: Vec<f64> = self.series.iter().map(|s| s.values.iter().sum()).collect();
-                indices.sort_by(|&a, &b| sums[b].partial_cmp(&sums[a]).unwrap_or(std::cmp::Ordering::Equal));
+                indices.sort_by(|&a, &b| {
+                    sums[b]
+                        .partial_cmp(&sums[a])
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
             }
             StackOrder::InsideOut => {
                 let sums: Vec<f64> = self.series.iter().map(|s| s.values.iter().sum()).collect();
-                indices.sort_by(|&a, &b| sums[b].partial_cmp(&sums[a]).unwrap_or(std::cmp::Ordering::Equal));
+                indices.sort_by(|&a, &b| {
+                    sums[b]
+                        .partial_cmp(&sums[a])
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
 
                 let mut new_order = Vec::with_capacity(n);
                 let mut top = true;
                 for idx in indices {
-                    if top { new_order.push(idx); } else { new_order.insert(0, idx); }
+                    if top {
+                        new_order.push(idx);
+                    } else {
+                        new_order.insert(0, idx);
+                    }
                     top = !top;
                 }
                 indices = new_order;
@@ -243,7 +291,9 @@ impl Stackplot {
                 }
             }
             StackOffset::Wiggle => {
-                if result.is_empty() || n_points == 0 { return; }
+                if result.is_empty() || n_points == 0 {
+                    return;
+                }
                 let n = result.len();
                 for i in 0..n_points {
                     let mut sum = 0.0;
@@ -257,7 +307,9 @@ impl Stackplot {
                     let total: f64 = result.iter().map(|s| s[i].height()).sum();
                     let offset = if total_weight > 0.0 && total > 0.0 {
                         -sum / (total_weight * 2.0)
-                    } else { 0.0 };
+                    } else {
+                        0.0
+                    };
                     for s in result.iter_mut() {
                         s[i].y0 += offset;
                         s[i].y1 += offset;
@@ -286,7 +338,9 @@ impl Widget for Stackplot {
             // Compute stacked data
             let stacked = self.compute_stacked();
             let n_points = stacked[0].len();
-            if n_points == 0 { return DrawStep::done(); }
+            if n_points == 0 {
+                return DrawStep::done();
+            }
 
             // Find y range
             let mut y_min = f64::MAX;
@@ -297,7 +351,9 @@ impl Widget for Stackplot {
                     y_max = y_max.max(pt.y1);
                 }
             }
-            if (y_max - y_min).abs() < 0.001 { y_max = y_min + 1.0; }
+            if (y_max - y_min).abs() < 0.001 {
+                y_max = y_min + 1.0;
+            }
 
             // Color palette
             let colors = [
@@ -313,21 +369,37 @@ impl Widget for Stackplot {
 
             // Draw stacked areas
             for (series_idx, series_data) in stacked.iter().enumerate() {
-                let color = self.series[series_idx].color.unwrap_or(colors[series_idx % colors.len()]);
+                let color = self.series[series_idx]
+                    .color
+                    .unwrap_or(colors[series_idx % colors.len()]);
                 self.draw_triangle.color = color;
 
                 for i in 0..n_points.saturating_sub(1) {
                     let x1 = chart_x + (i as f64 / (n_points - 1).max(1) as f64) * chart_w;
                     let x2 = chart_x + ((i + 1) as f64 / (n_points - 1).max(1) as f64) * chart_w;
 
-                    let y1_bottom = chart_y + chart_h - ((series_data[i].y0 - y_min) / (y_max - y_min)) * chart_h;
-                    let y1_top = chart_y + chart_h - ((series_data[i].y1 - y_min) / (y_max - y_min)) * chart_h;
-                    let y2_bottom = chart_y + chart_h - ((series_data[i + 1].y0 - y_min) / (y_max - y_min)) * chart_h;
-                    let y2_top = chart_y + chart_h - ((series_data[i + 1].y1 - y_min) / (y_max - y_min)) * chart_h;
+                    let y1_bottom = chart_y + chart_h
+                        - ((series_data[i].y0 - y_min) / (y_max - y_min)) * chart_h;
+                    let y1_top = chart_y + chart_h
+                        - ((series_data[i].y1 - y_min) / (y_max - y_min)) * chart_h;
+                    let y2_bottom = chart_y + chart_h
+                        - ((series_data[i + 1].y0 - y_min) / (y_max - y_min)) * chart_h;
+                    let y2_top = chart_y + chart_h
+                        - ((series_data[i + 1].y1 - y_min) / (y_max - y_min)) * chart_h;
 
                     // Draw two triangles per segment
-                    self.draw_triangle.draw_triangle(cx, dvec2(x1, y1_bottom), dvec2(x2, y2_bottom), dvec2(x1, y1_top));
-                    self.draw_triangle.draw_triangle(cx, dvec2(x1, y1_top), dvec2(x2, y2_bottom), dvec2(x2, y2_top));
+                    self.draw_triangle.draw_triangle(
+                        cx,
+                        dvec2(x1, y1_bottom),
+                        dvec2(x2, y2_bottom),
+                        dvec2(x1, y1_top),
+                    );
+                    self.draw_triangle.draw_triangle(
+                        cx,
+                        dvec2(x1, y1_top),
+                        dvec2(x2, y2_bottom),
+                        dvec2(x2, y2_top),
+                    );
                 }
 
                 // Draw top line
@@ -335,17 +407,26 @@ impl Widget for Stackplot {
                     self.draw_line.color = darken(color, 0.3);
                     for i in 0..n_points.saturating_sub(1) {
                         let x1 = chart_x + (i as f64 / (n_points - 1).max(1) as f64) * chart_w;
-                        let x2 = chart_x + ((i + 1) as f64 / (n_points - 1).max(1) as f64) * chart_w;
-                        let y1 = chart_y + chart_h - ((series_data[i].y1 - y_min) / (y_max - y_min)) * chart_h;
-                        let y2 = chart_y + chart_h - ((series_data[i + 1].y1 - y_min) / (y_max - y_min)) * chart_h;
-                        self.draw_line.draw_line(cx, dvec2(x1, y1), dvec2(x2, y2), 1.5);
+                        let x2 =
+                            chart_x + ((i + 1) as f64 / (n_points - 1).max(1) as f64) * chart_w;
+                        let y1 = chart_y + chart_h
+                            - ((series_data[i].y1 - y_min) / (y_max - y_min)) * chart_h;
+                        let y2 = chart_y + chart_h
+                            - ((series_data[i + 1].y1 - y_min) / (y_max - y_min)) * chart_h;
+                        self.draw_line
+                            .draw_line(cx, dvec2(x1, y1), dvec2(x2, y2), 1.5);
                     }
                 }
             }
 
             // Draw title
             if !self.title.is_empty() {
-                self.label.draw_at(cx, dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0), &self.title, TextAnchor::TopCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0),
+                    &self.title,
+                    TextAnchor::TopCenter,
+                );
             }
         }
 
@@ -357,22 +438,31 @@ impl Widget for Stackplot {
 
 impl StackplotRef {
     pub fn set_data(&self, series: Vec<StackSeries>, x_labels: Vec<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_data(series, x_labels); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_data(series, x_labels);
+        }
     }
     pub fn add_series(&self, series: StackSeries) {
-        if let Some(mut inner) = self.borrow_mut() { inner.add_series(series); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.add_series(series);
+        }
     }
     pub fn set_title(&self, title: impl Into<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_title(title); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_title(title);
+        }
     }
     pub fn set_order(&self, order: StackOrder) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_order(order); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_order(order);
+        }
     }
     pub fn set_offset(&self, offset: StackOffset) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_offset(offset); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_offset(offset);
+        }
     }
 }
-
 
 // =============================================================================
 // Streamgraph Widget
@@ -401,18 +491,32 @@ impl StreamSeries {
 
 #[derive(Live, LiveHook, Widget)]
 pub struct Streamgraph {
-    #[redraw] #[live] draw_bg: DrawQuad,
-    #[redraw] #[live] draw_triangle: DrawTriangle,
-    #[redraw] #[live] draw_line: DrawPlotLine,
-    #[walk] walk: Walk,
-    #[layout] layout: Layout,
-    #[live] label: PlotLabel,
-    #[live] theme: ChartTheme,
+    #[redraw]
+    #[live]
+    draw_bg: DrawQuad,
+    #[redraw]
+    #[live]
+    draw_triangle: DrawTriangle,
+    #[redraw]
+    #[live]
+    draw_line: DrawPlotLine,
+    #[walk]
+    walk: Walk,
+    #[layout]
+    layout: Layout,
+    #[live]
+    label: PlotLabel,
+    #[live]
+    theme: ChartTheme,
 
-    #[rust] series: Vec<StreamSeries>,
-    #[rust] labels: Vec<String>,
-    #[rust] title: String,
-    #[rust] area: Area,
+    #[rust]
+    series: Vec<StreamSeries>,
+    #[rust]
+    labels: Vec<String>,
+    #[rust]
+    title: String,
+    #[rust]
+    area: Area,
 }
 
 impl Streamgraph {
@@ -441,19 +545,30 @@ impl Widget for Streamgraph {
             let chart_w = rect.size.x - padding * 2.0;
             let chart_h = rect.size.y - padding * 2.0;
 
-            let n_points = self.series.iter().map(|s| s.values.len()).max().unwrap_or(0);
-            if n_points == 0 { return DrawStep::done(); }
+            let n_points = self
+                .series
+                .iter()
+                .map(|s| s.values.len())
+                .max()
+                .unwrap_or(0);
+            if n_points == 0 {
+                return DrawStep::done();
+            }
 
             // Calculate totals
             let mut totals: Vec<f64> = vec![0.0; n_points];
             for s in &self.series {
                 for (i, &val) in s.values.iter().enumerate() {
-                    if i < totals.len() { totals[i] += val; }
+                    if i < totals.len() {
+                        totals[i] += val;
+                    }
                 }
             }
 
             let max_total = totals.iter().cloned().fold(0.0_f64, f64::max);
-            if max_total == 0.0 { return DrawStep::done(); }
+            if max_total == 0.0 {
+                return DrawStep::done();
+            }
 
             // Calculate baselines for centering (silhouette offset)
             let baselines: Vec<f64> = totals.iter().map(|&t| (max_total - t) / 2.0).collect();
@@ -503,7 +618,12 @@ impl Widget for Streamgraph {
 
             // Draw title
             if !self.title.is_empty() {
-                self.label.draw_at(cx, dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0), &self.title, TextAnchor::TopCenter);
+                self.label.draw_at(
+                    cx,
+                    dvec2(rect.pos.x + rect.size.x / 2.0, rect.pos.y + 15.0),
+                    &self.title,
+                    TextAnchor::TopCenter,
+                );
             }
         }
 
@@ -515,13 +635,18 @@ impl Widget for Streamgraph {
 
 impl StreamgraphRef {
     pub fn set_data(&self, series: Vec<StreamSeries>, labels: Vec<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_data(series, labels); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_data(series, labels);
+        }
     }
     pub fn add_series(&self, series: StreamSeries) {
-        if let Some(mut inner) = self.borrow_mut() { inner.add_series(series); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.add_series(series);
+        }
     }
     pub fn set_title(&self, title: impl Into<String>) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_title(title); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_title(title);
+        }
     }
 }
-

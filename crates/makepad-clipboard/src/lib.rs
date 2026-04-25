@@ -3,14 +3,18 @@
 
 #![allow(dead_code)]
 
-use std::sync::{Arc, Mutex};
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 
 /// Clipboard content types
 #[derive(Clone, Debug, PartialEq)]
 pub enum ClipboardContent {
     Text(String),
-    Image { width: u32, height: u32, data: Vec<u8> },
+    Image {
+        width: u32,
+        height: u32,
+        data: Vec<u8>,
+    },
     Html(String),
     Files(Vec<String>),
     Unknown,
@@ -57,7 +61,10 @@ impl ClipboardMonitor {
     }
 
     pub fn get_entries(&self) -> Vec<ClipboardEntry> {
-        self.entries.lock().map(|e| e.iter().cloned().collect()).unwrap_or_default()
+        self.entries
+            .lock()
+            .map(|e| e.iter().cloned().collect())
+            .unwrap_or_default()
     }
 
     pub fn add_entry(&self, entry: ClipboardEntry) {
@@ -129,7 +136,13 @@ impl ClipboardMonitor {
             self.poll_windows()
         }
 
-        #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "android", target_os = "linux", target_os = "windows")))]
+        #[cfg(not(any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "android",
+            target_os = "linux",
+            target_os = "windows"
+        )))]
         {
             None
         }
@@ -172,12 +185,12 @@ impl Default for ClipboardMonitor {
 }
 
 // Platform-specific implementations
-#[cfg(target_os = "macos")]
-mod macos;
 #[cfg(target_os = "ios")]
 mod ios;
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
 

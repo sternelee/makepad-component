@@ -27,28 +27,28 @@ pub mod tooltip;
 
 pub use accordion::*;
 pub use alert::*;
+pub use avatar::*;
 pub use badge::*;
-pub use calendar::*;
 pub use button::*;
+pub use calendar::*;
+pub use card::*;
 pub use checkbox::*;
 pub use divider::*;
 pub use input::*;
 pub use label::*;
+pub use modal::*;
+pub use notification::*;
 pub use page_flip::*;
+pub use popover::*;
 pub use progress::*;
 pub use radio::*;
+pub use skeleton::*;
 pub use slider::*;
 pub use spinner::*;
 pub use switch::*;
 pub use tab::*;
 pub use text::*;
 pub use tooltip::*;
-pub use card::*;
-pub use avatar::*;
-pub use modal::*;
-pub use notification::*;
-pub use skeleton::*;
-pub use popover::*;
 // dropdown, list 只定义 live_design 样式
 
 use makepad_widgets::Cx;

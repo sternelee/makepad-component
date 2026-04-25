@@ -367,12 +367,12 @@ impl Widget for MpCardClickable {
         match event.hits(cx, self.view.area()) {
             Hit::FingerHoverIn(_) => {
                 self.hover = 1.0;
-                self.view.apply_over(cx, live!{ draw_bg: { hover: 1.0 } });
+                self.view.apply_over(cx, live! { draw_bg: { hover: 1.0 } });
                 self.redraw(cx);
             }
             Hit::FingerHoverOut(_) => {
                 self.hover = 0.0;
-                self.view.apply_over(cx, live!{ draw_bg: { hover: 0.0 } });
+                self.view.apply_over(cx, live! { draw_bg: { hover: 0.0 } });
                 self.redraw(cx);
             }
             Hit::FingerUp(fe) => {

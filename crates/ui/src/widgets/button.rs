@@ -271,10 +271,13 @@ impl Widget for MpButton {
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
         let disabled_f = if self.disabled { 1.0 } else { 0.0 };
-        self.draw_bg.apply_over(cx, live! { disabled: (disabled_f) });
-        self.draw_text.apply_over(cx, live! { disabled: (disabled_f) });
+        self.draw_bg
+            .apply_over(cx, live! { disabled: (disabled_f) });
+        self.draw_text
+            .apply_over(cx, live! { disabled: (disabled_f) });
         self.draw_bg.begin(cx, walk, self.layout);
-        self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), self.text.as_ref());
+        self.draw_text
+            .draw_walk(cx, Walk::fit(), Align::default(), self.text.as_ref());
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
         DrawStep::done()

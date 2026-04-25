@@ -1,7 +1,7 @@
-use makepad_widgets::*;
+use super::*;
 use crate::elements::*;
 use crate::text::*;
-use super::*;
+use makepad_widgets::*;
 
 live_design! {
     use link::theme::*;
@@ -122,7 +122,8 @@ impl Widget for ScatterPlot {
                 self.initial_y_range = self.y_range;
             }
             Hit::FingerMove(fe) => {
-                if self.is_dragging && self.plot_area.width() > 0.0 && self.plot_area.height() > 0.0 {
+                if self.is_dragging && self.plot_area.width() > 0.0 && self.plot_area.height() > 0.0
+                {
                     let dx_pixels = fe.abs.x - self.drag_start.x;
                     let dy_pixels = fe.abs.y - self.drag_start.y;
 
@@ -153,8 +154,10 @@ impl Widget for ScatterPlot {
                 let mouse_x = fe.abs.x;
                 let mouse_y = fe.abs.y;
 
-                if mouse_x >= self.plot_area.left && mouse_x <= self.plot_area.right
-                    && mouse_y >= self.plot_area.top && mouse_y <= self.plot_area.bottom
+                if mouse_x >= self.plot_area.left
+                    && mouse_x <= self.plot_area.right
+                    && mouse_y >= self.plot_area.top
+                    && mouse_y <= self.plot_area.bottom
                 {
                     let rel_x = (mouse_x - self.plot_area.left) / self.plot_area.width();
                     let rel_y = (self.plot_area.bottom - mouse_y) / self.plot_area.height();
@@ -289,8 +292,10 @@ impl ScatterPlot {
     }
 
     fn data_to_pixel(&self, x: f64, y: f64) -> DVec2 {
-        let px = self.plot_area.left + (x - self.x_range.0) / (self.x_range.1 - self.x_range.0) * self.plot_area.width();
-        let py = self.plot_area.bottom - (y - self.y_range.0) / (self.y_range.1 - self.y_range.0) * self.plot_area.height();
+        let px = self.plot_area.left
+            + (x - self.x_range.0) / (self.x_range.1 - self.x_range.0) * self.plot_area.width();
+        let py = self.plot_area.bottom
+            - (y - self.y_range.0) / (self.y_range.1 - self.y_range.0) * self.plot_area.height();
         dvec2(px, py)
     }
 
@@ -343,7 +348,13 @@ impl ScatterPlot {
                     // Radial gradient using same-hue lighter/darker colors
                     let (center_color, outer_color) = gradient_pair(color);
                     self.draw_point_gradient.color = color;
-                    self.draw_point_gradient.draw_point_gradient(cx, p, self.point_radius, center_color, outer_color);
+                    self.draw_point_gradient.draw_point_gradient(
+                        cx,
+                        p,
+                        self.point_radius,
+                        center_color,
+                        outer_color,
+                    );
                 } else {
                     self.draw_point.color = color;
                     self.draw_point.draw_point(cx, p, self.point_radius);
@@ -360,7 +371,8 @@ impl ScatterPlot {
         for x in &x_ticks {
             let p = self.data_to_pixel(*x, self.y_range.0);
             let label = format!("{:.1}", x);
-            self.label.draw_at(cx, dvec2(p.x, p.y + 5.0), &label, TextAnchor::TopCenter);
+            self.label
+                .draw_at(cx, dvec2(p.x, p.y + 5.0), &label, TextAnchor::TopCenter);
         }
 
         // Y axis tick labels
@@ -368,13 +380,19 @@ impl ScatterPlot {
         for y in &y_ticks {
             let p = self.data_to_pixel(self.x_range.0, *y);
             let label = format!("{:.1}", y);
-            self.label.draw_at(cx, dvec2(p.x - 5.0, p.y), &label, TextAnchor::MiddleRight);
+            self.label
+                .draw_at(cx, dvec2(p.x - 5.0, p.y), &label, TextAnchor::MiddleRight);
         }
 
         // Title
         if !self.title.is_empty() {
             let center_x = (self.plot_area.left + self.plot_area.right) / 2.0;
-            self.label.draw_at(cx, dvec2(center_x, self.plot_area.top - 10.0), &self.title, TextAnchor::BottomCenter);
+            self.label.draw_at(
+                cx,
+                dvec2(center_x, self.plot_area.top - 10.0),
+                &self.title,
+                TextAnchor::BottomCenter,
+            );
         }
     }
 
@@ -395,10 +413,7 @@ impl ScatterPlot {
                 self.plot_area.right - legend_width - 10.0,
                 self.plot_area.top + 10.0,
             ),
-            LegendPosition::TopLeft => (
-                self.plot_area.left + 10.0,
-                self.plot_area.top + 10.0,
-            ),
+            LegendPosition::TopLeft => (self.plot_area.left + 10.0, self.plot_area.top + 10.0),
             LegendPosition::BottomRight => (
                 self.plot_area.right - legend_width - 10.0,
                 self.plot_area.bottom - legend_height - 10.0,
@@ -420,10 +435,30 @@ impl ScatterPlot {
 
         // Draw legend border
         self.draw_line.color = self.theme.legend_border_color;
-        self.draw_line.draw_line(cx, dvec2(legend_x, legend_y), dvec2(legend_x + legend_width, legend_y), 1.0);
-        self.draw_line.draw_line(cx, dvec2(legend_x, legend_y + legend_height), dvec2(legend_x + legend_width, legend_y + legend_height), 1.0);
-        self.draw_line.draw_line(cx, dvec2(legend_x, legend_y), dvec2(legend_x, legend_y + legend_height), 1.0);
-        self.draw_line.draw_line(cx, dvec2(legend_x + legend_width, legend_y), dvec2(legend_x + legend_width, legend_y + legend_height), 1.0);
+        self.draw_line.draw_line(
+            cx,
+            dvec2(legend_x, legend_y),
+            dvec2(legend_x + legend_width, legend_y),
+            1.0,
+        );
+        self.draw_line.draw_line(
+            cx,
+            dvec2(legend_x, legend_y + legend_height),
+            dvec2(legend_x + legend_width, legend_y + legend_height),
+            1.0,
+        );
+        self.draw_line.draw_line(
+            cx,
+            dvec2(legend_x, legend_y),
+            dvec2(legend_x, legend_y + legend_height),
+            1.0,
+        );
+        self.draw_line.draw_line(
+            cx,
+            dvec2(legend_x + legend_width, legend_y),
+            dvec2(legend_x + legend_width, legend_y + legend_height),
+            1.0,
+        );
 
         // Draw legend entries
         for (idx, series) in self.series.iter().enumerate() {
@@ -431,7 +466,11 @@ impl ScatterPlot {
             let entry_y = legend_y + padding + idx as f64 * line_height + line_height / 2.0;
 
             self.draw_point.color = color;
-            self.draw_point.draw_point(cx, dvec2(legend_x + padding + marker_size / 2.0, entry_y), marker_size / 2.0);
+            self.draw_point.draw_point(
+                cx,
+                dvec2(legend_x + padding + marker_size / 2.0, entry_y),
+                marker_size / 2.0,
+            );
 
             self.label.set_color(self.theme.label_color);
             self.label.draw_at(
@@ -530,4 +569,3 @@ impl ScatterPlotRef {
         }
     }
 }
-

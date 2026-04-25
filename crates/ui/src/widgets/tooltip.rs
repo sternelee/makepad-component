@@ -196,7 +196,13 @@ impl LiveNew for TooltipPosition {
 }
 
 impl LiveApply for TooltipPosition {
-    fn apply(&mut self, _cx: &mut Cx, _apply: &mut Apply, index: usize, nodes: &[LiveNode]) -> usize {
+    fn apply(
+        &mut self,
+        _cx: &mut Cx,
+        _apply: &mut Apply,
+        index: usize,
+        nodes: &[LiveNode],
+    ) -> usize {
         if let LiveValue::BareEnum(v) = &nodes[index].value {
             *self = match *v {
                 live_id!(Top) => TooltipPosition::Top,
@@ -361,7 +367,9 @@ impl Widget for MpTooltip {
 impl MpTooltip {
     fn draw_popup_overlay(&mut self, cx: &mut Cx2d, scope: &mut Scope) {
         // Update label text
-        self.view.label(ids!(popup.popup_label)).set_text(cx, self.tip.as_ref());
+        self.view
+            .label(ids!(popup.popup_label))
+            .set_text(cx, self.tip.as_ref());
 
         // Begin overlay rendering
         self.draw_list.begin_overlay_reuse(cx);
@@ -381,7 +389,10 @@ impl MpTooltip {
         let is_measuring = self.popup_size.x == 0.0;
         let pos = if is_measuring {
             // Draw off-screen for measurement
-            DVec2 { x: -10000.0, y: -10000.0 }
+            DVec2 {
+                x: -10000.0,
+                y: -10000.0,
+            }
         } else {
             self.snap_position(cx, calculated_pos)
         };
@@ -468,7 +479,9 @@ impl MpTooltip {
 
         // Update popup size for positioning
         let new_size = popup.area().rect(cx).size;
-        if (new_size.x - self.popup_size.x).abs() > 1.0 || (new_size.y - self.popup_size.y).abs() > 1.0 {
+        if (new_size.x - self.popup_size.x).abs() > 1.0
+            || (new_size.y - self.popup_size.y).abs() > 1.0
+        {
             self.popup_size = new_size;
             cx.redraw_all();
         }
@@ -477,7 +490,11 @@ impl MpTooltip {
         self.draw_list.end(cx);
     }
 
-    fn calculate_position(&self, anchor_rect: Rect, screen_size: DVec2) -> (DVec2, TooltipPosition) {
+    fn calculate_position(
+        &self,
+        anchor_rect: Rect,
+        screen_size: DVec2,
+    ) -> (DVec2, TooltipPosition) {
         let c = anchor_rect;
         let popup_size = self.popup_size;
         let gap = self.gap;
@@ -536,7 +553,13 @@ impl MpTooltip {
         (pos, actual_position)
     }
 
-    fn calc_pos_for_direction(&self, position: TooltipPosition, c: Rect, popup_size: DVec2, gap: f64) -> DVec2 {
+    fn calc_pos_for_direction(
+        &self,
+        position: TooltipPosition,
+        c: Rect,
+        popup_size: DVec2,
+        gap: f64,
+    ) -> DVec2 {
         match position {
             TooltipPosition::Top => DVec2 {
                 x: c.pos.x + (c.size.x - popup_size.x) / 2.0,

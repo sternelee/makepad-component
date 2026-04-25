@@ -145,8 +145,7 @@ impl SseClient {
         headers: &[(String, String)],
         tx: &Sender<SseEvent>,
     ) -> Result<(), String> {
-        let mut request = ureq::get(url)
-            .set("Accept", "text/event-stream");
+        let mut request = ureq::get(url).set("Accept", "text/event-stream");
 
         for (key, value) in headers {
             request = request.set(key, value);
@@ -198,7 +197,8 @@ impl SseClient {
             .timeout_read(Duration::from_secs(10))
             .build();
 
-        let mut request = agent.post(url)
+        let mut request = agent
+            .post(url)
             .set("Content-Type", "application/json")
             .set("Accept", "text/event-stream");
 

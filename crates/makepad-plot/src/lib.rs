@@ -1,11 +1,11 @@
 // Makepad Plot - Matplotlib-style plotting library for Makepad
 
-pub mod plot;
 pub mod elements;
+pub mod plot;
 pub mod text;
 
-pub use plot::*;
 pub use elements::*;
+pub use plot::*;
 pub use text::*;
 
 use makepad_widgets::*;
