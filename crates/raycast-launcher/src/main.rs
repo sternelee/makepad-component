@@ -52,57 +52,69 @@ script_mod! {
                 width: Fill
                 height: Fit
                 margin: Inset{top: 4 bottom: 4 left: 8 right: 50}
-                padding: Inset{left: 12 top: 8 right: 12 bottom: 8}
-                flow: Overlay
+                flow: Down
+                spacing: 0
                 show_bg: true
+                new_batch: true
                 draw_bg +: {
                     color: #x2a2a3a
                     radius: 8.0
                 }
 
-                selectable := Markdown{
+                View{
                     width: Fill
                     height: Fit
-                    selectable: true
-                    body: ""
-
-                    splash_block := View{
-                        visible: false
+                    padding: Inset{left: 12 top: 8 right: 12 bottom: 8}
+                    selectable := Markdown{
                         width: Fill
                         height: Fit
-                        flow: Down
-                        spacing: 6
-                        padding: Inset{top: 8}
+                        selectable: true
+                        body: ""
+                    }
+                }
 
-                        splash_view := Splash{
+                splash_block := View{
+                    visible: false
+                    width: Fill
+                    height: Fit
+                    flow: Down
+                    spacing: 0
+
+                    View{
+                        width: Fill
+                        height: 1
+                        show_bg: true
+                        draw_bg +: { color: #x3a3a4a }
+                    }
+
+                    splash_view := Splash{
+                        width: Fill
+                        height: Fit
+                    }
+
+                    View{
+                        width: Fill
+                        height: Fit
+                        flow: Right
+                        spacing: 8
+                        padding: Inset{left: 10 right: 10 top: 5 bottom: 5}
+
+                        Label{
                             width: Fill
-                            height: Fit
+                            text: "Splash App Preview"
+                            draw_text +: {
+                                text_style: theme.font_regular {font_size: 9}
+                                color: #x64748b
+                            }
                         }
 
-                        View{
-                            width: Fill
-                            height: Fit
-                            flow: Right
-                            spacing: 8
-                            padding: Inset{top: 4 bottom: 2}
-
-                            Label{
-                                width: Fill
-                                text: "Splash App Preview"
-                                draw_text +: {
-                                    text_style: theme.font_regular {font_size: 9}
-                                    color: #x64748b
-                                }
-                            }
-
-                            save_splash_btn := Button{
-                                text: "Save as App"
-                                padding: Inset{left: 12 right: 12 top: 5 bottom: 5}
-                                draw_bg +: { color: #x1d4ed8 radius: 5.0 }
-                                draw_text +: {
-                                    text_style: theme.font_bold {font_size: 10}
-                                    color: #xffffff
-                                }
+                        save_splash_btn := Button{
+                            text: "Save as App"
+                            padding: Inset{left: 12 right: 12 top: 5 bottom: 5}
+                            draw_bg +: { color: #x1d4ed8 radius: 5.0 }
+                            draw_text +: {
+                                text_style: theme.font_bold {font_size: 10}
+                                color: #xffffff
                             }
                         }
                     }
@@ -1101,7 +1113,7 @@ impl LauncherPanel {
             )
         } else if self.show_chat {
             (
-                "Describe a UI to create, e.g. 'Build a dark calculator' or 'Design a music player'",
+                "Describe a UI to create",
                 self.chat_draft.as_str(),
                 self.chat_loading,
                 true,
@@ -1289,8 +1301,7 @@ impl LauncherPanel {
                 .map(|it| {
                     matches!(
                         it.launch,
-                        LaunchTarget::OpenChat
-                            | LaunchTarget::OpenSplashApp(_)
+                        LaunchTarget::OpenChat | LaunchTarget::OpenSplashApp(_)
                     )
                 })
                 .unwrap_or(false);
@@ -1819,8 +1830,7 @@ impl Widget for LauncherPanel {
                         ) = if let Some(entry) = self.all_items.get(source_idx) {
                             let is_builtin = matches!(
                                 entry.launch,
-                                LaunchTarget::OpenChat
-                                    | LaunchTarget::OpenSplashApp(_)
+                                LaunchTarget::OpenChat | LaunchTarget::OpenSplashApp(_)
                             );
                             (
                                 entry.app_name.clone(),
