@@ -262,7 +262,7 @@ impl LauncherPanel {
             state: serde_json::json!({}),
         };
 
-        let path = format!("{}.json", safe_name);
+        let path = format!("app-{}.json", safe_name);
         match serde_json::to_string_pretty(&descriptor) {
             Ok(json) => {
                 if let Err(e) = std::fs::write(&path, json) {
