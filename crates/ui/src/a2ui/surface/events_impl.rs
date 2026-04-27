@@ -29,6 +29,9 @@ impl Widget for A2uiSurface {
             for ti in self.mp_text_inputs.iter_mut() {
                 ti.handle_event(cx, event, scope);
             }
+            for sw in self.mp_switches.iter_mut() {
+                sw.handle_event(cx, event, scope);
+            }
         });
 
         let mut needs_redraw = false;
@@ -128,6 +131,45 @@ impl Widget for A2uiSurface {
             }
         }
 
+        // Check switch (shadcn Switch component) actions
+        for (idx, sw) in self.mp_switches.iter().enumerate() {
+            if let Some(action) = actions.find_widget_action(sw.widget_uid()) {
+                if let MpSwitchAction::Changed(new_value) = action.cast::<MpSwitchAction>() {
+                    if let Some((component_id, binding_path, _current_value, action_def)) =
+                        self.switch_meta.get(idx)
+                    {
+                        if let Some(path) = binding_path {
+                            cx.widget_action(
+                                self.widget_uid(),
+                                &scope.path,
+                                A2uiSurfaceAction::DataModelChanged {
+                                    surface_id: surface_id.clone(),
+                                    path: path.clone(),
+                                    value: serde_json::Value::Bool(new_value),
+                                },
+                            );
+                            needs_redraw = true;
+                        }
+                        if let Some(def) = action_def {
+                            if let Some(processor) = &self.processor {
+                                let user_action = processor.create_action(
+                                    &surface_id,
+                                    component_id,
+                                    def,
+                                    self.current_scope.as_deref(),
+                                );
+                                cx.widget_action(
+                                    self.widget_uid(),
+                                    &scope.path,
+                                    A2uiSurfaceAction::UserAction(user_action),
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Handle calendar events via MpCalendar widget
         if let Some(cal) = self.mp_calendar.as_mut() {
             let cal_actions = cx.capture_actions(|cx| {
@@ -206,6 +248,7 @@ impl Widget for A2uiSurface {
         self.checkbox_meta.clear();
         self.slider_meta.clear();
         self.text_input_meta.clear();
+        self.switch_meta.clear();
         self.audio_player_data.clear();
         self.label_count = 0;
         self.inside_card = false;
@@ -257,6 +300,9 @@ impl Widget for A2uiSurface {
 
         let text_input_count = self.text_input_meta.len();
         self.mp_text_inputs.truncate(text_input_count);
+
+        let switch_count = self.switch_meta.len();
+        self.mp_switches.truncate(switch_count);
 
         let audio_player_count = self.audio_player_data.len();
         if audio_player_count < self.audio_player_areas.len() {

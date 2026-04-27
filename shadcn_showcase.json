@@ -1,0 +1,806 @@
+[
+  {
+    "beginRendering": {
+      "surfaceId": "main",
+      "root": "root"
+    }
+  },
+  {
+    "surfaceUpdate": {
+      "surfaceId": "main",
+      "components": [
+        {
+          "id": "root",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "page-title",
+                  "section-badges",
+                  "section-alerts",
+                  "section-avatars",
+                  "section-progress",
+                  "section-spinners",
+                  "section-switches",
+                  "section-accordion",
+                  "section-notifications",
+                  "section-skeletons"
+                ]
+              }
+            }
+          }
+        },
+
+        {
+          "id": "page-title",
+          "component": {
+            "Text": {
+              "text": { "literalString": "shadcn UI Components — Splash Script Demo" },
+              "usageHint": "h1"
+            }
+          }
+        },
+
+        {
+          "id": "section-badges",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "badge-section-title",
+                  "badge-row"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "badge-section-title",
+          "component": {
+            "Text": {
+              "text": { "literalString": "Badge" },
+              "usageHint": "h2"
+            }
+          }
+        },
+        {
+          "id": "badge-row",
+          "component": {
+            "Row": {
+              "children": {
+                "explicitList": [
+                  "badge-default",
+                  "badge-secondary",
+                  "badge-destructive",
+                  "badge-success",
+                  "badge-warning",
+                  "badge-info"
+                ]
+              },
+              "alignment": "center"
+            }
+          }
+        },
+        {
+          "id": "badge-default",
+          "component": {
+            "Badge": {
+              "text": { "literalString": "Default" },
+              "variant": "default"
+            }
+          }
+        },
+        {
+          "id": "badge-secondary",
+          "component": {
+            "Badge": {
+              "text": { "literalString": "Secondary" },
+              "variant": "secondary"
+            }
+          }
+        },
+        {
+          "id": "badge-destructive",
+          "component": {
+            "Badge": {
+              "text": { "literalString": "Destructive" },
+              "variant": "destructive"
+            }
+          }
+        },
+        {
+          "id": "badge-success",
+          "component": {
+            "Badge": {
+              "text": { "literalString": "Success" },
+              "variant": "success"
+            }
+          }
+        },
+        {
+          "id": "badge-warning",
+          "component": {
+            "Badge": {
+              "text": { "literalString": "Warning" },
+              "variant": "warning"
+            }
+          }
+        },
+        {
+          "id": "badge-info",
+          "component": {
+            "Badge": {
+              "text": { "literalString": "Info" },
+              "variant": "info"
+            }
+          }
+        },
+
+        {
+          "id": "section-alerts",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "alert-section-title",
+                  "alert-default",
+                  "alert-destructive",
+                  "alert-warning",
+                  "alert-success",
+                  "alert-info"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "alert-section-title",
+          "component": {
+            "Text": {
+              "text": { "literalString": "Alert" },
+              "usageHint": "h2"
+            }
+          }
+        },
+        {
+          "id": "alert-default",
+          "component": {
+            "Alert": {
+              "title": { "literalString": "Heads up!" },
+              "description": { "literalString": "You can add components to your app using the CLI." },
+              "variant": "default"
+            }
+          }
+        },
+        {
+          "id": "alert-destructive",
+          "component": {
+            "Alert": {
+              "title": { "literalString": "Error" },
+              "description": { "literalString": "Your session has expired. Please log in again." },
+              "variant": "destructive"
+            }
+          }
+        },
+        {
+          "id": "alert-warning",
+          "component": {
+            "Alert": {
+              "title": { "literalString": "Warning" },
+              "description": { "literalString": "This action cannot be undone." },
+              "variant": "warning"
+            }
+          }
+        },
+        {
+          "id": "alert-success",
+          "component": {
+            "Alert": {
+              "title": { "literalString": "Success" },
+              "description": { "literalString": "Your changes have been saved." },
+              "variant": "success"
+            }
+          }
+        },
+        {
+          "id": "alert-info",
+          "component": {
+            "Alert": {
+              "description": { "literalString": "Informational message with no title." },
+              "variant": "info"
+            }
+          }
+        },
+
+        {
+          "id": "section-avatars",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "avatar-section-title",
+                  "avatar-row"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "avatar-section-title",
+          "component": {
+            "Text": {
+              "text": { "literalString": "Avatar" },
+              "usageHint": "h2"
+            }
+          }
+        },
+        {
+          "id": "avatar-row",
+          "component": {
+            "Row": {
+              "children": {
+                "explicitList": [
+                  "avatar-xs",
+                  "avatar-sm",
+                  "avatar-md",
+                  "avatar-lg",
+                  "avatar-xl"
+                ]
+              },
+              "alignment": "center"
+            }
+          }
+        },
+        {
+          "id": "avatar-xs",
+          "component": {
+            "Avatar": {
+              "fallback": { "literalString": "XS" },
+              "size": "xSmall"
+            }
+          }
+        },
+        {
+          "id": "avatar-sm",
+          "component": {
+            "Avatar": {
+              "fallback": { "literalString": "SM" },
+              "size": "small"
+            }
+          }
+        },
+        {
+          "id": "avatar-md",
+          "component": {
+            "Avatar": {
+              "fallback": { "literalString": "JD" },
+              "size": "medium"
+            }
+          }
+        },
+        {
+          "id": "avatar-lg",
+          "component": {
+            "Avatar": {
+              "fallback": { "literalString": "AB" },
+              "size": "large"
+            }
+          }
+        },
+        {
+          "id": "avatar-xl",
+          "component": {
+            "Avatar": {
+              "fallback": { "literalString": "ZA" },
+              "size": "xLarge"
+            }
+          }
+        },
+
+        {
+          "id": "section-progress",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "progress-section-title",
+                  "progress-label-0",
+                  "progress-0",
+                  "progress-label-1",
+                  "progress-1",
+                  "progress-label-2",
+                  "progress-2",
+                  "progress-label-3",
+                  "progress-3"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "progress-section-title",
+          "component": {
+            "Text": {
+              "text": { "literalString": "Progress" },
+              "usageHint": "h2"
+            }
+          }
+        },
+        {
+          "id": "progress-label-0",
+          "component": {
+            "Text": { "text": { "path": "/progress/task1Label" } }
+          }
+        },
+        {
+          "id": "progress-0",
+          "component": {
+            "Progress": {
+              "value": { "path": "/progress/task1" }
+            }
+          }
+        },
+        {
+          "id": "progress-label-1",
+          "component": {
+            "Text": { "text": { "literalString": "Uploading... 45%" } }
+          }
+        },
+        {
+          "id": "progress-1",
+          "component": {
+            "Progress": {
+              "value": { "literalNumber": 45 },
+              "variant": "default"
+            }
+          }
+        },
+        {
+          "id": "progress-label-2",
+          "component": {
+            "Text": { "text": { "literalString": "Completed 100%" } }
+          }
+        },
+        {
+          "id": "progress-2",
+          "component": {
+            "Progress": {
+              "value": { "literalNumber": 100 },
+              "variant": "success"
+            }
+          }
+        },
+        {
+          "id": "progress-label-3",
+          "component": {
+            "Text": { "text": { "literalString": "Failed — 72% complete" } }
+          }
+        },
+        {
+          "id": "progress-3",
+          "component": {
+            "Progress": {
+              "value": { "literalNumber": 72 },
+              "variant": "destructive"
+            }
+          }
+        },
+
+        {
+          "id": "section-spinners",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "spinner-section-title",
+                  "spinner-row"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "spinner-section-title",
+          "component": {
+            "Text": {
+              "text": { "literalString": "Spinner" },
+              "usageHint": "h2"
+            }
+          }
+        },
+        {
+          "id": "spinner-row",
+          "component": {
+            "Row": {
+              "children": {
+                "explicitList": [
+                  "spinner-sm",
+                  "spinner-md",
+                  "spinner-lg"
+                ]
+              },
+              "alignment": "center"
+            }
+          }
+        },
+        {
+          "id": "spinner-sm",
+          "component": {
+            "Spinner": { "size": 16 }
+          }
+        },
+        {
+          "id": "spinner-md",
+          "component": {
+            "Spinner": { "size": 24 }
+          }
+        },
+        {
+          "id": "spinner-lg",
+          "component": {
+            "Spinner": { "size": 40 }
+          }
+        },
+
+        {
+          "id": "section-switches",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "switch-section-title",
+                  "switch-off",
+                  "switch-on",
+                  "switch-bound"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "switch-section-title",
+          "component": {
+            "Text": {
+              "text": { "literalString": "Switch" },
+              "usageHint": "h2"
+            }
+          }
+        },
+        {
+          "id": "switch-off",
+          "component": {
+            "Switch": {
+              "value": { "literalBoolean": false },
+              "label": { "literalString": "Notifications (off)" }
+            }
+          }
+        },
+        {
+          "id": "switch-on",
+          "component": {
+            "Switch": {
+              "value": { "literalBoolean": true },
+              "label": { "literalString": "Dark Mode (on)" }
+            }
+          }
+        },
+        {
+          "id": "switch-bound",
+          "component": {
+            "Switch": {
+              "value": { "path": "/settings/autoUpdate" },
+              "label": { "literalString": "Auto-update (data-bound)" },
+              "binding": "/settings/autoUpdate",
+              "action": {
+                "name": "toggleAutoUpdate",
+                "context": [
+                  { "key": "feature", "value": { "literalString": "autoUpdate" } }
+                ]
+              }
+            }
+          }
+        },
+
+        {
+          "id": "section-accordion",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "accordion-section-title",
+                  "accordion-main"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "accordion-section-title",
+          "component": {
+            "Text": {
+              "text": { "literalString": "Accordion" },
+              "usageHint": "h2"
+            }
+          }
+        },
+        {
+          "id": "accordion-main",
+          "component": {
+            "Accordion": {
+              "items": [
+                {
+                  "title": { "literalString": "What is A2UI?" },
+                  "content": "accordion-content-1"
+                },
+                {
+                  "title": { "literalString": "How does the Splash script mode work?" },
+                  "content": "accordion-content-2"
+                },
+                {
+                  "title": { "literalString": "Which shadcn components are supported?" },
+                  "content": "accordion-content-3"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "accordion-content-1",
+          "component": {
+            "Text": {
+              "text": { "literalString": "A2UI (Agent-to-UI) is an open-source declarative JSON protocol for AI agents to generate interactive UIs. It is LLM-optimized, cross-platform, and streaming-capable." }
+            }
+          }
+        },
+        {
+          "id": "accordion-content-2",
+          "component": {
+            "Text": {
+              "text": { "literalString": "Splash script mode lets you describe UI through JSON without recompiling Rust. The A2UI Processor parses the JSON and renders Makepad widgets dynamically." }
+            }
+          }
+        },
+        {
+          "id": "accordion-content-3",
+          "component": {
+            "Text": {
+              "text": { "literalString": "Badge, Alert, Avatar, Progress, Spinner, Switch, Accordion, Notification, Skeleton — all are now available in the script layer via this showcase." }
+            }
+          }
+        },
+
+        {
+          "id": "section-notifications",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "notification-section-title",
+                  "notification-default",
+                  "notification-success",
+                  "notification-warning",
+                  "notification-destructive"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "notification-section-title",
+          "component": {
+            "Text": {
+              "text": { "literalString": "Notification / Toast" },
+              "usageHint": "h2"
+            }
+          }
+        },
+        {
+          "id": "notification-default",
+          "component": {
+            "Notification": {
+              "title": { "literalString": "New message" },
+              "description": { "literalString": "You have 3 unread messages in your inbox." },
+              "variant": "default"
+            }
+          }
+        },
+        {
+          "id": "notification-success",
+          "component": {
+            "Notification": {
+              "title": { "literalString": "Upload complete" },
+              "description": { "literalString": "Your file has been uploaded successfully." },
+              "variant": "success"
+            }
+          }
+        },
+        {
+          "id": "notification-warning",
+          "component": {
+            "Notification": {
+              "title": { "literalString": "Storage almost full" },
+              "description": { "literalString": "You are using 90% of your storage quota." },
+              "variant": "warning"
+            }
+          }
+        },
+        {
+          "id": "notification-destructive",
+          "component": {
+            "Notification": {
+              "title": { "literalString": "Connection lost" },
+              "description": { "literalString": "Unable to connect to the server. Retrying..." },
+              "variant": "destructive"
+            }
+          }
+        },
+
+        {
+          "id": "section-skeletons",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "skeleton-section-title",
+                  "skeleton-text-line",
+                  "skeleton-text-line-short",
+                  "skeleton-avatar-row",
+                  "skeleton-card"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "skeleton-section-title",
+          "component": {
+            "Text": {
+              "text": { "literalString": "Skeleton" },
+              "usageHint": "h2"
+            }
+          }
+        },
+        {
+          "id": "skeleton-text-line",
+          "component": {
+            "Skeleton": {
+              "height": 16,
+              "borderRadius": 4
+            }
+          }
+        },
+        {
+          "id": "skeleton-text-line-short",
+          "component": {
+            "Skeleton": {
+              "width": 180,
+              "height": 16,
+              "borderRadius": 4
+            }
+          }
+        },
+        {
+          "id": "skeleton-avatar-row",
+          "component": {
+            "Row": {
+              "children": {
+                "explicitList": [
+                  "skeleton-avatar",
+                  "skeleton-name-col"
+                ]
+              },
+              "alignment": "center"
+            }
+          }
+        },
+        {
+          "id": "skeleton-avatar",
+          "component": {
+            "Skeleton": {
+              "width": 40,
+              "height": 40,
+              "borderRadius": 20
+            }
+          }
+        },
+        {
+          "id": "skeleton-name-col",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "skeleton-name",
+                  "skeleton-email"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "skeleton-name",
+          "component": {
+            "Skeleton": {
+              "width": 120,
+              "height": 12,
+              "borderRadius": 4
+            }
+          }
+        },
+        {
+          "id": "skeleton-email",
+          "component": {
+            "Skeleton": {
+              "width": 180,
+              "height": 10,
+              "borderRadius": 4
+            }
+          }
+        },
+        {
+          "id": "skeleton-card",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "skeleton-card-img",
+                  "skeleton-card-line1",
+                  "skeleton-card-line2"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "skeleton-card-img",
+          "component": {
+            "Skeleton": {
+              "height": 120,
+              "borderRadius": 8
+            }
+          }
+        },
+        {
+          "id": "skeleton-card-line1",
+          "component": {
+            "Skeleton": {
+              "height": 16,
+              "borderRadius": 4
+            }
+          }
+        },
+        {
+          "id": "skeleton-card-line2",
+          "component": {
+            "Skeleton": {
+              "width": 200,
+              "height": 12,
+              "borderRadius": 4
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "dataModelUpdate": {
+      "surfaceId": "main",
+      "path": "/",
+      "contents": [
+        {
+          "key": "progress",
+          "valueMap": [
+            { "key": "task1Label", "valueString": "Installing dependencies... 68%" },
+            { "key": "task1", "valueNumber": 68 }
+          ]
+        },
+        {
+          "key": "settings",
+          "valueMap": [
+            { "key": "autoUpdate", "valueBoolean": true },
+            { "key": "darkMode", "valueBoolean": false }
+          ]
+        }
+      ]
+    }
+  }
+]

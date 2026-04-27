@@ -61,6 +61,33 @@ impl A2uiSurface {
             ComponentType::Divider(_) => {
                 self.render_divider(cx);
             }
+            ComponentType::Badge(badge) => {
+                self.render_badge(cx, badge, data_model);
+            }
+            ComponentType::Alert(alert) => {
+                self.render_alert(cx, scope, surface, data_model, alert);
+            }
+            ComponentType::Avatar(avatar) => {
+                self.render_avatar(cx, avatar, data_model);
+            }
+            ComponentType::Progress(progress) => {
+                self.render_progress(cx, progress, data_model);
+            }
+            ComponentType::Spinner(spinner) => {
+                self.render_spinner(cx, spinner);
+            }
+            ComponentType::Switch(switch) => {
+                self.render_switch(cx, switch, data_model, component_id);
+            }
+            ComponentType::Accordion(accordion) => {
+                self.render_accordion(cx, scope, surface, data_model, accordion);
+            }
+            ComponentType::Notification(notification) => {
+                self.render_notification(cx, scope, surface, data_model, notification);
+            }
+            ComponentType::Skeleton(skeleton) => {
+                self.render_skeleton(cx, skeleton);
+            }
             _ => {
                 // Unsupported component - skip for now
             }

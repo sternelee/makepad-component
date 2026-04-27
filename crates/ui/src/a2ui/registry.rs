@@ -37,6 +37,17 @@ pub enum A2uiComponentType {
     AudioPlayer,
     // Shader visualization
     ShaderStage,
+
+    // shadcn UI components (Splash script layer)
+    Badge,
+    Alert,
+    Avatar,
+    Progress,
+    Spinner,
+    Switch,
+    Accordion,
+    Notification,
+    Skeleton,
 }
 
 impl A2uiComponentType {
@@ -62,6 +73,15 @@ impl A2uiComponentType {
             A2uiComponentType::Calendar => "Calendar",
             A2uiComponentType::AudioPlayer => "AudioPlayer",
             A2uiComponentType::ShaderStage => "ShaderStage",
+            A2uiComponentType::Badge => "Badge",
+            A2uiComponentType::Alert => "Alert",
+            A2uiComponentType::Avatar => "Avatar",
+            A2uiComponentType::Progress => "Progress",
+            A2uiComponentType::Spinner => "Spinner",
+            A2uiComponentType::Switch => "Switch",
+            A2uiComponentType::Accordion => "Accordion",
+            A2uiComponentType::Notification => "Notification",
+            A2uiComponentType::Skeleton => "Skeleton",
         }
     }
 
@@ -87,6 +107,15 @@ impl A2uiComponentType {
             "Calendar" => Some(A2uiComponentType::Calendar),
             "AudioPlayer" => Some(A2uiComponentType::AudioPlayer),
             "ShaderStage" => Some(A2uiComponentType::ShaderStage),
+            "Badge" => Some(A2uiComponentType::Badge),
+            "Alert" => Some(A2uiComponentType::Alert),
+            "Avatar" => Some(A2uiComponentType::Avatar),
+            "Progress" => Some(A2uiComponentType::Progress),
+            "Spinner" => Some(A2uiComponentType::Spinner),
+            "Switch" => Some(A2uiComponentType::Switch),
+            "Accordion" => Some(A2uiComponentType::Accordion),
+            "Notification" => Some(A2uiComponentType::Notification),
+            "Skeleton" => Some(A2uiComponentType::Skeleton),
             _ => None,
         }
     }
@@ -113,6 +142,15 @@ impl A2uiComponentType {
             A2uiComponentType::Calendar,
             A2uiComponentType::AudioPlayer,
             A2uiComponentType::ShaderStage,
+            A2uiComponentType::Badge,
+            A2uiComponentType::Alert,
+            A2uiComponentType::Avatar,
+            A2uiComponentType::Progress,
+            A2uiComponentType::Spinner,
+            A2uiComponentType::Switch,
+            A2uiComponentType::Accordion,
+            A2uiComponentType::Notification,
+            A2uiComponentType::Skeleton,
         ]
     }
 }
@@ -311,6 +349,70 @@ impl ComponentRegistry {
             implemented: true,
         });
 
+        // shadcn UI components (Splash script layer)
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Badge,
+            makepad_widget: "MpBadgeStandalone",
+            description: "Inline badge / pill label (default, secondary, destructive, outline)",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Alert,
+            makepad_widget: "MpAlert",
+            description: "Alert banner (default, destructive, warning, success, info)",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Avatar,
+            makepad_widget: "MpAvatar",
+            description: "Circular avatar with initials fallback",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Progress,
+            makepad_widget: "MpProgress",
+            description: "Horizontal progress bar (0–100)",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Spinner,
+            makepad_widget: "MpSpinner",
+            description: "Rotating loading spinner",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Switch,
+            makepad_widget: "MpSwitch",
+            description: "Toggle switch with two-way data binding",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Accordion,
+            makepad_widget: "MpAccordion",
+            description: "Collapsible accordion sections",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Notification,
+            makepad_widget: "MpNotification",
+            description: "Toast / notification popup",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Skeleton,
+            makepad_widget: "MpSkeleton",
+            description: "Loading skeleton placeholder",
+            implemented: true,
+        });
+
         registry
     }
 
@@ -386,6 +488,15 @@ pub fn component_type_of(component: &super::message::ComponentType) -> A2uiCompo
         ComponentType::Calendar(_) => A2uiComponentType::Calendar,
         ComponentType::AudioPlayer(_) => A2uiComponentType::AudioPlayer,
         ComponentType::ShaderStage(_) => A2uiComponentType::ShaderStage,
+        ComponentType::Badge(_) => A2uiComponentType::Badge,
+        ComponentType::Alert(_) => A2uiComponentType::Alert,
+        ComponentType::Avatar(_) => A2uiComponentType::Avatar,
+        ComponentType::Progress(_) => A2uiComponentType::Progress,
+        ComponentType::Spinner(_) => A2uiComponentType::Spinner,
+        ComponentType::Switch(_) => A2uiComponentType::Switch,
+        ComponentType::Accordion(_) => A2uiComponentType::Accordion,
+        ComponentType::Notification(_) => A2uiComponentType::Notification,
+        ComponentType::Skeleton(_) => A2uiComponentType::Skeleton,
     }
 }
 
