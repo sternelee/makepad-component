@@ -135,7 +135,7 @@ impl Widget for A2uiSurface {
         for (idx, sw) in self.mp_switches.iter().enumerate() {
             if let Some(action) = actions.find_widget_action(sw.widget_uid()) {
                 if let MpSwitchAction::Changed(new_value) = action.cast::<MpSwitchAction>() {
-                    if let Some((component_id, binding_path, _, action_def)) =
+                    if let Some((component_id, binding_path, _current_value, action_def)) =
                         self.switch_meta.get(idx)
                     {
                         if let Some(path) = binding_path {

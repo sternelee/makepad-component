@@ -875,7 +875,10 @@ pub struct ProgressComponent {
     /// Current value 0–100 (literal or path-bound)
     pub value: NumberValue,
 
-    /// Visual variant (default blue, success green, destructive red)
+    /// Visual variant (reuses BadgeVariant for semantic color mapping:
+    /// default=blue, success=green, warning=amber, destructive=red).
+    /// A dedicated ProgressVariant may be introduced if progress-specific
+    /// semantics diverge from badge semantics in the future.
     #[serde(default)]
     pub variant: Option<BadgeVariant>,
 }

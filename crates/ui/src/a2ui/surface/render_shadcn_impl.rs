@@ -49,7 +49,7 @@ fn avatar_color(idx: usize) -> Vec4 {
         (0.580, 0.247, 0.902), // purple  #943CE6
     ];
     let (r, g, b) = COLORS[idx % COLORS.len()];
-    Vec4 { x: r, y: g, z: b, w: 1.0 }
+    vec4(r, g, b, 1.0)
 }
 
 // ============================================================================
@@ -199,14 +199,17 @@ impl A2uiSurface {
         );
 
         let size = match avatar.size.unwrap_or_default() {
-            AvatarSize::XSmall => 24.0_f64,
+            AvatarSize::XSmall => 24.0,
             AvatarSize::Small  => 32.0,
             AvatarSize::Medium => 40.0,
             AvatarSize::Large  => 56.0,
             AvatarSize::XLarge => 80.0,
         };
 
-        let color_idx = fallback.bytes().fold(0usize, |acc, b| acc.wrapping_add(b as usize));
+        // Use a multiplicative hash so transposed inputs (e.g. "AB" vs "BA") produce different colors
+        let color_idx = fallback
+            .bytes()
+            .fold(0usize, |acc, b| acc.wrapping_mul(31).wrapping_add(b as usize));
         let bg_color = avatar_color(color_idx);
 
         let walk = Walk {
@@ -277,7 +280,8 @@ impl A2uiSurface {
         spinner: &SpinnerComponent,
     ) {
         // MVP: render spinner as a unicode rotation glyph via the label pool.
-        // Full spinning animation requires a dedicated MpSpinner widget pool entry.
+        // ⟳ (U+27F3) serves as a static placeholder; full spinning animation requires
+        // a dedicated MpSpinner widget pool entry with an Animator driving rotation.
         let font_size = spinner.size.map(|s| s * 0.6).unwrap_or(14.0);
         let label_idx = self.label_count;
         self.label_count += 1;

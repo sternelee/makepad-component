@@ -337,7 +337,10 @@ live_design! {
         // shadcn UI draw primitives (Splash script layer)
         // ============================================================
 
-        // Rounded-rect background used for Badge, Alert, Notification, Skeleton
+        // Rounded-rect background used for Badge, Alert, Notification, Skeleton.
+        // The default color and border_radius are always overridden at runtime
+        // via apply_over() before each draw call, so these defaults are never
+        // directly visible — they exist only to satisfy the Live type system.
         draw_badge: {
             color: #3b82f6
             instance border_radius: 12.0
