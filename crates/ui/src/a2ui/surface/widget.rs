@@ -17,6 +17,7 @@ use crate::widgets::{
     calendar::MpCalendar,
     checkbox::{MpCheckbox, MpCheckboxAction},
     slider::{MpSlider, MpSliderAction},
+    switch::{MpSwitch, MpSwitchAction},
     label::MpLabel,
 };
 
@@ -77,6 +78,7 @@ live_design! {
     use crate::widgets::button::MpButton;
     use crate::widgets::checkbox::MpCheckbox;
     use crate::widgets::slider::MpSlider;
+    use crate::widgets::switch::MpSwitch;
     use crate::widgets::label::MpLabel;
 
     pub A2uiSurface = {{A2uiSurface}} {
@@ -330,6 +332,88 @@ live_design! {
         img_keyboard: dep("crate://self/resources/keyboard.jpg")
         img_alipay: dep("crate://self/resources/alipay.png")
         img_wechat: dep("crate://self/resources/wechat.png")
+
+        // ============================================================
+        // shadcn UI draw primitives (Splash script layer)
+        // ============================================================
+
+        // Rounded-rect background used for Badge, Alert, Notification, Skeleton
+        draw_badge: {
+            color: #3b82f6
+            instance border_radius: 12.0
+
+            fn pixel(self) -> vec4 {
+                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                sdf.box(
+                    0.0, 0.0,
+                    self.rect_size.x, self.rect_size.y,
+                    max(1.0, self.border_radius)
+                );
+                sdf.fill(self.color);
+                return sdf.result;
+            }
+        }
+
+        // Filled circle used for Avatar background
+        draw_circle: {
+            color: #6366f1
+
+            fn pixel(self) -> vec4 {
+                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                let c = self.rect_size * 0.5;
+                let r = min(c.x, c.y) - 1.0;
+                sdf.circle(c.x, c.y, r);
+                sdf.fill(self.color);
+                return sdf.result;
+            }
+        }
+
+        // Progress bar capsule (track + fill driven by `progress` instance uniform)
+        draw_progress: {
+            color: #3b82f6
+            instance track_color: #374151
+            instance progress: 0.5
+
+            fn pixel(self) -> vec4 {
+                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+                let sz = self.rect_size;
+                let r = sz.y * 0.5;
+
+                // Track capsule
+                sdf.circle(r, r, r);
+                sdf.rect(r, 0.0, sz.x - sz.y, sz.y);
+                sdf.circle(sz.x - r, r, r);
+                sdf.fill(self.track_color);
+
+                // Fill capsule (overlay)
+                let fill_end = sz.x * self.progress;
+                let px = self.pos.x * sz.x;
+                let in_fill = step(px, fill_end);
+
+                let sdf2 = Sdf2d::viewport(self.pos * self.rect_size);
+                sdf2.circle(r, r, r);
+                sdf2.rect(r, 0.0, sz.x - sz.y, sz.y);
+                sdf2.circle(sz.x - r, r, r);
+                sdf2.fill(self.color);
+
+                return mix(sdf.result, sdf2.result, in_fill * sdf2.result.w);
+            }
+        }
+
+        // Small text for badges, alert descriptions, etc.
+        draw_comp_text: {
+            text_style: <THEME_FONT_REGULAR> { font_size: 12.0 }
+            color: #FFFFFF
+        }
+
+        // Bold text for alert titles, section headings
+        draw_comp_title: {
+            text_style: <THEME_FONT_BOLD> { font_size: 13.0 }
+            color: #FFFFFF
+        }
+
+        // Switch template for interactive toggle pool
+        tpl_switch: <MpSwitch> {}
     }
 }
 
@@ -477,6 +561,7 @@ pub struct A2uiSurface {
     #[live] tpl_label: Option<LivePtr>,
     #[live] tpl_text_input: Option<LivePtr>,
     #[live] tpl_calendar: Option<LivePtr>,
+    #[live] tpl_switch: Option<LivePtr>,
 
     // ============================================================================
     // Widget pools
@@ -502,6 +587,10 @@ pub struct A2uiSurface {
     #[rust]
     mp_text_inputs: Vec<TextInput>,
 
+    /// Pool of MpSwitch instances (shadcn Switch component)
+    #[rust]
+    mp_switches: Vec<MpSwitch>,
+
     // ============================================================================
     // Pool metadata (maps pool index to A2UI component info)
     // ============================================================================
@@ -522,6 +611,10 @@ pub struct A2uiSurface {
     #[rust]
     text_input_meta: Vec<(String, Option<String>, String)>,
 
+    /// Switch metadata: (component_id, binding_path, current_value, action_def)
+    #[rust]
+    switch_meta: Vec<(String, Option<String>, bool, Option<ActionDefinition>)>,
+
     /// Frame counter for label pool (reset each frame, used as pool index)
     #[rust]
     label_count: usize,
@@ -529,6 +622,33 @@ pub struct A2uiSurface {
     /// Whether currently rendering inside a Card (for audio player rendering)
     #[rust]
     inside_card: bool,
+
+    // ============================================================================
+    // shadcn UI draw primitives (DrawColor with custom shaders)
+    // ============================================================================
+
+    /// Rounded-rect background for Badge, Alert, Notification, Skeleton, Accordion header
+    #[redraw]
+    #[live]
+    draw_badge: DrawColor,
+
+    /// Filled circle for Avatar background
+    #[redraw]
+    #[live]
+    draw_circle: DrawColor,
+
+    /// Capsule progress bar (track + fill via `progress` instance uniform)
+    #[redraw]
+    #[live]
+    draw_progress: DrawColor,
+
+    /// Small text for shadcn component labels
+    #[live]
+    draw_comp_text: DrawText,
+
+    /// Bold text for shadcn component titles / section headers
+    #[live]
+    draw_comp_title: DrawText,
 
     // ============================================================================
     // Image sources (preloaded)
@@ -871,6 +991,15 @@ impl A2uiSurface {
         }
         &mut self.mp_text_inputs[idx]
     }
+
+    /// Get or grow a switch from the pool
+    fn pool_switch(&mut self, cx: &mut Cx, idx: usize) -> &mut MpSwitch {
+        while self.mp_switches.len() <= idx {
+            let new_sw = MpSwitch::new_from_ptr(cx, self.tpl_switch);
+            self.mp_switches.push(new_sw);
+        }
+        &mut self.mp_switches[idx]
+    }
 }
 
 // Widget trait implementation (handle_event + draw_walk)
@@ -878,6 +1007,9 @@ include!("events_impl.rs");
 
 // Render methods - layout and basic components
 include!("render_impl.rs");
+
+// Render methods - shadcn UI components (Badge, Alert, Avatar, Progress, etc.)
+include!("render_shadcn_impl.rs");
 
 // Render methods - charts, chord, audio player
 include!("render_charts_impl.rs");

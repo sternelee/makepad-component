@@ -170,6 +170,17 @@ pub enum ComponentType {
 
     // Shader visualization components
     ShaderStage(ShaderStageComponent),
+
+    // shadcn UI components (Splash script layer)
+    Badge(BadgeComponent),
+    Alert(AlertComponent),
+    Avatar(AvatarComponent),
+    Progress(ProgressComponent),
+    Spinner(SpinnerComponent),
+    Switch(SwitchComponent),
+    Accordion(AccordionComponent),
+    Notification(NotificationComponent),
+    Skeleton(SkeletonComponent),
 }
 
 /// Children reference - either explicit list or template-based
@@ -811,6 +822,181 @@ pub enum TextInputType {
     Number,
     Tel,
     Url,
+}
+
+// ============================================================================
+// shadcn UI Components (Splash script layer)
+// ============================================================================
+
+/// Badge component for status indicators, counts, or labels
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BadgeComponent {
+    /// Badge text content (literal or path-bound)
+    pub text: StringValue,
+
+    /// Visual variant
+    #[serde(default)]
+    pub variant: Option<BadgeVariant>,
+}
+
+/// Alert/notification banner component
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlertComponent {
+    /// Alert title (optional)
+    #[serde(default)]
+    pub title: Option<StringValue>,
+
+    /// Alert body / description text
+    pub description: StringValue,
+
+    /// Visual variant
+    #[serde(default)]
+    pub variant: Option<AlertVariant>,
+}
+
+/// Avatar / user icon component (initials-based)
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AvatarComponent {
+    /// Fallback text shown when no image (usually initials, e.g. "JD")
+    pub fallback: StringValue,
+
+    /// Avatar size hint
+    #[serde(default)]
+    pub size: Option<AvatarSize>,
+}
+
+/// Progress bar component (0–100)
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProgressComponent {
+    /// Current value 0–100 (literal or path-bound)
+    pub value: NumberValue,
+
+    /// Visual variant (default blue, success green, destructive red)
+    #[serde(default)]
+    pub variant: Option<BadgeVariant>,
+}
+
+/// Loading spinner component
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpinnerComponent {
+    /// Size in logical pixels (default 24)
+    #[serde(default)]
+    pub size: Option<f64>,
+}
+
+/// Toggle switch component (boolean on/off)
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwitchComponent {
+    /// Current on/off state (literal or path-bound)
+    pub value: BooleanValue,
+
+    /// Optional label text shown beside the switch
+    #[serde(default)]
+    pub label: Option<StringValue>,
+
+    /// Two-way data binding path (e.g. "/settings/darkMode")
+    #[serde(default)]
+    pub binding: Option<String>,
+
+    /// Action to trigger when switch is toggled
+    #[serde(default)]
+    pub action: Option<ActionDefinition>,
+}
+
+/// A single accordion section (title + content child)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccordionItem {
+    /// Section title text
+    pub title: StringValue,
+
+    /// Content child component ID
+    pub content: String,
+}
+
+/// Accordion / collapsible sections component
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccordionComponent {
+    /// Ordered list of accordion sections
+    #[serde(default)]
+    pub items: Vec<AccordionItem>,
+}
+
+/// Toast / notification popup component
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotificationComponent {
+    /// Notification title
+    pub title: StringValue,
+
+    /// Notification body text
+    pub description: StringValue,
+
+    /// Visual variant (maps to Alert variants)
+    #[serde(default)]
+    pub variant: Option<AlertVariant>,
+}
+
+/// Skeleton placeholder (loading state visual)
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkeletonComponent {
+    /// Width in logical pixels (default Fill)
+    #[serde(default)]
+    pub width: Option<f64>,
+
+    /// Height in logical pixels (default 16)
+    #[serde(default)]
+    pub height: Option<f64>,
+
+    /// Border radius (default 4)
+    #[serde(default)]
+    pub border_radius: Option<f64>,
+}
+
+/// Badge visual variants
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BadgeVariant {
+    #[default]
+    Default,
+    Secondary,
+    Destructive,
+    Outline,
+    Success,
+    Warning,
+    Info,
+}
+
+/// Alert visual variants
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AlertVariant {
+    #[default]
+    Default,
+    Destructive,
+    Warning,
+    Success,
+    Info,
+}
+
+/// Avatar size variants
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AvatarSize {
+    XSmall,
+    Small,
+    #[default]
+    Medium,
+    Large,
+    XLarge,
 }
 
 // ============================================================================
