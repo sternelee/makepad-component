@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 
 mod audio_input;
 mod audio_output;
+mod background;
 mod dithering;
 mod gemini_live;
 mod memory;
@@ -15,6 +16,7 @@ use audio_input::MicCapture;
 use audio_output::AudioPlayer;
 
 use gemini_live::{GeminiEvent, GeminiLiveClient, ModelTurn, Part, ServerContent};
+use background::{ParticleBackground, CANVAS_W, CANVAS_H};
 use memory::MemorySummary;
 use storage::{Message, Storage};
 use memory::format_timestamp;
@@ -127,43 +129,46 @@ script_mod! {
                                 Filler{}
                                 duration_label := Label{text: "" draw_text +: {text_style +: {font_size: 12.0}}}
                             }
-
                             scene_area := View{
                                 width: Fill
                                 height: Fill
-                                flow: Down
-                                align: Align{x: 0.5 y: 0.0}
+                                flow: Overlay
                                 show_bg: true
                                 draw_bg +: { color: vec4(0.04, 0.05, 0.10, 1.0) }
+                                // Layer 0: particle canvas / background image
                                 scene_background := Image{width: Fill height: Fill visible: false}
-
+                                // Layer 1: orb + speech overlay
                                 View{
                                     width: Fill
                                     height: Fill
-                                    align: Center
-                                    scene_visual := View{width: 220 height: 220 align: Center show_bg: true
-                                        draw_bg +: { color: vec4(0.10, 0.18, 0.35, 0.5) }
-                                        inner_glow := View{width: 170 height: 170 align: Center show_bg: true
-                                            draw_bg +: { color: vec4(0.15, 0.30, 0.60, 0.6) }
-                                            orb_label := Label{text: "\u{25ef}" draw_text +: {text_style +: {font_size: 56.0}}}
+                                    flow: Down
+                                    View{
+                                        width: Fill
+                                        height: Fill
+                                        align: Center
+                                        scene_visual := View{width: 220 height: 220 align: Center show_bg: true
+                                            draw_bg +: { color: vec4(0.10, 0.18, 0.35, 0.5) }
+                                            inner_glow := View{width: 170 height: 170 align: Center show_bg: true
+                                                draw_bg +: { color: vec4(0.15, 0.30, 0.60, 0.6) }
+                                                orb_label := Label{text: "\u{25ef}" draw_text +: {text_style +: {font_size: 56.0}}}
+                                            }
                                         }
                                     }
-                                }
-
-                                speech_overlay := View{
-                                    width: Fill
-                                    height: Fit
-                                    flow: Down
-                                    align: Align{x: 0.5 y: 0.0}
-                                    spacing: 10
-                                    padding: Inset{left: 40 right: 40 top: 16 bottom: 16}
-                                    visible: false
-                                    show_bg: true
-                                    draw_bg +: { color: vec4(0.04, 0.04, 0.12, 0.90) }
-                                    speech_label := Label{text: "" draw_text +: {text_style +: {font_size: 18.0}}}
-                                    speech_actions := View{width: Fit height: 32 flow: Right spacing: 16
-                                        replay_btn    := Button{text: "\u{21ba} Replay" visible: false}
-                                        translate_btn := Button{text: "\u{1f310} Translate" visible: false}
+                                    speech_overlay := View{
+                                        width: Fill
+                                        height: Fit
+                                        flow: Down
+                                        align: Align{x: 0.5 y: 0.0}
+                                        spacing: 10
+                                        padding: Inset{left: 40 right: 40 top: 16 bottom: 16}
+                                        visible: false
+                                        show_bg: true
+                                        draw_bg +: { color: vec4(0.04, 0.04, 0.12, 0.90) }
+                                        speech_label := Label{text: "" draw_text +: {text_style +: {font_size: 18.0}}}
+                                        speech_actions := View{width: Fit height: 32 flow: Right spacing: 16
+                                            replay_btn    := Button{text: "\u{21ba} Replay" visible: false}
+                                            translate_btn := Button{text: "\u{1f310} Translate" visible: false}
+                                        }
                                     }
                                 }
                             }
@@ -402,6 +407,12 @@ pub struct App {
     next_frame: NextFrame,
     #[rust]
     anim_tick: u64,
+    /// Particle dithering background system
+    #[rust]
+    particle_bg: Option<ParticleBackground>,
+    /// Last frame timestamp (for particle physics)
+    #[rust]
+    particle_time: f64,
 }
 
 impl MatchEvent for App {
@@ -429,6 +440,8 @@ impl MatchEvent for App {
         self.current_audio_buf = Vec::new();
         self.session_start_time = None;
         self.anim_tick = 0;
+        self.particle_bg = None;
+        self.particle_time = 0.0;
         self.next_frame = cx.new_next_frame(); // start animation loop
         self.ui.text_input(cx, ids!(msg_input)).set_key_focus(cx);
         self.update_memory_action_button_labels(cx);
@@ -916,59 +929,44 @@ impl MatchEvent for App {
                 .pick_file()
             {
                 if let Ok(bytes) = std::fs::read(&path) {
-                    let ext = path
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .unwrap_or("png")
-                        .to_lowercase();
+                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("png").to_lowercase();
                     let mime_type = match ext.as_str() {
                         "jpg" | "jpeg" => "image/jpeg",
-                        "png" => "image/png",
-                        "gif" => "image/gif",
+                        "gif"  => "image/gif",
                         "webp" => "image/webp",
-                        _ => "image/png",
+                        _      => "image/png",
+                    }.to_string();
+
+                    use ::image::ImageReader;
+                    use std::io::Cursor;
+                    let decoded = ImageReader::new(Cursor::new(&bytes))
+                        .with_guessed_format()
+                        .ok()
+                        .and_then(|r| r.decode().ok());
+
+                    if let Some(img) = decoded {
+                        // Store original bytes (base64) for Gemini image context
+                        let b64 = base64::Engine::encode(
+                            &base64::engine::general_purpose::STANDARD, &bytes,
+                        );
+                        self.current_image = Some((mime_type, b64));
+
+                        // Build particle system
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap().as_secs_f64();
+                        let bg = ParticleBackground::from_image(&img);
+                        // First render + upload immediately
+                        let first_png = bg.render_png(now);
+                        let _ = self.ui.image(cx, ids!(scene_background))
+                            .load_png_from_data(cx, &first_png);
+                        self.ui.image(cx, ids!(scene_background)).set_visible(cx, true);
+                        self.particle_bg = Some(bg);
+                        self.particle_time = now;
+
+                        self.ui.label(cx, ids!(status_label))
+                            .set_text(cx, "\u{2728} Particle canvas ready — hover & click to interact");
                     }
-                    .to_string();
-
-                    let dithered = if mime_type != "image/gif" {
-                        use ::image::ImageReader;
-                        use std::io::Cursor;
-                        let img = ImageReader::new(Cursor::new(&bytes))
-                            .with_guessed_format()
-                            .ok()
-                            .and_then(|r| r.decode().ok());
-                        if let Some(img) = img {
-                            let dithered_img = dithering::apply_floyd_steinberg(&img);
-                            let mut buf = Vec::new();
-                            dithered_img
-                                .write_to(&mut Cursor::new(&mut buf), ::image::ImageFormat::Png)
-                                .ok();
-                            buf
-                        } else {
-                            bytes.clone()
-                        }
-                    } else {
-                        bytes.clone()
-                    };
-
-                    let b64 = base64::Engine::encode(
-                        &base64::engine::general_purpose::STANDARD,
-                        &dithered,
-                    );
-                    self.current_image = Some(("image/png".to_string(), b64.clone()));
-                    self.current_dithered_image = Some(b64);
-                    self.ui
-                        .image(cx, ids!(scene_background))
-                        .load_png_from_data(cx, &dithered);
-                    self.ui
-                        .view(cx, ids!(scene_background))
-                        .set_visible(cx, true);
-                    self.ui
-                        .label(cx, ids!(speech_label))
-                        .set_text(cx, "Dithered ✓ Type a message.");
-                    self.ui
-                        .label(cx, ids!(status_label))
-                        .set_text(cx, "Dithered image loaded");
                 }
             }
         }
@@ -997,7 +995,9 @@ impl MatchEvent for App {
             self.session_state = "idle".to_string();
             self.current_image = None;
             self.current_dithered_image = None;
+            self.particle_bg = None;
             self.scene_content = None;
+            self.ui.image(cx, ids!(scene_background)).set_visible(cx, false);
             self.set_speech_text(cx, "");
             self.ui
                 .view(cx, ids!(scene_background))
@@ -1809,11 +1809,27 @@ impl AppMain for App {
     }
 
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
-        // Animation loop: update orb indicator based on session_state
+        // Animation loop: update orb indicator + particle background
         if self.next_frame.is_event(event).is_some() {
             self.anim_tick = self.anim_tick.wrapping_add(1);
             self.update_orb_animation(cx);
             self.update_duration_label(cx);
+
+            // Particle background physics + render
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap().as_secs_f64();
+            self.particle_time = now;
+            if let Some(bg) = &mut self.particle_bg {
+                // Run physics every frame; render every other frame (~30fps) to save CPU
+                let needs_redraw = bg.update(now);
+                if needs_redraw && self.anim_tick % 2 == 0 {
+                    let png = bg.render_png(now);
+                    let _ = self.ui.image(cx, ids!(scene_background))
+                        .load_png_from_data(cx, &png);
+                }
+            }
+
             self.next_frame = cx.new_next_frame();
         }
 
@@ -1921,5 +1937,53 @@ impl AppMain for App {
 
         self.match_event(cx, event);
         self.ui.handle_event(cx, event, &mut Scope::empty());
+
+        // ── Mouse tracking for particle background ──────────────────────
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap().as_secs_f64();
+
+        if let Event::MouseMove(me) = event {
+            if self.particle_bg.is_some() {
+                let area = self.ui.view(cx, ids!(scene_area)).area();
+                let rect = area.rect(cx);
+                if rect.size.x > 1.0 && rect.size.y > 1.0 {
+                    let rel_x = me.abs.x as f32 - rect.pos.x as f32;
+                    let rel_y = me.abs.y as f32 - rect.pos.y as f32;
+                    let cx_pos = rel_x / rect.size.x as f32 * CANVAS_W as f32;
+                    let cy_pos = rel_y / rect.size.y as f32 * CANVAS_H as f32;
+                    let inside = rel_x >= 0.0 && rel_y >= 0.0
+                        && rel_x < rect.size.x as f32
+                        && rel_y < rect.size.y as f32;
+                    if let Some(bg) = &mut self.particle_bg {
+                        bg.set_mouse(cx_pos, cy_pos, inside);
+                        if inside { bg.push_comet(cx_pos, cy_pos, now); }
+                    }
+                }
+            }
+        }
+
+        if let Event::MouseDown(me) = event {
+            if me.button == MouseButton::PRIMARY {
+                if self.particle_bg.is_some() {
+                    let area = self.ui.view(cx, ids!(scene_area)).area();
+                    let rect = area.rect(cx);
+                    if rect.size.x > 1.0 {
+                        let rel_x = me.abs.x as f32 - rect.pos.x as f32;
+                        let rel_y = me.abs.y as f32 - rect.pos.y as f32;
+                        let inside = rel_x >= 0.0 && rel_y >= 0.0
+                            && rel_x < rect.size.x as f32
+                            && rel_y < rect.size.y as f32;
+                        if inside {
+                            let cx_pos = rel_x / rect.size.x as f32 * CANVAS_W as f32;
+                            let cy_pos = rel_y / rect.size.y as f32 * CANVAS_H as f32;
+                            if let Some(bg) = &mut self.particle_bg {
+                                bg.add_ripple(cx_pos, cy_pos, now);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
