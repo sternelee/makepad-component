@@ -1,28 +1,5 @@
 pub use makepad_widgets;
 
-fn format_timestamp(timestamp: f64) -> String {
-    let total_seconds = timestamp as u64;
-    let hours = (total_seconds % 86400) / 3600;
-    let minutes = (total_seconds % 3600) / 60;
-    let hour_12 = if hours == 0 {
-        12
-    } else if hours > 12 {
-        hours - 12
-    } else {
-        hours
-    };
-    let am_pm = if hours >= 12 { "PM" } else { "AM" };
-    format!(
-        "{:02}/{:02}/{:02} {:02}:{:02}{}",
-        (total_seconds / 86400 / 30) % 12 + 1,
-        (total_seconds / 86400) % 30 + 1,
-        (total_seconds / 86400 / 365) % 100,
-        hour_12,
-        minutes,
-        am_pm
-    )
-}
-
 use makepad_widgets::*;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -38,8 +15,9 @@ use audio_input::MicCapture;
 use audio_output::AudioPlayer;
 
 use gemini_live::{GeminiEvent, GeminiLiveClient, ModelTurn, Part, ServerContent};
-use memory::{create_memory, MemorySummary, Message};
-use storage::Storage;
+use memory::MemorySummary;
+use storage::{Message, Storage};
+use memory::format_timestamp;
 
 #[derive(Debug, Clone)]
 enum SceneContent {
@@ -53,7 +31,12 @@ enum GeminiAction {
     Connected,
     TextReceived(String),
     AudioReceived(Vec<u8>),
+    /// Transcript of AI audio (for SpeechOverlay)
+    OutputTranscript(String),
+    /// Transcript of user audio input
+    InputTranscript(String),
     TurnComplete,
+    Interrupted,
     Error(String),
     Disconnected,
 }
@@ -71,6 +54,12 @@ enum UiToGemini {
         data: String,
         caption: Option<String>,
     },
+    /// Raw PCM16 audio chunk (16kHz mono) from microphone
+    Audio(Vec<u8>),
+    /// Interrupt AI speech: stop playback and signal Gemini
+    Interrupt,
+    /// Signal end of user speech turn
+    SignalEnd,
     Disconnect,
 }
 
@@ -93,17 +82,17 @@ script_mod! {
     startup() do #(App::script_component(vm)){
         ui: Root{
             main_window := Window{
-                window.inner_size: vec2(900, 700)
-                window.title: "Gemini Garden"
+                window.inner_size: vec2(960, 720)
+                window.title: "Gemini Garden u2014 Live Companion"
                 window.transparent: true
-                pass +: { clear_color: vec4(0.0, 0.0, 0.0, 0.94) }
+                pass +: { clear_color: vec4(0.04, 0.04, 0.08, 1.0) }
                 body +: {
                     main_view := View{
                         width: Fill
                         height: Fill
                         flow: Down
                         show_bg: true
-                        draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
+                        draw_bg +: { color: vec4(0.05, 0.05, 0.10, 0.95) }
 
                         nav_bar := View{
                             width: Fill
@@ -112,7 +101,7 @@ script_mod! {
                             spacing: 8
                             padding: Inset{left: 24 right: 24 top: 8 bottom: 8}
                             show_bg: true
-                            draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
+                            draw_bg +: { color: vec4(0.05, 0.05, 0.10, 0.95) }
 
                             tab_garden := Button{text: "THE GARDEN"}
                             tab_memory := Button{text: "MEMORY"}
@@ -125,40 +114,56 @@ script_mod! {
                             height: Fill
                             flow: Down
                             show_bg: true
-                            draw_bg +: { color: vec4(0.02, 0.02, 0.05, 1.0) }
+                            draw_bg +: { color: vec4(0.04, 0.04, 0.08, 1.0) }
 
                             status_bar := View{
                                 width: Fill
-                                height: 40
+                                height: 36
                                 flow: Right
                                 spacing: 12
                                 padding: Inset{left: 24 right: 24 top: 0 bottom: 0}
-                                gemini_label := Label{text: "✨ Gemini" draw_text: {font_size: 14}}
-                                status_label := Label{text: "Offline" draw_text: {font_size: 12}}
+                                gemini_label := Label{text: "✨ Gemini" draw_text +: {text_style +: {font_size: 14.0}}}
+                                status_label := Label{text: "Offline" draw_text +: {text_style +: {font_size: 12.0}}}
                                 Filler{}
-                                duration_label := Label{text: "00:00" draw_text: {font_size: 12}}
+                                duration_label := Label{text: "" draw_text +: {text_style +: {font_size: 12.0}}}
                             }
 
                             scene_area := View{
                                 width: Fill
                                 height: Fill
-                                align: Center
+                                flow: Down
+                                align: Align{x: 0.5 y: 0.0}
                                 show_bg: true
-                                draw_bg +: { color: vec4(0.05, 0.08, 0.15, 0.95) }
+                                draw_bg +: { color: vec4(0.04, 0.05, 0.10, 1.0) }
                                 scene_background := Image{width: Fill height: Fill visible: false}
-                                scene_visual := View{width: 200 height: 200 align: Center show_bg: true
-                                    draw_bg +: { color: vec4(0.2, 0.4, 0.8, 0.3) }
-                                    inner_glow := View{width: 160 height: 160 align: Center show_bg: true
-                                        draw_bg +: { color: vec4(0.3, 0.6, 1.0, 0.5) }
+
+                                View{
+                                    width: Fill
+                                    height: Fill
+                                    align: Center
+                                    scene_visual := View{width: 220 height: 220 align: Center show_bg: true
+                                        draw_bg +: { color: vec4(0.10, 0.18, 0.35, 0.5) }
+                                        inner_glow := View{width: 170 height: 170 align: Center show_bg: true
+                                            draw_bg +: { color: vec4(0.15, 0.30, 0.60, 0.6) }
+                                            orb_label := Label{text: "\u{25ef}" draw_text +: {text_style +: {font_size: 56.0}}}
+                                        }
                                     }
                                 }
-                                speech_overlay := View{width: Fill height: Fit flow: Down align: Center spacing: 8 padding: 24
+
+                                speech_overlay := View{
+                                    width: Fill
+                                    height: Fit
+                                    flow: Down
+                                    align: Align{x: 0.5 y: 0.0}
+                                    spacing: 10
+                                    padding: Inset{left: 40 right: 40 top: 16 bottom: 16}
+                                    visible: false
                                     show_bg: true
-                                    draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.6) }
-                                    speech_label := Label{text: "" draw_text: {font_size: 18 text_style: {align: Center}}}
-                                    speech_actions := View{width: Fit height: 32 flow: Right spacing: 12
-                                        replay_btn := Button{text: "↺ Replay" visible: false}
-                                        translate_btn := Button{text: "🌐 Translate" visible: false}
+                                    draw_bg +: { color: vec4(0.04, 0.04, 0.12, 0.90) }
+                                    speech_label := Label{text: "" draw_text +: {text_style +: {font_size: 18.0}}}
+                                    speech_actions := View{width: Fit height: 32 flow: Right spacing: 16
+                                        replay_btn    := Button{text: "\u{21ba} Replay" visible: false}
+                                        translate_btn := Button{text: "\u{1f310} Translate" visible: false}
                                     }
                                 }
                             }
@@ -170,7 +175,7 @@ script_mod! {
                                 spacing: 10
                                 padding: Inset{left: 20 right: 20 top: 8 bottom: 8}
                                 show_bg: true
-                                draw_bg +: { color: vec4(0.1, 0.1, 0.15, 0.9) }
+                                draw_bg +: { color: vec4(0.07, 0.07, 0.14, 0.96) }
                                 msg_input := TextInput{width: Fill}
                                 send_btn := Button{text: "Send"}
                                 mic_btn := Button{text: "🎤 Mic"}
@@ -184,7 +189,7 @@ script_mod! {
                                 spacing: 10
                                 padding: Inset{left: 20 right: 20 top: 0 bottom: 0}
                                 show_bg: true
-                                draw_bg +: { color: vec4(0.1, 0.1, 0.15, 0.9) }
+                                draw_bg +: { color: vec4(0.07, 0.07, 0.14, 0.96) }
                                 save_btn := Button{text: "Save Memory"}
                                 upload_btn := Button{text: "📷 Img"}
                                 scene_url_btn := Button{text: "🔗 URL"}
@@ -198,80 +203,96 @@ script_mod! {
                             width: Fill
                             height: Fill
                             flow: Down
-                            spacing: 12
-                            padding: 24
+                            spacing: 16
+                            padding: Inset{left: 28 right: 28 top: 20 bottom: 20}
                             visible: false
                             show_bg: true
-                            draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
-                            memory_tabs := View{width: Fill height: 32 flow: Right spacing: 8
-                                list_view_btn := Button{text: "List View"}
-                                carousel_view_btn := Button{text: "Carousel"}
+                            draw_bg +: { color: vec4(0.04, 0.04, 0.08, 1.0) }
+
+                            // Tab bar
+                            memory_tabs := View{width: Fill height: 36 flow: Right spacing: 8
+                                list_view_btn     := Button{text: "List"}
+                                carousel_view_btn := Button{text: "Cards"}
                                 calendar_view_btn := Button{text: "Calendar"}
+                                Filler{}
+                                memory_count := Label{text: "0 memories" draw_text +: {text_style +: {font_size: 11.0}}}
                             }
-                            Label{text: "Memory"}
-                            memory_count := Label{text: "0 saved memories"}
-                            memory_list := Label{text: "No memories."}
-                            carousel_view := View{width: Fill height: Fill flow: Down spacing: 16 visible: false
-                                carousel_header := View{width: Fill height: 48 flow: Right spacing: 12
-                                    prev_card_btn := Button{text: "<"}
-                                    carousel_card := View{width: Fill height: Fill flow: Down spacing: 8
+
+                            // List view
+                            memory_list := Label{text: "No memories yet."}
+
+                            // Carousel card view
+                            carousel_view := View{width: Fill height: Fill flow: Down spacing: 12 visible: false
+                                carousel_header := View{width: Fill height: Fit flow: Right spacing: 10 align: Align{x: 0.0 y: 0.5}
+                                    prev_card_btn := Button{text: "\u{2039}"}
+                                    carousel_card := View{
+                                        width: Fill
+                                        height: Fit
+                                        flow: Down
+                                        spacing: 10
+                                        padding: Inset{left: 24 right: 24 top: 20 bottom: 20}
                                         show_bg: true
-                                        draw_bg +: { color: vec4(0.15, 0.15, 0.2, 0.9) }
-                                        padding: 16
-                                        card_title := Label{text: "Title" draw_text: {font_size: 20}}
-                                        card_mood := Label{text: "mood" draw_text: {font_size: 14}}
-                                        card_summary := Label{text: "Summary..." draw_text: {font_size: 14}}
-                                        card_date := Label{text: "Date" draw_text: {font_size: 12}}
+                                        draw_bg +: { color: vec4(0.09, 0.09, 0.18, 0.95) }
+                                        card_title   := Label{text: "" draw_text +: {text_style +: {font_size: 22.0}}}
+                                        card_mood    := Label{text: "" draw_text +: {text_style +: {font_size: 13.0}}}
+                                        card_summary := Label{text: "" draw_text +: {text_style +: {font_size: 15.0}}}
+                                        card_date    := Label{text: "" draw_text +: {text_style +: {font_size: 11.0}}}
                                     }
-                                    next_card_btn := Button{text: ">"}
+                                    next_card_btn := Button{text: "\u{203a}"}
                                 }
-                                carousel_indicators := View{width: Fill height: 24 flow: Right align: Center}
+                                carousel_indicators := View{width: Fill height: 20 flow: Right align: Center spacing: 4}
                             }
-                            calendar_view := View{width: Fill height: Fit flow: Down spacing: 4 visible: false
-                                calendar_header := View{width: Fill height: 32 flow: Right spacing: 8
-                                    prev_month_btn := Button{text: "<"}
-                                    month_label := Label{text: "MM/YYYY"}
-                                    next_month_btn := Button{text: ">"}
+
+                            // Calendar view
+                            calendar_view := View{width: Fill height: Fit flow: Down spacing: 8 visible: false
+                                calendar_header := View{width: Fill height: 36 flow: Right spacing: 8 align: Align{x: 0.0 y: 0.5}
+                                    prev_month_btn := Button{text: "\u{2039}"}
+                                    month_label    := Label{text: "" draw_text +: {text_style +: {font_size: 14.0}}}
+                                    next_month_btn := Button{text: "\u{203a}"}
                                 }
-                                calendar_grid := View{width: Fill height: Fit flow: Right spacing: 2
-                                    day_labels := View{width: Fill height: 20 flow: Right spacing: 2
-                                        Label{text: "S"}
-                                        Label{text: "M"}
-                                        Label{text: "T"}
-                                        Label{text: "W"}
-                                        Label{text: "T"}
-                                        Label{text: "F"}
-                                        Label{text: "S"}
+                                calendar_grid := View{width: Fill height: Fit flow: Down spacing: 2
+                                    day_labels := View{width: Fill height: 24 flow: Right spacing: 4
+                                        Label{text: "Su"} Label{text: "Mo"} Label{text: "Tu"}
+                                        Label{text: "We"} Label{text: "Th"} Label{text: "Fr"} Label{text: "Sa"}
                                     }
-                                    calendar_days := View{width: Fill height: Fill flow: Right spacing: 2}
+                                    calendar_days := View{width: Fill height: Fit flow: Right spacing: 2}
                                 }
                                 selected_date_label := Label{text: "Select a date"}
                             }
-                            memory_actions := View{width: Fill height: Fit flow: Right spacing: 8 visible: false
-                                open_detail_btn := Button{text: "Open"}
-                                copy_id_btn := Button{text: "Show ID"}
-                                prev_memory_btn := Button{text: "Prev"}
-                                next_memory_btn := Button{text: "Next"}
-                                delete_selected_btn := Button{text: "Delete"}
-                                delete_all_btn := Button{text: "Clear"}
+
+                            // Action row
+                            memory_actions := View{width: Fill height: Fit flow: Right spacing: 6 visible: false
+                                open_detail_btn      := Button{text: "Open"}
+                                prev_memory_btn      := Button{text: "Prev"}
+                                next_memory_btn      := Button{text: "Next"}
+                                Filler{}
+                                copy_id_btn          := Button{text: "ID"}
+                                delete_selected_btn  := Button{text: "Delete"}
+                                delete_all_btn       := Button{text: "Clear All"}
                             }
-                            memory_detail := Label{text: "Memory detail will appear here."}
+
+                            // Detail panel
+                            memory_detail := Label{text: ""}
                         }
 
                         music_page := View{
                             width: Fill
                             height: Fill
                             flow: Down
-                            spacing: 24
+                            spacing: 32
                             align: Center
                             visible: false
                             show_bg: true
-                            draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
-                            Label{text: "Ambient"}
-                            Label{text: "No track playing"}
-                            prev_btn := Button{text: "Prev"}
-                            play_btn := Button{text: "Play"}
-                            next_btn := Button{text: "Next"}
+                            draw_bg +: { color: vec4(0.04, 0.04, 0.08, 1.0) }
+
+                            Label{text: "\u{266b} Ambient"}
+                            music_track_label := Label{text: "— Coming soon —"}
+                            View{width: Fit height: Fit flow: Right spacing: 16
+                                prev_btn := Button{text: "\u{23ee}"}
+                                play_btn := Button{text: "\u{25b6}"}
+                                next_btn := Button{text: "\u{23ed}"}
+                            }
+                            Label{text: "Ambient music will be available in a future update."}
                         }
 
                         info_page := View{
@@ -282,7 +303,7 @@ script_mod! {
                             padding: 24
                             visible: false
                             show_bg: true
-                            draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
+                            draw_bg +: { color: vec4(0.05, 0.05, 0.10, 0.95) }
 
                             Label{text: "Info & Settings"}
 
@@ -293,7 +314,7 @@ script_mod! {
                                 spacing: 12
                                 padding: 20
                                 show_bg: true
-                                draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
+                                draw_bg +: { color: vec4(0.05, 0.05, 0.10, 0.95) }
                                 Label{text: "API Configuration"}
                             View{width: Fill height: Fit flow: Right spacing: 10
                                     Label{text: "API Key:"}
@@ -311,10 +332,10 @@ script_mod! {
                                 spacing: 8
                                 padding: 20
                                 show_bg: true
-                                draw_bg +: { color: vec4(0.0, 0.0, 0.0, 0.8) }
+                                draw_bg +: { color: vec4(0.05, 0.05, 0.10, 0.95) }
                                 Label{text: "Session"}
                                 Label{text: "Model: gemini-3.1-flash-lite-preview"}
-                                Label{text: "Status: Idle"}
+                                Label{text: "Voice u2022 Text u2022 Image"}
                             }
                         }
                     }
@@ -368,6 +389,19 @@ pub struct App {
     mic_capture: Option<MicCapture>,
     #[rust]
     audio_player: Option<AudioPlayer>,
+    /// Last complete AI audio turn (for replay)
+    #[rust]
+    last_audio_turn: Vec<u8>,
+    /// Accumulator for current AI audio turn
+    #[rust]
+    current_audio_buf: Vec<u8>,
+    /// Session start time (Unix seconds), set when Connected
+    #[rust]
+    session_start_time: Option<f64>,
+    #[rust]
+    next_frame: NextFrame,
+    #[rust]
+    anim_tick: u64,
 }
 
 impl MatchEvent for App {
@@ -391,6 +425,11 @@ impl MatchEvent for App {
         self.scene_content = None;
         self.mic_capture = Some(MicCapture::new());
         self.audio_player = Some(AudioPlayer::new());
+        self.last_audio_turn = Vec::new();
+        self.current_audio_buf = Vec::new();
+        self.session_start_time = None;
+        self.anim_tick = 0;
+        self.next_frame = cx.new_next_frame(); // start animation loop
         self.ui.text_input(cx, ids!(msg_input)).set_key_focus(cx);
         self.update_memory_action_button_labels(cx);
         if let Ok(api_key) = std::env::var("GEMINI_API_KEY") {
@@ -414,6 +453,12 @@ impl MatchEvent for App {
                 match ga {
                     GeminiAction::Connected => {
                         self.session_state = "connected".to_string();
+                        self.session_start_time = Some(
+                            std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs_f64()
+                        );
                         self.ui
                             .label(cx, ids!(status_label))
                             .set_text(cx, "● Connected");
@@ -426,44 +471,120 @@ impl MatchEvent for App {
                             .set_visible(cx, true);
                     }
                     GeminiAction::TextReceived(text) => {
+                        // Clear overlay at start of new turn
+                        if self.session_state != "speaking" {
+                            self.pending_response.clear();
+                        }
                         self.session_state = "speaking".to_string();
                         self.pending_response.push_str(text);
-                        self.ui
-                            .label(cx, ids!(speech_label))
-                            .set_text(cx, &self.pending_response);
-                        self.ui
-                            .label(cx, ids!(status_label))
-                            .set_text(cx, "● Speaking");
+                        let txt = self.pending_response.clone();
+                        self.set_speech_text(cx, &txt);
+                        self.ui.label(cx, ids!(status_label)).set_text(cx, "\u{25cf} Speaking");
                         self.ui.button(cx, ids!(replay_btn)).set_visible(cx, true);
-                        self.ui
-                            .button(cx, ids!(translate_btn))
-                            .set_visible(cx, true);
+                        self.ui.button(cx, ids!(translate_btn)).set_visible(cx, true);
                     }
-                    GeminiAction::TurnComplete => {
-                        self.session_state = "idle".to_string();
-                        if !self.pending_response.is_empty() {
+                    GeminiAction::OutputTranscript(text) => {
+                        // Clear overlay at start of new turn
+                        if self.session_state != "speaking" {
+                            self.pending_response.clear();
+                        }
+                        // AI audio transcript — show in SpeechOverlay
+                        self.session_state = "speaking".to_string();
+                        self.pending_response.push_str(&text);
+                        let txt = self.pending_response.clone();
+                        self.set_speech_text(cx, &txt);
+                        self.ui.label(cx, ids!(status_label)).set_text(cx, "\u{25cf} Speaking");
+                        self.ui.button(cx, ids!(replay_btn)).set_visible(cx, true);
+                        self.ui.button(cx, ids!(translate_btn)).set_visible(cx, true);
+                        // Add to conversation for Memory saving
+                        self.conversation.push(Message {
+                            role: "assistant".to_string(),
+                            content: text.to_string(),
+                            timestamp: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs_f64(),
+                        });
+                    }
+                    GeminiAction::InputTranscript(text) => {
+                        // User voice transcript — add to conversation
+                        if !text.trim().is_empty() {
                             self.conversation.push(Message {
-                                role: "assistant".to_string(),
-                                content: self.pending_response.clone(),
+                                role: "user".to_string(),
+                                content: text.to_string(),
                                 timestamp: std::time::SystemTime::now()
                                     .duration_since(std::time::UNIX_EPOCH)
                                     .unwrap()
                                     .as_secs_f64(),
                             });
+                        }
+                    }
+                    GeminiAction::TurnComplete => {
+                        self.session_state = "idle".to_string();
+                        // Save completed audio turn for replay
+                        if !self.current_audio_buf.is_empty() {
+                            self.last_audio_turn = std::mem::take(&mut self.current_audio_buf);
+                        }
+                        // In text-only mode, pending_response holds assistant text not yet saved.
+                        // In audio+transcription mode, OutputTranscript already pushed to conversation.
+                        // Only push if pending_response has content that wasn't pushed via transcript.
+                        if !self.pending_response.is_empty() {
+                            // Check if last conversation entry already has this content
+                            let already_saved = self.conversation.last()
+                                .map(|m| m.role == "assistant" && self.pending_response.contains(&m.content))
+                                .unwrap_or(false);
+                            if !already_saved {
+                                self.conversation.push(Message {
+                                    role: "assistant".to_string(),
+                                    content: self.pending_response.clone(),
+                                    timestamp: std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap()
+                                        .as_secs_f64(),
+                                });
+                            }
                             self.pending_response.clear();
                         }
                         self.ui.label(cx, ids!(status_label)).set_text(cx, "Ready");
                     }
+                    GeminiAction::Interrupted => {
+                        // AI interrupted — stop playback, reset state
+                        if let Some(ref mut player) = self.audio_player {
+                            player.stop();
+                        }
+                        if !self.pending_response.is_empty() {
+                            self.pending_response.clear();
+                        }
+                        self.session_state = "idle".to_string();
+                        self.ui.label(cx, ids!(status_label)).set_text(cx, "Ready");
+                    }
                     GeminiAction::AudioReceived(pcm_data) => {
+                        self.session_state = "speaking".to_string();
+                        self.ui.label(cx, ids!(status_label)).set_text(cx, "\u{25cf} Speaking");
+                        // Accumulate for replay
+                        self.current_audio_buf.extend_from_slice(&pcm_data);
                         if let Some(ref mut player) = self.audio_player {
                             let _ = player.play_audio(pcm_data.to_vec());
                         }
                     }
                     GeminiAction::Error(e) => {
                         self.session_state = "error".to_string();
+                        // Stop mic and playback on error
+                        if self.is_recording {
+                            if let Some(ref mut mic) = self.mic_capture {
+                                mic.stop_capture();
+                            }
+                            self.is_recording = false;
+                            self.ui.button(cx, ids!(mic_btn)).set_text(cx, "🎤 Mic");
+                        }
+                        if let Some(ref mut player) = self.audio_player {
+                            player.stop();
+                        }
+                        self.session_start_time = None;
+                        self.ui.label(cx, ids!(duration_label)).set_text(cx, "00:00");
                         let short = format!("Error: {}", e);
                         eprintln!("{}", short);
-                        self.ui.label(cx, ids!(speech_label)).set_text(cx, &short);
+                        self.set_speech_text(cx, &short);
                         self.ui
                             .label(cx, ids!(status_label))
                             .set_text(cx, &format!("⚠ {}", short));
@@ -475,6 +596,21 @@ impl MatchEvent for App {
                     }
                     GeminiAction::Disconnected => {
                         self.session_state = "disconnected".to_string();
+                        self.session_start_time = None;
+                        self.current_audio_buf.clear();
+                        // Stop mic if still recording
+                        if self.is_recording {
+                            if let Some(ref mut mic) = self.mic_capture {
+                                mic.stop_capture();
+                            }
+                            self.is_recording = false;
+                            self.ui.button(cx, ids!(mic_btn)).set_text(cx, "🎤 Mic");
+                        }
+                        // Stop any audio playback
+                        if let Some(ref mut player) = self.audio_player {
+                            player.stop();
+                        }
+                        self.ui.label(cx, ids!(duration_label)).set_text(cx, "00:00");
                         let status = self.ui.label(cx, ids!(status_label)).text();
                         if !status.starts_with("Error:") {
                             self.ui
@@ -506,24 +642,25 @@ impl MatchEvent for App {
             self.show_page(cx, "info");
         }
 
+        // Music page — placeholder handlers (no-op until audio tracks integrated)
+        if self.ui.button(cx, ids!(play_btn)).clicked(actions) {}
+        if self.ui.button(cx, ids!(prev_btn)).clicked(actions) {}
+        if self.ui.button(cx, ids!(next_btn)).clicked(actions) {}
+
         if self.ui.button(cx, ids!(disconnect_btn)).clicked(actions) {
-            let mut guard = self.text_sender.lock().unwrap();
-            if let Some(sender) = guard.as_ref() {
-                let _ = sender.try_send(UiToGemini::Disconnect);
-            }
-            *guard = None;
+            {
+                let mut guard = self.text_sender.lock().unwrap();
+                if let Some(sender) = guard.as_ref() {
+                    let _ = sender.try_send(UiToGemini::Disconnect);
+                }
+                *guard = None;
+            } // guard dropped here
             self.pending_response.clear();
-            self.ui.label(cx, ids!(speech_label)).set_text(cx, "");
-            self.ui
-                .label(cx, ids!(status_label))
-                .set_text(cx, "Disconnected");
-            self.ui
-                .label(cx, ids!(conn_status))
-                .set_text(cx, "Disconnected");
+            self.set_speech_text(cx, "");
+            self.ui.label(cx, ids!(status_label)).set_text(cx, "Disconnected");
+            self.ui.label(cx, ids!(conn_status)).set_text(cx, "Disconnected");
             self.ui.button(cx, ids!(connect_btn)).set_visible(cx, true);
-            self.ui
-                .button(cx, ids!(disconnect_btn))
-                .set_visible(cx, false);
+            self.ui.button(cx, ids!(disconnect_btn)).set_visible(cx, false);
         }
 
         if self.ui.button(cx, ids!(connect_btn)).clicked(actions) {
@@ -586,6 +723,16 @@ impl MatchEvent for App {
                                                 .await
                                         }
                                     }
+                                    UiToGemini::Audio(pcm) => {
+                                        client_sender.send_audio_raw(pcm).await
+                                    }
+                                    UiToGemini::Interrupt => {
+                                        // Signal Gemini to stop; local playback stopped by UI
+                                        client_sender.signal_start().await
+                                    }
+                                    UiToGemini::SignalEnd => {
+                                        client_sender.signal_end().await
+                                    }
                                     UiToGemini::Disconnect => break,
                                 };
                                 if let Err(e) = result {
@@ -596,6 +743,15 @@ impl MatchEvent for App {
                         while let Some(event) = event_rx.recv().await {
                             match event {
                                 GeminiEvent::Connected => Cx::post_action(GeminiAction::Connected),
+                                GeminiEvent::AudioData(pcm) => {
+                                    Cx::post_action(GeminiAction::AudioReceived(pcm));
+                                }
+                                GeminiEvent::OutputTranscript(text) => {
+                                    Cx::post_action(GeminiAction::OutputTranscript(text));
+                                }
+                                GeminiEvent::InputTranscript(text) => {
+                                    Cx::post_action(GeminiAction::InputTranscript(text));
+                                }
                                 GeminiEvent::Content(ServerContent::ModelTurn(ModelTurn {
                                     model_turn: Some(turn),
                                 })) => {
@@ -623,6 +779,9 @@ impl MatchEvent for App {
                                 }
                                 GeminiEvent::TurnComplete => {
                                     Cx::post_action(GeminiAction::TurnComplete)
+                                }
+                                GeminiEvent::Interrupted => {
+                                    Cx::post_action(GeminiAction::Interrupted);
                                 }
                                 GeminiEvent::Error(e) => Cx::post_action(GeminiAction::Error(e)),
                                 GeminiEvent::Disconnected => {
@@ -668,16 +827,58 @@ impl MatchEvent for App {
         if self.ui.button(cx, ids!(mic_btn)).clicked(actions) {
             self.is_recording = !self.is_recording;
             if self.is_recording {
+                // --- Interrupt if AI is currently speaking ---
+                if self.session_state == "speaking" {
+                    // Stop local playback immediately
+                    if let Some(ref mut player) = self.audio_player {
+                        player.stop();
+                    }
+                    // Signal Gemini to stop its output
+                    let guard = self.text_sender.lock().unwrap();
+                    if let Some(s) = guard.as_ref() {
+                        let _ = s.try_send(UiToGemini::Interrupt);
+                    }
+                }
+
                 if let Some(ref mut mic) = self.mic_capture {
                     if mic.has_microphone() {
-                        self.session_state = "listening".to_string();
-                        self.ui.button(cx, ids!(mic_btn)).set_text(cx, "⏹ Stop");
-                        self.ui
-                            .label(cx, ids!(status_label))
-                            .set_text(cx, "● Listening... (Voice input active)");
-                        self.ui
-                            .label(cx, ids!(conn_status))
-                            .set_text(cx, "Listening + Voice");
+                        // Create channel: mic → Gemini audio forwarding
+                        let (audio_tx, audio_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);
+                        match mic.start_capture(audio_tx) {
+                            Ok(()) => {
+                                self.session_state = "listening".to_string();
+                                self.ui.button(cx, ids!(mic_btn)).set_text(cx, "⏹ Stop");
+                                self.ui
+                                    .label(cx, ids!(status_label))
+                                    .set_text(cx, "● Listening...");
+                                self.ui
+                                    .label(cx, ids!(conn_status))
+                                    .set_text(cx, "Listening");
+
+                                // Spawn forwarding task: audio_rx → UiToGemini::Audio
+                                let text_sender = self.text_sender.clone();
+                                std::thread::spawn(move || {
+                                    let rt = tokio::runtime::Runtime::new().unwrap();
+                                    rt.block_on(async move {
+                                        let mut rx = audio_rx;
+                                        while let Some(chunk) = rx.recv().await {
+                                            let guard = text_sender.lock().unwrap();
+                                            if let Some(s) = guard.as_ref() {
+                                                let _ = s.try_send(UiToGemini::Audio(chunk));
+                                            } else {
+                                                break; // disconnected
+                                            }
+                                        }
+                                    });
+                                });
+                            }
+                            Err(e) => {
+                                self.is_recording = false;
+                                self.ui
+                                    .label(cx, ids!(status_label))
+                                    .set_text(cx, &format!("Mic error: {}", e));
+                            }
+                        }
                     } else {
                         self.is_recording = false;
                         self.ui
@@ -686,12 +887,19 @@ impl MatchEvent for App {
                     }
                 }
             } else {
-                if let Some(ref mut mic) = self.mic_capture {
-                    mic.stop_capture();
+                // Stop recording: tell Gemini user finished speaking, stop mic
+                {
+                    let guard = self.text_sender.lock().unwrap();
+                    if let Some(s) = guard.as_ref() {
+                        let _ = s.try_send(UiToGemini::SignalEnd);
+                    }
                 }
-                self.session_state = "idle".to_string();
+                if let Some(ref mut mic) = self.mic_capture {
+                    mic.stop_capture(); // drops stream → audio_rx closes → forwarding task exits
+                }
+                self.session_state = "thinking".to_string();
                 self.ui.button(cx, ids!(mic_btn)).set_text(cx, "🎤 Mic");
-                self.ui.label(cx, ids!(status_label)).set_text(cx, "Ready");
+                self.ui.label(cx, ids!(status_label)).set_text(cx, "⏳ Processing...");
                 self.ui
                     .label(cx, ids!(conn_status))
                     .set_text(cx, "Connected");
@@ -699,89 +907,7 @@ impl MatchEvent for App {
         }
 
         if self.ui.button(cx, ids!(save_btn)).clicked(actions) {
-            if self.conversation.is_empty() {
-                self.ui
-                    .label(cx, ids!(speech_label))
-                    .set_text(cx, "No conversation to save.");
-                return;
-            }
-            let data_dir = dirs::data_dir()
-                .unwrap_or_else(|| PathBuf::from("/tmp"))
-                .join("gemini-talker");
-            if let Ok(ref storage) = Storage::new(data_dir) {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs_f64();
-                let id = format!("memory_{}", now as u64);
-                let api_key = std::env::var("GEMINI_API_KEY").unwrap_or_default();
-                let messages_for_ai: Vec<storage::Message> = self
-                    .conversation
-                    .iter()
-                    .map(|m| storage::Message {
-                        role: m.role.clone(),
-                        content: m.content.clone(),
-                        timestamp: m.timestamp,
-                    })
-                    .collect();
-                let (title, summary, mood) = if !api_key.is_empty() && !messages_for_ai.is_empty() {
-                    storage
-                        .summarize_with_ai(&messages_for_ai, &api_key)
-                        .unwrap_or_else(|_| {
-                            let title = messages_for_ai
-                                .iter()
-                                .find(|m| m.role == "user")
-                                .map(|m| m.content.chars().take(25).collect::<String>())
-                                .unwrap_or_else(|| "Conversation".to_string());
-                            let summary = messages_for_ai
-                                .iter()
-                                .take(3)
-                                .map(|m| m.content.chars().take(40).collect::<String>())
-                                .collect::<Vec<_>>()
-                                .join(" | ");
-                            (title, summary, None)
-                        })
-                } else {
-                    let title = self
-                        .conversation
-                        .iter()
-                        .find(|m| m.role == "user")
-                        .map(|m| {
-                            let text = m.content.chars().take(30).collect::<String>();
-                            if m.content.len() > 30 {
-                                format!("{}...", text)
-                            } else {
-                                text
-                            }
-                        })
-                        .unwrap_or_else(|| "Conversation".to_string());
-                    let summary = self
-                        .conversation
-                        .iter()
-                        .take(3)
-                        .map(|m| m.content.chars().take(50).collect::<String>())
-                        .collect::<Vec<_>>()
-                        .join(" | ");
-                    (title, summary, None)
-                };
-                let date = format_timestamp(now);
-                let mem = storage::Memory {
-                    id,
-                    title,
-                    summary,
-                    mood,
-                    timestamp: now,
-                    date,
-                    image_cover: self.current_image.as_ref().map(|(_, d)| d.clone()),
-                    messages: messages_for_ai,
-                };
-                let _ = storage.save_memory(&mem);
-                self.conversation.clear();
-                self.ui
-                    .label(cx, ids!(status_label))
-                    .set_text(cx, "Memory Saved!");
-                self.refresh_memory_list(cx);
-            }
+            self.save_current_conversation(cx);
         }
 
         if self.ui.button(cx, ids!(upload_btn)).clicked(actions) {
@@ -848,19 +974,57 @@ impl MatchEvent for App {
         }
 
         if self.ui.button(cx, ids!(stop_btn)).clicked(actions) {
+            // Stop AI speech immediately
+            if let Some(ref mut player) = self.audio_player {
+                player.stop();
+            }
+            // Stop mic if recording
+            if self.is_recording {
+                if let Some(ref mut mic) = self.mic_capture {
+                    mic.stop_capture();
+                }
+                self.is_recording = false;
+                self.ui.button(cx, ids!(mic_btn)).set_text(cx, "🎤 Mic");
+            }
+            // Signal Gemini to interrupt
+            {
+                let guard = self.text_sender.lock().unwrap();
+                if let Some(s) = guard.as_ref() {
+                    let _ = s.try_send(UiToGemini::Interrupt);
+                }
+            }
             self.pending_response.clear();
+            self.session_state = "idle".to_string();
             self.current_image = None;
             self.current_dithered_image = None;
             self.scene_content = None;
-            self.is_recording = false;
-            self.ui.label(cx, ids!(speech_label)).set_text(cx, "");
-            self.ui.button(cx, ids!(mic_btn)).set_text(cx, "🎤 Mic");
+            self.set_speech_text(cx, "");
             self.ui
                 .view(cx, ids!(scene_background))
                 .set_visible(cx, false);
             self.ui
                 .label(cx, ids!(status_label))
                 .set_text(cx, "Stopped");
+        }
+
+        if self.ui.button(cx, ids!(replay_btn)).clicked(actions) {
+            if !self.last_audio_turn.is_empty() {
+                if let Some(ref mut player) = self.audio_player {
+                    player.stop();
+                    let _ = player.play_audio(self.last_audio_turn.clone());
+                }
+            }
+        }
+
+        if self.ui.button(cx, ids!(translate_btn)).clicked(actions) {
+            // Placeholder: send translation request via text
+            if !self.pending_response.is_empty() {
+                let prompt = format!("Translate to English: {}", self.pending_response);
+                let guard = self.text_sender.lock().unwrap();
+                if let Some(s) = guard.as_ref() {
+                    let _ = s.try_send(UiToGemini::Text(prompt));
+                }
+            }
         }
 
         if self.ui.button(cx, ids!(scene_url_btn)).clicked(actions) {
@@ -1003,6 +1167,128 @@ impl MatchEvent for App {
 }
 
 impl App {
+    /// Update session duration counter in status bar.
+    /// Save the current conversation as a Memory card with AI-generated summary.
+    fn save_current_conversation(&mut self, cx: &mut Cx) {
+        if self.conversation.is_empty() {
+            self.set_speech_text(cx, "Nothing to save.");
+            return;
+        }
+        let data_dir = dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
+            .join("gemini-talker");
+        let storage = match Storage::new(data_dir) {
+            Ok(s) => s,
+            Err(e) => {
+                self.ui.label(cx, ids!(status_label)).set_text(cx, &format!("Save error: {}", e));
+                return;
+            }
+        };
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs_f64();
+        let api_key = std::env::var("GEMINI_API_KEY").unwrap_or_default();
+        // Dedup consecutive assistant messages (transcript can produce many small chunks)
+        let messages: Vec<storage::Message> = {
+            let mut deduped: Vec<storage::Message> = Vec::new();
+            for m in &self.conversation {
+                if let Some(last) = deduped.last_mut() {
+                    if last.role == m.role && last.content.contains(m.content.trim()) {
+                        continue; // already included
+                    }
+                }
+                deduped.push(storage::Message {
+                    role: m.role.clone(),
+                    content: m.content.clone(),
+                    timestamp: m.timestamp,
+                });
+            }
+            deduped
+        };
+        let (title, summary, mood) = if !api_key.is_empty() {
+            storage.summarize_with_ai(&messages, &api_key)
+                .unwrap_or_else(|_| self.fallback_summary(&messages))
+        } else {
+            self.fallback_summary(&messages)
+        };
+        let mem = storage::Memory {
+            id: format!("memory_{}", now as u64),
+            title,
+            summary,
+            mood,
+            timestamp: now,
+            date: format_timestamp(now),
+            image_cover: self.current_image.as_ref().map(|(_, d)| d.clone()),
+            messages,
+        };
+        match storage.save_memory(&mem) {
+            Ok(()) => {
+                self.conversation.clear();
+                self.ui.label(cx, ids!(status_label)).set_text(cx, "\u{2713} Memory saved");
+                self.refresh_memory_list(cx);
+            }
+            Err(e) => {
+                self.ui.label(cx, ids!(status_label)).set_text(cx, &format!("Save failed: {}", e));
+            }
+        }
+    }
+
+    fn fallback_summary(&self, messages: &[storage::Message]) -> (String, String, Option<String>) {
+        let title = messages.iter().find(|m| m.role == "user")
+            .map(|m| {
+                let t = m.content.chars().take(30).collect::<String>();
+                if m.content.len() > 30 { format!("{}\u{2026}", t) } else { t }
+            })
+            .unwrap_or_else(|| "Conversation".to_string());
+        let summary = messages.iter().take(4)
+            .map(|m| m.content.chars().take(50).collect::<String>())
+            .collect::<Vec<_>>()
+            .join(" \u{2022} ");
+        (title, summary, None)
+    }
+
+    fn update_duration_label(&mut self, cx: &mut Cx) {
+        if let Some(start) = self.session_start_time {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs_f64();
+            let elapsed = (now - start) as u64;
+            let mm = elapsed / 60;
+            let ss = elapsed % 60;
+            self.ui
+                .label(cx, ids!(duration_label))
+                .set_text(cx, &format!("{:02}:{:02}", mm, ss));
+        }
+    }
+
+    /// Update the SceneCore orb animation based on current session_state.
+    /// Called every NextFrame tick.
+    /// Show speech overlay with text; hide when text is empty.
+    fn set_speech_text(&mut self, cx: &mut Cx, text: &str) {
+        let visible = !text.is_empty();
+        self.ui.view(cx, ids!(speech_overlay)).set_visible(cx, visible);
+        self.ui.label(cx, ids!(speech_label)).set_text(cx, text);
+        if !visible {
+            self.ui.button(cx, ids!(replay_btn)).set_visible(cx, false);
+            self.ui.button(cx, ids!(translate_btn)).set_visible(cx, false);
+        }
+    }
+
+    fn update_orb_animation(&mut self, cx: &mut Cx) {
+        // Animation frames for each state (cycle through chars)
+        let (orb_chars, period): (&[&str], u64) = match self.session_state.as_str() {
+            "listening" => (&["\u{25CF}", "\u{25C9}", "\u{25CE}", "\u{25C9}"], 8),  // ● ◉ ◎ cycling
+            "thinking"  => (&["\u{25D4}", "\u{25D1}", "\u{25D5}", "\u{25D3}"], 12), // quarter-circle spin
+            "speaking"  => (&["\u{266A}", "\u{25CF}", "\u{266B}", "\u{25CF}"], 6),  // ♪ ● ♫ pulse
+            "error"     => (&["\u{26A0}", "\u{2715}"], 20),                         // ⚠ ✕
+            _            => (&["\u{25EF}", "\u{25CE}"], 40),                         // ◯ ◎ idle breathe
+        };
+        let idx = ((self.anim_tick / (period.max(1))) as usize) % orb_chars.len();
+        self.ui.label(cx, ids!(orb_label)).set_text(cx, orb_chars[idx]);
+    }
+
     fn send_current_input(&mut self, cx: &mut Cx) {
         let text = self.ui.text_input(cx, ids!(msg_input)).text();
         if text.is_empty() && self.scene_content.is_none() {
@@ -1523,6 +1809,14 @@ impl AppMain for App {
     }
 
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
+        // Animation loop: update orb indicator based on session_state
+        if self.next_frame.is_event(event).is_some() {
+            self.anim_tick = self.anim_tick.wrapping_add(1);
+            self.update_orb_animation(cx);
+            self.update_duration_label(cx);
+            self.next_frame = cx.new_next_frame();
+        }
+
         if self.current_page == 0 {
             if let Event::KeyDown(key) = event {
                 if key.key_code == KeyCode::ReturnKey {

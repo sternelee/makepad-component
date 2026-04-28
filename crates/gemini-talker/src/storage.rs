@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -19,6 +20,17 @@ pub struct Memory {
     pub date: String,
     pub image_cover: Option<String>,
     pub messages: Vec<Message>,
+}
+
+/// Summary info for listing memories (used by main.rs and memory page)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemorySummary {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    pub date: String,
+    pub timestamp: f64,
+    pub mood: Option<String>,
 }
 
 pub struct Storage {
@@ -140,13 +152,13 @@ impl Storage {
         Ok(Memory { messages, ..memory })
     }
 
-    pub fn list_memories(&self) -> Result<Vec<super::memory::MemorySummary>> {
+    pub fn list_memories(&self) -> Result<Vec<MemorySummary>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, title, summary, timestamp, date, mood FROM memories ORDER BY timestamp DESC",
         )?;
         let memories = stmt
             .query_map([], |row| {
-                Ok(super::memory::MemorySummary {
+                Ok(MemorySummary {
                     id: row.get(0)?,
                     title: row.get(1)?,
                     summary: row.get(2)?,
@@ -172,7 +184,7 @@ impl Storage {
         &self,
         year: i32,
         month: u32,
-    ) -> Result<Vec<super::memory::MemorySummary>> {
+    ) -> Result<Vec<MemorySummary>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, title, summary, timestamp, date, mood FROM memories 
              WHERE date LIKE ?1 ORDER BY timestamp DESC",
@@ -180,7 +192,7 @@ impl Storage {
         let pattern = format!("{:02}/%/{:02}", month, year % 100);
         let memories = stmt
             .query_map(params![pattern], |row| {
-                Ok(super::memory::MemorySummary {
+                Ok(MemorySummary {
                     id: row.get(0)?,
                     title: row.get(1)?,
                     summary: row.get(2)?,

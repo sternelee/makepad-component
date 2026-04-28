@@ -1,10 +1,13 @@
+#![allow(dead_code)]
 //! Gemini Live API Client
 //!
 //! Provides real-time communication with Gemini Live via the `gemini-live` crate.
 
 use ::gemini_live::prelude::{
-    connect, recv_event, Content as LiveContent, GeminiModel as LiveGeminiModel, Part as LivePart,
+    connect, recv_event, Content as LiveContent,
+    GeminiModel as LiveGeminiModel, Part as LivePart,
     Role as LiveRole, SessionConfig, SessionEvent, SessionHandle, SessionPhase, TransportConfig,
+    ActivityHandling,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use serde::{Deserialize, Serialize};
@@ -14,7 +17,7 @@ use std::{
 };
 use tokio::sync::{mpsc, RwLock};
 
-/// Default model for Gemini Live
+/// Default model for Gemini Live (supports audio I/O)
 const DEFAULT_MODEL: &str = "gemini-3.1-flash-lite-preview";
 
 /// Connection state
@@ -33,6 +36,12 @@ pub enum GeminiEvent {
     Connected,
     /// Server sent content (text, audio, etc.)
     Content(ServerContent),
+    /// Audio data received (raw PCM16 bytes at 24kHz)
+    AudioData(Vec<u8>),
+    /// Text transcript of AI audio output
+    OutputTranscript(String),
+    /// Text transcript of user audio input
+    InputTranscript(String),
     /// Model finished responding
     TurnComplete,
     /// Input was interrupted
@@ -97,6 +106,12 @@ enum OutgoingMessage {
         caption: Option<String>,
     },
     Audio(String),
+    /// Raw PCM16 audio bytes
+    AudioRaw(Vec<u8>),
+    /// Signal user started speaking (interrupts AI if speaking)
+    SignalStart,
+    /// Signal user stopped speaking
+    SignalEnd,
     Disconnect,
 }
 
@@ -122,8 +137,14 @@ impl GeminiLiveClient {
 
         let config = SessionConfig::new(&self.api_key)
             .model(LiveGeminiModel::Custom(DEFAULT_MODEL.to_string()))
-            .text_only()
-            .system_instruction("You are a warm, empathetic AI companion. Have natural, flowing conversations about images, emotions, and memories. Be conversational and engaging.");
+            // No .text_only() — default enables AUDIO responses
+            // Interrupt AI when user starts speaking
+            .activity_handling(ActivityHandling::StartOfActivityInterrupts)
+            // Get text transcript of AI audio output (for SpeechOverlay)
+            .enable_output_transcription()
+            // Get text transcript of user audio input
+            .enable_input_transcription()
+            .system_instruction("You are an emotional live companion. You respond in a natural, spoken, emotionally aware way. You do not sound like an assistant. You should react to images, atmosphere, memory, and feeling. Keep responses short, warm, and conversational. Avoid structured explanations unless the user asks for them directly. Focus on resonance, mood, and scene-based interaction.");
 
         let session = connect(config, TransportConfig::default())
             .await
@@ -195,6 +216,15 @@ impl GeminiLiveClient {
                     SessionEvent::Connected | SessionEvent::PhaseChanged(SessionPhase::Active) => {
                         *state.write().await = ConnectionState::Connected;
                         let _ = event_tx.send(GeminiEvent::Connected).await;
+                    }
+                    SessionEvent::AudioData(bytes) => {
+                        let _ = event_tx.send(GeminiEvent::AudioData(bytes.to_vec())).await;
+                    }
+                    SessionEvent::OutputTranscription(text) => {
+                        let _ = event_tx.send(GeminiEvent::OutputTranscript(text)).await;
+                    }
+                    SessionEvent::InputTranscription(text) => {
+                        let _ = event_tx.send(GeminiEvent::InputTranscript(text)).await;
                     }
                     SessionEvent::TextDelta(text) => {
                         saw_delta_this_turn = true;
@@ -279,6 +309,13 @@ impl GeminiLiveClient {
                             continue;
                         }
                     },
+                    OutgoingMessage::AudioRaw(bytes) => session_for_send.send_audio(bytes).await,
+                    OutgoingMessage::SignalStart => {
+                        session_for_send.signal_activity_start().await
+                    }
+                    OutgoingMessage::SignalEnd => {
+                        session_for_send.signal_activity_end().await
+                    }
                     OutgoingMessage::Disconnect => {
                         let _ = session_for_send.disconnect().await;
                         break;
@@ -394,6 +431,39 @@ impl ClientHandle {
         if let Some(sender) = &self.sender {
             sender
                 .send(OutgoingMessage::Disconnect)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    /// Send raw PCM16 audio bytes (16kHz mono)
+    pub async fn send_audio_raw(&self, bytes: Vec<u8>) -> Result<(), String> {
+        if let Some(sender) = &self.sender {
+            sender
+                .send(OutgoingMessage::AudioRaw(bytes))
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    /// Signal user started speaking — interrupts AI if currently speaking
+    pub async fn signal_start(&self) -> Result<(), String> {
+        if let Some(sender) = &self.sender {
+            sender
+                .send(OutgoingMessage::SignalStart)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    /// Signal user stopped speaking
+    pub async fn signal_end(&self) -> Result<(), String> {
+        if let Some(sender) = &self.sender {
+            sender
+                .send(OutgoingMessage::SignalEnd)
                 .await
                 .map_err(|e| e.to_string())?;
         }

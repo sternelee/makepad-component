@@ -1,5 +1,7 @@
+#![allow(dead_code)]
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, Host, SampleFormat, Stream};
+use cpal::{Device, Host, Stream};
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -8,7 +10,8 @@ pub struct AudioPlayer {
     output_device: Option<Device>,
     stream: Option<Stream>,
     is_playing: Arc<Mutex<bool>>,
-    audio_buffer: Arc<Mutex<Vec<u8>>>,
+    /// Ring buffer — VecDeque gives O(1) pop_front vs Vec's O(n) remove(0)
+    audio_buffer: Arc<Mutex<VecDeque<u8>>>,
     sample_rate: u32,
 }
 
@@ -22,8 +25,8 @@ impl AudioPlayer {
             output_device,
             stream: None,
             is_playing: Arc::new(Mutex::new(false)),
-            audio_buffer: Arc::new(Mutex::new(Vec::new())),
-            sample_rate: 16000,
+            audio_buffer: Arc::new(Mutex::new(VecDeque::new())),
+            sample_rate: 24000, // Gemini Live outputs 24kHz PCM16
         }
     }
 
@@ -31,18 +34,22 @@ impl AudioPlayer {
         self.output_device.is_some()
     }
 
-    pub fn list_devices(&self) -> Vec<String> {
-        self.host
-            .output_devices()
-            .map(|devices| devices.filter_map(|d| d.name().ok()).collect())
-            .unwrap_or_default()
-    }
-
+    /// Append audio chunk to the playback buffer.
+    /// If playback stream is not yet started, starts it.
     pub fn play_audio(&mut self, pcm_data: Vec<u8>) -> Result<(), String> {
-        if self.stream.is_some() {
-            self.stop();
+        // Append to ring buffer
+        {
+            let mut buf = self.audio_buffer.lock().unwrap();
+            buf.extend(pcm_data.iter().copied());
         }
 
+        // If stream already running, nothing else to do
+        if self.stream.is_some() {
+            *self.is_playing.lock().unwrap() = true;
+            return Ok(());
+        }
+
+        // Start playback stream
         let device = self
             .output_device
             .as_ref()
@@ -56,8 +63,6 @@ impl AudioPlayer {
 
         let is_playing = self.is_playing.clone();
         let audio_buf = self.audio_buffer.clone();
-
-        *audio_buf.lock().unwrap() = pcm_data.clone();
         *is_playing.lock().unwrap() = true;
 
         let err_fn = |err| eprintln!("Audio playback error: {}", err);
@@ -69,18 +74,12 @@ impl AudioPlayer {
                     let playing = *is_playing.lock().unwrap();
                     let mut buf = audio_buf.lock().unwrap();
 
-                    if playing && buf.len() >= 2 {
-                        for sample in data.iter_mut() {
-                            if buf.len() >= 2 {
-                                let b0 = buf.remove(0);
-                                let b1 = buf.remove(0);
-                                *sample = i16::from_le_bytes([b0, b1]);
-                            } else {
-                                break;
-                            }
-                        }
-                    } else {
-                        for sample in data.iter_mut() {
+                    for sample in data.iter_mut() {
+                        if playing && buf.len() >= 2 {
+                            let b0 = buf.pop_front().unwrap_or(0);
+                            let b1 = buf.pop_front().unwrap_or(0);
+                            *sample = i16::from_le_bytes([b0, b1]);
+                        } else {
                             *sample = 0;
                         }
                     }
@@ -98,14 +97,17 @@ impl AudioPlayer {
         Ok(())
     }
 
+    /// Stop playback immediately and clear the buffer.
     pub fn stop(&mut self) {
         *self.is_playing.lock().unwrap() = false;
         self.audio_buffer.lock().unwrap().clear();
         self.stream = None;
     }
 
+    /// Whether the player has data queued.
     pub fn is_playing(&self) -> bool {
         *self.is_playing.lock().unwrap()
+            && !self.audio_buffer.lock().unwrap().is_empty()
     }
 }
 

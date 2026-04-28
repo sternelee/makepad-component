@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use image::{DynamicImage, GenericImageView, GrayImage, Luma};
 
 pub fn apply_floyd_steinberg(img: &DynamicImage) -> DynamicImage {
