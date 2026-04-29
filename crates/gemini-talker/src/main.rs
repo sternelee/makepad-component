@@ -1957,7 +1957,6 @@ impl AppMain for App {
                         && rel_y < rect.size.y as f32;
                     if let Some(bg) = &mut self.particle_bg {
                         bg.set_mouse(cx_pos, cy_pos, inside);
-                        if inside { bg.push_comet(cx_pos, cy_pos, now); }
                     }
                 }
             }

@@ -18,14 +18,14 @@ pub const CANVAS_H: u32 = 320;
 
 // ── Sampling ─────────────────────────────────────────────────────────────────
 /// Sample every N pixels in x and y → controls point cloud density.
-const DOT_STEP: usize = 3;
+const DOT_STEP: usize = 2;
 /// Minimum alpha to include a pixel as a particle.
 const ALPHA_THRESHOLD: u8 = 30;
 
 // ── Physics ───────────────────────────────────────────────────────────────────
-const MOUSE_RADIUS: f32 = 80.0;
+const MOUSE_RADIUS: f32 = 40.0;
 const MOUSE_RADIUS_SQ: f32 = MOUSE_RADIUS * MOUSE_RADIUS;
-const MOUSE_FORCE_PEAK: f32 = 38.0;
+const MOUSE_FORCE_PEAK: f32 = 28.0;
 const EASING: f32 = 0.12;
 const SNAP: f32 = 0.04;
 
@@ -244,27 +244,6 @@ impl ParticleBackground {
             }
         }
 
-        // ── Comet trail ──────────────────────────────────────────────────
-        let pts: Vec<_> = self.comet.iter().collect();
-        let n = pts.len();
-        if n >= 2 {
-            let t_newest = pts[n - 1].t;
-            for i in 0..n - 1 {
-                let age = ((pts[i + 1].t - t_newest + COMET_TOTAL_S) / COMET_TOTAL_S)
-                    .clamp(0.0, 1.0) as f32;
-                let alpha = age.powf(1.8) * 0.88;
-                if alpha > 0.01 {
-                    draw_line(&mut px, w, h,
-                        pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y,
-                        2.0, COMET_COL, alpha);
-                }
-            }
-            if let Some(head) = pts.last() {
-                draw_soft_circle(&mut px, w, h, head.x, head.y, 4.0, COMET_COL, 0.95);
-                draw_soft_circle(&mut px, w, h, head.x, head.y, 1.8, [225, 245, 255], 1.0);
-            }
-        }
-
         // ── Ripple rings ─────────────────────────────────────────────────
         for r in &self.ripples {
             let elapsed = now - r.start;
@@ -304,15 +283,10 @@ fn blend(buf: &mut [u8], w: usize, x: i32, y: i32, r: u8, g: u8, b: u8, a: f32) 
     buf[i + 2] = lerp_u8(buf[i + 2], b, a);
 }
 
-/// 2×2 square dot — main particle rendering primitive.
+/// 1×1 single pixel dot — fine point cloud.
 fn draw_dot(buf: &mut [u8], w: usize, h: usize, x: f32, y: f32, c: [u8; 3], a: f32) {
     let _ = h;
-    let xi = x as i32;
-    let yi = y as i32;
-    blend(buf, w, xi,     yi,     c[0], c[1], c[2], a);
-    blend(buf, w, xi + 1, yi,     c[0], c[1], c[2], a * 0.70);
-    blend(buf, w, xi,     yi + 1, c[0], c[1], c[2], a * 0.70);
-    blend(buf, w, xi + 1, yi + 1, c[0], c[1], c[2], a * 0.50);
+    blend(buf, w, x as i32, y as i32, c[0], c[1], c[2], a);
 }
 
 /// Soft radial glow (comet head / displaced halo).
