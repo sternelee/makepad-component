@@ -17,7 +17,9 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [workspace.dependencies]
-makepad-widgets = { path = "/Users/sternelee/www/github/makepad/widgets" }
+
+makepad-widgets = { git = "https://github.com/makepad/makepad" }
+makepad-script = { git = "https://github.com/makepad/makepad" }
 makepad-component = { path = "crates/ui" }
 makepad-plot = { path = "crates/makepad-plot" }
 
