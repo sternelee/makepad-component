@@ -24,17 +24,17 @@ use mod.mp_theme.*
 // ============================================================
 // Section Header Component
 // ============================================================
-SectionHeader = Label {
+let SectionHeader = Label{
     width: Fit, height: Fit,
-    draw_text: {
+    draw_text +: {
         text_style: theme.font_bold{ font_size: 18.0 }
         color: FOREGROUND
     }
 }
 
-SubsectionLabel = Label {
+let SubsectionLabel = Label{
     width: Fit, height: Fit,
-    draw_text: {
+    draw_text +: {
         text_style: theme.font_regular{ font_size: 12.0 }
         color: MUTED_FOREGROUND
     }
@@ -43,8 +43,8 @@ SubsectionLabel = Label {
 // ============================================================
 // Category Tab Style
 // ============================================================
-CategoryTab = mod.widgets.MpTabPill {
-    padding: { left: 16, right: 16, top: 8, bottom: 8 }
+let CategoryTab = mod.widgets.MpTabPill{
+    padding: Inset{ left: 16, right: 16, top: 8, bottom: 8 }
 }
 
 // ============================================================
@@ -52,13 +52,12 @@ CategoryTab = mod.widgets.MpTabPill {
 // ============================================================
 mod.widgets.ShaderCanvasBase = #(ShaderCanvas::register_widget(vm))
 mod.widgets.ShaderCanvas = set_type_default() do mod.widgets.ShaderCanvasBase{
-    show_bg: true
-    draw_bg: {
+    draw_bg +: {
         // Time uniform driven by animator
-        instance anim_time: 0.0
+        anim_time: instance(0.0)
 
         // Shadertoy-style fractal shader
-        fn pixel(self) -> vec4 {
+        pixel: fn() {
             let resolution = self.rect_size;
             let uv = self.pos;
             let t = self.anim_time;
@@ -106,10 +105,10 @@ mod.widgets.ShaderCanvas = set_type_default() do mod.widgets.ShaderCanvasBase{
         }
     }
 
-    animator: {
-        anim = {
-            default: on,
-            on = {
+    animator: Animator{
+        anim: {
+            default: @on
+            on: AnimatorState{
                 from: {all: Loop {duration: 10.0, end: 1.0}}
                 apply: {
                     draw_bg: {
@@ -126,12 +125,11 @@ mod.widgets.ShaderCanvas = set_type_default() do mod.widgets.ShaderCanvasBase{
 // ============================================================
 mod.widgets.ShaderArtCanvasBase = #(ShaderArtCanvas::register_widget(vm))
 mod.widgets.ShaderArtCanvas = set_type_default() do mod.widgets.ShaderArtCanvasBase{
-    show_bg: true
     speed: 1.0
 
-    draw_bg: {
-        instance anim_time: 0.0
-        instance speed: 1.0
+    draw_bg +: {
+        anim_time: instance(0.0)
+        speed: instance(1.0)
 
         // Observer shader - glowing lattice effect
         // Original: vec2 p=(FC.xy*2.-r)/r.y/.2,v;
@@ -140,7 +138,7 @@ mod.widgets.ShaderArtCanvas = set_type_default() do mod.widgets.ShaderArtCanvasB
         //     for(v=p,f=0.;f++<9.;v+=sin(ceil(v*f+i*.9)-t/2.)/f);
         //   o=max(tanh(o+(o=texture(b,...))*o),.0);
 
-        fn pixel(self) -> vec4 {
+        pixel: fn() {
             let r = self.rect_size;
             let t = self.anim_time * self.speed;
 
@@ -198,10 +196,10 @@ mod.widgets.ShaderArtCanvas = set_type_default() do mod.widgets.ShaderArtCanvasB
         }
     }
 
-    animator: {
-        anim = {
-            default: on,
-            on = {
+    animator: Animator{
+        anim: {
+            default: @on
+            on: AnimatorState{
                 from: {all: Loop {duration: 15.0, end: 1.0}}
                 apply: {
                     draw_bg: {
@@ -218,16 +216,15 @@ mod.widgets.ShaderArtCanvas = set_type_default() do mod.widgets.ShaderArtCanvasB
 // ============================================================
 mod.widgets.ShaderArt2CanvasBase = #(ShaderArt2Canvas::register_widget(vm))
 mod.widgets.ShaderArt2Canvas = set_type_default() do mod.widgets.ShaderArt2CanvasBase{
-    show_bg: true
     speed: 1.0
 
-    draw_bg: {
-        instance anim_time: 0.0
-        instance speed: 1.0
+    draw_bg +: {
+        anim_time: instance(0.0)
+        speed: instance(1.0)
 
         // Golden FBM noise + SCRY bitmap text
         // Faithful translation from Shadertoy common code
-        fn pixel(self) -> vec4 {
+        pixel: fn() {
             let t = self.anim_time * self.speed;
             let uv = self.pos;
             let ar = self.rect_size.x / self.rect_size.y;
@@ -320,7 +317,8 @@ mod.widgets.ShaderArt2Canvas = set_type_default() do mod.widgets.ShaderArt2Canva
             // Char S (29671)
             let bv1 = floor(vec2(suv.x * 3.0, suv.y * 5.0)) / 3.0;
             let cc1 = bv1.x + bv1.y * 3.0;
-            let b1 = mod(floor(29671.0 / exp2(ceil(cc1 * 3.0 - 0.6))), 2.0);
+            let b1c = floor(29671.0 / exp2(ceil(cc1 * 3.0 - 0.6)));
+            let b1 = b1c - 2.0 * floor(b1c / 2.0);
             let m1 = step(0.0, bv1.x) * step(0.0, bv1.y)
                    * step(0.0, -bv1.x + 0.99) * step(0.0, -bv1.y + 1.6);
 
@@ -328,7 +326,8 @@ mod.widgets.ShaderArt2Canvas = set_type_default() do mod.widgets.ShaderArt2Canva
             let sx2 = suv.x - 1.333;
             let bv2 = floor(vec2(sx2 * 3.0, suv.y * 5.0)) / 3.0;
             let cc2 = bv2.x + bv2.y * 3.0;
-            let b2 = mod(floor(29263.0 / exp2(ceil(cc2 * 3.0 - 0.6))), 2.0);
+            let b2c = floor(29263.0 / exp2(ceil(cc2 * 3.0 - 0.6)));
+            let b2 = b2c - 2.0 * floor(b2c / 2.0);
             let m2 = step(0.0, bv2.x) * step(0.0, bv2.y)
                    * step(0.0, -bv2.x + 0.99) * step(0.0, -bv2.y + 1.6);
 
@@ -336,7 +335,8 @@ mod.widgets.ShaderArt2Canvas = set_type_default() do mod.widgets.ShaderArt2Canva
             let sx3 = suv.x - 2.666;
             let bv3 = floor(vec2(sx3 * 3.0, suv.y * 5.0)) / 3.0;
             let cc3 = bv3.x + bv3.y * 3.0;
-            let b3 = mod(floor(31469.0 / exp2(ceil(cc3 * 3.0 - 0.6))), 2.0);
+            let b3c = floor(31469.0 / exp2(ceil(cc3 * 3.0 - 0.6)));
+            let b3 = b3c - 2.0 * floor(b3c / 2.0);
             let m3 = step(0.0, bv3.x) * step(0.0, bv3.y)
                    * step(0.0, -bv3.x + 0.99) * step(0.0, -bv3.y + 1.6);
 
@@ -344,7 +344,8 @@ mod.widgets.ShaderArt2Canvas = set_type_default() do mod.widgets.ShaderArt2Canva
             let sx4 = suv.x - 4.0;
             let bv4 = floor(vec2(sx4 * 3.0, suv.y * 5.0)) / 3.0;
             let cc4 = bv4.x + bv4.y * 3.0;
-            let b4 = mod(floor(23186.0 / exp2(ceil(cc4 * 3.0 - 0.6))), 2.0);
+            let b4c = floor(23186.0 / exp2(ceil(cc4 * 3.0 - 0.6)));
+            let b4 = b4c - 2.0 * floor(b4c / 2.0);
             let m4 = step(0.0, bv4.x) * step(0.0, bv4.y)
                    * step(0.0, -bv4.x + 0.99) * step(0.0, -bv4.y + 1.6);
 
@@ -393,10 +394,10 @@ mod.widgets.ShaderArt2Canvas = set_type_default() do mod.widgets.ShaderArt2Canva
         }
     }
 
-    animator: {
-        anim = {
-            default: on,
-            on = {
+    animator: Animator{
+        anim: {
+            default: @on
+            on: AnimatorState{
                 from: {all: Loop {duration: 20.0, end: 1.0}}
                 apply: {
                     draw_bg: {
@@ -413,15 +414,14 @@ mod.widgets.ShaderArt2Canvas = set_type_default() do mod.widgets.ShaderArt2Canva
 // ============================================================
 mod.widgets.ShaderMathCanvasBase = #(ShaderMathCanvas::register_widget(vm))
 mod.widgets.ShaderMathCanvas = set_type_default() do mod.widgets.ShaderMathCanvasBase{
-    show_bg: true
     speed: 1.0
 
-    draw_bg: {
-        instance anim_time: 0.0
-        instance speed: 1.0
+    draw_bg +: {
+        anim_time: instance(0.0)
+        speed: instance(1.0)
 
         // Jellyfish point-cloud shader (minimal GPU version)
-        fn pixel(self) -> vec4 {
+        pixel: fn() {
             let t = self.anim_time * self.speed;
             let aspect = self.rect_size.x / self.rect_size.y;
 
@@ -442,7 +442,7 @@ mod.widgets.ShaderMathCanvas = set_type_default() do mod.widgets.ShaderMathCanva
             // Single jellyfish: 10×12 = 120 points flat loop
             for i in 0..120 {
                 let fi = float(i);
-                let ix = mod(fi, 10.0);
+                let ix = fi - 10.0 * floor(fi / 10.0);
                 let iy = floor(fi / 10.0);
 
                 let x = ix * 17.0;
@@ -454,7 +454,7 @@ mod.widgets.ShaderMathCanvas = set_type_default() do mod.widgets.ShaderMathCanva
 
                 let bell = 1.0 + 0.8 * exp(-(d - 4.0));
 
-                let q = 60.0 - 3.0 * sin(atan(k, e))
+                let q = 60.0 - 3.0 * sin(atan2(k, e))
                       + k * (3.0 + 4.0 / d * sin(d * d - 2.0 * t));
                 let c = d / 2.0 + e / 99.0 - t / 18.0;
 
@@ -471,7 +471,7 @@ mod.widgets.ShaderMathCanvas = set_type_default() do mod.widgets.ShaderMathCanva
                              + exp(-dist2 / 250.0) * 0.02;
 
                     let hue = y * 0.016 + k * 0.12
-                            + atan(k, e) * 0.25 + d * 0.06;
+                            + atan2(k, e) * 0.25 + d * 0.06;
                     o = o + vec4(
                         glow * (0.5 + 0.5 * cos(6.2832 * hue)),
                         glow * (0.5 + 0.5 * cos(6.2832 * (hue - 0.33))),
@@ -491,10 +491,10 @@ mod.widgets.ShaderMathCanvas = set_type_default() do mod.widgets.ShaderMathCanva
         }
     }
 
-    animator: {
-        anim = {
-            default: on,
-            on = {
+    animator: Animator{
+        anim: {
+            default: @on
+            on: AnimatorState{
                 from: {all: Loop {duration: 20.0, end: 1.0}}
                 apply: {
                     draw_bg: {
@@ -514,10 +514,10 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
     width: Fill, height: Fill,
     flow: Down,
     spacing: 20,
-    padding: { left: 24, right: 24, top: 24, bottom: 100 }
+    padding: Inset{ left: 24, right: 24, top: 24, bottom: 100 }
 
     show_bg: true
-    draw_bg: { color: #x1e1e2eff }
+    draw_bg +: { color: #x1e1e2eff }
 
     // Header
     View {
@@ -526,22 +526,21 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
         spacing: 8,
 
         SectionHeader{
-            draw_text: { color: #xcdd6f4ff }
+            draw_text +: { color: #xcdd6f4ff }
             text: "Natural Language UI Generation"
         }
 
         Label {
             width: Fill, height: Fit,
-            draw_text: {
+            draw_text +: {
                 text_style: theme.font_regular{ font_size: 13.0 }
                 color: #xa6adc8ff
-                wrap: Word
             }
             text: "Type commands to dynamically generate UI widgets in real-time."
         }
     }
 
-    mod.widgets.MpDivider { draw_bg: { color: #x313244ff } }
+    mod.widgets.MpDivider { draw_bg +: { color: #x313244ff } }
 
     // Command Input Section
     View {
@@ -550,7 +549,7 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
         spacing: 12,
 
         Label {
-            draw_text: {
+            draw_text +: {
                 text_style: theme.font_bold{ font_size: 14.0 }
                 color: #x89b4faff
             }
@@ -562,14 +561,13 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
             width: Fill, height: Fit,
             padding: 12,
             show_bg: true
-            draw_bg: { color: #x313244ff }
+            draw_bg +: { color: #x313244ff }
 
             Label {
                 width: Fill, height: Fit,
-                draw_text: {
+                draw_text +: {
                     text_style: theme.font_regular{ font_size: 12.0 }
                     color: #x6c7086ff
-                    wrap: Word
                 }
                 text: "Commands: \"add button Submit\" | \"add label Hello World\" | \"add card User Profile\" | \"add progress 75\" | \"add switch Dark Mode\" | \"clear\""
             }
@@ -579,39 +577,39 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
             width: Fill, height: Fit,
             flow: Right,
             spacing: 12,
-            align: { y: 0.5 }
+            align: Align{ y: 0.5 }
 
-            command_input = TextInput{
+            command_input := TextInput{
                 width: Fill, height: Fit,
                 padding: 12,
                 empty_text: "Type a command... e.g. 'add button Click Me'"
-                draw_bg: {
+                draw_bg +: {
                     color: #x313244ff
                 }
-                draw_text: {
+                draw_text +: {
                     text_style: theme.font_regular{ font_size: 14.0 }
                     color: #xcdd6f4ff
                 }
             }
 
-            generate_btn = mod.widgets.MpButtonPrimary { text: "Generate" }
-            clear_btn = mod.widgets.MpButtonGhost {
-                draw_text: { color: #xf38ba8ff }
+            generate_btn := mod.widgets.MpButtonPrimary{ text: "Generate" }
+            clear_btn := mod.widgets.MpButtonGhost{
+                draw_text +: { color: #xf38ba8ff }
                 text: "Clear All"
             }
         }
     }
 
-    mod.widgets.MpDivider { draw_bg: { color: #x313244ff } }
+    mod.widgets.MpDivider { draw_bg +: { color: #x313244ff } }
 
     // Generated UI Section
     View {
         width: Fill, height: Fit,
         flow: Right,
-        align: { y: 0.5 }
+        align: Align{ y: 0.5 }
 
         Label {
-            draw_text: {
+            draw_text +: {
                 text_style: theme.font_bold{ font_size: 14.0 }
                 color: #x89b4faff
             }
@@ -620,8 +618,8 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
 
         View { width: Fill, height: 1 }
 
-        widget_count_label = Label {
-            draw_text: {
+        widget_count_label := Label{
+            draw_text +: {
                 text_style: theme.font_bold{ font_size: 14.0 }
                 color: #xa6e3a1ff
             }
@@ -630,32 +628,32 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
     }
 
     // Dynamic PortalList for generated widgets
-    generated_list = PortalList{
+    generated_list := PortalList{
         width: Fill, height: 400,
         flow: Down,
 
         // Button template
-        GenButton = View {
+        let GenButton = View{
             width: Fill, height: Fit,
             padding: 8,
-            margin: { bottom: 8 }
+            margin: Inset{ bottom: 8 }
 
-            gen_button = mod.widgets.MpButtonPrimary {
+            gen_button := mod.widgets.MpButtonPrimary{
                 width: Fit
                 text: "Button"
             }
         }
 
         // Label template
-        GenLabel = View {
+        let GenLabel = View{
             width: Fill, height: Fit,
-            padding: { left: 12, right: 12, top: 16, bottom: 16 }
-            margin: { bottom: 8 }
+            padding: Inset{ left: 12, right: 12, top: 16, bottom: 16 }
+            margin: Inset{ bottom: 8 }
             show_bg: true
-            draw_bg: { color: #x313244ff }
+            draw_bg +: { color: #x313244ff }
 
-            gen_label = Label {
-                draw_text: {
+            gen_label := Label{
+                draw_text +: {
                     text_style: theme.font_regular{ font_size: 14.0 }
                     color: #xcdd6f4ff
                 }
@@ -664,9 +662,9 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
         }
 
         // Card template
-        GenCard = mod.widgets.MpCard {
+        let GenCard = mod.widgets.MpCard{
             width: Fill, height: Fit,
-            margin: { bottom: 8 }
+            margin: Inset{ bottom: 8 }
             padding: 16,
 
             View {
@@ -674,8 +672,8 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
                 flow: Down,
                 spacing: 8,
 
-                card_title = Label {
-                    draw_text: {
+                card_title := Label{
+                    draw_text +: {
                         text_style: theme.font_bold{ font_size: 16.0 }
                         color: #xcdd6f4ff
                     }
@@ -683,7 +681,7 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
                 }
 
                 Label {
-                    draw_text: {
+                    draw_text +: {
                         text_style: theme.font_regular{ font_size: 13.0 }
                         color: #xa6adc8ff
                     }
@@ -693,42 +691,42 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
         }
 
         // Progress template
-        GenProgress = View {
+        let GenProgress = View{
             width: Fill, height: Fit,
             padding: 12,
-            margin: { bottom: 8 }
+            margin: Inset{ bottom: 8 }
             show_bg: true
-            draw_bg: { color: #x313244ff }
+            draw_bg +: { color: #x313244ff }
             flow: Down,
             spacing: 8,
 
-            progress_label = Label {
-                draw_text: {
+            progress_label := Label{
+                draw_text +: {
                     text_style: theme.font_regular{ font_size: 12.0 }
                     color: #xa6adc8ff
                 }
                 text: "Progress: 50%"
             }
 
-            gen_progress = mod.widgets.MpProgress {
+            gen_progress := mod.widgets.MpProgress{
                 width: Fill, height: 8,
                 value: 50
             }
         }
 
         // Switch template
-        GenSwitch = View {
+        let GenSwitch = View{
             width: Fill, height: Fit,
             padding: 12,
-            margin: { bottom: 8 }
+            margin: Inset{ bottom: 8 }
             show_bg: true
-            draw_bg: { color: #x313244ff }
+            draw_bg +: { color: #x313244ff }
             flow: Right,
-            align: { y: 0.5 }
+            align: Align{ y: 0.5 }
             spacing: 12,
 
-            switch_label = Label {
-                draw_text: {
+            switch_label := Label{
+                draw_text +: {
                     text_style: theme.font_regular{ font_size: 14.0 }
                     color: #xcdd6f4ff
                 }
@@ -737,31 +735,31 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
 
             View { width: Fill, height: 1 }
 
-            gen_switch = mod.widgets.MpSwitch {}
+            gen_switch := mod.widgets.MpSwitch{}
         }
 
         // Input template
-        GenInput = View {
+        let GenInput = View{
             width: Fill, height: Fit,
             padding: 8,
-            margin: { bottom: 8 }
+            margin: Inset{ bottom: 8 }
             flow: Down,
             spacing: 8,
 
-            input_label = Label {
-                draw_text: {
+            input_label := Label{
+                draw_text +: {
                     text_style: theme.font_regular{ font_size: 12.0 }
                     color: #xa6adc8ff
                 }
                 text: "Input Field"
             }
 
-            gen_input = TextInput{
+            gen_input := TextInput{
                 width: Fill, height: Fit,
                 padding: 10,
                 empty_text: "Enter text..."
-                draw_bg: { color: #x45475aff }
-                draw_text: {
+                draw_bg +: { color: #x45475aff }
+                draw_text +: {
                     text_style: theme.font_regular{ font_size: 14.0 }
                     color: #xcdd6f4ff
                 }
@@ -778,10 +776,10 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
     width: Fill, height: Fill,
     flow: Down,
     spacing: 20,
-    padding: { left: 24, right: 24, top: 24, bottom: 100 }
+    padding: Inset{ left: 24, right: 24, top: 24, bottom: 100 }
 
     show_bg: true
-    draw_bg: { color: #x1e1e2eff }
+    draw_bg +: { color: #x1e1e2eff }
 
     // Header
     View {
@@ -790,22 +788,21 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
         spacing: 8,
 
         SectionHeader{
-            draw_text: { color: #xcdd6f4ff }
+            draw_text +: { color: #xcdd6f4ff }
             text: "JSON Render - A2UI Protocol"
         }
 
         Label {
             width: Fill, height: Fit,
-            draw_text: {
+            draw_text +: {
                 text_style: theme.font_regular{ font_size: 13.0 }
                 color: #xa6adc8ff
-                wrap: Word
             }
             text: "Parse JSON schema to dynamically render Makepad UI components. Supports nested layouts and component properties."
         }
     }
 
-    mod.widgets.MpDivider { draw_bg: { color: #x313244ff } }
+    mod.widgets.MpDivider { draw_bg +: { color: #x313244ff } }
 
     // Main content area - two columns
     View {
@@ -820,19 +817,19 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
             spacing: 12,
 
             Label {
-                draw_text: {
+                draw_text +: {
                     text_style: theme.font_bold{ font_size: 14.0 }
                     color: #x89b4faff
                 }
                 text: "JSON Schema"
             }
 
-            json_input = TextInput{
+            json_input := TextInput{
                 width: Fill, height: Fill,
                 padding: 12,
                 empty_text: "Enter JSON UI schema..."
-                draw_bg: { color: #x313244ff }
-                draw_text: {
+                draw_bg +: { color: #x313244ff }
+                draw_text +: {
                     text_style: theme.font_regular{ font_size: 12.0 }
                     color: #xcdd6f4ff
                 }
@@ -843,14 +840,14 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
                 flow: Right,
                 spacing: 12,
 
-                render_btn = mod.widgets.MpButtonPrimary { text: "Render" }
-                clear_render_btn = mod.widgets.MpButtonGhost {
-                    draw_text: { color: #xf38ba8ff }
+                render_btn := mod.widgets.MpButtonPrimary{ text: "Render" }
+                clear_render_btn := mod.widgets.MpButtonGhost{
+                    draw_text +: { color: #xf38ba8ff }
                     text: "Clear"
                 }
                 View { width: Fill }
-                load_example_btn = mod.widgets.MpButtonSecondary { text: "Basic Example" }
-                load_raycast_btn = mod.widgets.MpButtonSecondary { text: "Raycast Examples" }
+                load_example_btn := mod.widgets.MpButtonSecondary{ text: "Basic Example" }
+                load_raycast_btn := mod.widgets.MpButtonSecondary{ text: "Raycast Examples" }
             }
         }
 
@@ -863,10 +860,10 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
             View {
                 width: Fill, height: Fit,
                 flow: Right,
-                align: { y: 0.5 }
+                align: Align{ y: 0.5 }
 
                 Label {
-                    draw_text: {
+                    draw_text +: {
                         text_style: theme.font_bold{ font_size: 14.0 }
                         color: #x89b4faff
                     }
@@ -875,8 +872,8 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
 
                 View { width: Fill }
 
-                render_status = Label {
-                    draw_text: {
+                render_status := Label{
+                    draw_text +: {
                         text_style: theme.font_bold{ font_size: 12.0 }
                         color: #xa6e3a1ff
                     }
@@ -885,45 +882,45 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
             }
 
             // Preview container with border
-            preview_container = View {
+            preview_container := View{
                 width: Fill, height: Fill,
                 padding: 16,
                 show_bg: true
-                draw_bg: { color: #x11111bff }
+                draw_bg +: { color: #x11111bff }
 
                 // Dynamic content rendered via PortalList
-                json_list = PortalList{
+                json_list := PortalList{
                     width: Fill, height: Fill,
                     flow: Down,
 
                     // View container template
-                    JsonView = View {
+                    let JsonView = View{
                         width: Fill, height: Fit,
                         padding: 8,
-                        margin: { bottom: 4 }
+                        margin: Inset{ bottom: 4 }
                         show_bg: true
-                        draw_bg: { color: #x1e1e2eff }
+                        draw_bg +: { color: #x1e1e2eff }
                         flow: Down,
                         spacing: 8,
                     }
 
                     // HStack template
-                    JsonHStack = View {
+                    let JsonHStack = View{
                         width: Fill, height: Fit,
                         padding: 8,
-                        margin: { bottom: 4 }
+                        margin: Inset{ bottom: 4 }
                         flow: Right,
                         spacing: 8,
                     }
 
                     // Label template
-                    JsonLabel = View {
+                    let JsonLabel = View{
                         width: Fill, height: Fit,
                         padding: 8,
-                        margin: { bottom: 4 }
+                        margin: Inset{ bottom: 4 }
 
-                        json_label_text = Label {
-                            draw_text: {
+                        json_label_text := Label{
+                            draw_text +: {
                                 text_style: theme.font_regular{ font_size: 14.0 }
                                 color: #xcdd6f4ff
                             }
@@ -932,19 +929,19 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
                     }
 
                     // Button template
-                    JsonButton = View {
+                    let JsonButton = View{
                         width: Fit, height: Fit,
-                        margin: { bottom: 4 }
+                        margin: Inset{ bottom: 4 }
 
-                        json_button = mod.widgets.MpButtonPrimary {
+                        json_button := mod.widgets.MpButtonPrimary{
                             text: "Button"
                         }
                     }
 
                     // Card template
-                    JsonCard = mod.widgets.MpCard {
+                    let JsonCard = mod.widgets.MpCard{
                         width: Fill, height: Fit,
-                        margin: { bottom: 8 }
+                        margin: Inset{ bottom: 8 }
                         padding: 16,
 
                         View {
@@ -952,16 +949,16 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
                             flow: Down,
                             spacing: 8,
 
-                            json_card_title = Label {
-                                draw_text: {
+                            json_card_title := Label{
+                                draw_text +: {
                                     text_style: theme.font_bold{ font_size: 16.0 }
                                     color: #xcdd6f4ff
                                 }
                                 text: "Card"
                             }
 
-                            json_card_desc = Label {
-                                draw_text: {
+                            json_card_desc := Label{
+                                draw_text +: {
                                     text_style: theme.font_regular{ font_size: 13.0 }
                                     color: #xa6adc8ff
                                 }
@@ -971,42 +968,42 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
                     }
 
                     // Progress template
-                    JsonProgress = View {
+                    let JsonProgress = View{
                         width: Fill, height: Fit,
                         padding: 12,
-                        margin: { bottom: 4 }
+                        margin: Inset{ bottom: 4 }
                         show_bg: true
-                        draw_bg: { color: #x313244ff }
+                        draw_bg +: { color: #x313244ff }
                         flow: Down,
                         spacing: 8,
 
-                        json_progress_label = Label {
-                            draw_text: {
+                        json_progress_label := Label{
+                            draw_text +: {
                                 text_style: theme.font_regular{ font_size: 12.0 }
                                 color: #xa6adc8ff
                             }
                             text: "Progress"
                         }
 
-                        json_progress = mod.widgets.MpProgress {
+                        json_progress := mod.widgets.MpProgress{
                             width: Fill, height: 8,
                             value: 50
                         }
                     }
 
                     // Switch template
-                    JsonSwitch = View {
+                    let JsonSwitch = View{
                         width: Fill, height: Fit,
                         padding: 12,
-                        margin: { bottom: 4 }
+                        margin: Inset{ bottom: 4 }
                         show_bg: true
-                        draw_bg: { color: #x313244ff }
+                        draw_bg +: { color: #x313244ff }
                         flow: Right,
-                        align: { y: 0.5 }
+                        align: Align{ y: 0.5 }
                         spacing: 12,
 
-                        json_switch_label = Label {
-                            draw_text: {
+                        json_switch_label := Label{
+                            draw_text +: {
                                 text_style: theme.font_regular{ font_size: 14.0 }
                                 color: #xcdd6f4ff
                             }
@@ -1015,31 +1012,31 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
 
                         View { width: Fill }
 
-                        json_switch = mod.widgets.MpSwitch {}
+                        json_switch := mod.widgets.MpSwitch{}
                     }
 
                     // TextInput template
-                    JsonInput = View {
+                    let JsonInput = View{
                         width: Fill, height: Fit,
                         padding: 8,
-                        margin: { bottom: 4 }
+                        margin: Inset{ bottom: 4 }
                         flow: Down,
                         spacing: 4,
 
-                        json_input_label = Label {
-                            draw_text: {
+                        json_input_label := Label{
+                            draw_text +: {
                                 text_style: theme.font_regular{ font_size: 12.0 }
                                 color: #xa6adc8ff
                             }
                             text: "Input"
                         }
 
-                        json_text_input = TextInput{
+                        json_text_input := TextInput{
                             width: Fill, height: Fit,
                             padding: 10,
                             empty_text: "Enter text..."
-                            draw_bg: { color: #x45475aff }
-                            draw_text: {
+                            draw_bg +: { color: #x45475aff }
+                            draw_text +: {
                                 text_style: theme.font_regular{ font_size: 14.0 }
                                 color: #xcdd6f4ff
                             }
@@ -1047,15 +1044,15 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
                     }
 
                     // Image placeholder template
-                    JsonImage = View {
+                    let JsonImage = View{
                         width: Fill, height: 120,
-                        margin: { bottom: 4 }
+                        margin: Inset{ bottom: 4 }
                         show_bg: true
-                        draw_bg: { color: #x313244ff }
-                        align: { x: 0.5, y: 0.5 }
+                        draw_bg +: { color: #x313244ff }
+                        align: Align{ x: 0.5, y: 0.5 }
 
                         Label {
-                            draw_text: {
+                            draw_text +: {
                                 text_style: theme.font_regular{ font_size: 12.0 }
                                 color: #x6c7086ff
                             }
@@ -1064,9 +1061,9 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
                     }
 
                     // Divider template
-                    JsonDivider = mod.widgets.MpDivider {
-                        margin: { top: 8, bottom: 8 }
-                        draw_bg: { color: #x313244ff }
+                    let JsonDivider = mod.widgets.MpDivider{
+                        margin: Inset{ top: 8, bottom: 8 }
+                        draw_bg +: { color: #x313244ff }
                     }
                 }
             }
@@ -1075,23 +1072,22 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
 }
 
 // App is registered via app_main! macro
-ui: Root{
-        main_window = Window{
-            window: {
-                title: "Component Zoo"
-                inner_size: vec2(1280, 900)
-            }
+startup() do #(App::script_component(vm)){
+    ui: Root{
+        main_window := Window{
+            window.title: "Component Zoo"
+            window.inner_size: vec2(1280, 900)
 
             show_bg: true
-            draw_bg: { color: BACKGROUND }
+            draw_bg +: { color: BACKGROUND }
 
-            body = View {
+            body := View{
                 width: Fill,
                 height: Fill,
                 flow: Overlay,
 
                 // Main content area
-                main_content = View {
+                main_content := View{
                     width: Fill,
                     height: Fill,
                     flow: Down,
@@ -1100,11 +1096,11 @@ ui: Root{
                 View {
                     width: Fill, height: Fit,
                     flow: Down,
-                    padding: { left: 24, right: 24, top: 24, bottom: 16 },
+                    padding: Inset{ left: 24, right: 24, top: 24, bottom: 16 },
                     spacing: 8,
 
                     Label {
-                        draw_text: {
+                        draw_text +: {
                             text_style: theme.font_bold{ font_size: 24.0 }
                             color: FOREGROUND
                         }
@@ -1112,7 +1108,7 @@ ui: Root{
                     }
 
                     Label {
-                        draw_text: {
+                        draw_text +: {
                             text_style: theme.font_regular{ font_size: 14.0 }
                             color: MUTED_FOREGROUND
                         }
@@ -1123,42 +1119,42 @@ ui: Root{
                 // Category Tab Bar
                 View {
                     width: Fill, height: Fit,
-                    padding: { left: 24, right: 24, bottom: 16 },
+                    padding: Inset{ left: 24, right: 24, bottom: 16 },
 
                     mod.widgets.MpTabBarPill {
-                        cat_form = CategoryTab{ text: "Form" }
-                        cat_display = CategoryTab{ text: "Display" }
-                        cat_nav = CategoryTab{ text: "Navigation" }
-                        cat_feedback = CategoryTab{ text: "Feedback" }
-                        cat_data = CategoryTab{ text: "Data" }
-                        cat_shader = CategoryTab{ text: "Shader" }
-                        cat_shader_art = CategoryTab{ text: "Shader Art" }
-                        cat_shader_art2 = CategoryTab{ text: "Shader FBM" }
-                        cat_shader_math = CategoryTab{ text: "Shader Math" }
-                        cat_splash = CategoryTab{ text: "Splash" }
-                        cat_json = CategoryTab{ text: "JSON Render" }
+                        cat_form := CategoryTab{ text: "Form" }
+                        cat_display := CategoryTab{ text: "Display" }
+                        cat_nav := CategoryTab{ text: "Navigation" }
+                        cat_feedback := CategoryTab{ text: "Feedback" }
+                        cat_data := CategoryTab{ text: "Data" }
+                        cat_shader := CategoryTab{ text: "Shader" }
+                        cat_shader_art := CategoryTab{ text: "Shader Art" }
+                        cat_shader_art2 := CategoryTab{ text: "Shader FBM" }
+                        cat_shader_math := CategoryTab{ text: "Shader Math" }
+                        cat_splash := CategoryTab{ text: "Splash" }
+                        cat_json := CategoryTab{ text: "JSON Render" }
                     }
                 }
 
                 mod.widgets.MpDivider {}
 
                 // Content area with PageFlip
-                category_pages = PageFlip{
+                category_pages := PageFlip{
                     width: Fill,
                     height: Fill,
-                    active_page: page_form,
+                    active_page: @page_form,
 
                     // ============================================================
                     // Form Controls Page
                     // ============================================================
-                    page_form = ScrollYView{
+                    page_form := ScrollYView{
                         width: Fill, height: Fill,
                         flow: Down,
                         spacing: 24,
-                        padding: { left: 24, right: 24, top: 24, bottom: 200 }
+                        padding: Inset{ left: 24, right: 24, top: 24, bottom: 200 }
 
                         show_bg: true
-                        draw_bg: { color: #xe2e8f0ff }
+                        draw_bg +: { color: #xe2e8f0ff }
 
                         // ===== Button Section =====
                         View {
@@ -1181,10 +1177,10 @@ ui: Root{
                                     flow: Right,
                                     spacing: 12,
 
-                                    btn_primary = mod.widgets.MpButtonPrimary { text: "Primary" }
-                                    btn_secondary = mod.widgets.MpButtonSecondary { text: "Secondary" }
-                                    btn_danger = mod.widgets.MpButtonDanger { text: "Danger" }
-                                    btn_ghost = mod.widgets.MpButtonGhost { text: "Ghost" }
+                                    btn_primary := mod.widgets.MpButtonPrimary{ text: "Primary" }
+                                    btn_secondary := mod.widgets.MpButtonSecondary{ text: "Secondary" }
+                                    btn_danger := mod.widgets.MpButtonDanger{ text: "Danger" }
+                                    btn_ghost := mod.widgets.MpButtonGhost{ text: "Ghost" }
                                 }
                             }
 
@@ -1200,7 +1196,7 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 12,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpButtonSmall { text: "Small" }
                                     mod.widgets.MpButton { text: "Medium" }
@@ -1224,13 +1220,13 @@ ui: Root{
                                 flow: Down,
                                 spacing: 12,
 
-                                checkbox1 = mod.widgets.MpCheckbox { text: "Option 1" }
-                                checkbox2 = mod.widgets.MpCheckbox { text: "Option 2", checked: true }
-                                checkbox3 = mod.widgets.MpCheckbox { text: "Option 3" }
+                                checkbox1 := mod.widgets.MpCheckbox{ text: "Option 1" }
+                                checkbox2 := mod.widgets.MpCheckbox{ text: "Option 2", checked: true }
+                                checkbox3 := mod.widgets.MpCheckbox{ text: "Option 3" }
                             }
 
-                            checkbox_status = Label {
-                                draw_text: {
+                            checkbox_status := Label{
+                                draw_text +: {
                                     text_style: theme.font_regular{ font_size: 12.0 }
                                     color: MUTED_FOREGROUND
                                 }
@@ -1257,10 +1253,10 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 12,
-                                    align: { y: 0.5 }
-                                    switch_wifi = mod.widgets.MpSwitch {}
+                                    align: Align{ y: 0.5 }
+                                    switch_wifi := mod.widgets.MpSwitch{}
                                     Label {
-                                        draw_text: {
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: FOREGROUND
                                         }
@@ -1272,10 +1268,10 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 12,
-                                    align: { y: 0.5 }
-                                    switch_bluetooth = mod.widgets.MpSwitch { on: true }
+                                    align: Align{ y: 0.5 }
+                                    switch_bluetooth := mod.widgets.MpSwitch{ on: true }
                                     Label {
-                                        draw_text: {
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: FOREGROUND
                                         }
@@ -1287,10 +1283,10 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 12,
-                                    align: { y: 0.5 }
-                                    switch_notifications = mod.widgets.MpSwitch {}
+                                    align: Align{ y: 0.5 }
+                                    switch_notifications := mod.widgets.MpSwitch{}
                                     Label {
-                                        draw_text: {
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: FOREGROUND
                                         }
@@ -1311,7 +1307,7 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpSwitch { on: true }
                                     mod.widgets.MpSwitch { on: true }
@@ -1335,13 +1331,13 @@ ui: Root{
                                 flow: Down,
                                 spacing: 12,
 
-                                radio_small = mod.widgets.MpRadio { text: "Small" }
-                                radio_medium = mod.widgets.MpRadio { text: "Medium", checked: true }
-                                radio_large = mod.widgets.MpRadio { text: "Large" }
+                                radio_small := mod.widgets.MpRadio{ text: "Small" }
+                                radio_medium := mod.widgets.MpRadio{ text: "Medium", checked: true }
+                                radio_large := mod.widgets.MpRadio{ text: "Large" }
                             }
 
-                            radio_status = Label {
-                                draw_text: {
+                            radio_status := Label{
+                                draw_text +: {
                                     text_style: theme.font_regular{ font_size: 12.0 }
                                     color: MUTED_FOREGROUND
                                 }
@@ -1370,15 +1366,15 @@ ui: Root{
                                     width: Fill, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
-                                    dropdown_basic = mod.widgets.MpDropdown {
+                                    dropdown_basic := mod.widgets.MpDropdown{
                                         width: 200,
                                         labels: ["Apple", "Banana", "Cherry", "Date", "Elderberry"]
                                     }
 
-                                    dropdown_status = Label {
-                                        draw_text: {
+                                    dropdown_status := Label{
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: MUTED_FOREGROUND
                                         }
@@ -1429,7 +1425,7 @@ ui: Root{
                                     width: Fill, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpDropdownSmall {
                                         width: 140,
@@ -1471,16 +1467,16 @@ ui: Root{
                                     width: Fill, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
-                                    slider_default = mod.widgets.MpSlider {
+                                    slider_default := mod.widgets.MpSlider{
                                         width: 300,
                                         min: 0.0, max: 100.0, value: 50.0, step: 1.0,
                                     }
 
-                                    slider_default_label = Label {
+                                    slider_default_label := Label{
                                         width: 100, height: Fit,
-                                        draw_text: {
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: FOREGROUND
                                         }
@@ -1537,14 +1533,14 @@ ui: Root{
                                     flow: Right,
                                     spacing: 16,
 
-                                    slider_vert = mod.widgets.MpSliderVertical {
+                                    slider_vert := mod.widgets.MpSliderVertical{
                                         height: Fill,
                                         min: 0.0, max: 100.0, value: 30.0, step: 1.0,
                                     }
 
-                                    slider_vert_label = Label {
+                                    slider_vert_label := Label{
                                         width: 120, height: Fit,
-                                        draw_text: {
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: FOREGROUND
                                         }
@@ -1565,18 +1561,18 @@ ui: Root{
                                     width: Fill, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
-                                    slider_range = mod.widgets.MpSlider {
+                                    slider_range := mod.widgets.MpSlider{
                                         width: 300,
                                         min: 0.0, max: 100.0,
                                         value_start: 20.0, value: 80.0,
                                         range_mode: true, step: 1.0,
                                     }
 
-                                    slider_range_label = Label {
+                                    slider_range_label := Label{
                                         width: 150, height: Fit,
-                                        draw_text: {
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: FOREGROUND
                                         }
@@ -1588,18 +1584,18 @@ ui: Root{
                                     width: Fill, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
-                                    slider_range_success = mod.widgets.MpSliderSuccess {
+                                    slider_range_success := mod.widgets.MpSliderSuccess{
                                         width: 300,
                                         min: 0.0, max: 100.0,
                                         value_start: 30.0, value: 70.0,
                                         range_mode: true, step: 5.0,
                                     }
 
-                                    slider_range_success_label = Label {
+                                    slider_range_success_label := Label{
                                         width: 150, height: Fit,
-                                        draw_text: {
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: FOREGROUND
                                         }
@@ -1650,7 +1646,7 @@ ui: Root{
 
                                     mod.widgets.MpInputPassword {
                                         width: 200,
-                                        input = { empty_text: "Password input" }
+                                        input +: { empty_text: "Password input" }
                                     }
 
                                     mod.widgets.MpInputNumeric {
@@ -1672,7 +1668,7 @@ ui: Root{
                                     width: Fill, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpInputSmall {
                                         width: 150,
@@ -1703,15 +1699,15 @@ ui: Root{
                                     width: Fill, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
-                                    input_interactive = mod.widgets.MpInput {
+                                    input_interactive := mod.widgets.MpInput{
                                         width: 250,
                                         empty_text: "Type something..."
                                     }
 
-                                    input_status = Label {
-                                        draw_text: {
+                                    input_status := Label{
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: MUTED_FOREGROUND
                                         }
@@ -1726,14 +1722,14 @@ ui: Root{
                     // ============================================================
                     // Display Page
                     // ============================================================
-                    page_display = ScrollYView{
+                    page_display := ScrollYView{
                         width: Fill, height: Fill,
                         flow: Down,
                         spacing: 24,
-                        padding: { left: 24, right: 24, top: 24, bottom: 100 }
+                        padding: Inset{ left: 24, right: 24, top: 24, bottom: 100 }
 
                         show_bg: true
-                        draw_bg: { color: #xbbf7d0ff }
+                        draw_bg +: { color: #xbbf7d0ff }
 
                         // ===== Label Section =====
                         View {
@@ -1755,7 +1751,7 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 1.0 }
+                                    align: Align{ y: 1.0 }
 
                                     mod.widgets.MpLabelXs { text: "Extra Small" }
                                     mod.widgets.MpLabelSm { text: "Small" }
@@ -1905,7 +1901,7 @@ ui: Root{
                                     width: 400, height: Fit,
                                     padding: 16,
                                     show_bg: true,
-                                    draw_bg: { color: #xffffffff }
+                                    draw_bg +: { color: #xffffffff }
 
                                     mod.widgets.MpText {
                                         text: "This is a paragraph of text that demonstrates word wrapping. When the text is too long to fit on a single line, it automatically wraps to the next line. This is useful for displaying longer content like descriptions or articles."
@@ -1927,7 +1923,7 @@ ui: Root{
                                     spacing: 12,
                                     padding: 16,
                                     show_bg: true,
-                                    draw_bg: { color: #xffffffff }
+                                    draw_bg +: { color: #xffffffff }
 
                                     mod.widgets.MpTextXs { text: "Extra small text for fine print" }
                                     mod.widgets.MpTextSm { text: "Small text for captions" }
@@ -1951,7 +1947,7 @@ ui: Root{
                                     spacing: 8,
                                     padding: 16,
                                     show_bg: true,
-                                    draw_bg: { color: #xffffffff }
+                                    draw_bg +: { color: #xffffffff }
 
                                     mod.widgets.MpText { text: "Default text color" }
                                     mod.widgets.MpTextMuted { text: "Muted text for secondary info" }
@@ -1976,7 +1972,7 @@ ui: Root{
                                     spacing: 16,
                                     padding: 16,
                                     show_bg: true,
-                                    draw_bg: { color: #xffffffff }
+                                    draw_bg +: { color: #xffffffff }
 
                                     // Lead text
                                     mod.widgets.MpTextLead {
@@ -1988,7 +1984,7 @@ ui: Root{
                                         width: Fit, height: Fit,
                                         flow: Right,
                                         spacing: 4,
-                                        align: { y: 0.5 }
+                                        align: Align{ y: 0.5 }
 
                                         mod.widgets.MpTextInline { text: "Use the " }
                                         mod.widgets.MpTextCode { text: "println!()" }
@@ -2025,12 +2021,12 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 24,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     // Default (red)
                                     mod.widgets.MpBadge {
                                         count: 5
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonSecondary { text: "Messages" }
                                         }
                                     }
@@ -2038,7 +2034,7 @@ ui: Root{
                                     // Success (green)
                                     mod.widgets.MpBadgeSuccess {
                                         count: 3
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonSecondary { text: "Completed" }
                                         }
                                     }
@@ -2046,7 +2042,7 @@ ui: Root{
                                     // Warning (orange)
                                     mod.widgets.MpBadgeWarning {
                                         count: 2
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonSecondary { text: "Pending" }
                                         }
                                     }
@@ -2065,25 +2061,25 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 24,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpBadge {
                                         count: 9
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonGhost { text: "Default" }
                                         }
                                     }
 
                                     mod.widgets.MpBadgeInfo {
                                         count: 12
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonGhost { text: "Info" }
                                         }
                                     }
 
                                     mod.widgets.MpBadgeSecondary {
                                         count: 7
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonGhost { text: "Secondary" }
                                         }
                                     }
@@ -2102,22 +2098,22 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 24,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpBadgeDot {
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonSecondary { text: "Notifications" }
                                         }
                                     }
 
                                     mod.widgets.MpBadgeDotSuccess {
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonSecondary { text: "Online" }
                                         }
                                     }
 
                                     mod.widgets.MpBadgeDotWarning {
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonSecondary { text: "Away" }
                                         }
                                     }
@@ -2136,19 +2132,19 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 12,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpBadgeStandalone {
-                                        label = { text: "5" }
+                                        label +: { text: "5" }
                                     }
                                     mod.widgets.MpBadgeStandaloneSuccess {
-                                        label = { text: "New" }
+                                        label +: { text: "New" }
                                     }
                                     mod.widgets.MpBadgeStandaloneWarning {
-                                        label = { text: "99+" }
+                                        label +: { text: "99+" }
                                     }
                                     mod.widgets.MpBadgeStandaloneInfo {
-                                        label = { text: "Beta" }
+                                        label +: { text: "Beta" }
                                     }
                                 }
                             }
@@ -2165,19 +2161,19 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
-                                    badge_dec_btn = mod.widgets.MpButtonGhost { text: "-" }
-                                    interactive_badge = mod.widgets.MpBadge {
+                                    badge_dec_btn := mod.widgets.MpButtonGhost{ text: "-" }
+                                    interactive_badge := mod.widgets.MpBadge{
                                         count: 5
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonSecondary { text: "Items" }
                                         }
                                     }
-                                    badge_inc_btn = mod.widgets.MpButtonGhost { text: "+" }
+                                    badge_inc_btn := mod.widgets.MpButtonGhost{ text: "+" }
 
-                                    badge_count_label = Label {
-                                        draw_text: {
+                                    badge_count_label := Label{
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 12.0 }
                                             color: MUTED_FOREGROUND
                                         }
@@ -2209,13 +2205,13 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
-                                    mod.widgets.MpAvatarXSmall { label = { text: "XS" } }
-                                    mod.widgets.MpAvatarSmall { label = { text: "SM" } }
-                                    mod.widgets.MpAvatar { label = { text: "MD" } }
-                                    mod.widgets.MpAvatarLarge { label = { text: "LG" } }
-                                    mod.widgets.MpAvatarXLarge { label = { text: "XL" } }
+                                    mod.widgets.MpAvatarXSmall { label +: { text: "XS" } }
+                                    mod.widgets.MpAvatarSmall { label +: { text: "SM" } }
+                                    mod.widgets.MpAvatar { label +: { text: "MD" } }
+                                    mod.widgets.MpAvatarLarge { label +: { text: "LG" } }
+                                    mod.widgets.MpAvatarXLarge { label +: { text: "XL" } }
                                 }
                             }
 
@@ -2231,13 +2227,13 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 12,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
-                                    mod.widgets.MpAvatar { label = { text: "JD" } }
-                                    mod.widgets.MpAvatarPrimary { label = { text: "AB" } }
-                                    mod.widgets.MpAvatarSuccess { label = { text: "CD" } }
-                                    mod.widgets.MpAvatarDanger { label = { text: "EF" } }
-                                    mod.widgets.MpAvatarWarning { label = { text: "GH" } }
+                                    mod.widgets.MpAvatar { label +: { text: "JD" } }
+                                    mod.widgets.MpAvatarPrimary { label +: { text: "AB" } }
+                                    mod.widgets.MpAvatarSuccess { label +: { text: "CD" } }
+                                    mod.widgets.MpAvatarDanger { label +: { text: "EF" } }
+                                    mod.widgets.MpAvatarWarning { label +: { text: "GH" } }
                                 }
                             }
 
@@ -2253,12 +2249,12 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 12,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
-                                    dynamic_avatar = mod.widgets.MpAvatar { label = { text: "??" } }
-                                    avatar_change_btn = mod.widgets.MpButtonSecondary { text: "Random Name" }
-                                    avatar_name_label = Label {
-                                        draw_text: {
+                                    dynamic_avatar := mod.widgets.MpAvatar{ label +: { text: "??" } }
+                                    avatar_change_btn := mod.widgets.MpButtonSecondary{ text: "Random Name" }
+                                    avatar_name_label := Label{
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: MUTED_FOREGROUND
                                         }
@@ -2292,7 +2288,7 @@ ui: Root{
                                     }
                                     mod.widgets.MpCardContent {
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 14.0 }
                                                 color: FOREGROUND
                                             }
@@ -2314,7 +2310,7 @@ ui: Root{
                                     }
                                     mod.widgets.MpCardContent {
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 14.0 }
                                                 color: FOREGROUND
                                             }
@@ -2341,7 +2337,7 @@ ui: Root{
                                         width: 180,
                                         padding: 12,
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 14.0 }
                                                 color: SUCCESS
                                             }
@@ -2353,7 +2349,7 @@ ui: Root{
                                         width: 180,
                                         padding: 12,
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 14.0 }
                                                 color: DANGER
                                             }
@@ -2365,7 +2361,7 @@ ui: Root{
                                         width: 180,
                                         padding: 12,
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 14.0 }
                                                 color: #xb45309ff
                                             }
@@ -2377,7 +2373,7 @@ ui: Root{
                                         width: 180,
                                         padding: 12,
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 14.0 }
                                                 color: INFO
                                             }
@@ -2400,7 +2396,7 @@ ui: Root{
                                     flow: Right,
                                     spacing: 12,
 
-                                    clickable_card_1 = mod.widgets.MpCardClickable {
+                                    clickable_card_1 := mod.widgets.MpCardClickable{
                                         width: 200,
                                         mod.widgets.MpCardHeader {
                                             mod.widgets.MpCardTitle { text: "Click Me" }
@@ -2408,7 +2404,7 @@ ui: Root{
                                         }
                                     }
 
-                                    clickable_card_2 = mod.widgets.MpCardClickable {
+                                    clickable_card_2 := mod.widgets.MpCardClickable{
                                         width: 200,
                                         mod.widgets.MpCardHeader {
                                             mod.widgets.MpCardTitle { text: "Interactive" }
@@ -2416,9 +2412,9 @@ ui: Root{
                                         }
                                     }
 
-                                    card_click_status = Label {
+                                    card_click_status := Label{
                                         width: Fit, height: Fit,
-                                        draw_text: {
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: MUTED_FOREGROUND
                                         }
@@ -2474,12 +2470,12 @@ ui: Root{
                                     width: Fill, height: Fit,
                                     flow: Right,
                                     spacing: 8,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
-                                    skeleton_toggle_btn = mod.widgets.MpButtonPrimary { text: "Toggle Loading" }
+                                    skeleton_toggle_btn := mod.widgets.MpButtonPrimary{ text: "Toggle Loading" }
 
-                                    skeleton_status = Label {
-                                        draw_text: {
+                                    skeleton_status := Label{
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: MUTED_FOREGROUND
                                         }
@@ -2488,11 +2484,11 @@ ui: Root{
                                 }
 
                                 // Interactive skeleton widget
-                                interactive_skeleton = mod.widgets.MpSkeletonWidget {
+                                interactive_skeleton := mod.widgets.MpSkeletonWidget{
                                     width: Fill,
                                     height: Fit,
 
-                                    skeleton = View {
+                                    skeleton := View{
                                         width: Fill, height: Fit,
                                         flow: Down,
                                         spacing: 8
@@ -2502,20 +2498,20 @@ ui: Root{
                                         mod.widgets.MpSkeletonRounded { width: 200, height: 14 }
                                     }
 
-                                    content = View {
+                                    content := View{
                                         width: Fill, height: Fit,
                                         flow: Down,
                                         spacing: 8
 
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_bold{ font_size: 16.0 }
                                                 color: FOREGROUND
                                             }
                                             text: "Content Loaded!"
                                         }
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 14.0 }
                                                 color: MUTED_FOREGROUND
                                             }
@@ -2525,7 +2521,7 @@ ui: Root{
                                 }
                             }
 
-                            mod.widgets.MpDivider { margin: { top: 8, bottom: 8 } }
+                            mod.widgets.MpDivider { margin: Inset{ top: 8, bottom: 8 } }
 
                             View {
                                 width: Fit, height: Fit,
@@ -2538,7 +2534,7 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpSkeleton {
                                         width: 200, height: 20
@@ -2583,7 +2579,7 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpSpinnerXs {}
                                     mod.widgets.MpSpinnerSm {}
@@ -2605,7 +2601,7 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpSpinnerPrimary {}
                                     mod.widgets.MpSpinnerSuccess {}
@@ -2626,7 +2622,7 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpSpinnerThin {}
                                     mod.widgets.MpSpinner {}
@@ -2647,7 +2643,7 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpSpinnerSlow {}
                                     mod.widgets.MpSpinner {}
@@ -2667,7 +2663,7 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 24,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpSpinnerDots {}
                                     mod.widgets.MpSpinnerPulse {}
@@ -2686,7 +2682,7 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 32,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
                                     mod.widgets.MpSpinnerWithLabel {}
                                     mod.widgets.MpSpinnerWithLabelVertical {}
@@ -2698,14 +2694,14 @@ ui: Root{
                     // ============================================================
                     // Navigation Page
                     // ============================================================
-                    page_nav = ScrollYView{
+                    page_nav := ScrollYView{
                         width: Fill, height: Fill,
                         flow: Down,
                         spacing: 24,
-                        padding: { left: 24, right: 24, top: 24, bottom: 100 }
+                        padding: Inset{ left: 24, right: 24, top: 24, bottom: 100 }
 
                         show_bg: true
-                        draw_bg: { color: #xbfdbfeff }
+                        draw_bg +: { color: #xbfdbfeff }
 
                         // ===== Tab Section =====
                         View {
@@ -2724,9 +2720,9 @@ ui: Root{
                                 SubsectionLabel{ text: "Default" }
 
                                 mod.widgets.MpTabBar {
-                                    tab_home = mod.widgets.MpTab { text: "Home" }
-                                    tab_profile = mod.widgets.MpTab { text: "Profile" }
-                                    tab_settings = mod.widgets.MpTab { text: "Settings" }
+                                    tab_home := mod.widgets.MpTab{ text: "Home" }
+                                    tab_profile := mod.widgets.MpTab{ text: "Profile" }
+                                    tab_settings := mod.widgets.MpTab{ text: "Settings" }
                                 }
                             }
 
@@ -2739,9 +2735,9 @@ ui: Root{
                                 SubsectionLabel{ text: "Underline" }
 
                                 mod.widgets.MpTabBarUnderline {
-                                    tab_u_overview = mod.widgets.MpTabUnderline { text: "Overview" }
-                                    tab_u_analytics = mod.widgets.MpTabUnderline { text: "Analytics" }
-                                    tab_u_reports = mod.widgets.MpTabUnderline { text: "Reports" }
+                                    tab_u_overview := mod.widgets.MpTabUnderline{ text: "Overview" }
+                                    tab_u_analytics := mod.widgets.MpTabUnderline{ text: "Analytics" }
+                                    tab_u_reports := mod.widgets.MpTabUnderline{ text: "Reports" }
                                 }
                             }
 
@@ -2754,9 +2750,9 @@ ui: Root{
                                 SubsectionLabel{ text: "Pill" }
 
                                 mod.widgets.MpTabBarPill {
-                                    tab_p_all = mod.widgets.MpTabPill { text: "All" }
-                                    tab_p_active = mod.widgets.MpTabPill { text: "Active" }
-                                    tab_p_completed = mod.widgets.MpTabPill { text: "Completed" }
+                                    tab_p_all := mod.widgets.MpTabPill{ text: "All" }
+                                    tab_p_active := mod.widgets.MpTabPill{ text: "Active" }
+                                    tab_p_completed := mod.widgets.MpTabPill{ text: "Completed" }
                                 }
                             }
 
@@ -2769,9 +2765,9 @@ ui: Root{
                                 SubsectionLabel{ text: "Outline" }
 
                                 mod.widgets.MpTabBarOutline {
-                                    tab_o_day = mod.widgets.MpTabOutline { text: "Day" }
-                                    tab_o_week = mod.widgets.MpTabOutline { text: "Week" }
-                                    tab_o_month = mod.widgets.MpTabOutline { text: "Month" }
+                                    tab_o_day := mod.widgets.MpTabOutline{ text: "Day" }
+                                    tab_o_week := mod.widgets.MpTabOutline{ text: "Week" }
+                                    tab_o_month := mod.widgets.MpTabOutline{ text: "Month" }
                                 }
                             }
 
@@ -2784,14 +2780,14 @@ ui: Root{
                                 SubsectionLabel{ text: "Segmented" }
 
                                 mod.widgets.MpTabBarSegmented {
-                                    tab_s_list = mod.widgets.MpTabSegmented { text: "List" }
-                                    tab_s_grid = mod.widgets.MpTabSegmented { text: "Grid" }
-                                    tab_s_map = mod.widgets.MpTabSegmented { text: "Map" }
+                                    tab_s_list := mod.widgets.MpTabSegmented{ text: "List" }
+                                    tab_s_grid := mod.widgets.MpTabSegmented{ text: "Grid" }
+                                    tab_s_map := mod.widgets.MpTabSegmented{ text: "Map" }
                                 }
                             }
 
-                            tab_status = Label {
-                                draw_text: {
+                            tab_status := Label{
+                                draw_text +: {
                                     text_style: theme.font_regular{ font_size: 12.0 }
                                     color: MUTED_FOREGROUND
                                 }
@@ -2810,7 +2806,7 @@ ui: Root{
                             SectionHeader{ text: "PageFlip" }
 
                             Label {
-                                draw_text: {
+                                draw_text +: {
                                     text_style: theme.font_regular{ font_size: 14.0 }
                                     color: MUTED_FOREGROUND
                                 }
@@ -2823,30 +2819,30 @@ ui: Root{
                                 flow: Right,
                                 spacing: 8,
 
-                                page_btn_a = mod.widgets.MpButtonPrimary { text: "Page A" }
-                                page_btn_b = mod.widgets.MpButtonGhost { text: "Page B" }
-                                page_btn_c = mod.widgets.MpButtonGhost { text: "Page C" }
+                                page_btn_a := mod.widgets.MpButtonPrimary{ text: "Page A" }
+                                page_btn_b := mod.widgets.MpButtonGhost{ text: "Page B" }
+                                page_btn_c := mod.widgets.MpButtonGhost{ text: "Page C" }
                             }
 
                             // PageFlip container
                             View {
                                 width: Fill, height: 120,
                                 show_bg: true,
-                                draw_bg: {
+                                draw_bg +: {
                                     color: (MUTED)
                                 }
 
-                                demo_page_flip = PageFlip{
+                                demo_page_flip := PageFlip{
                                     width: Fill, height: Fill,
-                                    active_page: page_a,
+                                    active_page: @page_a,
 
-                                    page_a = View {
+                                    page_a := View{
                                         width: Fill, height: Fill,
-                                        align: { x: 0.5, y: 0.5 }
+                                        align: Align{ x: 0.5, y: 0.5 }
                                         show_bg: true
-                                        draw_bg: { color: #xdbeafeff }
+                                        draw_bg +: { color: #xdbeafeff }
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_bold{ font_size: 24.0 }
                                                 color: PRIMARY
                                             }
@@ -2854,13 +2850,13 @@ ui: Root{
                                         }
                                     }
 
-                                    page_b = View {
+                                    page_b := View{
                                         width: Fill, height: Fill,
-                                        align: { x: 0.5, y: 0.5 }
+                                        align: Align{ x: 0.5, y: 0.5 }
                                         show_bg: true
-                                        draw_bg: { color: #xdcfce7ff }
+                                        draw_bg +: { color: #xdcfce7ff }
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_bold{ font_size: 24.0 }
                                                 color: SUCCESS
                                             }
@@ -2868,13 +2864,13 @@ ui: Root{
                                         }
                                     }
 
-                                    page_c = View {
+                                    page_c := View{
                                         width: Fill, height: Fill,
-                                        align: { x: 0.5, y: 0.5 }
+                                        align: Align{ x: 0.5, y: 0.5 }
                                         show_bg: true
-                                        draw_bg: { color: #xfee2e2ff }
+                                        draw_bg +: { color: #xfee2e2ff }
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_bold{ font_size: 24.0 }
                                                 color: DANGER
                                             }
@@ -2889,14 +2885,14 @@ ui: Root{
                     // ============================================================
                     // Feedback Page
                     // ============================================================
-                    page_feedback = ScrollYView{
+                    page_feedback := ScrollYView{
                         width: Fill, height: Fill,
                         flow: Down,
                         spacing: 24,
-                        padding: { left: 24, right: 24, top: 24, bottom: 100 }
+                        padding: Inset{ left: 24, right: 24, top: 24, bottom: 100 }
 
                         show_bg: true
-                        draw_bg: { color: #xfde68aff }
+                        draw_bg +: { color: #xfde68aff }
 
                         // ===== Tooltip Section =====
                         View {
@@ -2917,32 +2913,32 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 24,
-                                    padding: { top: 40, bottom: 40 }
+                                    padding: Inset{ top: 40, bottom: 40 }
 
                                     mod.widgets.MpTooltipTop {
                                         tip: "Tooltip on top"
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonSecondary { text: "Top" }
                                         }
                                     }
 
                                     mod.widgets.MpTooltipBottom {
                                         tip: "Tooltip on bottom"
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonSecondary { text: "Bottom" }
                                         }
                                     }
 
                                     mod.widgets.MpTooltipLeft {
                                         tip: "Tooltip on left"
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonSecondary { text: "Left" }
                                         }
                                     }
 
                                     mod.widgets.MpTooltipRight {
                                         tip: "Tooltip on right"
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonSecondary { text: "Right" }
                                         }
                                     }
@@ -2961,19 +2957,19 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    padding: { top: 20, bottom: 20 }
+                                    padding: Inset{ top: 20, bottom: 20 }
 
                                     mod.widgets.MpTooltipTop {
                                         tip: "Instant tooltip (0s delay)"
                                         show_delay: 0.0
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonOutline { text: "Instant" }
                                         }
                                     }
 
                                     mod.widgets.MpTooltipTop {
                                         tip: "Default delay (0.3s)"
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonOutline { text: "Default 0.3s" }
                                         }
                                     }
@@ -2981,7 +2977,7 @@ ui: Root{
                                     mod.widgets.MpTooltipTop {
                                         tip: "Slow tooltip (1s delay)"
                                         show_delay: 1.0
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonOutline { text: "Slow 1s" }
                                         }
                                     }
@@ -2989,7 +2985,7 @@ ui: Root{
                                     mod.widgets.MpTooltipTop {
                                         tip: "Very slow tooltip (2s delay)"
                                         show_delay: 2.0
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonOutline { text: "Very Slow 2s" }
                                         }
                                     }
@@ -3008,13 +3004,13 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 24,
-                                    align: { y: 0.5 }
-                                    padding: { top: 20, bottom: 20 }
+                                    align: Align{ y: 0.5 }
+                                    padding: Inset{ top: 20, bottom: 20 }
 
                                     // Tooltip on Checkbox
                                     mod.widgets.MpTooltipTop {
                                         tip: "Check this to enable feature"
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpCheckbox {
                                                 text: "Checkbox"
                                             }
@@ -3024,15 +3020,15 @@ ui: Root{
                                     // Tooltip on Switch
                                     mod.widgets.MpTooltipTop {
                                         tip: "Toggle to turn on/off"
-                                        content = {
+                                        content +: {
                                             View {
                                                 width: Fit, height: Fit,
                                                 flow: Right,
                                                 spacing: 8,
-                                                align: { y: 0.5 }
+                                                align: Align{ y: 0.5 }
                                                 mod.widgets.MpSwitch {}
                                                 Label {
-                                                    draw_text: {
+                                                    draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 14.0 }
                                                         color: FOREGROUND
                                                     }
@@ -3045,7 +3041,7 @@ ui: Root{
                                     // Tooltip on Radio
                                     mod.widgets.MpTooltipTop {
                                         tip: "Select this option"
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpRadio {
                                                 text: "Radio"
                                             }
@@ -3055,9 +3051,9 @@ ui: Root{
                                     // Tooltip on Icon/Label
                                     mod.widgets.MpTooltipTop {
                                         tip: "This is an info icon with tooltip"
-                                        content = {
+                                        content +: {
                                             Label {
-                                                draw_text: {
+                                                draw_text +: {
                                                     text_style: theme.font_regular{ font_size: 20.0 }
                                                     color: PRIMARY
                                                 }
@@ -3080,18 +3076,18 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    padding: { top: 20, bottom: 20 }
+                                    padding: Inset{ top: 20, bottom: 20 }
 
                                     mod.widgets.MpTooltipTop {
                                         tip: "This is a longer tooltip text that provides more detailed information about the element being hovered."
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonGhost { text: "Long tooltip" }
                                         }
                                     }
 
                                     mod.widgets.MpTooltipBottom {
                                         tip: "Tooltips can contain helpful hints, keyboard shortcuts, or additional context for users."
-                                        content = {
+                                        content +: {
                                             mod.widgets.MpButtonGhost { text: "Helpful hints" }
                                         }
                                     }
@@ -3180,14 +3176,14 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Right,
                                     spacing: 16,
-                                    align: { y: 0.5 }
+                                    align: Align{ y: 0.5 }
 
-                                    progress_dec_btn = mod.widgets.MpButtonGhost { text: "-10" }
-                                    interactive_progress = mod.widgets.MpProgress { width: 200, value: 50.0 }
-                                    progress_inc_btn = mod.widgets.MpButtonGhost { text: "+10" }
+                                    progress_dec_btn := mod.widgets.MpButtonGhost{ text: "-10" }
+                                    interactive_progress := mod.widgets.MpProgress{ width: 200, value: 50.0 }
+                                    progress_inc_btn := mod.widgets.MpButtonGhost{ text: "+10" }
 
-                                    progress_label = Label {
-                                        draw_text: {
+                                    progress_label := Label{
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: FOREGROUND
                                         }
@@ -3221,32 +3217,32 @@ ui: Root{
                                     spacing: 12,
 
                                     mod.widgets.MpAlert {
-                                        content = {
-                                            message = { text: "This is a default alert message." }
+                                        content +: {
+                                            message +: { text: "This is a default alert message." }
                                         }
                                     }
 
                                     mod.widgets.MpAlertInfo {
-                                        content = {
-                                            message = { text: "This is an info alert for general information." }
+                                        content +: {
+                                            message +: { text: "This is an info alert for general information." }
                                         }
                                     }
 
                                     mod.widgets.MpAlertSuccess {
-                                        content = {
-                                            message = { text: "Operation completed successfully!" }
+                                        content +: {
+                                            message +: { text: "Operation completed successfully!" }
                                         }
                                     }
 
                                     mod.widgets.MpAlertWarning {
-                                        content = {
-                                            message = { text: "Please review your input before continuing." }
+                                        content +: {
+                                            message +: { text: "Please review your input before continuing." }
                                         }
                                     }
 
                                     mod.widgets.MpAlertError {
-                                        content = {
-                                            message = { text: "Something went wrong. Please try again." }
+                                        content +: {
+                                            message +: { text: "Something went wrong. Please try again." }
                                         }
                                     }
                                 }
@@ -3266,23 +3262,23 @@ ui: Root{
                                     spacing: 12,
 
                                     mod.widgets.MpAlertInfo {
-                                        content = {
-                                            title_wrapper = { visible: true, title = { text: "Information" } }
-                                            message = { text: "This alert has a title for more context." }
+                                        content +: {
+                                            title_wrapper +: { visible: true, title +: { text: "Information" } }
+                                            message +: { text: "This alert has a title for more context." }
                                         }
                                     }
 
                                     mod.widgets.MpAlertSuccess {
-                                        content = {
-                                            title_wrapper = { visible: true, title = { text: "Success!" } }
-                                            message = { text: "Your changes have been saved successfully." }
+                                        content +: {
+                                            title_wrapper +: { visible: true, title +: { text: "Success!" } }
+                                            message +: { text: "Your changes have been saved successfully." }
                                         }
                                     }
 
                                     mod.widgets.MpAlertError {
-                                        content = {
-                                            title_wrapper = { visible: true, title = { text: "Error" } }
-                                            message = { text: "Failed to connect to the server. Check your network." }
+                                        content +: {
+                                            title_wrapper +: { visible: true, title +: { text: "Error" } }
+                                            message +: { text: "Failed to connect to the server. Check your network." }
                                         }
                                     }
                                 }
@@ -3301,18 +3297,18 @@ ui: Root{
                                     flow: Down,
                                     spacing: 12,
 
-                                    closable_alert = mod.widgets.MpAlertInfo {
+                                    closable_alert := mod.widgets.MpAlertInfo{
                                         closable: true
-                                        content = {
-                                            message = { text: "This alert can be closed. Click the X button." }
+                                        content +: {
+                                            message +: { text: "This alert can be closed. Click the X button." }
                                         }
                                     }
 
-                                    closable_alert_warning = mod.widgets.MpAlertWarning {
+                                    closable_alert_warning := mod.widgets.MpAlertWarning{
                                         closable: true
-                                        content = {
-                                            title_wrapper = { visible: true, title = { text: "Warning" } }
-                                            message = { text: "This is a closable warning with title." }
+                                        content +: {
+                                            title_wrapper +: { visible: true, title +: { text: "Warning" } }
+                                            message +: { text: "This is a closable warning with title." }
                                         }
                                     }
                                 }
@@ -3332,28 +3328,28 @@ ui: Root{
                                     spacing: 0,
 
                                     mod.widgets.MpAlertBannerInfo {
-                                        content = {
-                                            message = { text: "Info banner - full width, no border radius" }
+                                        content +: {
+                                            message +: { text: "Info banner - full width, no border radius" }
                                         }
                                     }
 
                                     mod.widgets.MpAlertBannerSuccess {
                                         closable: true
-                                        content = {
-                                            message = { text: "Success banner with close button" }
+                                        content +: {
+                                            message +: { text: "Success banner with close button" }
                                         }
                                     }
 
                                     mod.widgets.MpAlertBannerWarning {
-                                        content = {
-                                            message = { text: "Warning banner alert" }
+                                        content +: {
+                                            message +: { text: "Warning banner alert" }
                                         }
                                     }
 
                                     mod.widgets.MpAlertBannerError {
                                         closable: true
-                                        content = {
-                                            message = { text: "Error banner - something needs attention!" }
+                                        content +: {
+                                            message +: { text: "Error banner - something needs attention!" }
                                         }
                                     }
                                 }
@@ -3376,16 +3372,16 @@ ui: Root{
                                 flow: Right,
                                 spacing: 8,
 
-                                show_success_notif = mod.widgets.MpButtonSuccess { text: "Success" }
-                                show_error_notif = mod.widgets.MpButtonDanger { text: "Error" }
-                                show_warning_notif = mod.widgets.MpButtonWarning { text: "Warning" }
-                                show_info_notif = mod.widgets.MpButtonPrimary { text: "Info" }
+                                show_success_notif := mod.widgets.MpButtonSuccess{ text: "Success" }
+                                show_error_notif := mod.widgets.MpButtonDanger{ text: "Error" }
+                                show_warning_notif := mod.widgets.MpButtonWarning{ text: "Warning" }
+                                show_info_notif := mod.widgets.MpButtonPrimary{ text: "Info" }
                             }
 
-                            mod.widgets.MpDivider { margin: { top: 8, bottom: 8 } }
+                            mod.widgets.MpDivider { margin: Inset{ top: 8, bottom: 8 } }
 
                             Label {
-                                draw_text: {
+                                draw_text +: {
                                     text_style: theme.font_regular{ font_size: 14.0 }
                                     color: MUTED_FOREGROUND
                                 }
@@ -3398,37 +3394,37 @@ ui: Root{
                                 spacing: 12,
 
                                 mod.widgets.MpNotification {
-                                    content = {
-                                        title = { text: "Notification" }
-                                        message = { text: "This is a default notification message." }
+                                    content +: {
+                                        title +: { text: "Notification" }
+                                        message +: { text: "This is a default notification message." }
                                     }
                                 }
 
                                 mod.widgets.MpNotificationSuccess {
-                                    content = {
-                                        title = { text: "Success" }
-                                        message = { text: "Operation completed successfully!" }
+                                    content +: {
+                                        title +: { text: "Success" }
+                                        message +: { text: "Operation completed successfully!" }
                                     }
                                 }
 
                                 mod.widgets.MpNotificationError {
-                                    content = {
-                                        title = { text: "Error" }
-                                        message = { text: "Something went wrong. Please try again." }
+                                    content +: {
+                                        title +: { text: "Error" }
+                                        message +: { text: "Something went wrong. Please try again." }
                                     }
                                 }
 
                                 mod.widgets.MpNotificationWarning {
-                                    content = {
-                                        title = { text: "Warning" }
-                                        message = { text: "Please review your input before continuing." }
+                                    content +: {
+                                        title +: { text: "Warning" }
+                                        message +: { text: "Please review your input before continuing." }
                                     }
                                 }
 
                                 mod.widgets.MpNotificationInfo {
-                                    content = {
-                                        title = { text: "Info" }
-                                        message = { text: "Here's some helpful information." }
+                                    content +: {
+                                        title +: { text: "Info" }
+                                        message +: { text: "Here's some helpful information." }
                                     }
                                 }
                             }
@@ -3449,12 +3445,12 @@ ui: Root{
                                 width: Fill, height: Fit,
                                 flow: Right,
                                 spacing: 16,
-                                align: { y: 0.5 }
+                                align: Align{ y: 0.5 }
 
-                                open_modal_btn = mod.widgets.MpButtonPrimary { text: "Open Modal" }
+                                open_modal_btn := mod.widgets.MpButtonPrimary{ text: "Open Modal" }
 
-                                modal_status = Label {
-                                    draw_text: {
+                                modal_status := Label{
+                                    draw_text +: {
                                         text_style: theme.font_regular{ font_size: 14.0 }
                                         color: MUTED_FOREGROUND
                                     }
@@ -3462,10 +3458,10 @@ ui: Root{
                                 }
                             }
 
-                            mod.widgets.MpDivider { margin: { top: 8, bottom: 8 } }
+                            mod.widgets.MpDivider { margin: Inset{ top: 8, bottom: 8 } }
 
                             Label {
-                                draw_text: {
+                                draw_text +: {
                                     text_style: theme.font_regular{ font_size: 14.0 }
                                     color: MUTED_FOREGROUND
                                 }
@@ -3475,19 +3471,19 @@ ui: Root{
                             // Basic Modal preview
                             mod.widgets.MpModal {
                                 width: 350,
-                                header = {
-                                    title = { text: "Modal Title" }
+                                header +: {
+                                    title +: { text: "Modal Title" }
                                 }
-                                body = {
+                                body +: {
                                     Label {
-                                        draw_text: {
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: MUTED_FOREGROUND
                                         }
                                         text: "This is the modal content area."
                                     }
                                 }
-                                footer = {
+                                footer +: {
                                     mod.widgets.MpButtonGhost { text: "Cancel" }
                                     mod.widgets.MpButtonPrimary { text: "Confirm" }
                                 }
@@ -3496,19 +3492,19 @@ ui: Root{
                             // Alert Dialog preview
                             mod.widgets.MpAlertDialog {
                                 width: 320,
-                                header = {
-                                    title = { text: "Are you sure?" }
+                                header +: {
+                                    title +: { text: "Are you sure?" }
                                 }
-                                body = {
+                                body +: {
                                     Label {
-                                        draw_text: {
+                                        draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
                                             color: MUTED_FOREGROUND
                                         }
                                         text: "This action cannot be undone."
                                     }
                                 }
-                                footer = {
+                                footer +: {
                                     mod.widgets.MpButtonGhost { text: "Cancel" }
                                     mod.widgets.MpButtonDanger { text: "Delete" }
                                 }
@@ -3533,7 +3529,7 @@ ui: Root{
 
                                 SubsectionLabel{ text: "Basic" }
                                 Label {
-                                    draw_text: {
+                                    draw_text +: {
                                         text_style: theme.font_regular{ font_size: 13.0 }
                                         color: MUTED_FOREGROUND
                                     }
@@ -3546,18 +3542,18 @@ ui: Root{
                                     spacing: 16,
 
                                     mod.widgets.MpPopoverBottom {
-                                        trigger: Hover
+                                        trigger: mod.widgets.MpPopoverTrigger.Hover
                                         mod.widgets.MpButtonPrimary { text: "Hover me" }
-                                        content = {
-                                            Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                            Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                            Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                        content +: {
+                                            Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                         }
                                     }
                                 }
                             }
 
-                            mod.widgets.MpDivider { margin: { top: 8, bottom: 8 } }
+                            mod.widgets.MpDivider { margin: Inset{ top: 8, bottom: 8 } }
 
                             // ===== Trigger Types (Ant Design: hover, focus, click) =====
                             View {
@@ -3567,7 +3563,7 @@ ui: Root{
 
                                 SubsectionLabel{ text: "Three trigger modes" }
                                 Label {
-                                    draw_text: {
+                                    draw_text +: {
                                         text_style: theme.font_regular{ font_size: 13.0 }
                                         color: MUTED_FOREGROUND
                                     }
@@ -3581,40 +3577,40 @@ ui: Root{
 
                                     // Hover trigger
                                     mod.widgets.MpPopoverBottom {
-                                        trigger: Hover
+                                        trigger: mod.widgets.MpPopoverTrigger.Hover
                                         mod.widgets.MpButton { text: "Hover me" }
-                                        content = {
-                                            Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                            Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                            Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                        content +: {
+                                            Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                         }
                                     }
 
                                     // Focus trigger
                                     mod.widgets.MpPopoverBottom {
-                                        trigger: Focus
+                                        trigger: mod.widgets.MpPopoverTrigger.Focus
                                         mod.widgets.MpButton { text: "Focus me" }
-                                        content = {
-                                            Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                            Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                            Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                        content +: {
+                                            Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                         }
                                     }
 
                                     // Click trigger
                                     mod.widgets.MpPopoverBottom {
-                                        trigger: Focus
+                                        trigger: mod.widgets.MpPopoverTrigger.Focus
                                         mod.widgets.MpButton { text: "Click me" }
-                                        content = {
-                                            Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                            Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                            Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                        content +: {
+                                            Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                         }
                                     }
                                 }
                             }
 
-                            mod.widgets.MpDivider { margin: { top: 8, bottom: 8 } }
+                            mod.widgets.MpDivider { margin: Inset{ top: 8, bottom: 8 } }
 
                             // ===== Placement (12 positions - Ant Design style layout) =====
                             View {
@@ -3624,7 +3620,7 @@ ui: Root{
 
                                 SubsectionLabel{ text: "Placement" }
                                 Label {
-                                    draw_text: {
+                                    draw_text +: {
                                         text_style: theme.font_regular{ font_size: 13.0 }
                                         color: MUTED_FOREGROUND
                                     }
@@ -3636,8 +3632,8 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Down,
                                     spacing: 8,
-                                    align: { x: 0.5 }
-                                    padding: { top: 16 }
+                                    align: Align{ x: 0.5 }
+                                    padding: Inset{ top: 16 }
 
                                     // Top row: TL, Top, TR
                                     View {
@@ -3647,28 +3643,28 @@ ui: Root{
 
                                         mod.widgets.MpPopoverTopLeft {
                                             mod.widgets.MpButton { width: 80, text: "TL" }
-                                            content = {
-                                                Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            content +: {
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                             }
                                         }
 
                                         mod.widgets.MpPopoverTop {
                                             mod.widgets.MpButton { width: 80, text: "Top" }
-                                            content = {
-                                                Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            content +: {
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                             }
                                         }
 
                                         mod.widgets.MpPopoverTopRight {
                                             mod.widgets.MpButton { width: 80, text: "TR" }
-                                            content = {
-                                                Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            content +: {
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                             }
                                         }
                                     }
@@ -3687,28 +3683,28 @@ ui: Root{
 
                                             mod.widgets.MpPopoverLeftTop {
                                                 mod.widgets.MpButton { width: 80, text: "LT" }
-                                                content = {
-                                                    Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                    Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                    Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                content +: {
+                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                                 }
                                             }
 
                                             mod.widgets.MpPopoverLeft {
                                                 mod.widgets.MpButton { width: 80, text: "Left" }
-                                                content = {
-                                                    Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                    Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                    Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                content +: {
+                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                                 }
                                             }
 
                                             mod.widgets.MpPopoverLeftBottom {
                                                 mod.widgets.MpButton { width: 80, text: "LB" }
-                                                content = {
-                                                    Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                    Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                    Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                content +: {
+                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                                 }
                                             }
                                         }
@@ -3721,28 +3717,28 @@ ui: Root{
 
                                             mod.widgets.MpPopoverRightTop {
                                                 mod.widgets.MpButton { width: 80, text: "RT" }
-                                                content = {
-                                                    Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                    Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                    Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                content +: {
+                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                                 }
                                             }
 
                                             mod.widgets.MpPopoverRight {
                                                 mod.widgets.MpButton { width: 80, text: "Right" }
-                                                content = {
-                                                    Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                    Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                    Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                content +: {
+                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                                 }
                                             }
 
                                             mod.widgets.MpPopoverRightBottom {
                                                 mod.widgets.MpButton { width: 80, text: "RB" }
-                                                content = {
-                                                    Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                    Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                    Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                content +: {
+                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                                 }
                                             }
                                         }
@@ -3756,35 +3752,35 @@ ui: Root{
 
                                         mod.widgets.MpPopoverBottomLeft {
                                             mod.widgets.MpButton { width: 80, text: "BL" }
-                                            content = {
-                                                Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            content +: {
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                             }
                                         }
 
                                         mod.widgets.MpPopoverBottom {
                                             mod.widgets.MpButton { width: 80, text: "Bottom" }
-                                            content = {
-                                                Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            content +: {
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                             }
                                         }
 
                                         mod.widgets.MpPopoverBottomRight {
                                             mod.widgets.MpButton { width: 80, text: "BR" }
-                                            content = {
-                                                Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            content +: {
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                             }
                                         }
                                     }
                                 }
                             }
 
-                            mod.widgets.MpDivider { margin: { top: 8, bottom: 8 } }
+                            mod.widgets.MpDivider { margin: Inset{ top: 8, bottom: 8 } }
 
                             // ===== Arrow (Show/Hide) =====
                             View {
@@ -3794,7 +3790,7 @@ ui: Root{
 
                                 SubsectionLabel{ text: "Arrow" }
                                 Label {
-                                    draw_text: {
+                                    draw_text +: {
                                         text_style: theme.font_regular{ font_size: 13.0 }
                                         color: MUTED_FOREGROUND
                                     }
@@ -3814,16 +3810,16 @@ ui: Root{
                                         spacing: 4,
 
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
                                                 color: MUTED_FOREGROUND
                                             }
                                             text: "Arrow Up"
                                         }
                                         mod.widgets.MpPopoverArrowUp {
-                                            content = {
-                                                Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            content +: {
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                             }
                                         }
                                     }
@@ -3835,16 +3831,16 @@ ui: Root{
                                         spacing: 4,
 
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
                                                 color: MUTED_FOREGROUND
                                             }
                                             text: "Arrow Down"
                                         }
                                         mod.widgets.MpPopoverArrowDown {
-                                            content = {
-                                                Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            content +: {
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                             }
                                         }
                                     }
@@ -3856,16 +3852,16 @@ ui: Root{
                                         spacing: 4,
 
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
                                                 color: MUTED_FOREGROUND
                                             }
                                             text: "Arrow Left"
                                         }
                                         mod.widgets.MpPopoverArrowLeft {
-                                            content = {
-                                                Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            content +: {
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                             }
                                         }
                                     }
@@ -3877,23 +3873,23 @@ ui: Root{
                                         spacing: 4,
 
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
                                                 color: MUTED_FOREGROUND
                                             }
                                             text: "Arrow Right"
                                         }
                                         mod.widgets.MpPopoverArrowRight {
-                                            content = {
-                                                Label { draw_text: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            content +: {
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
                                             }
                                         }
                                     }
                                 }
                             }
 
-                            mod.widgets.MpDivider { margin: { top: 8, bottom: 8 } }
+                            mod.widgets.MpDivider { margin: Inset{ top: 8, bottom: 8 } }
 
                             // ===== Controlling the close of the dialog =====
                             View {
@@ -3903,7 +3899,7 @@ ui: Root{
 
                                 SubsectionLabel{ text: "Controlling the close of the dialog" }
                                 Label {
-                                    draw_text: {
+                                    draw_text +: {
                                         text_style: theme.font_regular{ font_size: 13.0 }
                                         color: MUTED_FOREGROUND
                                     }
@@ -3914,21 +3910,21 @@ ui: Root{
                                     width: Fit, height: Fit,
                                     flow: Overlay,
 
-                                    popover_trigger_btn = mod.widgets.MpButtonPrimary { text: "Click me" }
+                                    popover_trigger_btn := mod.widgets.MpButtonPrimary{ text: "Click me" }
 
                                     View {
                                         width: Fit, height: Fit,
-                                        margin: { top: 44 }
+                                        margin: Inset{ top: 44 }
 
-                                        interactive_popover = mod.widgets.MpPopoverWidget {
-                                            content = mod.widgets.MpPopoverBase {
+                                        interactive_popover := mod.widgets.MpPopoverWidget{
+                                            content := mod.widgets.MpPopoverBase{
                                                 width: 200, height: Fit,
                                                 padding: 12,
                                                 flow: Down,
                                                 spacing: 8,
 
                                                 Label {
-                                                    draw_text: {
+                                                    draw_text +: {
                                                         text_style: theme.font_bold{ font_size: 14.0 }
                                                         color: FOREGROUND
                                                     }
@@ -3936,19 +3932,17 @@ ui: Root{
                                                 }
                                                 Label {
                                                     width: Fill,
-                                                    draw_text: {
+                                                    draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 13.0 }
                                                         color: MUTED_FOREGROUND
-                                                        wrap: Word
                                                     }
                                                     text: "Content"
                                                 }
                                                 Label {
                                                     width: Fill,
-                                                    draw_text: {
+                                                    draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 13.0 }
                                                         color: MUTED_FOREGROUND
-                                                        wrap: Word
                                                     }
                                                     text: "Content"
                                                 }
@@ -3958,7 +3952,7 @@ ui: Root{
                                 }
                             }
 
-                            mod.widgets.MpDivider { margin: { top: 8, bottom: 8 } }
+                            mod.widgets.MpDivider { margin: Inset{ top: 8, bottom: 8 } }
 
                             // ===== Popover Content Styles =====
                             View {
@@ -3968,7 +3962,7 @@ ui: Root{
 
                                 SubsectionLabel{ text: "Content Styles (Static Preview)" }
                                 Label {
-                                    draw_text: {
+                                    draw_text +: {
                                         text_style: theme.font_regular{ font_size: 13.0 }
                                         color: MUTED_FOREGROUND
                                     }
@@ -3979,7 +3973,7 @@ ui: Root{
                                     width: Fill, height: Fit,
                                     flow: Right,
                                     spacing: 24,
-                                    align: { y: 0.0 }
+                                    align: Align{ y: 0.0 }
 
                                     // Basic Popover
                                     View {
@@ -3988,7 +3982,7 @@ ui: Root{
                                         spacing: 4,
 
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
                                                 color: MUTED_FOREGROUND
                                             }
@@ -3999,10 +3993,9 @@ ui: Root{
                                             Label {
                                                 width: Fill,
                                                 height: Fit,
-                                                draw_text: {
+                                                draw_text +: {
                                                     text_style: theme.font_regular{ font_size: 13.0 }
                                                     color: FOREGROUND
-                                                    wrap: Word
                                                 }
                                                 text: "Content"
                                             }
@@ -4016,7 +4009,7 @@ ui: Root{
                                         spacing: 4,
 
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
                                                 color: MUTED_FOREGROUND
                                             }
@@ -4024,11 +4017,11 @@ ui: Root{
                                         }
                                         mod.widgets.MpPopoverWithHeader {
                                             width: 200,
-                                            header = {
-                                                title_label = { text: "Title" }
+                                            header +: {
+                                                title_label +: { text: "Title" }
                                             }
-                                            body = {
-                                                desc_label = { text: "Content" }
+                                            body +: {
+                                                desc_label +: { text: "Content" }
                                             }
                                         }
                                     }
@@ -4040,7 +4033,7 @@ ui: Root{
                                         spacing: 4,
 
                                         Label {
-                                            draw_text: {
+                                            draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
                                                 color: MUTED_FOREGROUND
                                             }
@@ -4048,10 +4041,10 @@ ui: Root{
                                         }
                                         mod.widgets.MpPopoverMenu {
                                             width: 160,
-                                            mod.widgets.MpPopoverMenuItem { label = { text: "Edit" } }
-                                            mod.widgets.MpPopoverMenuItem { label = { text: "Duplicate" } }
+                                            mod.widgets.MpPopoverMenuItem { label +: { text: "Edit" } }
+                                            mod.widgets.MpPopoverMenuItem { label +: { text: "Duplicate" } }
                                             mod.widgets.MpPopoverMenuDivider {}
-                                            mod.widgets.MpPopoverMenuItemDanger { label = { text: "Delete" } }
+                                            mod.widgets.MpPopoverMenuItemDanger { label +: { text: "Delete" } }
                                         }
                                     }
                                 }
@@ -4062,14 +4055,14 @@ ui: Root{
                     // ============================================================
                     // Data Page
                     // ============================================================
-                    page_data = ScrollYView{
+                    page_data := ScrollYView{
                         width: Fill, height: Fill,
                         flow: Down,
                         spacing: 24,
-                        padding: { left: 24, right: 24, top: 24, bottom: 100 }
+                        padding: Inset{ left: 24, right: 24, top: 24, bottom: 100 }
 
                         show_bg: true
-                        draw_bg: { color: #xfbcfe8ff }
+                        draw_bg +: { color: #xfbcfe8ff }
 
                         // ===== List Section =====
                         View {
@@ -4127,7 +4120,7 @@ ui: Root{
                                     mod.widgets.MpListDivided {
                                         mod.widgets.MpListItem {
                                             mod.widgets.MpListItemLeading {
-                                                mod.widgets.MpAvatarSmall { label = { text: "JD" } }
+                                                mod.widgets.MpAvatarSmall { label +: { text: "JD" } }
                                             }
                                             mod.widgets.MpListItemContent {
                                                 mod.widgets.MpListItemTitle { text: "John Doe" }
@@ -4137,7 +4130,7 @@ ui: Root{
                                         mod.widgets.MpListDividerFull {}
                                         mod.widgets.MpListItem {
                                             mod.widgets.MpListItemLeading {
-                                                mod.widgets.MpAvatarSmall { label = { text: "AS" } }
+                                                mod.widgets.MpAvatarSmall { label +: { text: "AS" } }
                                             }
                                             mod.widgets.MpListItemContent {
                                                 mod.widgets.MpListItemTitle { text: "Alice Smith" }
@@ -4147,7 +4140,7 @@ ui: Root{
                                         mod.widgets.MpListDividerFull {}
                                         mod.widgets.MpListItem {
                                             mod.widgets.MpListItemLeading {
-                                                mod.widgets.MpAvatarSmall { label = { text: "BJ" } }
+                                                mod.widgets.MpAvatarSmall { label +: { text: "BJ" } }
                                             }
                                             mod.widgets.MpListItemContent {
                                                 mod.widgets.MpListItemTitle { text: "Bob Johnson" }
@@ -4184,12 +4177,12 @@ ui: Root{
 
                                     mod.widgets.MpAccordion {
                                         mod.widgets.MpAccordionItem {
-                                            header = mod.widgets.MpAccordionHeaderBase {
-                                                label = { text: "Section 1" }
+                                            header := mod.widgets.MpAccordionHeader{
+                                                label +: { text: "Section 1" }
                                             }
-                                            body = {
+                                            body +: {
                                                 Label {
-                                                    draw_text: {
+                                                    draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 14.0 }
                                                         color: MUTED_FOREGROUND
                                                     }
@@ -4201,12 +4194,12 @@ ui: Root{
                                         mod.widgets.MpAccordionDivider {}
 
                                         mod.widgets.MpAccordionItem {
-                                            header = mod.widgets.MpAccordionHeaderBase {
-                                                label = { text: "Section 2" }
+                                            header := mod.widgets.MpAccordionHeader{
+                                                label +: { text: "Section 2" }
                                             }
-                                            body = {
+                                            body +: {
                                                 Label {
-                                                    draw_text: {
+                                                    draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 14.0 }
                                                         color: MUTED_FOREGROUND
                                                     }
@@ -4218,12 +4211,12 @@ ui: Root{
                                         mod.widgets.MpAccordionDivider {}
 
                                         mod.widgets.MpAccordionItem {
-                                            header = mod.widgets.MpAccordionHeaderBase {
-                                                label = { text: "Section 3" }
+                                            header := mod.widgets.MpAccordionHeader{
+                                                label +: { text: "Section 3" }
                                             }
-                                            body = {
+                                            body +: {
                                                 Label {
-                                                    draw_text: {
+                                                    draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 14.0 }
                                                         color: MUTED_FOREGROUND
                                                     }
@@ -4244,12 +4237,12 @@ ui: Root{
 
                                     mod.widgets.MpAccordionBordered {
                                         mod.widgets.MpAccordionItemBordered {
-                                            header = mod.widgets.MpAccordionHeaderBase {
-                                                label = { text: "FAQ Item 1" }
+                                            header := mod.widgets.MpAccordionHeader{
+                                                label +: { text: "FAQ Item 1" }
                                             }
-                                            body = {
+                                            body +: {
                                                 Label {
-                                                    draw_text: {
+                                                    draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 14.0 }
                                                         color: MUTED_FOREGROUND
                                                     }
@@ -4259,12 +4252,12 @@ ui: Root{
                                         }
 
                                         mod.widgets.MpAccordionItemBordered {
-                                            header = mod.widgets.MpAccordionHeaderBase {
-                                                label = { text: "FAQ Item 2" }
+                                            header := mod.widgets.MpAccordionHeader{
+                                                label +: { text: "FAQ Item 2" }
                                             }
-                                            body = {
+                                            body +: {
                                                 Label {
-                                                    draw_text: {
+                                                    draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 14.0 }
                                                         color: MUTED_FOREGROUND
                                                     }
@@ -4291,12 +4284,12 @@ ui: Root{
                                 width: Fit, height: Fit,
                                 flow: Right,
                                 spacing: 16,
-                                align: { y: 0.5 }
+                                align: Align{ y: 0.5 }
 
-                                counter_btn = mod.widgets.MpButtonPrimary { text: "Click me!" }
+                                counter_btn := mod.widgets.MpButtonPrimary{ text: "Click me!" }
 
-                                counter_label = Label {
-                                    draw_text: {
+                                counter_label := Label{
+                                    draw_text +: {
                                         text_style: theme.font_regular{ font_size: 14.0 }
                                         color: FOREGROUND
                                     }
@@ -4309,22 +4302,22 @@ ui: Root{
                     // ============================================================
                     // Shader Page - Shadertoy-style fractal effect
                     // ============================================================
-                    page_shader = View {
+                    page_shader := View{
                         width: Fill, height: Fill,
                         flow: Down,
                         padding: 24,
                         spacing: 16,
 
                         show_bg: true
-                        draw_bg: { color: #x1a1a2eff }
+                        draw_bg +: { color: #x1a1a2eff }
 
                         SectionHeader{
-                            draw_text: { color: #xffffffff }
+                            draw_text +: { color: #xffffffff }
                             text: "Shader Art"
                         }
 
                         Label {
-                            draw_text: {
+                            draw_text +: {
                                 text_style: theme.font_regular{ font_size: 12.0 }
                                 color: #xa0a0a0ff
                             }
@@ -4332,7 +4325,7 @@ ui: Root{
                         }
 
                         // Shader display area with animated time
-                        shader_canvas = ShaderCanvas{
+                        shader_canvas := mod.widgets.ShaderCanvas{
                             width: Fill, height: Fill,
                         }
                     }
@@ -4340,22 +4333,22 @@ ui: Root{
                     // ============================================================
                     // Shader Art Page - Observer effect
                     // ============================================================
-                    page_shader_art = View {
+                    page_shader_art := View{
                         width: Fill, height: Fill,
                         flow: Down,
                         padding: 24,
                         spacing: 16,
 
                         show_bg: true
-                        draw_bg: { color: #x0a0a0fff }
+                        draw_bg +: { color: #x0a0a0fff }
 
                         SectionHeader{
-                            draw_text: { color: #xffffffff }
+                            draw_text +: { color: #xffffffff }
                             text: "Shader Art - Observer"
                         }
 
                         Label {
-                            draw_text: {
+                            draw_text +: {
                                 text_style: theme.font_regular{ font_size: 12.0 }
                                 color: #xa0a0a0ff
                             }
@@ -4367,18 +4360,18 @@ ui: Root{
                             width: Fill, height: Fit,
                             flow: Right,
                             spacing: 16,
-                            align: { y: 0.5 }
+                            align: Align{ y: 0.5 }
 
                             Label {
                                 width: Fit,
-                                draw_text: {
+                                draw_text +: {
                                     text_style: theme.font_regular{ font_size: 14.0 }
                                     color: #xffffffff
                                 }
                                 text: "Speed:"
                             }
 
-                            shader_art_speed = mod.widgets.MpSlider {
+                            shader_art_speed := mod.widgets.MpSlider{
                                 width: 200, height: 24,
                                 min: 0.1,
                                 max: 3.0,
@@ -4386,9 +4379,9 @@ ui: Root{
                                 step: 0.1,
                             }
 
-                            shader_art_speed_label = Label {
+                            shader_art_speed_label := Label{
                                 width: 60,
-                                draw_text: {
+                                draw_text +: {
                                     text_style: theme.font_bold{ font_size: 14.0 }
                                     color: #x89b4faff
                                 }
@@ -4397,7 +4390,7 @@ ui: Root{
                         }
 
                         // Shader display area
-                        shader_art_canvas = ShaderArtCanvas{
+                        shader_art_canvas := mod.widgets.ShaderArtCanvas{
                             width: Fill, height: Fill,
                         }
                     }
@@ -4405,22 +4398,22 @@ ui: Root{
                     // ============================================================
                     // Shader FBM Page - Domain warped noise art
                     // ============================================================
-                    page_shader_art2 = View {
+                    page_shader_art2 := View{
                         width: Fill, height: Fill,
                         flow: Down,
                         padding: 24,
                         spacing: 16,
 
                         show_bg: true
-                        draw_bg: { color: #x0a0a0fff }
+                        draw_bg +: { color: #x0a0a0fff }
 
                         SectionHeader{
-                            draw_text: { color: #xffffffff }
+                            draw_text +: { color: #xffffffff }
                             text: "Shader Art - FBM Noise"
                         }
 
                         Label {
-                            draw_text: {
+                            draw_text +: {
                                 text_style: theme.font_regular{ font_size: 12.0 }
                                 color: #xa0a0a0ff
                             }
@@ -4432,18 +4425,18 @@ ui: Root{
                             width: Fill, height: Fit,
                             flow: Right,
                             spacing: 16,
-                            align: { y: 0.5 }
+                            align: Align{ y: 0.5 }
 
                             Label {
                                 width: Fit,
-                                draw_text: {
+                                draw_text +: {
                                     text_style: theme.font_regular{ font_size: 14.0 }
                                     color: #xffffffff
                                 }
                                 text: "Speed:"
                             }
 
-                            shader_art2_speed = mod.widgets.MpSlider {
+                            shader_art2_speed := mod.widgets.MpSlider{
                                 width: 200, height: 24,
                                 min: 0.1,
                                 max: 3.0,
@@ -4451,9 +4444,9 @@ ui: Root{
                                 step: 0.1,
                             }
 
-                            shader_art2_speed_label = Label {
+                            shader_art2_speed_label := Label{
                                 width: 60,
-                                draw_text: {
+                                draw_text +: {
                                     text_style: theme.font_bold{ font_size: 14.0 }
                                     color: #x89b4faff
                                 }
@@ -4462,7 +4455,7 @@ ui: Root{
                         }
 
                         // Shader display area
-                        shader_art2_canvas = ShaderArt2Canvas{
+                        shader_art2_canvas := mod.widgets.ShaderArt2Canvas{
                             width: Fill, height: Fill,
                         }
                     }
@@ -4470,22 +4463,22 @@ ui: Root{
                     // ============================================================
                     // Shader Math Page - Parametric flow field
                     // ============================================================
-                    page_shader_math = View {
+                    page_shader_math := View{
                         width: Fill, height: Fill,
                         flow: Down,
                         padding: 24,
                         spacing: 16,
 
                         show_bg: true
-                        draw_bg: { color: #x080812ff }
+                        draw_bg +: { color: #x080812ff }
 
                         SectionHeader{
-                            draw_text: { color: #xffffffff }
+                            draw_text +: { color: #xffffffff }
                             text: "Shader Math - Jellyfish"
                         }
 
                         Label {
-                            draw_text: {
+                            draw_text +: {
                                 text_style: theme.font_regular{ font_size: 12.0 }
                                 color: #xa0a0a0ff
                             }
@@ -4497,18 +4490,18 @@ ui: Root{
                             width: Fill, height: Fit,
                             flow: Right,
                             spacing: 16,
-                            align: { y: 0.5 }
+                            align: Align{ y: 0.5 }
 
                             Label {
                                 width: Fit,
-                                draw_text: {
+                                draw_text +: {
                                     text_style: theme.font_regular{ font_size: 14.0 }
                                     color: #xffffffff
                                 }
                                 text: "Speed:"
                             }
 
-                            shader_math_speed = mod.widgets.MpSlider {
+                            shader_math_speed := mod.widgets.MpSlider{
                                 width: 200, height: 24,
                                 min: 0.1,
                                 max: 3.0,
@@ -4516,9 +4509,9 @@ ui: Root{
                                 step: 0.1,
                             }
 
-                            shader_math_speed_label = Label {
+                            shader_math_speed_label := Label{
                                 width: 60,
-                                draw_text: {
+                                draw_text +: {
                                     text_style: theme.font_bold{ font_size: 14.0 }
                                     color: #x89b4faff
                                 }
@@ -4527,7 +4520,7 @@ ui: Root{
                         }
 
                         // Shader display area
-                        shader_math_canvas = ShaderMathCanvas{
+                        shader_math_canvas := mod.widgets.ShaderMathCanvas{
                             width: Fill, height: Fill,
                         }
                     }
@@ -4535,34 +4528,33 @@ ui: Root{
                     // ============================================================
                     // Splash Page - Dynamic scripting showcase
                     // ============================================================
-                    page_splash = SplashDemo{}
-                    page_json = JsonRenderDemo{}
+                    page_splash := mod.widgets.SplashDemo{}
+                    page_json := mod.widgets.JsonRenderDemo{}
                 }
                 } // close main_content
 
                 // Modal overlay - must be after main_content to appear on top
-                demo_modal = mod.widgets.MpModalWidget {
-                content = {
-                    dialog = mod.widgets.MpModal {
+                demo_modal := mod.widgets.MpModalWidget{
+                content +: {
+                    dialog := mod.widgets.MpModal{
                         width: 400,
-                        header = {
-                            title = { text: "Interactive Modal" }
+                        header +: {
+                            title +: { text: "Interactive Modal" }
                         }
-                        body = {
+                        body +: {
                             Label {
                                 width: Fill,
                                 height: Fit,
-                                draw_text: {
+                                draw_text +: {
                                     text_style: theme.font_regular{ font_size: 14.0 }
                                     color: MUTED_FOREGROUND
-                                    wrap: Word
                                 }
                                 text: "This is an interactive modal dialog. Click the X button or the backdrop to close it."
                             }
                         }
-                        footer = {
-                            modal_cancel_btn = mod.widgets.MpButtonGhost { text: "Cancel" }
-                            modal_confirm_btn = mod.widgets.MpButtonPrimary { text: "Confirm" }
+                        footer +: {
+                            modal_cancel_btn := mod.widgets.MpButtonGhost{ text: "Cancel" }
+                            modal_confirm_btn := mod.widgets.MpButtonPrimary{ text: "Confirm" }
                         }
                     }
                 }
@@ -4572,18 +4564,19 @@ ui: Root{
                 View {
                     width: Fill,
                     height: Fill,
-                    align: { x: 1.0, y: 0.0 }
-                    padding: { top: 20, right: 20 }
+                    align: Align{ x: 1.0, y: 0.0 }
+                    padding: Inset{ top: 20, right: 20 }
 
-                    demo_notification = mod.widgets.MpNotificationWidget {
-                        content = {
-                            title = { text: "Notification" }
-                            message = { text: "This is an interactive notification!" }
+                    demo_notification := mod.widgets.MpNotificationWidget{
+                        content +: {
+                            title +: { text: "Notification" }
+                            message +: { text: "This is an interactive notification!" }
                         }
                     }
                 }
             } // close body (Overlay)
         }
+    }
     }
 }
 
@@ -4592,118 +4585,167 @@ app_main!(App);
 // ============================================================
 // ShaderCanvas - Animated shader widget
 // ============================================================
-#[derive(Script, ScriptHook, Widget)]
+#[derive(Script, ScriptHook, Widget, Animator)]
 pub struct ShaderCanvas {
-    #[deref]
-    view: View,
+    #[uid]
+    uid: WidgetUid,
+    #[source]
+    source: ScriptObjectRef,
     #[apply_default]
     animator: Animator,
+    #[redraw]
+    #[live]
+    draw_bg: DrawQuad,
+    #[walk]
+    walk: Walk,
+    #[layout]
+    layout: Layout,
+    #[rust]
+    area: Area,
 }
 
 impl Widget for ShaderCanvas {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         if self.animator_handle_event(cx, event).must_redraw() {
             self.redraw(cx);
         }
-        self.view.handle_event(cx, event, scope);
     }
 
-    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
-        // Start time animation
+    fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
         self.animator_play(cx, ids!(anim.on));
-        self.view.draw_walk(cx, scope, walk)
+        self.draw_bg.begin(cx, walk, self.layout);
+        self.draw_bg.end(cx);
+        self.area = self.draw_bg.area();
+        DrawStep::done()
     }
 }
 
 // ============================================================
 // ShaderArtCanvas - Observer shader widget
 // ============================================================
-#[derive(Script, ScriptHook, Widget)]
+#[derive(Script, ScriptHook, Widget, Animator)]
 pub struct ShaderArtCanvas {
-    #[deref]
-    view: View,
+    #[uid]
+    uid: WidgetUid,
+    #[source]
+    source: ScriptObjectRef,
     #[apply_default]
     animator: Animator,
+    #[redraw]
+    #[live]
+    draw_bg: DrawQuad,
+    #[walk]
+    walk: Walk,
+    #[layout]
+    layout: Layout,
+    #[rust]
+    area: Area,
     #[live]
     speed: f64,
 }
 
 impl Widget for ShaderArtCanvas {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         if self.animator_handle_event(cx, event).must_redraw() {
             self.redraw(cx);
         }
-        self.view.handle_event(cx, event, scope);
     }
 
-    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
-        // Apply speed to shader
-        script_apply_eval!(cx, self, {
-            draw_bg: { speed: #(self.speed as f32) }
+    fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        script_apply_eval!(cx, self.draw_bg, {
+            speed: #(self.speed as f32)
         });
-        // Start time animation
         self.animator_play(cx, ids!(anim.on));
-        self.view.draw_walk(cx, scope, walk)
+        self.draw_bg.begin(cx, walk, self.layout);
+        self.draw_bg.end(cx);
+        self.area = self.draw_bg.area();
+        DrawStep::done()
     }
 }
 
 // ============================================================
 // ShaderArt2Canvas - FBM noise art widget
 // ============================================================
-#[derive(Script, ScriptHook, Widget)]
+#[derive(Script, ScriptHook, Widget, Animator)]
 pub struct ShaderArt2Canvas {
-    #[deref]
-    view: View,
+    #[uid]
+    uid: WidgetUid,
+    #[source]
+    source: ScriptObjectRef,
     #[apply_default]
     animator: Animator,
+    #[redraw]
+    #[live]
+    draw_bg: DrawQuad,
+    #[walk]
+    walk: Walk,
+    #[layout]
+    layout: Layout,
+    #[rust]
+    area: Area,
     #[live]
     speed: f64,
 }
 
 impl Widget for ShaderArt2Canvas {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         if self.animator_handle_event(cx, event).must_redraw() {
             self.redraw(cx);
         }
-        self.view.handle_event(cx, event, scope);
     }
 
-    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
-        script_apply_eval!(cx, self, {
-            draw_bg: { speed: #(self.speed as f32) }
+    fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        script_apply_eval!(cx, self.draw_bg, {
+            speed: #(self.speed as f32)
         });
         self.animator_play(cx, ids!(anim.on));
-        self.view.draw_walk(cx, scope, walk)
+        self.draw_bg.begin(cx, walk, self.layout);
+        self.draw_bg.end(cx);
+        self.area = self.draw_bg.area();
+        DrawStep::done()
     }
 }
 
 // ============================================================
 // ShaderMathCanvas - Parametric flow field widget
 // ============================================================
-#[derive(Script, ScriptHook, Widget)]
+#[derive(Script, ScriptHook, Widget, Animator)]
 pub struct ShaderMathCanvas {
-    #[deref]
-    view: View,
+    #[uid]
+    uid: WidgetUid,
+    #[source]
+    source: ScriptObjectRef,
     #[apply_default]
     animator: Animator,
+    #[redraw]
+    #[live]
+    draw_bg: DrawQuad,
+    #[walk]
+    walk: Walk,
+    #[layout]
+    layout: Layout,
+    #[rust]
+    area: Area,
     #[live]
     speed: f64,
 }
 
 impl Widget for ShaderMathCanvas {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         if self.animator_handle_event(cx, event).must_redraw() {
             self.redraw(cx);
         }
-        self.view.handle_event(cx, event, scope);
     }
 
-    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
-        script_apply_eval!(cx, self, {
-            draw_bg: { speed: #(self.speed as f32) }
+    fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        script_apply_eval!(cx, self.draw_bg, {
+            speed: #(self.speed as f32)
         });
         self.animator_play(cx, ids!(anim.on));
-        self.view.draw_walk(cx, scope, walk)
+        self.draw_bg.begin(cx, walk, self.layout);
+        self.draw_bg.end(cx);
+        self.area = self.draw_bg.area();
+        DrawStep::done()
     }
 }
 
@@ -6139,7 +6181,7 @@ impl AppMain for App {
     fn script_mod(vm: &mut ScriptVm) -> ScriptValue {
         crate::makepad_widgets::script_mod(vm);
         makepad_component::script_mod(vm);
-        ScriptValue::from_id(id!())
+        self::script_mod(vm)
     }
 
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {

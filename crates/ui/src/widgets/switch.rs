@@ -17,6 +17,9 @@ script_mod! {
         draw_bg +: {
             on: instance(0.0)
             hover: instance(0.0)
+            track_off: uniform(SWITCH_TRACK_OFF)
+            track_on: uniform(SUCCESS)
+            thumb_color: uniform(SWITCH_THUMB)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -29,7 +32,7 @@ script_mod! {
                 sdf.circle(sz.x - r, r, r)
 
                 // macOS style colors: subtle gray when off, system green when on
-                let mut color = mix(SWITCH_TRACK_OFF, SUCCESS, self.on)
+                let mut color = mix(self.track_off, self.track_on, self.on)
                 // Subtle brighten on hover
                 color = mix(color, #xffffff, self.hover * 0.15)
 
@@ -40,7 +43,7 @@ script_mod! {
                 let thumb_r = r - 3.0
                 let knob_x = mix(r, sz.x - r, self.on)
                 sdf.circle(knob_x, r, thumb_r)
-                sdf.fill(SWITCH_THUMB)
+                sdf.fill(self.thumb_color)
 
                 return sdf.result
             }

@@ -25,6 +25,8 @@ script_mod! {
         draw_circle +: {
             checked: instance(0.0)
             hover: instance(0.0)
+            primary: uniform(PRIMARY)
+            border_color: uniform(BORDER)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -38,8 +40,8 @@ script_mod! {
                 // Colors
                 let bg_unchecked = #xffffff
                 let bg_checked = #xffffff
-                let border_unchecked = mix(BORDER, PRIMARY, self.hover * 0.5)
-                let border_checked = PRIMARY
+                let border_unchecked = mix(self.border_color, self.primary, self.hover * 0.5)
+                let border_checked = self.primary
 
                 // Interpolate based on checked state
                 let bg = mix(bg_unchecked, bg_checked, self.checked)
@@ -52,7 +54,7 @@ script_mod! {
                 if (self.checked > 0.5) {
                     let dot_radius = radius * 0.5
                     sdf.circle(center.x, center.y, dot_radius)
-                    sdf.fill(PRIMARY)
+                    sdf.fill(self.primary)
                 }
 
                 return sdf.result
