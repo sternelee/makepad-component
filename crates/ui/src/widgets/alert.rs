@@ -1,170 +1,168 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-
-    use crate::theme::colors::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.mp_theme.*
 
     // ============================================================
     // Alert Icons - SDF drawn icons for each variant
     // ============================================================
 
     // Info icon (circle with i)
-    MpAlertIconInfo = <View> {
+    mod.widgets.MpAlertIconInfo = View{
         width: 20
         height: 20
-        align: { x: 0.5, y: 0.5 }
+        align: Align{x: 0.5, y: 0.5}
 
         show_bg: true
-        draw_bg: {
-            instance icon_color: (INFO)
+        draw_bg +: {
+            icon_color: instance(INFO)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let c = self.rect_size * 0.5;
-                let r = min(c.x, c.y) - 1.0;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+                let r = min(c.x, c.y) - 1.0
 
                 // Circle
-                sdf.circle(c.x, c.y, r);
-                sdf.stroke(self.icon_color, 1.5);
+                sdf.circle(c.x, c.y, r)
+                sdf.stroke(self.icon_color, 1.5)
 
                 // Letter i - dot
-                sdf.circle(c.x, c.y - 3.0, 1.5);
-                sdf.fill(self.icon_color);
+                sdf.circle(c.x, c.y - 3.0, 1.5)
+                sdf.fill(self.icon_color)
                 // Letter i - stem
-                sdf.rect(c.x - 1.0, c.y, 2.0, 5.0);
-                sdf.fill(self.icon_color);
+                sdf.rect(c.x - 1.0, c.y, 2.0, 5.0)
+                sdf.fill(self.icon_color)
 
-                return sdf.result;
+                return sdf.result
             }
         }
     }
 
     // Success icon (checkmark in circle)
-    MpAlertIconSuccess = <View> {
+    mod.widgets.MpAlertIconSuccess = View{
         width: 20
         height: 20
-        align: { x: 0.5, y: 0.5 }
+        align: Align{x: 0.5, y: 0.5}
 
         show_bg: true
-        draw_bg: {
-            instance icon_color: (SUCCESS)
+        draw_bg +: {
+            icon_color: instance(SUCCESS)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let c = self.rect_size * 0.5;
-                let r = min(c.x, c.y) - 1.0;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+                let r = min(c.x, c.y) - 1.0
 
                 // Circle
-                sdf.circle(c.x, c.y, r);
-                sdf.stroke(self.icon_color, 1.5);
+                sdf.circle(c.x, c.y, r)
+                sdf.stroke(self.icon_color, 1.5)
 
                 // Checkmark
-                sdf.move_to(c.x - 4.0, c.y);
-                sdf.line_to(c.x - 1.0, c.y + 3.0);
-                sdf.line_to(c.x + 5.0, c.y - 3.0);
-                sdf.stroke(self.icon_color, 1.5);
+                sdf.move_to(c.x - 4.0, c.y)
+                sdf.line_to(c.x - 1.0, c.y + 3.0)
+                sdf.line_to(c.x + 5.0, c.y - 3.0)
+                sdf.stroke(self.icon_color, 1.5)
 
-                return sdf.result;
+                return sdf.result
             }
         }
     }
 
     // Warning icon (triangle with !)
-    MpAlertIconWarning = <View> {
+    mod.widgets.MpAlertIconWarning = View{
         width: 20
         height: 20
-        align: { x: 0.5, y: 0.5 }
+        align: Align{x: 0.5, y: 0.5}
 
         show_bg: true
-        draw_bg: {
-            instance icon_color: (WARNING)
+        draw_bg +: {
+            icon_color: instance(WARNING)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let c = self.rect_size * 0.5;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
 
                 // Triangle
-                sdf.move_to(c.x, 2.0);
-                sdf.line_to(self.rect_size.x - 2.0, self.rect_size.y - 2.0);
-                sdf.line_to(2.0, self.rect_size.y - 2.0);
-                sdf.close_path();
-                sdf.stroke(self.icon_color, 1.5);
+                sdf.move_to(c.x, 2.0)
+                sdf.line_to(self.rect_size.x - 2.0, self.rect_size.y - 2.0)
+                sdf.line_to(2.0, self.rect_size.y - 2.0)
+                sdf.close_path()
+                sdf.stroke(self.icon_color, 1.5)
 
                 // Exclamation mark - stem
-                sdf.rect(c.x - 1.0, 7.0, 2.0, 5.0);
-                sdf.fill(self.icon_color);
+                sdf.rect(c.x - 1.0, 7.0, 2.0, 5.0)
+                sdf.fill(self.icon_color)
                 // Exclamation mark - dot
-                sdf.circle(c.x, 15.0, 1.5);
-                sdf.fill(self.icon_color);
+                sdf.circle(c.x, 15.0, 1.5)
+                sdf.fill(self.icon_color)
 
-                return sdf.result;
+                return sdf.result
             }
         }
     }
 
     // Error icon (X in circle)
-    MpAlertIconError = <View> {
+    mod.widgets.MpAlertIconError = View{
         width: 20
         height: 20
-        align: { x: 0.5, y: 0.5 }
+        align: Align{x: 0.5, y: 0.5}
 
         show_bg: true
-        draw_bg: {
-            instance icon_color: (DANGER)
+        draw_bg +: {
+            icon_color: instance(DANGER)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let c = self.rect_size * 0.5;
-                let r = min(c.x, c.y) - 1.0;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+                let r = min(c.x, c.y) - 1.0
 
                 // Circle
-                sdf.circle(c.x, c.y, r);
-                sdf.stroke(self.icon_color, 1.5);
+                sdf.circle(c.x, c.y, r)
+                sdf.stroke(self.icon_color, 1.5)
 
                 // X mark
-                let size = 4.0;
-                sdf.move_to(c.x - size, c.y - size);
-                sdf.line_to(c.x + size, c.y + size);
-                sdf.stroke(self.icon_color, 1.5);
+                let size = 4.0
+                sdf.move_to(c.x - size, c.y - size)
+                sdf.line_to(c.x + size, c.y + size)
+                sdf.stroke(self.icon_color, 1.5)
 
-                sdf.move_to(c.x + size, c.y - size);
-                sdf.line_to(c.x - size, c.y + size);
-                sdf.stroke(self.icon_color, 1.5);
+                sdf.move_to(c.x + size, c.y - size)
+                sdf.line_to(c.x - size, c.y + size)
+                sdf.stroke(self.icon_color, 1.5)
 
-                return sdf.result;
+                return sdf.result
             }
         }
     }
 
     // Secondary icon (info style, neutral)
-    MpAlertIconSecondary = <View> {
+    mod.widgets.MpAlertIconSecondary = View{
         width: 20
         height: 20
-        align: { x: 0.5, y: 0.5 }
+        align: Align{x: 0.5, y: 0.5}
 
         show_bg: true
-        draw_bg: {
-            instance icon_color: (MUTED_FOREGROUND)
+        draw_bg +: {
+            icon_color: instance(MUTED_FOREGROUND)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let c = self.rect_size * 0.5;
-                let r = min(c.x, c.y) - 1.0;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+                let r = min(c.x, c.y) - 1.0
 
                 // Circle
-                sdf.circle(c.x, c.y, r);
-                sdf.stroke(self.icon_color, 1.5);
+                sdf.circle(c.x, c.y, r)
+                sdf.stroke(self.icon_color, 1.5)
 
                 // Letter i
-                sdf.circle(c.x, c.y - 3.0, 1.5);
-                sdf.fill(self.icon_color);
-                sdf.rect(c.x - 1.0, c.y, 2.0, 5.0);
-                sdf.fill(self.icon_color);
+                sdf.circle(c.x, c.y - 3.0, 1.5)
+                sdf.fill(self.icon_color)
+                sdf.rect(c.x - 1.0, c.y, 2.0, 5.0)
+                sdf.fill(self.icon_color)
 
-                return sdf.result;
+                return sdf.result
             }
         }
     }
@@ -173,78 +171,123 @@ live_design! {
     // Close button
     // ============================================================
 
-    MpAlertCloseButton = <View> {
+    mod.widgets.MpAlertCloseButton = View{
         width: 20
         height: 20
-        cursor: Hand
-        align: { x: 0.5, y: 0.5 }
+        cursor: MouseCursor.Hand
+        align: Align{x: 0.5, y: 0.5}
 
         show_bg: true
-        draw_bg: {
-            instance icon_color: #94a3b8
-            instance hover: 0.0
-            instance bg_hover_color: #00000010
+        draw_bg +: {
+            icon_color: instance(#x94a3b8)
+            hover: instance(0.0)
+            bg_hover_color: instance(#x00000010)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let c = self.rect_size * 0.5;
-                let size = 5.0;
-                let r = min(c.x, c.y);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+                let size = 5.0
+                let r = min(c.x, c.y)
 
                 // Hover background
-                sdf.circle(c.x, c.y, r);
-                sdf.fill(mix(#0000, self.bg_hover_color, self.hover));
+                sdf.circle(c.x, c.y, r)
+                sdf.fill(mix(#x0000, self.bg_hover_color, self.hover))
 
-                let final_color = mix(self.icon_color, #64748b, self.hover);
+                let final_color = mix(self.icon_color, #x64748b, self.hover)
 
                 // X mark
-                sdf.move_to(c.x - size, c.y - size);
-                sdf.line_to(c.x + size, c.y + size);
-                sdf.stroke(final_color, 1.5);
+                sdf.move_to(c.x - size, c.y - size)
+                sdf.line_to(c.x + size, c.y + size)
+                sdf.stroke(final_color, 1.5)
 
-                sdf.move_to(c.x + size, c.y - size);
-                sdf.line_to(c.x - size, c.y + size);
-                sdf.stroke(final_color, 1.5);
+                sdf.move_to(c.x + size, c.y - size)
+                sdf.line_to(c.x - size, c.y + size)
+                sdf.stroke(final_color, 1.5)
 
-                return sdf.result;
+                return sdf.result
             }
         }
 
-        animator: {
-            hover = {
-                default: off
-                off = {
-                    from: { all: Forward { duration: 0.15 } }
-                    apply: { draw_bg: { hover: 0.0 } }
+        animator: Animator{
+            hover: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_bg: {hover: 0.0}}
                 }
-                on = {
-                    from: { all: Forward { duration: 0.1 } }
-                    apply: { draw_bg: { hover: 1.0 } }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.1}}
+                    apply: {draw_bg: {hover: 1.0}}
                 }
             }
         }
     }
 
     // ============================================================
+    // Content subtree templates (title + message)
+    // Variants override nested colors by re-declaring these
+    // templates with the same ids; the entries apply in place.
+    // ============================================================
+
+    mod.widgets.MpAlertTitle = Label{
+        width: Fill
+        height: Fit
+        draw_text +: {
+            text_style: theme.font_bold{font_size: 14.0}
+            color: FOREGROUND
+        }
+        text: ""
+    }
+
+    mod.widgets.MpAlertTitleWrapper = View{
+        width: Fill
+        height: Fit
+        visible: false
+
+        title := mod.widgets.MpAlertTitle{}
+    }
+
+    mod.widgets.MpAlertMessage = Label{
+        width: Fill
+        height: Fit
+        draw_text +: {
+            text_style: theme.font_regular{font_size: 13.0}
+            color: MUTED_FOREGROUND
+        }
+        text: ""
+    }
+
+    mod.widgets.MpAlertContent = View{
+        width: Fill
+        height: Fit
+        flow: Down
+        spacing: 4.0
+
+        title_wrapper := mod.widgets.MpAlertTitleWrapper{}
+        message := mod.widgets.MpAlertMessage{}
+    }
+
+    // ============================================================
     // Base Alert
     // ============================================================
 
-    MpAlertBase = {{MpAlert}} {
+    mod.widgets.MpAlertBase = #(MpAlert::register_widget(vm))
+    mod.widgets.MpAlert = set_type_default() do mod.widgets.MpAlertBase{
         width: Fill
         height: Fit
-        padding: { left: 16, right: 16, top: 12, bottom: 12 }
+        padding: Inset{left: 16.0, right: 16.0, top: 12.0, bottom: 12.0}
         flow: Right
-        spacing: 12
-        align: { y: 0.0 }
+        spacing: 12.0
+        align: Align{y: 0.0}
 
         show_bg: true
-        draw_bg: {
-            instance bg_color: #f1f5f920
-            instance border_radius: 8.0
-            instance border_color: (BORDER)
+        draw_bg +: {
+            bg_color: instance(#xf1f5f920)
+            border_radius: instance(8.0)
+            border_color: instance(BORDER)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
 
                 // Main box with rounded corners
                 sdf.box(
@@ -253,167 +296,131 @@ live_design! {
                     self.rect_size.x - 1.0,
                     self.rect_size.y - 1.0,
                     self.border_radius
-                );
-                sdf.fill_keep(self.bg_color);
-                sdf.stroke(self.border_color, 1.0);
+                )
+                sdf.fill_keep(self.bg_color)
+                sdf.stroke(self.border_color, 1.0)
 
-                return sdf.result;
+                return sdf.result
             }
         }
 
-        icon = <MpAlertIconSecondary> {}
-
-        content = <View> {
-            width: Fill
-            height: Fit
-            flow: Down
-            spacing: 4
-
-            title_wrapper = <View> {
-                width: Fill
-                height: Fit
-                visible: false
-
-                title = <Label> {
-                    width: Fill
-                    height: Fit
-                    draw_text: {
-                        text_style: <THEME_FONT_BOLD> { font_size: 14.0 }
-                        color: (FOREGROUND)
-                    }
-                    text: ""
-                }
-            }
-
-            message = <Label> {
-                width: Fill
-                height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> { font_size: 13.0 }
-                    color: (MUTED_FOREGROUND)
-                }
-                text: ""
-            }
-        }
-
-        close_button = <MpAlertCloseButton> {}
+        icon := mod.widgets.MpAlertIconSecondary{}
+        content := mod.widgets.MpAlertContent{}
+        close_button := mod.widgets.MpAlertCloseButton{}
     }
 
     // ============================================================
     // Alert Variants
     // ============================================================
 
-    // Default/Secondary Alert
-    pub MpAlert = <MpAlertBase> {}
-
     // Info Alert
-    pub MpAlertInfo = <MpAlertBase> {
-        draw_bg: {
-            bg_color: #06b6d410
-            border_color: #a5f3fc
+    mod.widgets.MpAlertInfo = mod.widgets.MpAlert{
+        draw_bg +: {
+            bg_color: instance(#x06b6d410)
+            border_color: instance(#xa5f3fc)
         }
 
-        icon = <MpAlertIconInfo> {}
+        icon := mod.widgets.MpAlertIconInfo{}
 
-        content = {
-            title_wrapper = {
-                title = {
-                    draw_text: { color: (INFO) }
+        content := mod.widgets.MpAlertContent{
+            title_wrapper := mod.widgets.MpAlertTitleWrapper{
+                title := mod.widgets.MpAlertTitle{
+                    draw_text +: { color: INFO }
                 }
             }
-            message = {
-                draw_text: { color: #0e7490 }
+            message := mod.widgets.MpAlertMessage{
+                draw_text +: { color: #x0e7490 }
             }
         }
 
-        close_button = {
-            draw_bg: {
-                icon_color: #06b6d4
-                bg_hover_color: #06b6d420
+        close_button := mod.widgets.MpAlertCloseButton{
+            draw_bg +: {
+                icon_color: instance(#x06b6d4)
+                bg_hover_color: instance(#x06b6d420)
             }
         }
     }
 
     // Success Alert
-    pub MpAlertSuccess = <MpAlertBase> {
-        draw_bg: {
-            bg_color: #16a34a10
-            border_color: #bbf7d0
+    mod.widgets.MpAlertSuccess = mod.widgets.MpAlert{
+        draw_bg +: {
+            bg_color: instance(#x16a34a10)
+            border_color: instance(#xbbf7d0)
         }
 
-        icon = <MpAlertIconSuccess> {}
+        icon := mod.widgets.MpAlertIconSuccess{}
 
-        content = {
-            title_wrapper = {
-                title = {
-                    draw_text: { color: (SUCCESS) }
+        content := mod.widgets.MpAlertContent{
+            title_wrapper := mod.widgets.MpAlertTitleWrapper{
+                title := mod.widgets.MpAlertTitle{
+                    draw_text +: { color: SUCCESS }
                 }
             }
-            message = {
-                draw_text: { color: #15803d }
+            message := mod.widgets.MpAlertMessage{
+                draw_text +: { color: #x15803d }
             }
         }
 
-        close_button = {
-            draw_bg: {
-                icon_color: #16a34a
-                bg_hover_color: #16a34a20
+        close_button := mod.widgets.MpAlertCloseButton{
+            draw_bg +: {
+                icon_color: instance(#x16a34a)
+                bg_hover_color: instance(#x16a34a20)
             }
         }
     }
 
     // Warning Alert
-    pub MpAlertWarning = <MpAlertBase> {
-        draw_bg: {
-            bg_color: #f59a0b10
-            border_color: #fde68a
+    mod.widgets.MpAlertWarning = mod.widgets.MpAlert{
+        draw_bg +: {
+            bg_color: instance(#xf59a0b10)
+            border_color: instance(#xfde68a)
         }
 
-        icon = <MpAlertIconWarning> {}
+        icon := mod.widgets.MpAlertIconWarning{}
 
-        content = {
-            title_wrapper = {
-                title = {
-                    draw_text: { color: #b45309 }
+        content := mod.widgets.MpAlertContent{
+            title_wrapper := mod.widgets.MpAlertTitleWrapper{
+                title := mod.widgets.MpAlertTitle{
+                    draw_text +: { color: #xb45309 }
                 }
             }
-            message = {
-                draw_text: { color: #854d0e }
+            message := mod.widgets.MpAlertMessage{
+                draw_text +: { color: #x854d0e }
             }
         }
 
-        close_button = {
-            draw_bg: {
-                icon_color: #f59a0b
-                bg_hover_color: #f59a0b20
+        close_button := mod.widgets.MpAlertCloseButton{
+            draw_bg +: {
+                icon_color: instance(#xf59a0b)
+                bg_hover_color: instance(#xf59a0b20)
             }
         }
     }
 
     // Error/Danger Alert
-    pub MpAlertError = <MpAlertBase> {
-        draw_bg: {
-            bg_color: #dc262610
-            border_color: #fecaca
+    mod.widgets.MpAlertError = mod.widgets.MpAlert{
+        draw_bg +: {
+            bg_color: instance(#xdc262610)
+            border_color: instance(#xfecaca)
         }
 
-        icon = <MpAlertIconError> {}
+        icon := mod.widgets.MpAlertIconError{}
 
-        content = {
-            title_wrapper = {
-                title = {
-                    draw_text: { color: (DANGER) }
+        content := mod.widgets.MpAlertContent{
+            title_wrapper := mod.widgets.MpAlertTitleWrapper{
+                title := mod.widgets.MpAlertTitle{
+                    draw_text +: { color: DANGER }
                 }
             }
-            message = {
-                draw_text: { color: #b91c1c }
+            message := mod.widgets.MpAlertMessage{
+                draw_text +: { color: #xb91c1c }
             }
         }
 
-        close_button = {
-            draw_bg: {
-                icon_color: #dc2626
-                bg_hover_color: #dc262620
+        close_button := mod.widgets.MpAlertCloseButton{
+            draw_bg +: {
+                icon_color: instance(#xdc2626)
+                bg_hover_color: instance(#xdc262620)
             }
         }
     }
@@ -422,120 +429,125 @@ live_design! {
     // Banner Variants (full width, no border radius)
     // ============================================================
 
-    MpAlertBannerBase = <MpAlertBase> {
-        align: { y: 0.5 }
+    mod.widgets.MpAlertBannerBase = mod.widgets.MpAlert{
+        align: Align{y: 0.5}
 
-        draw_bg: {
-            border_radius: 0.0
+        draw_bg +: {
+            border_radius: instance(0.0)
         }
     }
 
-    pub MpAlertBanner = <MpAlertBannerBase> {}
+    mod.widgets.MpAlertBanner = mod.widgets.MpAlertBannerBase{}
 
-    pub MpAlertBannerInfo = <MpAlertBannerBase> {
-        draw_bg: {
-            bg_color: #06b6d410
-            border_color: #a5f3fc
+    mod.widgets.MpAlertBannerInfo = mod.widgets.MpAlertBannerBase{
+        draw_bg +: {
+            bg_color: instance(#x06b6d410)
+            border_color: instance(#xa5f3fc)
         }
 
-        icon = <MpAlertIconInfo> {}
+        icon := mod.widgets.MpAlertIconInfo{}
 
-        content = {
-            message = {
-                draw_text: { color: #0e7490 }
+        content := mod.widgets.MpAlertContent{
+            message := mod.widgets.MpAlertMessage{
+                draw_text +: { color: #x0e7490 }
             }
         }
 
-        close_button = {
-            draw_bg: {
-                icon_color: #06b6d4
-                bg_hover_color: #06b6d420
-            }
-        }
-    }
-
-    pub MpAlertBannerSuccess = <MpAlertBannerBase> {
-        draw_bg: {
-            bg_color: #16a34a10
-            border_color: #bbf7d0
-        }
-
-        icon = <MpAlertIconSuccess> {}
-
-        content = {
-            message = {
-                draw_text: { color: #15803d }
-            }
-        }
-
-        close_button = {
-            draw_bg: {
-                icon_color: #16a34a
-                bg_hover_color: #16a34a20
+        close_button := mod.widgets.MpAlertCloseButton{
+            draw_bg +: {
+                icon_color: instance(#x06b6d4)
+                bg_hover_color: instance(#x06b6d420)
             }
         }
     }
 
-    pub MpAlertBannerWarning = <MpAlertBannerBase> {
-        draw_bg: {
-            bg_color: #f59a0b10
-            border_color: #fde68a
+    mod.widgets.MpAlertBannerSuccess = mod.widgets.MpAlertBannerBase{
+        draw_bg +: {
+            bg_color: instance(#x16a34a10)
+            border_color: instance(#xbbf7d0)
         }
 
-        icon = <MpAlertIconWarning> {}
+        icon := mod.widgets.MpAlertIconSuccess{}
 
-        content = {
-            message = {
-                draw_text: { color: #854d0e }
+        content := mod.widgets.MpAlertContent{
+            message := mod.widgets.MpAlertMessage{
+                draw_text +: { color: #x15803d }
             }
         }
 
-        close_button = {
-            draw_bg: {
-                icon_color: #f59a0b
-                bg_hover_color: #f59a0b20
+        close_button := mod.widgets.MpAlertCloseButton{
+            draw_bg +: {
+                icon_color: instance(#x16a34a)
+                bg_hover_color: instance(#x16a34a20)
             }
         }
     }
 
-    pub MpAlertBannerError = <MpAlertBannerBase> {
-        draw_bg: {
-            bg_color: #dc262610
-            border_color: #fecaca
+    mod.widgets.MpAlertBannerWarning = mod.widgets.MpAlertBannerBase{
+        draw_bg +: {
+            bg_color: instance(#xf59a0b10)
+            border_color: instance(#xfde68a)
         }
 
-        icon = <MpAlertIconError> {}
+        icon := mod.widgets.MpAlertIconWarning{}
 
-        content = {
-            message = {
-                draw_text: { color: #b91c1c }
+        content := mod.widgets.MpAlertContent{
+            message := mod.widgets.MpAlertMessage{
+                draw_text +: { color: #x854d0e }
             }
         }
 
-        close_button = {
-            draw_bg: {
-                icon_color: #dc2626
-                bg_hover_color: #dc262620
+        close_button := mod.widgets.MpAlertCloseButton{
+            draw_bg +: {
+                icon_color: instance(#xf59a0b)
+                bg_hover_color: instance(#xf59a0b20)
+            }
+        }
+    }
+
+    mod.widgets.MpAlertBannerError = mod.widgets.MpAlertBannerBase{
+        draw_bg +: {
+            bg_color: instance(#xdc262610)
+            border_color: instance(#xfecaca)
+        }
+
+        icon := mod.widgets.MpAlertIconError{}
+
+        content := mod.widgets.MpAlertContent{
+            message := mod.widgets.MpAlertMessage{
+                draw_text +: { color: #xb91c1c }
+            }
+        }
+
+        close_button := mod.widgets.MpAlertCloseButton{
+            draw_bg +: {
+                icon_color: instance(#xdc2626)
+                bg_hover_color: instance(#xdc262620)
             }
         }
     }
 }
 
 /// Alert action emitted when the close button is clicked
-#[derive(Clone, Debug, DefaultNone)]
+#[derive(Clone, Debug, Default)]
 pub enum MpAlertAction {
+    #[default]
     None,
     Close,
 }
 
 /// Alert widget for displaying important messages to users
-#[derive(Live, Widget)]
+#[derive(Script, Widget)]
 pub struct MpAlert {
+    #[source]
+    source: ScriptObjectRef,
+
     #[deref]
     view: View,
 
     /// Whether the alert is visible
     #[live(true)]
+    #[visible]
     visible: bool,
 
     /// Whether to show the close button
@@ -543,9 +555,21 @@ pub struct MpAlert {
     closable: bool,
 }
 
-impl LiveHook for MpAlert {
-    fn after_apply(&mut self, cx: &mut Cx, _apply: &mut Apply, _index: usize, _nodes: &[LiveNode]) {
-        self.sync_visibility(cx);
+impl ScriptHook for MpAlert {
+    fn on_after_apply(
+        &mut self,
+        vm: &mut ScriptVm,
+        apply: &Apply,
+        _scope: &mut Scope,
+        _value: ScriptValue,
+    ) {
+        // Re-assert the close button visibility after every structural apply,
+        // mirroring the old `LiveHook::after_apply` behavior. Animator-driven
+        // and eval applies don't change the child set, so skip those.
+        if apply.is_eval() || apply.is_animate() || apply.as_default().is_some() {
+            return;
+        }
+        vm.with_cx_mut(|cx| self.sync_visibility(cx));
     }
 }
 
@@ -553,8 +577,10 @@ impl Widget for MpAlert {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         self.view.handle_event(cx, event, scope);
 
+        let uid = self.widget_uid();
+
         // Handle close button hover and click
-        let close_button = self.view.view(ids!(close_button));
+        let close_button = self.view.view(cx, ids!(close_button));
         match event.hits(cx, close_button.area()) {
             Hit::FingerHoverIn(_) => {
                 close_button.animator_play(cx, ids!(hover.on));
@@ -563,7 +589,7 @@ impl Widget for MpAlert {
                 close_button.animator_play(cx, ids!(hover.off));
             }
             Hit::FingerDown(_) => {
-                cx.widget_action(self.widget_uid(), &scope.path, MpAlertAction::Close);
+                cx.widget_action(uid, MpAlertAction::Close);
             }
             _ => {}
         }
@@ -580,24 +606,27 @@ impl Widget for MpAlert {
 impl MpAlert {
     /// Sync visibility of close button
     fn sync_visibility(&mut self, cx: &mut Cx) {
+        let closable = self.closable;
         self.view
-            .view(ids!(close_button))
-            .set_visible(cx, self.closable);
+            .view(cx, ids!(close_button))
+            .set_visible(cx, closable);
     }
 
     /// Set the alert title
     pub fn set_title(&mut self, cx: &mut Cx, title: &str) {
-        let title_label = self.view.label(ids!(content.title_wrapper.title));
+        let title_label = self.view.label(cx, ids!(content.title_wrapper.title));
         title_label.set_text(cx, title);
         self.view
-            .view(ids!(content.title_wrapper))
+            .view(cx, ids!(content.title_wrapper))
             .set_visible(cx, !title.is_empty());
         self.redraw(cx);
     }
 
     /// Set the alert message
     pub fn set_message(&mut self, cx: &mut Cx, message: &str) {
-        self.view.label(ids!(content.message)).set_text(cx, message);
+        self.view
+            .label(cx, ids!(content.message))
+            .set_text(cx, message);
         self.redraw(cx);
     }
 

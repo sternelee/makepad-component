@@ -1,211 +1,177 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.mp_theme.*
 
-    use crate::theme::colors::*;
+    mod.widgets.MpSliderBase = #(MpSlider::register_widget(vm))
+
+    set_type_default() do #(DrawSliderTrack::script_shader(vm)){
+        ..mod.draw.DrawQuad
+
+        progress_start: 0.0
+        progress_end: 0.0
+        disabled: 0.0
+        vertical: 0.0
+        track_color: #xe2e8f0
+        fill_color: #x3b82f6
+        disabled_track_color: #xf1f5f9
+        disabled_fill_color: #x94a3b8
+
+        pixel: fn() {
+            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+            let sz = self.rect_size
+
+            // Choose track color based on disabled state
+            let track_col = mix(self.track_color, self.disabled_track_color, self.disabled)
+            let fill_col = mix(self.fill_color, self.disabled_fill_color, self.disabled)
+
+            let is_vert = self.vertical
+
+            // Visual track thickness (thin strip centered in the full rect)
+            let visual_thickness = 6.0
+
+            if (is_vert > 0.5) {
+                // Vertical: thin track centered horizontally
+                let track_x = (sz.x - visual_thickness) * 0.5
+                let r = visual_thickness * 0.5
+                sdf.box(track_x, 0.0, visual_thickness, sz.y, r)
+                sdf.fill(track_col)
+
+                // Fill region
+                let fill_start = sz.y * (1.0 - self.progress_end)
+                let fill_end = sz.y * (1.0 - self.progress_start)
+                let py = self.pos.y * sz.y
+                let in_fill = step(fill_start, py) * step(py, fill_end)
+
+                let sdf2 = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf2.box(track_x, 0.0, visual_thickness, sz.y, r)
+                sdf2.fill(fill_col)
+                let result = mix(sdf.result, sdf2.result, in_fill * sdf2.result.w)
+                return result
+            } else {
+                // Horizontal: thin track centered vertically
+                let track_y = (sz.y - visual_thickness) * 0.5
+                let r = visual_thickness * 0.5
+                sdf.box(0.0, track_y, sz.x, visual_thickness, r)
+                sdf.fill(track_col)
+
+                // Fill region
+                let fill_start = sz.x * self.progress_start
+                let fill_end = sz.x * self.progress_end
+                let px = self.pos.x * sz.x
+                let in_fill = step(fill_start, px) * step(px, fill_end)
+
+                let sdf2 = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf2.box(0.0, track_y, sz.x, visual_thickness, r)
+                sdf2.fill(fill_col)
+                let result = mix(sdf.result, sdf2.result, in_fill * sdf2.result.w)
+                return result
+            }
+        }
+    }
+
+    set_type_default() do #(DrawSliderThumb::script_shader(vm)){
+        ..mod.draw.DrawQuad
+
+        hover: 0.0
+        pressed: 0.0
+        disabled: 0.0
+        border_color: #x3b82f6
+        disabled_border_color: #x94a3b8
+
+        pixel: fn() {
+            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+            let c = self.rect_size * 0.5
+
+            // Choose border color based on disabled state
+            let border_col = mix(self.border_color, self.disabled_border_color, self.disabled)
+
+            // Shadow (only when not disabled)
+            let shadow_alpha = mix(0.2, 0.0, self.disabled)
+            let shadow_offset = 2.0
+            sdf.circle(c.x + shadow_offset, c.y + shadow_offset, c.x - 2.0)
+            sdf.fill(vec4(0.0, 0.0, 0.0, shadow_alpha))
+
+            // Main circle
+            sdf.circle(c.x, c.y, c.x - 2.0)
+
+            let base_color = mix(#xffffff, #xf8fafc, self.disabled)
+            let hover_color = #xf0f9ff
+            let pressed_color = #xe0f2fe
+
+            // Only apply hover/pressed when not disabled
+            let active_hover = self.hover * (1.0 - self.disabled)
+            let active_pressed = self.pressed * (1.0 - self.disabled)
+
+            let mut color = mix(base_color, hover_color, active_hover)
+            color = mix(color, pressed_color, active_pressed)
+
+            sdf.fill(color)
+
+            // Border
+            sdf.stroke(border_col, 2.5)
+
+            return sdf.result
+        }
+    }
 
     // Slider component
-    pub MpSlider = {{MpSlider}} {
-        width: Fill,
-        height: 24,
+    mod.widgets.MpSlider = set_type_default() do mod.widgets.MpSliderBase{
+        width: Fill
+        height: 24.0
 
-        draw_track: {
-            instance progress_start: 0.0
-            instance progress_end: 0.0
-            instance disabled: 0.0
-            instance vertical: 0.0
-            instance track_color: #e2e8f0
-            instance fill_color: #3b82f6
-            instance disabled_track_color: #f1f5f9
-            instance disabled_fill_color: #94a3b8
-
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let sz = self.rect_size;
-
-                // Choose track color based on disabled state
-                let track_col = mix(self.track_color, self.disabled_track_color, self.disabled);
-                let fill_col = mix(self.fill_color, self.disabled_fill_color, self.disabled);
-
-                let is_vert = self.vertical;
-
-                // Visual track thickness (thin strip centered in the full rect)
-                let visual_thickness = 6.0;
-
-                if is_vert > 0.5 {
-                    // Vertical: thin track centered horizontally
-                    let track_x = (sz.x - visual_thickness) * 0.5;
-                    let r = visual_thickness * 0.5;
-                    sdf.box(track_x, 0.0, visual_thickness, sz.y, r);
-                    sdf.fill(track_col);
-
-                    // Fill region
-                    let fill_start = sz.y * (1.0 - self.progress_end);
-                    let fill_end = sz.y * (1.0 - self.progress_start);
-                    let py = self.pos.y * sz.y;
-                    let in_fill = step(fill_start, py) * step(py, fill_end);
-
-                    let sdf2 = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf2.box(track_x, 0.0, visual_thickness, sz.y, r);
-                    sdf2.fill(fill_col);
-                    let result = mix(sdf.result, sdf2.result, in_fill * sdf2.result.w);
-                    return result;
-                } else {
-                    // Horizontal: thin track centered vertically
-                    let track_y = (sz.y - visual_thickness) * 0.5;
-                    let r = visual_thickness * 0.5;
-                    sdf.box(0.0, track_y, sz.x, visual_thickness, r);
-                    sdf.fill(track_col);
-
-                    // Fill region
-                    let fill_start = sz.x * self.progress_start;
-                    let fill_end = sz.x * self.progress_end;
-                    let px = self.pos.x * sz.x;
-                    let in_fill = step(fill_start, px) * step(px, fill_end);
-
-                    let sdf2 = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf2.box(0.0, track_y, sz.x, visual_thickness, r);
-                    sdf2.fill(fill_col);
-                    let result = mix(sdf.result, sdf2.result, in_fill * sdf2.result.w);
-                    return result;
+        animator: Animator{
+            hover: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_thumb: {hover: 0.0} draw_thumb_start: {hover: 0.0}}
+                }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.1}}
+                    apply: {draw_thumb: {hover: 1.0} draw_thumb_start: {hover: 1.0}}
                 }
             }
-        }
-
-        draw_thumb: {
-            instance hover: 0.0
-            instance pressed: 0.0
-            instance disabled: 0.0
-            instance border_color: #3b82f6
-            instance disabled_border_color: #94a3b8
-
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let c = self.rect_size * 0.5;
-
-                // Choose border color based on disabled state
-                let border_col = mix(self.border_color, self.disabled_border_color, self.disabled);
-
-                // Shadow (only when not disabled)
-                let shadow_alpha = mix(0.2, 0.0, self.disabled);
-                let shadow_offset = 2.0;
-                sdf.circle(c.x + shadow_offset, c.y + shadow_offset, c.x - 2.0);
-                sdf.fill(vec4(0.0, 0.0, 0.0, shadow_alpha));
-
-                // Main circle
-                sdf.circle(c.x, c.y, c.x - 2.0);
-
-                let base_color = mix(#ffffff, #f8fafc, self.disabled);
-                let hover_color = #f0f9ff;
-                let pressed_color = #e0f2fe;
-
-                // Only apply hover/pressed when not disabled
-                let active_hover = self.hover * (1.0 - self.disabled);
-                let active_pressed = self.pressed * (1.0 - self.disabled);
-
-                let color = mix(base_color, hover_color, active_hover);
-                let color = mix(color, pressed_color, active_pressed);
-
-                sdf.fill(color);
-
-                // Border
-                sdf.stroke(border_col, 2.5);
-
-                return sdf.result;
-            }
-        }
-
-        // Second thumb for range mode
-        draw_thumb_start: {
-            instance hover: 0.0
-            instance pressed: 0.0
-            instance disabled: 0.0
-            instance border_color: #3b82f6
-            instance disabled_border_color: #94a3b8
-
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let c = self.rect_size * 0.5;
-
-                let border_col = mix(self.border_color, self.disabled_border_color, self.disabled);
-
-                let shadow_alpha = mix(0.2, 0.0, self.disabled);
-                let shadow_offset = 2.0;
-                sdf.circle(c.x + shadow_offset, c.y + shadow_offset, c.x - 2.0);
-                sdf.fill(vec4(0.0, 0.0, 0.0, shadow_alpha));
-
-                sdf.circle(c.x, c.y, c.x - 2.0);
-
-                let base_color = mix(#ffffff, #f8fafc, self.disabled);
-                let hover_color = #f0f9ff;
-                let pressed_color = #e0f2fe;
-
-                let active_hover = self.hover * (1.0 - self.disabled);
-                let active_pressed = self.pressed * (1.0 - self.disabled);
-
-                let color = mix(base_color, hover_color, active_hover);
-                let color = mix(color, pressed_color, active_pressed);
-
-                sdf.fill(color);
-                sdf.stroke(border_col, 2.5);
-
-                return sdf.result;
-            }
-        }
-
-        animator: {
-            hover = {
-                default: off,
-                off = {
-                    from: { all: Forward { duration: 0.15 } }
-                    apply: { draw_thumb: { hover: 0.0 }, draw_thumb_start: { hover: 0.0 } }
+            pressed: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.2}}
+                    apply: {draw_thumb: {pressed: 0.0} draw_thumb_start: {pressed: 0.0}}
                 }
-                on = {
-                    from: { all: Forward { duration: 0.1 } }
-                    apply: { draw_thumb: { hover: 1.0 }, draw_thumb_start: { hover: 1.0 } }
-                }
-            }
-            pressed = {
-                default: off,
-                off = {
-                    from: { all: Forward { duration: 0.2 } }
-                    apply: { draw_thumb: { pressed: 0.0 }, draw_thumb_start: { pressed: 0.0 } }
-                }
-                on = {
-                    from: { all: Snap }
-                    apply: { draw_thumb: { pressed: 1.0 }, draw_thumb_start: { pressed: 1.0 } }
+                on: AnimatorState{
+                    from: {all: Snap}
+                    apply: {draw_thumb: {pressed: 1.0} draw_thumb_start: {pressed: 1.0}}
                 }
             }
         }
     }
 
     // Vertical slider
-    pub MpSliderVertical = <MpSlider> {
-        width: 24,
-        height: Fill,
-        vertical: true,
+    mod.widgets.MpSliderVertical = mod.widgets.MpSlider{
+        width: 24.0
+        height: Fill
+        vertical: true
     }
 
     // Slider variants
-    pub MpSliderSuccess = <MpSlider> {
-        draw_track: { fill_color: #22c55e }
-        draw_thumb: { border_color: #22c55e }
-        draw_thumb_start: { border_color: #22c55e }
+    mod.widgets.MpSliderSuccess = mod.widgets.MpSlider{
+        draw_track +: { fill_color: #x22c55e }
+        draw_thumb +: { border_color: #x22c55e }
+        draw_thumb_start +: { border_color: #x22c55e }
     }
 
-    pub MpSliderWarning = <MpSlider> {
-        draw_track: { fill_color: #f59e0b }
-        draw_thumb: { border_color: #f59e0b }
-        draw_thumb_start: { border_color: #f59e0b }
+    mod.widgets.MpSliderWarning = mod.widgets.MpSlider{
+        draw_track +: { fill_color: #xf59e0b }
+        draw_thumb +: { border_color: #xf59e0b }
+        draw_thumb_start +: { border_color: #xf59e0b }
     }
 
-    pub MpSliderDanger = <MpSlider> {
-        draw_track: { fill_color: #dc2626 }
-        draw_thumb: { border_color: #dc2626 }
-        draw_thumb_start: { border_color: #dc2626 }
+    mod.widgets.MpSliderDanger = mod.widgets.MpSlider{
+        draw_track +: { fill_color: #xdc2626 }
+        draw_thumb +: { border_color: #xdc2626 }
+        draw_thumb_start +: { border_color: #xdc2626 }
     }
 }
 
@@ -272,26 +238,75 @@ impl std::fmt::Display for SliderValue {
     }
 }
 
-#[derive(Clone, Debug, DefaultNone)]
+#[derive(Clone, Debug, Default)]
 pub enum MpSliderAction {
     Changed(SliderValue),
+    #[default]
     None,
 }
 
-#[derive(Live, LiveHook, Widget)]
+/// Track shader for MpSlider. Custom instance fields are written from Rust
+/// directly (the 2.0 replacement for `apply_over`).
+#[derive(Script, ScriptHook)]
+#[repr(C)]
+pub struct DrawSliderTrack {
+    #[deref]
+    draw_super: DrawQuad,
+    #[live]
+    progress_start: f32,
+    #[live]
+    progress_end: f32,
+    #[live]
+    disabled: f32,
+    #[live]
+    vertical: f32,
+    #[live]
+    track_color: Vec4f,
+    #[live]
+    fill_color: Vec4f,
+    #[live]
+    disabled_track_color: Vec4f,
+    #[live]
+    disabled_fill_color: Vec4f,
+}
+
+/// Thumb shader for MpSlider (shared by both thumbs in range mode).
+#[derive(Script, ScriptHook)]
+#[repr(C)]
+pub struct DrawSliderThumb {
+    #[deref]
+    draw_super: DrawQuad,
+    #[live]
+    hover: f32,
+    #[live]
+    pressed: f32,
+    #[live]
+    disabled: f32,
+    #[live]
+    border_color: Vec4f,
+    #[live]
+    disabled_border_color: Vec4f,
+}
+
+#[derive(Script, ScriptHook, Widget, Animator)]
 pub struct MpSlider {
+    #[uid]
+    uid: WidgetUid,
+    #[source]
+    source: ScriptObjectRef,
+    #[apply_default]
+    animator: Animator,
+
+    #[live]
+    draw_track: DrawSliderTrack,
+
     #[redraw]
     #[live]
-    draw_track: DrawQuad,
+    draw_thumb: DrawSliderThumb,
 
+    #[redraw]
     #[live]
-    draw_thumb: DrawQuad,
-
-    #[live]
-    draw_thumb_start: DrawQuad,
-
-    #[animator]
-    animator: Animator,
+    draw_thumb_start: DrawSliderThumb,
 
     #[walk]
     walk: Walk,
@@ -340,7 +355,7 @@ pub struct MpSlider {
 }
 
 impl Widget for MpSlider {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         if self.disabled {
             return;
         }
@@ -371,11 +386,11 @@ impl Widget for MpSlider {
                     self.dragging_start_thumb = progress < mid;
                 }
                 self.animator_play(cx, ids!(pressed.on));
-                self.update_value_from_position(cx, fe.abs, scope);
+                self.update_value_from_position(cx, fe.abs);
             }
             Hit::FingerMove(fe) => {
                 if self.dragging {
-                    self.update_value_from_position(cx, fe.abs, scope);
+                    self.update_value_from_position(cx, fe.abs);
                 }
             }
             Hit::FingerUp(_) => {
@@ -400,30 +415,13 @@ impl Widget for MpSlider {
         let disabled_f = if self.disabled { 1.0 } else { 0.0 };
         let vertical_f = if self.vertical { 1.0 } else { 0.0 };
 
-        // Update track
-        self.draw_track.apply_over(
-            cx,
-            live! {
-                progress_start: (progress_start),
-                progress_end: (progress_end),
-                disabled: (disabled_f),
-                vertical: (vertical_f)
-            },
-        );
-
-        // Update thumbs disabled state
-        self.draw_thumb.apply_over(
-            cx,
-            live! {
-                disabled: (disabled_f)
-            },
-        );
-        self.draw_thumb_start.apply_over(
-            cx,
-            live! {
-                disabled: (disabled_f)
-            },
-        );
+        // Update track + thumb shader instances
+        self.draw_track.progress_start = progress_start as f32;
+        self.draw_track.progress_end = progress_end as f32;
+        self.draw_track.disabled = disabled_f;
+        self.draw_track.vertical = vertical_f;
+        self.draw_thumb.disabled = disabled_f;
+        self.draw_thumb_start.disabled = disabled_f;
 
         // Get the rect for drawing
         let rect = cx.walk_turtle(walk);
@@ -569,7 +567,6 @@ impl MpSlider {
         let rect = self.track_area.rect(cx);
         if self.vertical {
             let thumb_radius = 10.0;
-            let _track_start = rect.pos.y + thumb_radius;
             let track_height = rect.size.y - thumb_radius * 2.0;
             if track_height <= 0.0 {
                 return 0.0;
@@ -590,7 +587,7 @@ impl MpSlider {
         }
     }
 
-    fn update_value_from_position(&mut self, cx: &mut Cx, pos: DVec2, scope: &mut Scope) {
+    fn update_value_from_position(&mut self, cx: &mut Cx, pos: DVec2) {
         let progress = self.position_to_progress(cx, pos);
         let raw_value = self.progress_to_value(progress);
 
@@ -612,7 +609,6 @@ impl MpSlider {
                     self.value_start = clamped;
                     cx.widget_action(
                         self.widget_uid(),
-                        &scope.path,
                         MpSliderAction::Changed(SliderValue::Range(self.value_start, self.value)),
                     );
                     self.redraw(cx);
@@ -624,22 +620,18 @@ impl MpSlider {
                     self.value = clamped;
                     cx.widget_action(
                         self.widget_uid(),
-                        &scope.path,
                         MpSliderAction::Changed(SliderValue::Range(self.value_start, self.value)),
                     );
                     self.redraw(cx);
                 }
             }
-        } else {
-            if (new_value - self.value).abs() > f64::EPSILON {
-                self.value = new_value;
-                cx.widget_action(
-                    self.widget_uid(),
-                    &scope.path,
-                    MpSliderAction::Changed(SliderValue::Single(self.value)),
-                );
-                self.redraw(cx);
-            }
+        } else if (new_value - self.value).abs() > f64::EPSILON {
+            self.value = new_value;
+            cx.widget_action(
+                self.widget_uid(),
+                MpSliderAction::Changed(SliderValue::Single(self.value)),
+            );
+            self.redraw(cx);
         }
     }
 

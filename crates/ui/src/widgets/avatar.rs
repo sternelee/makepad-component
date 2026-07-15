@@ -1,134 +1,116 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.mp_theme.*
 
-    use crate::theme::colors::*;
+    let AVATAR_SIZE_XS = 24.0
+    let AVATAR_SIZE_SM = 32.0
+    let AVATAR_SIZE_MD = 40.0
+    let AVATAR_SIZE_LG = 56.0
+    let AVATAR_SIZE_XL = 80.0
 
     // ============================================================
     // MpAvatar - Avatar/profile picture component
     // ============================================================
 
-    AVATAR_SIZE_XS = 24.0
-    AVATAR_SIZE_SM = 32.0
-    AVATAR_SIZE_MD = 40.0
-    AVATAR_SIZE_LG = 56.0
-    AVATAR_SIZE_XL = 80.0
-
     // Base avatar with initials (circle shape)
-    MpAvatarBase = <View> {
-        width: (AVATAR_SIZE_MD)
-        height: (AVATAR_SIZE_MD)
-        align: { x: 0.5, y: 0.5 }
+    mod.widgets.MpAvatarBase = #(MpAvatar::register_widget(vm))
+    mod.widgets.MpAvatar = set_type_default() do mod.widgets.MpAvatarBase{
+        width: AVATAR_SIZE_MD
+        height: AVATAR_SIZE_MD
+        align: Align{x: 0.5, y: 0.5}
 
         show_bg: true
-        draw_bg: {
-            instance radius: 20.0
-            instance bg_color: (MUTED)
+        draw_bg +: {
+            radius: instance(20.0)
+            bg_color: instance(MUTED)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let c = self.rect_size * 0.5;
-                let r = min(c.x, c.y);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+                let r = min(c.x, c.y)
 
-                sdf.circle(c.x, c.y, r);
-                sdf.fill(self.bg_color);
+                sdf.circle(c.x, c.y, r)
+                sdf.fill(self.bg_color)
 
-                return sdf.result;
+                return sdf.result
             }
         }
 
-        label = <Label> {
+        label := Label{
             width: Fit
             height: Fit
-            draw_text: {
-                text_style: <THEME_FONT_BOLD> { font_size: 14.0 }
-                color: (MUTED_FOREGROUND)
+            draw_text +: {
+                text_style: theme.font_bold{font_size: 14.0}
+                color: MUTED_FOREGROUND
             }
             text: ""
         }
     }
 
     // Extra small avatar
-    pub MpAvatarXSmall = <MpAvatarBase> {
-        width: (AVATAR_SIZE_XS)
-        height: (AVATAR_SIZE_XS)
+    mod.widgets.MpAvatarXSmall = mod.widgets.MpAvatar{
+        width: AVATAR_SIZE_XS
+        height: AVATAR_SIZE_XS
 
-        label = <Label> {
-            draw_text: {
-                text_style: <THEME_FONT_BOLD> { font_size: 10.0 }
+        label := Label{
+            width: Fit
+            height: Fit
+            draw_text +: {
+                text_style: theme.font_bold{font_size: 10.0}
+                color: MUTED_FOREGROUND
             }
+            text: ""
         }
     }
 
     // Small avatar
-    pub MpAvatarSmall = <MpAvatarBase> {
-        width: (AVATAR_SIZE_SM)
-        height: (AVATAR_SIZE_SM)
+    mod.widgets.MpAvatarSmall = mod.widgets.MpAvatar{
+        width: AVATAR_SIZE_SM
+        height: AVATAR_SIZE_SM
 
-        label = <Label> {
-            draw_text: {
-                text_style: <THEME_FONT_BOLD> { font_size: 12.0 }
-            }
-        }
-    }
-
-    // Default avatar (medium size) - with Widget support
-    pub MpAvatar = {{MpAvatar}} {
-        width: (AVATAR_SIZE_MD)
-        height: (AVATAR_SIZE_MD)
-        align: { x: 0.5, y: 0.5 }
-
-        show_bg: true
-        draw_bg: {
-            instance bg_color: (MUTED)
-
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let c = self.rect_size * 0.5;
-                let r = min(c.x, c.y);
-
-                sdf.circle(c.x, c.y, r);
-                sdf.fill(self.bg_color);
-
-                return sdf.result;
-            }
-        }
-
-        label = <Label> {
+        label := Label{
             width: Fit
             height: Fit
-            draw_text: {
-                text_style: <THEME_FONT_BOLD> { font_size: 14.0 }
-                color: (MUTED_FOREGROUND)
+            draw_text +: {
+                text_style: theme.font_bold{font_size: 12.0}
+                color: MUTED_FOREGROUND
             }
             text: ""
         }
     }
 
     // Large avatar
-    pub MpAvatarLarge = <MpAvatarBase> {
-        width: (AVATAR_SIZE_LG)
-        height: (AVATAR_SIZE_LG)
+    mod.widgets.MpAvatarLarge = mod.widgets.MpAvatar{
+        width: AVATAR_SIZE_LG
+        height: AVATAR_SIZE_LG
 
-        label = <Label> {
-            draw_text: {
-                text_style: <THEME_FONT_BOLD> { font_size: 20.0 }
+        label := Label{
+            width: Fit
+            height: Fit
+            draw_text +: {
+                text_style: theme.font_bold{font_size: 20.0}
+                color: MUTED_FOREGROUND
             }
+            text: ""
         }
     }
 
     // Extra large avatar
-    pub MpAvatarXLarge = <MpAvatarBase> {
-        width: (AVATAR_SIZE_XL)
-        height: (AVATAR_SIZE_XL)
+    mod.widgets.MpAvatarXLarge = mod.widgets.MpAvatar{
+        width: AVATAR_SIZE_XL
+        height: AVATAR_SIZE_XL
 
-        label = <Label> {
-            draw_text: {
-                text_style: <THEME_FONT_BOLD> { font_size: 28.0 }
+        label := Label{
+            width: Fit
+            height: Fit
+            draw_text +: {
+                text_style: theme.font_bold{font_size: 28.0}
+                color: MUTED_FOREGROUND
             }
+            text: ""
         }
     }
 
@@ -136,72 +118,64 @@ live_design! {
     // Square avatar variants
     // ============================================================
 
-    MpAvatarSquareBase = <View> {
-        width: (AVATAR_SIZE_MD)
-        height: (AVATAR_SIZE_MD)
-        align: { x: 0.5, y: 0.5 }
+    mod.widgets.MpAvatarSquareBase = mod.widgets.MpAvatar{
+        draw_bg +: {
+            radius: instance(6.0)
 
-        show_bg: true
-        draw_bg: {
-            instance bg_color: (MUTED)
-            instance radius: 6.0
-
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
 
                 sdf.box(
-                    0.0,
-                    0.0,
-                    self.rect_size.x,
-                    self.rect_size.y,
+                    0.0
+                    0.0
+                    self.rect_size.x
+                    self.rect_size.y
                     self.radius
-                );
-                sdf.fill(self.bg_color);
+                )
+                sdf.fill(self.bg_color)
 
-                return sdf.result;
+                return sdf.result
             }
         }
+    }
 
-        label = <Label> {
+    mod.widgets.MpAvatarSquare = mod.widgets.MpAvatarSquareBase{}
+
+    mod.widgets.MpAvatarSquareSmall = mod.widgets.MpAvatarSquareBase{
+        width: AVATAR_SIZE_SM
+        height: AVATAR_SIZE_SM
+
+        draw_bg +: {
+            radius: instance(4.0)
+        }
+
+        label := Label{
             width: Fit
             height: Fit
-            draw_text: {
-                text_style: <THEME_FONT_BOLD> { font_size: 14.0 }
-                color: (MUTED_FOREGROUND)
+            draw_text +: {
+                text_style: theme.font_bold{font_size: 12.0}
+                color: MUTED_FOREGROUND
             }
             text: ""
         }
     }
 
-    pub MpAvatarSquare = <MpAvatarSquareBase> {}
+    mod.widgets.MpAvatarSquareLarge = mod.widgets.MpAvatarSquareBase{
+        width: AVATAR_SIZE_LG
+        height: AVATAR_SIZE_LG
 
-    pub MpAvatarSquareSmall = <MpAvatarSquareBase> {
-        width: (AVATAR_SIZE_SM)
-        height: (AVATAR_SIZE_SM)
-
-        draw_bg: {
-            radius: 4.0
+        draw_bg +: {
+            radius: instance(8.0)
         }
 
-        label = <Label> {
-            draw_text: {
-                text_style: <THEME_FONT_BOLD> { font_size: 12.0 }
+        label := Label{
+            width: Fit
+            height: Fit
+            draw_text +: {
+                text_style: theme.font_bold{font_size: 20.0}
+                color: MUTED_FOREGROUND
             }
-        }
-    }
-
-    pub MpAvatarSquareLarge = <MpAvatarSquareBase> {
-        width: (AVATAR_SIZE_LG)
-        height: (AVATAR_SIZE_LG)
-
-        draw_bg: {
-            radius: 8.0
-        }
-
-        label = <Label> {
-            draw_text: {
-                text_style: <THEME_FONT_BOLD> { font_size: 20.0 }
-            }
+            text: ""
         }
     }
 
@@ -209,51 +183,67 @@ live_design! {
     // Color variants
     // ============================================================
 
-    pub MpAvatarPrimary = <MpAvatarBase> {
-        draw_bg: {
-            bg_color: (PRIMARY)
+    mod.widgets.MpAvatarPrimary = mod.widgets.MpAvatar{
+        draw_bg +: {
+            bg_color: instance(PRIMARY)
         }
 
-        label = <Label> {
-            draw_text: {
-                color: (PRIMARY_FOREGROUND)
+        label := Label{
+            width: Fit
+            height: Fit
+            draw_text +: {
+                text_style: theme.font_bold{font_size: 14.0}
+                color: PRIMARY_FOREGROUND
             }
+            text: ""
         }
     }
 
-    pub MpAvatarDanger = <MpAvatarBase> {
-        draw_bg: {
-            bg_color: (DANGER)
+    mod.widgets.MpAvatarDanger = mod.widgets.MpAvatar{
+        draw_bg +: {
+            bg_color: instance(DANGER)
         }
 
-        label = <Label> {
-            draw_text: {
-                color: (DANGER_FOREGROUND)
+        label := Label{
+            width: Fit
+            height: Fit
+            draw_text +: {
+                text_style: theme.font_bold{font_size: 14.0}
+                color: DANGER_FOREGROUND
             }
+            text: ""
         }
     }
 
-    pub MpAvatarSuccess = <MpAvatarBase> {
-        draw_bg: {
-            bg_color: (SUCCESS)
+    mod.widgets.MpAvatarSuccess = mod.widgets.MpAvatar{
+        draw_bg +: {
+            bg_color: instance(SUCCESS)
         }
 
-        label = <Label> {
-            draw_text: {
-                color: (SUCCESS_FOREGROUND)
+        label := Label{
+            width: Fit
+            height: Fit
+            draw_text +: {
+                text_style: theme.font_bold{font_size: 14.0}
+                color: SUCCESS_FOREGROUND
             }
+            text: ""
         }
     }
 
-    pub MpAvatarWarning = <MpAvatarBase> {
-        draw_bg: {
-            bg_color: (WARNING)
+    mod.widgets.MpAvatarWarning = mod.widgets.MpAvatar{
+        draw_bg +: {
+            bg_color: instance(WARNING)
         }
 
-        label = <Label> {
-            draw_text: {
-                color: (WARNING_FOREGROUND)
+        label := Label{
+            width: Fit
+            height: Fit
+            draw_text +: {
+                text_style: theme.font_bold{font_size: 14.0}
+                color: WARNING_FOREGROUND
             }
+            text: ""
         }
     }
 
@@ -261,18 +251,20 @@ live_design! {
     // Avatar Group
     // ============================================================
 
-    pub MpAvatarGroup = <View> {
+    mod.widgets.MpAvatarGroup = mod.widgets.View{
         width: Fit
         height: Fit
         flow: Right
-        spacing: -12  // Negative spacing for overlap
-        align: { y: 0.5 }
+        spacing: -12.0  // Negative spacing for overlap
+        align: Align{y: 0.5}
     }
 }
 
 /// Avatar widget for displaying user profile pictures or initials
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct MpAvatar {
+    #[source]
+    source: ScriptObjectRef,
     #[deref]
     view: View,
 }
@@ -290,7 +282,7 @@ impl Widget for MpAvatar {
 impl MpAvatar {
     /// Set the avatar text (usually initials)
     pub fn set_text(&mut self, cx: &mut Cx, text: &str) {
-        self.view.label(ids!(label)).set_text(cx, text);
+        self.view.label(cx, ids!(label)).set_text(cx, text);
     }
 
     /// Get initials from a full name (e.g., "John Doe" -> "JD")

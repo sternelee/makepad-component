@@ -1,34 +1,32 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-
-    use crate::theme::colors::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.mp_theme.*
 
     // ============================================================
     // MpPopover - Popover/Dropdown panel component
     // ============================================================
 
     // Base popover container
-    pub MpPopoverBase = <View> {
+    mod.widgets.MpPopoverBase = View{
         width: Fit
         height: Fit
         padding: 8
 
         show_bg: true
-        draw_bg: {
-            instance bg_color: (CARD)
-            instance border_radius: 8.0
-            instance border_color: (BORDER)
-            instance shadow_color: #0000001A
-            instance shadow_offset_y: 4.0
-            instance shadow_blur: 12.0
-            instance opacity: 1.0
+        draw_bg +: {
+            bg_color: instance(CARD)
+            border_radius: instance(8.0)
+            border_color: instance(BORDER)
+            shadow_color: instance(#x0000001A)
+            shadow_offset_y: instance(4.0)
+            shadow_blur: instance(12.0)
+            opacity: instance(1.0)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
 
                 // Shadow
                 sdf.box(
@@ -37,10 +35,10 @@ live_design! {
                     self.rect_size.x,
                     self.rect_size.y,
                     self.border_radius
-                );
-                sdf.blur = self.shadow_blur;
-                sdf.fill(self.shadow_color);
-                sdf.blur = 0.0;
+                )
+                sdf.blur = self.shadow_blur
+                sdf.fill(self.shadow_color)
+                sdf.blur = 0.0
 
                 // Main card
                 sdf.box(
@@ -49,11 +47,11 @@ live_design! {
                     self.rect_size.x - 1.0,
                     self.rect_size.y - 1.0,
                     self.border_radius
-                );
-                sdf.fill_keep(self.bg_color);
-                sdf.stroke(self.border_color, 1.0);
+                )
+                sdf.fill_keep(self.bg_color)
+                sdf.stroke(self.border_color, 1.0)
 
-                return Pal::premul(vec4(sdf.result.rgb, sdf.result.a * self.opacity));
+                return Pal.premul(vec4(sdf.result.rgb, sdf.result.a * self.opacity))
             }
         }
     }
@@ -62,7 +60,7 @@ live_design! {
     // Default Popover
     // ============================================================
 
-    pub MpPopover = <MpPopoverBase> {
+    mod.widgets.MpPopover = mod.widgets.MpPopoverBase{
         width: 240
         height: Fit
         padding: 12
@@ -71,41 +69,41 @@ live_design! {
     }
 
     // Popover with arrow pointing up
-    pub MpPopoverArrowUp = <View> {
+    mod.widgets.MpPopoverArrowUp = View{
         width: Fit
         height: Fit
         flow: Down
-        align: { x: 0.5 }
+        align: Align{x: 0.5}
 
-        arrow = <View> {
+        arrow := View{
             width: 16
             height: 8
-            margin: { bottom: -1 }
+            margin: Inset{bottom: -1}
 
             show_bg: true
-            draw_bg: {
-                instance arrow_color: (CARD)
-                instance arrow_border_color: (BORDER)
+            draw_bg +: {
+                arrow_color: instance(CARD)
+                arrow_border_color: instance(BORDER)
 
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    let w = self.rect_size.x;
-                    let h = self.rect_size.y;
+                pixel: fn() {
+                    let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                    let w = self.rect_size.x
+                    let h = self.rect_size.y
 
                     // Triangle pointing up
-                    sdf.move_to(w * 0.5, 0.0);
-                    sdf.line_to(w, h);
-                    sdf.line_to(0.0, h);
-                    sdf.close_path();
-                    sdf.fill_keep(self.arrow_color);
-                    sdf.stroke(self.arrow_border_color, 1.0);
+                    sdf.move_to(w * 0.5, 0.0)
+                    sdf.line_to(w, h)
+                    sdf.line_to(0.0, h)
+                    sdf.close_path()
+                    sdf.fill_keep(self.arrow_color)
+                    sdf.stroke(self.arrow_border_color, 1.0)
 
-                    return sdf.result;
+                    return sdf.result
                 }
             }
         }
 
-        content = <MpPopoverBase> {
+        content := mod.widgets.MpPopoverBase{
             width: 240
             height: Fit
             padding: 12
@@ -114,14 +112,14 @@ live_design! {
         }
     }
 
-    // Popover with arrow pointing down (static display)
-    pub MpPopoverArrowDown = <View> {
+    // Popover with arrow pointing down
+    mod.widgets.MpPopoverArrowDown = View{
         width: Fit
         height: Fit
         flow: Down
-        align: { x: 0.5 }
+        align: Align{x: 0.5}
 
-        content = <MpPopoverBase> {
+        content := mod.widgets.MpPopoverBase{
             width: 240
             height: Fit
             padding: 12
@@ -129,71 +127,71 @@ live_design! {
             spacing: 8
         }
 
-        arrow = <View> {
+        arrow := View{
             width: 16
             height: 8
-            margin: { top: -1 }
+            margin: Inset{top: -1}
 
             show_bg: true
-            draw_bg: {
-                instance arrow_color: (CARD)
-                instance arrow_border_color: (BORDER)
+            draw_bg +: {
+                arrow_color: instance(CARD)
+                arrow_border_color: instance(BORDER)
 
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    let w = self.rect_size.x;
-                    let h = self.rect_size.y;
+                pixel: fn() {
+                    let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                    let w = self.rect_size.x
+                    let h = self.rect_size.y
 
                     // Triangle pointing down
-                    sdf.move_to(0.0, 0.0);
-                    sdf.line_to(w, 0.0);
-                    sdf.line_to(w * 0.5, h);
-                    sdf.close_path();
-                    sdf.fill_keep(self.arrow_color);
-                    sdf.stroke(self.arrow_border_color, 1.0);
+                    sdf.move_to(0.0, 0.0)
+                    sdf.line_to(w, 0.0)
+                    sdf.line_to(w * 0.5, h)
+                    sdf.close_path()
+                    sdf.fill_keep(self.arrow_color)
+                    sdf.stroke(self.arrow_border_color, 1.0)
 
-                    return sdf.result;
+                    return sdf.result
                 }
             }
         }
     }
 
-    // Popover with arrow pointing left (for right placement)
-    pub MpPopoverArrowLeft = <View> {
+    // Popover with arrow pointing left
+    mod.widgets.MpPopoverArrowLeft = View{
         width: Fit
         height: Fit
         flow: Right
-        align: { y: 0.5 }
+        align: Align{y: 0.5}
 
-        arrow = <View> {
+        arrow := View{
             width: 8
             height: 16
-            margin: { right: -1 }
+            margin: Inset{right: -1}
 
             show_bg: true
-            draw_bg: {
-                instance arrow_color: (CARD)
-                instance arrow_border_color: (BORDER)
+            draw_bg +: {
+                arrow_color: instance(CARD)
+                arrow_border_color: instance(BORDER)
 
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    let w = self.rect_size.x;
-                    let h = self.rect_size.y;
+                pixel: fn() {
+                    let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                    let w = self.rect_size.x
+                    let h = self.rect_size.y
 
                     // Triangle pointing left
-                    sdf.move_to(w, 0.0);
-                    sdf.line_to(w, h);
-                    sdf.line_to(0.0, h * 0.5);
-                    sdf.close_path();
-                    sdf.fill_keep(self.arrow_color);
-                    sdf.stroke(self.arrow_border_color, 1.0);
+                    sdf.move_to(w, 0.0)
+                    sdf.line_to(w, h)
+                    sdf.line_to(0.0, h * 0.5)
+                    sdf.close_path()
+                    sdf.fill_keep(self.arrow_color)
+                    sdf.stroke(self.arrow_border_color, 1.0)
 
-                    return sdf.result;
+                    return sdf.result
                 }
             }
         }
 
-        content = <MpPopoverBase> {
+        content := mod.widgets.MpPopoverBase{
             width: 240
             height: Fit
             padding: 12
@@ -202,14 +200,14 @@ live_design! {
         }
     }
 
-    // Popover with arrow pointing right (for left placement)
-    pub MpPopoverArrowRight = <View> {
+    // Popover with arrow pointing right
+    mod.widgets.MpPopoverArrowRight = View{
         width: Fit
         height: Fit
         flow: Right
-        align: { y: 0.5 }
+        align: Align{y: 0.5}
 
-        content = <MpPopoverBase> {
+        content := mod.widgets.MpPopoverBase{
             width: 240
             height: Fit
             padding: 12
@@ -217,30 +215,30 @@ live_design! {
             spacing: 8
         }
 
-        arrow = <View> {
+        arrow := View{
             width: 8
             height: 16
-            margin: { left: -1 }
+            margin: Inset{left: -1}
 
             show_bg: true
-            draw_bg: {
-                instance arrow_color: (CARD)
-                instance arrow_border_color: (BORDER)
+            draw_bg +: {
+                arrow_color: instance(CARD)
+                arrow_border_color: instance(BORDER)
 
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    let w = self.rect_size.x;
-                    let h = self.rect_size.y;
+                pixel: fn() {
+                    let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                    let w = self.rect_size.x
+                    let h = self.rect_size.y
 
                     // Triangle pointing right
-                    sdf.move_to(0.0, 0.0);
-                    sdf.line_to(w, h * 0.5);
-                    sdf.line_to(0.0, h);
-                    sdf.close_path();
-                    sdf.fill_keep(self.arrow_color);
-                    sdf.stroke(self.arrow_border_color, 1.0);
+                    sdf.move_to(0.0, 0.0)
+                    sdf.line_to(w, h * 0.5)
+                    sdf.line_to(0.0, h)
+                    sdf.close_path()
+                    sdf.fill_keep(self.arrow_color)
+                    sdf.stroke(self.arrow_border_color, 1.0)
 
-                    return sdf.result;
+                    return sdf.result
                 }
             }
         }
@@ -250,7 +248,7 @@ live_design! {
     // Popover Menu (for dropdown menus)
     // ============================================================
 
-    pub MpPopoverMenu = <MpPopoverBase> {
+    mod.widgets.MpPopoverMenu = mod.widgets.MpPopoverBase{
         width: 200
         height: Fit
         padding: 4
@@ -258,92 +256,94 @@ live_design! {
     }
 
     // Menu item
-    pub MpPopoverMenuItem = <View> {
+    mod.widgets.MpPopoverMenuItem = View{
         width: Fill
         height: Fit
-        padding: { left: 12, right: 12, top: 8, bottom: 8 }
+        padding: Inset{left: 12, right: 12, top: 8, bottom: 8}
         flow: Right
-        align: { y: 0.5 }
+        align: Align{y: 0.5}
         spacing: 8
-        cursor: Hand
+        cursor: MouseCursor.Hand
 
         show_bg: true
-        draw_bg: {
-            instance bg_color: #00000000
-            instance bg_color_hover: #f1f5f9
-            instance border_radius: 4.0
-            instance hover: 0.0
+        draw_bg +: {
+            bg_color: instance(#x00000000)
+            bg_color_hover: instance(#xf1f5f9)
+            border_radius: instance(4.0)
+            hover: instance(0.0)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let result_color = mix(self.bg_color, self.bg_color_hover, self.hover);
-                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, self.border_radius);
-                sdf.fill(result_color);
-                return sdf.result;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let result_color = mix(self.bg_color, self.bg_color_hover, self.hover)
+                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, self.border_radius)
+                sdf.fill(result_color)
+                return sdf.result
             }
         }
 
-        animator: {
-            hover = {
-                default: off
-                off = {
-                    from: { all: Forward { duration: 0.1 } }
-                    apply: { draw_bg: { hover: 0.0 } }
+        animator: Animator{
+            hover: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.1}}
+                    apply: {draw_bg: {hover: 0.0}}
                 }
-                on = {
-                    from: { all: Forward { duration: 0.05 } }
-                    apply: { draw_bg: { hover: 1.0 } }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.05}}
+                    apply: {draw_bg: {hover: 1.0}}
                 }
             }
         }
 
-        label = <Label> {
+        label := Label{
             width: Fill
             height: Fit
-            draw_text: {
-                text_style: <THEME_FONT_REGULAR> { font_size: 14.0 }
-                color: (FOREGROUND)
+            draw_text +: {
+                text_style: theme.font_regular{font_size: 14.0}
+                color: FOREGROUND
             }
             text: "Menu Item"
         }
     }
 
     // Danger menu item
-    pub MpPopoverMenuItemDanger = <MpPopoverMenuItem> {
-        draw_bg: {
-            bg_color_hover: #fef2f2
+    mod.widgets.MpPopoverMenuItemDanger = mod.widgets.MpPopoverMenuItem{
+        draw_bg +: {
+            bg_color_hover: instance(#xfef2f2)
         }
-
-        label = <Label> {
-            draw_text: {
-                color: (DANGER)
+        label := Label{
+            draw_text +: {
+                color: DANGER
             }
         }
     }
 
     // Menu divider
-    pub MpPopoverMenuDivider = <View> {
+    mod.widgets.MpPopoverMenuDivider = View{
         width: Fill
         height: 1
-        margin: { top: 4, bottom: 4 }
+        margin: Inset{top: 4, bottom: 4}
         show_bg: true
-        draw_bg: {
-            color: (BORDER)
+        draw_bg +: {
+            color: instance(BORDER)
+            pixel: fn() {
+                return self.color
+            }
         }
     }
 
     // Menu section header
-    pub MpPopoverMenuHeader = <View> {
+    mod.widgets.MpPopoverMenuHeader = View{
         width: Fill
         height: Fit
-        padding: { left: 12, right: 12, top: 8, bottom: 4 }
+        padding: Inset{left: 12, right: 12, top: 8, bottom: 4}
 
-        <Label> {
+        Label{
             width: Fill
             height: Fit
-            draw_text: {
-                text_style: <THEME_FONT_BOLD> { font_size: 11.0 }
-                color: (MUTED_FOREGROUND)
+            draw_text +: {
+                text_style: theme.font_bold{font_size: 11.0}
+                color: MUTED_FOREGROUND
             }
         }
     }
@@ -352,56 +352,56 @@ live_design! {
     // Popover Content Variants
     // ============================================================
 
-    // Simple text popover (for tooltips with more content)
-    pub MpPopoverText = <MpPopoverBase> {
+    // Simple text popover
+    mod.widgets.MpPopoverText = mod.widgets.MpPopoverBase{
         width: 240
         height: Fit
         padding: 12
 
-        <Label> {
+        Label{
             width: Fill
             height: Fit
-            draw_text: {
-                text_style: <THEME_FONT_REGULAR> { font_size: 13.0 }
-                color: (FOREGROUND)
+            draw_text +: {
+                text_style: theme.font_regular{font_size: 13.0}
+                color: FOREGROUND
             }
             text: "Popover content"
         }
     }
 
     // Popover with header
-    pub MpPopoverWithHeader = <MpPopoverBase> {
+    mod.widgets.MpPopoverWithHeader = mod.widgets.MpPopoverBase{
         width: 280
         height: Fit
         flow: Down
 
-        header = <View> {
+        header := View{
             width: Fill
             height: Fit
-            padding: { left: 12, right: 12, top: 12, bottom: 8 }
+            padding: Inset{left: 12, right: 12, top: 12, bottom: 8}
 
-            title_label = <Label> {
+            title_label := Label{
                 width: Fill
                 height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_BOLD> { font_size: 14.0 }
-                    color: (FOREGROUND)
+                draw_text +: {
+                    text_style: theme.font_bold{font_size: 14.0}
+                    color: FOREGROUND
                 }
                 text: "Popover Title"
             }
         }
 
-        body = <View> {
+        body := View{
             width: Fill
             height: Fit
-            padding: { left: 12, right: 12, top: 0, bottom: 12 }
+            padding: Inset{left: 12, right: 12, top: 0, bottom: 12}
 
-            desc_label = <Label> {
+            desc_label := Label{
                 width: Fill
                 height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> { font_size: 13.0 }
-                    color: (MUTED_FOREGROUND)
+                draw_text +: {
+                    text_style: theme.font_regular{font_size: 13.0}
+                    color: MUTED_FOREGROUND
                 }
                 text: "Popover description text."
             }
@@ -412,18 +412,17 @@ live_design! {
     // Interactive Popover Widget
     // ============================================================
 
-    pub MpPopoverWidget = {{MpPopoverWidget}} {
+    mod.widgets.MpPopoverWidgetBase = #(MpPopoverWidget::register_widget(vm))
+    mod.widgets.MpPopoverWidget = set_type_default() do mod.widgets.MpPopoverWidgetBase{
         width: Fit
         height: Fit
         flow: Overlay
 
-        // Animation duration in seconds (can be overridden)
         animation_duration: 0.15
 
-        // Content with opacity-enabled background (hidden by default)
-        content = <MpPopoverBase> {
+        content := mod.widgets.MpPopoverBase{
             visible: false
-            draw_bg: { opacity: 0.0 }
+            draw_bg +: { opacity: instance(0.0) }
             width: 200
             height: Fit
             padding: 8
@@ -433,32 +432,31 @@ live_design! {
     }
 
     // Fast animation variant
-    pub MpPopoverWidgetFast = <MpPopoverWidget> {
+    mod.widgets.MpPopoverWidgetFast = mod.widgets.MpPopoverWidget{
         animation_duration: 0.03
     }
 
     // Slow animation variant
-    pub MpPopoverWidgetSlow = <MpPopoverWidget> {
+    mod.widgets.MpPopoverWidgetSlow = mod.widgets.MpPopoverWidget{
         animation_duration: 1.2
     }
 
     // Instant (no animation) variant
-    pub MpPopoverWidgetInstant = <MpPopoverWidget> {
+    mod.widgets.MpPopoverWidgetInstant = mod.widgets.MpPopoverWidget{
         animation_duration: 0.0
     }
 
     // ============================================================
-    // Placement Variants (12 positions like Ant Design)
+    // Placement Variants (12 positions)
     // ============================================================
 
-    // --- Top placements (popover above trigger, arrow points down) ---
-
-    // Top placement (centered) - popover appears above trigger
-    pub MpPopoverTop = <MpPopoverWidget> {
+    // Top placement
+    mod.widgets.MpPopoverTop = mod.widgets.MpPopoverWidget{
         trigger: Hover
-        content = {
+        content := {
             abs_pos: vec2(-30.0, -70.0)
-            width: Fit, height: Fit
+            width: Fit
+            height: Fit
             padding: 12
             flow: Down
             spacing: 4
@@ -466,23 +464,22 @@ live_design! {
     }
 
     // TopLeft placement
-    pub MpPopoverTopLeft = <MpPopoverTop> {
-        content = { abs_pos: vec2(0.0, -70.0) }
+    mod.widgets.MpPopoverTopLeft = mod.widgets.MpPopoverTop{
+        content := { abs_pos: vec2(0.0, -70.0) }
     }
 
     // TopRight placement
-    pub MpPopoverTopRight = <MpPopoverTop> {
-        content = { abs_pos: vec2(-60.0, -70.0) }
+    mod.widgets.MpPopoverTopRight = mod.widgets.MpPopoverTop{
+        content := { abs_pos: vec2(-60.0, -70.0) }
     }
 
-    // --- Bottom placements (popover below trigger, arrow points up) ---
-
-    // Bottom placement (centered) - popover appears below trigger
-    pub MpPopoverBottom = <MpPopoverWidget> {
+    // Bottom placement
+    mod.widgets.MpPopoverBottom = mod.widgets.MpPopoverWidget{
         trigger: Hover
-        content = {
+        content := {
             abs_pos: vec2(-30.0, 40.0)
-            width: Fit, height: Fit
+            width: Fit
+            height: Fit
             padding: 12
             flow: Down
             spacing: 4
@@ -490,23 +487,22 @@ live_design! {
     }
 
     // BottomLeft placement
-    pub MpPopoverBottomLeft = <MpPopoverBottom> {
-        content = { abs_pos: vec2(0.0, 40.0) }
+    mod.widgets.MpPopoverBottomLeft = mod.widgets.MpPopoverBottom{
+        content := { abs_pos: vec2(0.0, 40.0) }
     }
 
     // BottomRight placement
-    pub MpPopoverBottomRight = <MpPopoverBottom> {
-        content = { abs_pos: vec2(-60.0, 40.0) }
+    mod.widgets.MpPopoverBottomRight = mod.widgets.MpPopoverBottom{
+        content := { abs_pos: vec2(-60.0, 40.0) }
     }
 
-    // --- Left placements (popover to the left, arrow points right) ---
-
-    // Left placement (centered) - popover appears to the left
-    pub MpPopoverLeft = <MpPopoverWidget> {
+    // Left placement
+    mod.widgets.MpPopoverLeft = mod.widgets.MpPopoverWidget{
         trigger: Hover
-        content = {
+        content := {
             abs_pos: vec2(-105.0, -10.0)
-            width: Fit, height: Fit
+            width: Fit
+            height: Fit
             padding: 12
             flow: Down
             spacing: 4
@@ -514,23 +510,22 @@ live_design! {
     }
 
     // LeftTop placement
-    pub MpPopoverLeftTop = <MpPopoverLeft> {
-        content = { abs_pos: vec2(-105.0, 0.0) }
+    mod.widgets.MpPopoverLeftTop = mod.widgets.MpPopoverLeft{
+        content := { abs_pos: vec2(-105.0, 0.0) }
     }
 
     // LeftBottom placement
-    pub MpPopoverLeftBottom = <MpPopoverLeft> {
-        content = { abs_pos: vec2(-105.0, -25.0) }
+    mod.widgets.MpPopoverLeftBottom = mod.widgets.MpPopoverLeft{
+        content := { abs_pos: vec2(-105.0, -25.0) }
     }
 
-    // --- Right placements (popover to the right, arrow points left) ---
-
-    // Right placement (centered) - popover appears to the right
-    pub MpPopoverRight = <MpPopoverWidget> {
+    // Right placement
+    mod.widgets.MpPopoverRight = mod.widgets.MpPopoverWidget{
         trigger: Hover
-        content = {
+        content := {
             abs_pos: vec2(90.0, -10.0)
-            width: Fit, height: Fit
+            width: Fit
+            height: Fit
             padding: 12
             flow: Down
             spacing: 4
@@ -538,50 +533,65 @@ live_design! {
     }
 
     // RightTop placement
-    pub MpPopoverRightTop = <MpPopoverRight> {
-        content = { abs_pos: vec2(90.0, 0.0) }
+    mod.widgets.MpPopoverRightTop = mod.widgets.MpPopoverRight{
+        content := { abs_pos: vec2(90.0, 0.0) }
     }
 
     // RightBottom placement
-    pub MpPopoverRightBottom = <MpPopoverRight> {
-        content = { abs_pos: vec2(90.0, -25.0) }
+    mod.widgets.MpPopoverRightBottom = mod.widgets.MpPopoverRight{
+        content := { abs_pos: vec2(90.0, -25.0) }
     }
 
     // ============================================================
     // Interactive Menu Item Widget
     // ============================================================
 
-    pub MpPopoverMenuItemWidget = {{MpPopoverMenuItemWidget}} {
+    mod.widgets.MpPopoverMenuItemWidgetBase = #(MpPopoverMenuItemWidget::register_widget(vm))
+    mod.widgets.MpPopoverMenuItemWidget = set_type_default() do mod.widgets.MpPopoverMenuItemWidgetBase{
         width: Fill
         height: Fit
-        padding: { left: 12, right: 12, top: 8, bottom: 8 }
+        padding: Inset{left: 12, right: 12, top: 8, bottom: 8}
         flow: Right
-        align: { y: 0.5 }
+        align: Align{y: 0.5}
         spacing: 8
-        cursor: Hand
+        cursor: MouseCursor.Hand
 
         show_bg: true
-        draw_bg: {
-            instance bg_color: #00000000
-            instance bg_color_hover: #f1f5f9
-            instance border_radius: 4.0
-            instance hover: 0.0
+        draw_bg +: {
+            bg_color: instance(#x00000000)
+            bg_color_hover: instance(#xf1f5f9)
+            border_radius: instance(4.0)
+            hover: instance(0.0)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let result_color = mix(self.bg_color, self.bg_color_hover, self.hover);
-                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, self.border_radius);
-                sdf.fill(result_color);
-                return sdf.result;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let result_color = mix(self.bg_color, self.bg_color_hover, self.hover)
+                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, self.border_radius)
+                sdf.fill(result_color)
+                return sdf.result
             }
         }
 
-        label = <Label> {
+        animator: Animator{
+            hover: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.1}}
+                    apply: {draw_bg: {hover: 0.0}}
+                }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.05}}
+                    apply: {draw_bg: {hover: 1.0}}
+                }
+            }
+        }
+
+        label := Label{
             width: Fill
             height: Fit
-            draw_text: {
-                text_style: <THEME_FONT_REGULAR> { font_size: 14.0 }
-                color: (FOREGROUND)
+            draw_text +: {
+                text_style: theme.font_regular{font_size: 14.0}
+                color: FOREGROUND
             }
             text: "Menu Item"
         }
@@ -589,34 +599,37 @@ live_design! {
 }
 
 /// Popover actions
-#[derive(Clone, Debug, DefaultNone)]
+#[derive(Clone, Debug, Default)]
 pub enum MpPopoverAction {
+    #[default]
     None,
     Opened,
     Closed,
 }
 
 /// Menu item actions
-#[derive(Clone, Debug, DefaultNone)]
+#[derive(Clone, Debug, Default)]
 pub enum MpPopoverMenuItemAction {
+    #[default]
     None,
     Clicked,
 }
 
 /// Trigger mode for popover
-#[derive(Copy, Clone, Debug, Live, LiveHook)]
-#[live_ignore]
+#[derive(Copy, Clone, Debug, Default, Script, ScriptHook, PartialEq)]
 pub enum MpPopoverTrigger {
-    #[pick]
+    #[default]
     Click,
     Hover,
     Focus,
 }
 
 /// Interactive popover widget with show/hide functionality
-/// Uses NextFrame manual animation for opacity fade (animator cannot animate child components)
-#[derive(Live, LiveHook, Widget)]
+/// Uses NextFrame manual animation for opacity fade
+#[derive(Script, ScriptHook, Widget)]
 pub struct MpPopoverWidget {
+    #[source]
+    source: ScriptObjectRef,
     #[deref]
     view: View,
 
@@ -649,7 +662,7 @@ pub struct MpPopoverWidget {
 }
 
 impl Widget for MpPopoverWidget {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         // Handle NextFrame for manual animation
         if let Some(nf) = self.next_frame.is_event(event) {
             if self.animating.is_some() {
@@ -675,17 +688,15 @@ impl Widget for MpPopoverWidget {
                     if self.opacity <= 0.0 {
                         self.animating = None;
                         // Hide content after fade-out completes
-                        self.view.view(ids!(content)).set_visible(cx, false);
+                        self.view(cx, ids!(content)).set_visible(cx, false);
                     }
                 }
 
-                // Apply opacity to content's draw_bg
-                self.view.view(ids!(content)).apply_over(
-                    cx,
-                    live! {
-                        draw_bg: { opacity: (self.opacity) }
-                    },
-                );
+                // Apply opacity to content's draw_bg via script_apply_eval
+                let mut content_view = self.view(cx, ids!(content));
+                script_apply_eval!(cx, content_view, {
+                    draw_bg: { opacity: #(self.opacity as f32) }
+                });
 
                 self.redraw(cx);
 
@@ -724,7 +735,7 @@ impl Widget for MpPopoverWidget {
             }
         }
 
-        self.view.handle_event(cx, event, scope);
+        self.view.handle_event(cx, event, _scope);
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
@@ -740,7 +751,7 @@ impl MpPopoverWidget {
         }
         self.opened = true;
         // Make content visible
-        self.view.view(ids!(content)).set_visible(cx, true);
+        self.view(cx, ids!(content)).set_visible(cx, true);
 
         // Start fade-in animation
         if self.animation_duration > 0.0 {
@@ -750,12 +761,10 @@ impl MpPopoverWidget {
         } else {
             // Instant show
             self.opacity = 1.0;
-            self.view.view(ids!(content)).apply_over(
-                cx,
-                live! {
-                    draw_bg: { opacity: 1.0 }
-                },
-            );
+            let mut content_view = self.view(cx, ids!(content));
+            script_apply_eval!(cx, content_view, {
+                draw_bg: { opacity: 1.0 }
+            });
         }
         self.redraw(cx);
     }
@@ -775,7 +784,7 @@ impl MpPopoverWidget {
         } else {
             // Instant hide
             self.opacity = 0.0;
-            self.view.view(ids!(content)).set_visible(cx, false);
+            self.view(cx, ids!(content)).set_visible(cx, false);
         }
         self.redraw(cx);
     }
@@ -824,32 +833,30 @@ impl MpPopoverWidgetRef {
 }
 
 /// Interactive menu item widget with click handling
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct MpPopoverMenuItemWidget {
+    #[source]
+    source: ScriptObjectRef,
     #[deref]
     view: View,
 }
 
 impl Widget for MpPopoverMenuItemWidget {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        self.view.handle_event(cx, event, scope);
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
+        self.view.handle_event(cx, event, _scope);
+
+        let uid = self.widget_uid();
 
         match event.hits(cx, self.view.area()) {
             Hit::FingerHoverIn(_) => {
-                self.view.apply_over(cx, live! { draw_bg: { hover: 1.0 } });
-                self.redraw(cx);
+                self.view.animator_play(cx, ids!(hover.on));
             }
             Hit::FingerHoverOut(_) => {
-                self.view.apply_over(cx, live! { draw_bg: { hover: 0.0 } });
-                self.redraw(cx);
+                self.view.animator_play(cx, ids!(hover.off));
             }
             Hit::FingerUp(fe) => {
                 if fe.is_over {
-                    cx.widget_action(
-                        self.widget_uid(),
-                        &scope.path,
-                        MpPopoverMenuItemAction::Clicked,
-                    );
+                    cx.widget_action(uid, MpPopoverMenuItemAction::Clicked);
                 }
             }
             _ => {}
@@ -864,7 +871,7 @@ impl Widget for MpPopoverMenuItemWidget {
 impl MpPopoverMenuItemWidget {
     /// Set the menu item label
     pub fn set_text(&mut self, cx: &mut Cx, text: &str) {
-        self.view.label(ids!(label)).set_text(cx, text);
+        self.view.label(cx, ids!(label)).set_text(cx, text);
     }
 }
 

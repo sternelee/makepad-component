@@ -1,108 +1,114 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-
-    use crate::theme::colors::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.mp_theme.*
 
     // Checkbox component - uses DrawQuad begin/end pattern for reliable hit testing
-    pub MpCheckbox = {{MpCheckbox}} {
-        width: Fit,
-        height: Fit,
-        align: { y: 0.5 }
-        padding: { left: 4, right: 4, top: 4, bottom: 4 }
+    mod.widgets.MpCheckboxBase = #(MpCheckbox::register_widget(vm))
+    mod.widgets.MpCheckbox = set_type_default() do mod.widgets.MpCheckboxBase{
+        width: Fit
+        height: Fit
+        align: Align{y: 0.5}
+        padding: Inset{left: 4.0, right: 4.0, top: 4.0, bottom: 4.0}
         flow: Right
-        spacing: 8
+        spacing: 8.0
 
         // Outer draw_bg for hit testing area (transparent background)
-        draw_bg: {
-            fn pixel(self) -> vec4 {
-                return vec4(0.0, 0.0, 0.0, 0.0);
+        draw_bg +: {
+            pixel: fn() {
+                return vec4(0.0, 0.0, 0.0, 0.0)
             }
         }
 
         // The checkbox box with checkmark
-        draw_check: {
-            instance checked: 0.0
-            instance hover: 0.0
-            instance radius: 4.0
+        draw_check +: {
+            checked: instance(0.0)
+            hover: instance(0.0)
+            radius: instance(4.0)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let sz = self.rect_size;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let sz = self.rect_size
 
                 // Background box
-                sdf.box(1.0, 1.0, sz.x - 2.0, sz.y - 2.0, self.radius);
+                sdf.box(1.0, 1.0, sz.x - 2.0, sz.y - 2.0, self.radius)
 
                 // Colors
-                let bg_unchecked = #ffffff;
-                let bg_checked = (PRIMARY);
-                let border_unchecked = mix((BORDER), (PRIMARY), self.hover * 0.5);
-                let border_checked = (PRIMARY);
+                let bg_unchecked = #xffffff
+                let bg_checked = PRIMARY
+                let border_unchecked = mix(BORDER, PRIMARY, self.hover * 0.5)
+                let border_checked = PRIMARY
 
                 // Interpolate based on checked state
-                let bg = mix(bg_unchecked, bg_checked, self.checked);
-                let border = mix(border_unchecked, border_checked, self.checked);
+                let bg = mix(bg_unchecked, bg_checked, self.checked)
+                let border = mix(border_unchecked, border_checked, self.checked)
 
-                sdf.fill_keep(bg);
-                sdf.stroke(border, 1.5);
+                sdf.fill_keep(bg)
+                sdf.stroke(border, 1.5)
 
                 // Draw checkmark when checked
-                if self.checked > 0.5 {
-                    let check_color = #ffffff;
-                    let cx = sz.x * 0.5;
-                    let cy = sz.y * 0.5;
+                if (self.checked > 0.5) {
+                    let check_color = #xffffff
+                    let cx = sz.x * 0.5
+                    let cy = sz.y * 0.5
 
                     // Checkmark path (two lines)
-                    sdf.move_to(cx - 4.0, cy);
-                    sdf.line_to(cx - 1.0, cy + 3.0);
-                    sdf.line_to(cx + 4.0, cy - 3.0);
-                    sdf.stroke(check_color, 2.0);
+                    sdf.move_to(cx - 4.0, cy)
+                    sdf.line_to(cx - 1.0, cy + 3.0)
+                    sdf.line_to(cx + 4.0, cy - 3.0)
+                    sdf.stroke(check_color, 2.0)
                 }
 
-                return sdf.result;
+                return sdf.result
             }
         }
 
         // Label text
-        draw_label: {
-            text_style: <THEME_FONT_REGULAR>{ font_size: 13.0 }
-            color: (FOREGROUND)
+        draw_label +: {
+            text_style: theme.font_regular{font_size: 13.0}
+            color: FOREGROUND
         }
 
         text: ""
 
-        animator: {
-            hover = {
-                default: off
-                off = {
-                    from: { all: Forward { duration: 0.15 } }
-                    apply: { draw_check: { hover: 0.0 } }
+        animator: Animator{
+            hover: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_check: {hover: 0.0}}
                 }
-                on = {
-                    from: { all: Forward { duration: 0.1 } }
-                    apply: { draw_check: { hover: 1.0 } }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.1}}
+                    apply: {draw_check: {hover: 1.0}}
                 }
             }
-            checked = {
-                default: off
-                off = {
-                    from: { all: Forward { duration: 0.15 } }
-                    apply: { draw_check: { checked: 0.0 } }
+            checked: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_check: {checked: 0.0}}
                 }
-                on = {
-                    from: { all: Forward { duration: 0.15 } }
-                    apply: { draw_check: { checked: 1.0 } }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_check: {checked: 1.0}}
                 }
             }
         }
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, Widget, Animator)]
 pub struct MpCheckbox {
+    #[uid]
+    uid: WidgetUid,
+    #[source]
+    source: ScriptObjectRef,
+    #[apply_default]
+    animator: Animator,
+
     #[redraw]
     #[live]
     draw_bg: DrawQuad,
@@ -123,21 +129,34 @@ pub struct MpCheckbox {
     #[live]
     disabled: bool,
 
-    #[animator]
-    animator: Animator,
-
     #[rust]
     area: Area,
 }
 
-#[derive(Clone, Debug, DefaultNone)]
+impl ScriptHook for MpCheckbox {
+    fn on_after_new(&mut self, vm: &mut ScriptVm) {
+        vm.with_cx_mut(|cx| {
+            let checked = self.checked;
+            self.animator_toggle(
+                cx,
+                checked,
+                Animate::No,
+                ids!(checked.on),
+                ids!(checked.off),
+            );
+        });
+    }
+}
+
+#[derive(Clone, Debug, Default)]
 pub enum MpCheckboxAction {
     Changed(bool),
+    #[default]
     None,
 }
 
 impl Widget for MpCheckbox {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         let uid = self.widget_uid();
 
         if self.animator_handle_event(cx, event).must_redraw() {
@@ -163,14 +182,14 @@ impl Widget for MpCheckbox {
             Hit::FingerUp(fe) => {
                 if fe.is_over {
                     self.checked = !self.checked;
-
-                    if self.checked {
-                        self.animator_play(cx, ids!(checked.on));
-                    } else {
-                        self.animator_play(cx, ids!(checked.off));
-                    }
-
-                    cx.widget_action(uid, &scope.path, MpCheckboxAction::Changed(self.checked));
+                    self.animator_toggle(
+                        cx,
+                        self.checked,
+                        Animate::Yes,
+                        ids!(checked.on),
+                        ids!(checked.off),
+                    );
+                    cx.widget_action(uid, MpCheckboxAction::Changed(self.checked));
                     self.redraw(cx);
                 }
             }
@@ -183,12 +202,7 @@ impl Widget for MpCheckbox {
         self.draw_bg.begin(cx, walk, self.layout);
 
         // Draw checkbox box (18x18)
-        let check_walk = Walk {
-            width: Size::Fixed(18.0),
-            height: Size::Fixed(18.0),
-            ..Walk::default()
-        };
-        self.draw_check.draw_walk(cx, check_walk);
+        self.draw_check.draw_walk(cx, Walk::fixed(18.0, 18.0));
 
         // Draw label text
         if !self.text.as_ref().is_empty() {
@@ -215,11 +229,13 @@ impl MpCheckbox {
     pub fn set_checked(&mut self, cx: &mut Cx, checked: bool) {
         if self.checked != checked {
             self.checked = checked;
-            if checked {
-                self.animator_play(cx, ids!(checked.on));
-            } else {
-                self.animator_play(cx, ids!(checked.off));
-            }
+            self.animator_toggle(
+                cx,
+                checked,
+                Animate::Yes,
+                ids!(checked.on),
+                ids!(checked.off),
+            );
             self.redraw(cx);
         }
     }

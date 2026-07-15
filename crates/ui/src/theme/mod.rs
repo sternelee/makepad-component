@@ -1,7 +1,7 @@
 pub mod colors;
 
-use makepad_widgets::Cx;
+use makepad_widgets::*;
 
-pub fn live_design(cx: &mut Cx) {
-    crate::theme::colors::live_design(cx);
+pub fn script_mod(vm: &mut ScriptVm) {
+    crate::theme::colors::script_mod(vm);
 }

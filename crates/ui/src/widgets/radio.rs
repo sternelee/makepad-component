@@ -1,104 +1,120 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.mp_theme.*
 
-    use crate::theme::colors::*;
+    // Radio button component - uses DrawQuad begin/end pattern for reliable hit testing
+    mod.widgets.MpRadioBase = #(MpRadio::register_widget(vm))
+    mod.widgets.MpRadio = set_type_default() do mod.widgets.MpRadioBase{
+        width: Fit
+        height: Fit
+        align: Align{y: 0.5}
+        flow: Right
+        spacing: 8.0
 
-    // Radio button component
-    pub MpRadio = {{MpRadio}} {
-        width: Fit,
-        height: Fit,
-        flow: Right,
-        spacing: 8,
-        align: { y: 0.5 }
-
-        // Radio circle
-        radio_circle = <View> {
-            width: 18,
-            height: 18,
-
-            show_bg: true,
-            draw_bg: {
-                instance checked: 0.0
-                instance hover: 0.0
-
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    let sz = self.rect_size;
-                    let center = sz * 0.5;
-                    let radius = center.x - 1.0;
-
-                    // Outer circle
-                    sdf.circle(center.x, center.y, radius);
-
-                    // Colors
-                    let bg_unchecked = #ffffff;
-                    let bg_checked = #ffffff;
-                    let border_unchecked = mix(#d2d8f0, #3b82f6, self.hover * 0.5);
-                    let border_checked = #3b82f6;
-
-                    let bg = mix(bg_unchecked, bg_checked, self.checked);
-                    let border = mix(border_unchecked, border_checked, self.checked);
-
-                    sdf.fill_keep(bg);
-                    sdf.stroke(border, 1.5);
-
-                    // Inner dot when checked
-                    if self.checked > 0.5 {
-                        let dot_radius = radius * 0.5;
-                        sdf.circle(center.x, center.y, dot_radius);
-                        sdf.fill(#3b82f6);
-                    }
-
-                    return sdf.result;
-                }
+        // Outer draw_bg for hit testing area (transparent background)
+        draw_bg +: {
+            pixel: fn() {
+                return vec4(0.0, 0.0, 0.0, 0.0)
             }
         }
 
-        // Label
-        label = <Label> {
-            width: Fit,
-            draw_text: {
-                text_style: <THEME_FONT_REGULAR>{ font_size: 14.0 }
-                color: #0f172a
+        // The radio circle with inner dot
+        draw_circle +: {
+            checked: instance(0.0)
+            hover: instance(0.0)
+
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let sz = self.rect_size
+                let center = sz * 0.5
+                let radius = center.x - 1.0
+
+                // Outer circle
+                sdf.circle(center.x, center.y, radius)
+
+                // Colors
+                let bg_unchecked = #xffffff
+                let bg_checked = #xffffff
+                let border_unchecked = mix(BORDER, PRIMARY, self.hover * 0.5)
+                let border_checked = PRIMARY
+
+                // Interpolate based on checked state
+                let bg = mix(bg_unchecked, bg_checked, self.checked)
+                let border = mix(border_unchecked, border_checked, self.checked)
+
+                sdf.fill_keep(bg)
+                sdf.stroke(border, 1.5)
+
+                // Inner dot when checked
+                if (self.checked > 0.5) {
+                    let dot_radius = radius * 0.5
+                    sdf.circle(center.x, center.y, dot_radius)
+                    sdf.fill(PRIMARY)
+                }
+
+                return sdf.result
             }
-            text: ""
         }
 
-        animator: {
-            hover = {
-                default: off
-                off = {
-                    from: { all: Forward { duration: 0.15 } }
-                    apply: { radio_circle = { draw_bg: { hover: 0.0 } } }
+        // Label text
+        draw_label +: {
+            text_style: theme.font_regular{font_size: 14.0}
+            color: FOREGROUND
+        }
+
+        text: ""
+
+        animator: Animator{
+            hover: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_circle: {hover: 0.0}}
                 }
-                on = {
-                    from: { all: Forward { duration: 0.1 } }
-                    apply: { radio_circle = { draw_bg: { hover: 1.0 } } }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.1}}
+                    apply: {draw_circle: {hover: 1.0}}
                 }
             }
-            checked = {
-                default: off
-                off = {
-                    from: { all: Forward { duration: 0.15 } }
-                    apply: { radio_circle = { draw_bg: { checked: 0.0 } } }
+            checked: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_circle: {checked: 0.0}}
                 }
-                on = {
-                    from: { all: Forward { duration: 0.15 } }
-                    apply: { radio_circle = { draw_bg: { checked: 1.0 } } }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_circle: {checked: 1.0}}
                 }
             }
         }
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, Widget, Animator)]
 pub struct MpRadio {
-    #[deref]
-    view: View,
+    #[uid]
+    uid: WidgetUid,
+    #[source]
+    source: ScriptObjectRef,
+    #[apply_default]
+    animator: Animator,
+
+    #[redraw]
+    #[live]
+    draw_bg: DrawQuad,
+    #[live]
+    draw_circle: DrawQuad,
+    #[live]
+    draw_label: DrawText,
+
+    #[walk]
+    walk: Walk,
+    #[layout]
+    layout: Layout,
 
     #[live]
     text: ArcStringMut,
@@ -109,31 +125,45 @@ pub struct MpRadio {
     #[live]
     value: ArcStringMut,
 
-    #[animator]
-    animator: Animator,
+    #[rust]
+    area: Area,
 }
 
-#[derive(Clone, Debug, DefaultNone)]
+impl ScriptHook for MpRadio {
+    fn on_after_new(&mut self, vm: &mut ScriptVm) {
+        vm.with_cx_mut(|cx| {
+            let checked = self.checked;
+            self.animator_toggle(
+                cx,
+                checked,
+                Animate::No,
+                ids!(checked.on),
+                ids!(checked.off),
+            );
+        });
+    }
+}
+
+#[derive(Clone, Debug, Default)]
 pub enum MpRadioAction {
     Changed(bool),
+    #[default]
     None,
 }
 
 impl Widget for MpRadio {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         let uid = self.widget_uid();
 
         if self.animator_handle_event(cx, event).must_redraw() {
             self.redraw(cx);
         }
 
-        self.view.handle_event(cx, event, scope);
-
         if self.disabled {
             return;
         }
 
-        match event.hits(cx, self.view.area()) {
+        match event.hits(cx, self.area) {
             Hit::FingerHoverIn(_) => {
                 cx.set_cursor(MouseCursor::Hand);
                 self.animator_play(cx, ids!(hover.on));
@@ -147,7 +177,7 @@ impl Widget for MpRadio {
                     // Radio can only be checked, not unchecked by clicking
                     self.checked = true;
                     self.animator_play(cx, ids!(checked.on));
-                    cx.widget_action(uid, &scope.path, MpRadioAction::Changed(true));
+                    cx.widget_action(uid, MpRadioAction::Changed(true));
                     self.redraw(cx);
                 }
             }
@@ -155,25 +185,23 @@ impl Widget for MpRadio {
         }
     }
 
-    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
-        // Update label text
+    fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Begin outer container (provides hit testing area)
+        self.draw_bg.begin(cx, walk, self.layout);
+
+        // Draw radio circle (18x18)
+        self.draw_circle.draw_walk(cx, Walk::fixed(18.0, 18.0));
+
+        // Draw label text
         if !self.text.as_ref().is_empty() {
-            self.view
-                .label(ids!(label))
-                .set_text(cx, self.text.as_ref());
+            self.draw_label
+                .draw_walk(cx, Walk::fit(), Align::default(), self.text.as_ref());
         }
 
-        // Sync initial checked state
-        if self.checked {
-            self.view.view(ids!(radio_circle)).apply_over(
-                cx,
-                live! {
-                    draw_bg: { checked: 1.0 }
-                },
-            );
-        }
+        self.draw_bg.end(cx);
+        self.area = self.draw_bg.area();
 
-        self.view.draw_walk(cx, scope, walk)
+        DrawStep::done()
     }
 }
 
@@ -188,11 +216,13 @@ impl MpRadio {
 
     pub fn set_checked(&mut self, cx: &mut Cx, checked: bool) {
         self.checked = checked;
-        if checked {
-            self.animator_play(cx, ids!(checked.on));
-        } else {
-            self.animator_play(cx, ids!(checked.off));
-        }
+        self.animator_toggle(
+            cx,
+            checked,
+            Animate::Yes,
+            ids!(checked.on),
+            ids!(checked.off),
+        );
         self.redraw(cx);
     }
 

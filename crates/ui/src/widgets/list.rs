@@ -1,33 +1,31 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-
-    use crate::theme::colors::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.mp_theme.*
 
     // ============================================================
     // MpList - List container and item components
     // ============================================================
 
     // List container
-    pub MpList = <View> {
+    mod.widgets.MpList = mod.widgets.View{
         width: Fill
         height: Fit
         flow: Down
     }
 
     // List with dividers (using RoundedView for proper border support)
-    pub MpListDivided = <RoundedView> {
+    mod.widgets.MpListDivided = mod.widgets.RoundedView{
         width: Fill
         height: Fit
         flow: Down
 
-        draw_bg: {
-            color: (CARD)
+        draw_bg +: {
+            color: CARD
             border_radius: 8.0
-            border_color: (BORDER)
+            border_color: BORDER
         }
     }
 
@@ -36,96 +34,96 @@ live_design! {
     // ============================================================
 
     // Basic list item
-    pub MpListItem = <View> {
+    mod.widgets.MpListItem = mod.widgets.View{
         width: Fill
         height: Fit
-        padding: { left: 16, right: 16, top: 12, bottom: 12 }
+        padding: Inset{left: 16.0, right: 16.0, top: 12.0, bottom: 12.0}
         flow: Right
-        align: { y: 0.5 }
+        align: Align{y: 0.5}
         spacing: 12
     }
 
     // List item with hover effect
-    pub MpListItemHover = <View> {
+    mod.widgets.MpListItemHover = mod.widgets.View{
         width: Fill
         height: Fit
-        padding: { left: 16, right: 16, top: 12, bottom: 12 }
+        padding: Inset{left: 16.0, right: 16.0, top: 12.0, bottom: 12.0}
         flow: Right
-        align: { y: 0.5 }
+        align: Align{y: 0.5}
         spacing: 12
-        cursor: Hand
+        cursor: MouseCursor.Hand
 
         show_bg: true
-        draw_bg: {
-            instance bg_color: #00000000
-            instance bg_color_hover: #f8fafc
-            instance hover: 0.0
+        draw_bg +: {
+            bg_color: instance(#x00000000)
+            bg_color_hover: instance(#xf8fafc)
+            hover: instance(0.0)
 
-            fn pixel(self) -> vec4 {
-                return mix(self.bg_color, self.bg_color_hover, self.hover);
+            pixel: fn() {
+                return Pal.premul(mix(self.bg_color, self.bg_color_hover, self.hover))
             }
         }
 
-        animator: {
-            hover = {
-                default: off
-                off = {
-                    from: { all: Forward { duration: 0.15 } }
-                    apply: { draw_bg: { hover: 0.0 } }
+        animator: Animator{
+            hover: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_bg: {hover: 0.0}}
                 }
-                on = {
-                    from: { all: Forward { duration: 0.1 } }
-                    apply: { draw_bg: { hover: 1.0 } }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.1}}
+                    apply: {draw_bg: {hover: 1.0}}
                 }
             }
         }
     }
 
     // List item with active state
-    pub MpListItemActive = <View> {
+    mod.widgets.MpListItemActive = mod.widgets.View{
         width: Fill
         height: Fit
-        padding: { left: 16, right: 16, top: 12, bottom: 12 }
+        padding: Inset{left: 16.0, right: 16.0, top: 12.0, bottom: 12.0}
         flow: Right
-        align: { y: 0.5 }
+        align: Align{y: 0.5}
         spacing: 12
-        cursor: Hand
+        cursor: MouseCursor.Hand
 
         show_bg: true
-        draw_bg: {
-            instance bg_color: #00000000
-            instance bg_color_hover: #f8fafc
-            instance bg_color_active: #eff6ff
-            instance hover: 0.0
-            instance active: 0.0
+        draw_bg +: {
+            bg_color: instance(#x00000000)
+            bg_color_hover: instance(#xf8fafc)
+            bg_color_active: instance(#xeff6ff)
+            hover: instance(0.0)
+            active: instance(0.0)
 
-            fn pixel(self) -> vec4 {
-                let base = mix(self.bg_color, self.bg_color_active, self.active);
-                return mix(base, self.bg_color_hover, self.hover * (1.0 - self.active));
+            pixel: fn() {
+                let base = mix(self.bg_color, self.bg_color_active, self.active)
+                return Pal.premul(mix(base, self.bg_color_hover, self.hover * (1.0 - self.active)))
             }
         }
 
-        animator: {
-            hover = {
-                default: off
-                off = {
-                    from: { all: Forward { duration: 0.15 } }
-                    apply: { draw_bg: { hover: 0.0 } }
+        animator: Animator{
+            hover: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_bg: {hover: 0.0}}
                 }
-                on = {
-                    from: { all: Forward { duration: 0.1 } }
-                    apply: { draw_bg: { hover: 1.0 } }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.1}}
+                    apply: {draw_bg: {hover: 1.0}}
                 }
             }
-            active = {
-                default: off
-                off = {
-                    from: { all: Forward { duration: 0.1 } }
-                    apply: { draw_bg: { active: 0.0 } }
+            active: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.1}}
+                    apply: {draw_bg: {active: 0.0}}
                 }
-                on = {
-                    from: { all: Snap }
-                    apply: { draw_bg: { active: 1.0 } }
+                on: AnimatorState{
+                    from: {all: Snap}
+                    apply: {draw_bg: {active: 1.0}}
                 }
             }
         }
@@ -136,14 +134,14 @@ live_design! {
     // ============================================================
 
     // List item leading (icon/avatar area)
-    pub MpListItemLeading = <View> {
+    mod.widgets.MpListItemLeading = mod.widgets.View{
         width: Fit
         height: Fit
-        align: { x: 0.5, y: 0.5 }
+        align: Align{x: 0.5, y: 0.5}
     }
 
     // List item content (title + description)
-    pub MpListItemContent = <View> {
+    mod.widgets.MpListItemContent = mod.widgets.View{
         width: Fill
         height: Fit
         flow: Down
@@ -151,52 +149,50 @@ live_design! {
     }
 
     // List item title
-    pub MpListItemTitle = <Label> {
+    mod.widgets.MpListItemTitle = mod.widgets.Label{
         width: Fill
         height: Fit
-        draw_text: {
-            text_style: <THEME_FONT_REGULAR> { font_size: 14.0 }
-            color: (FOREGROUND)
+        draw_text +: {
+            text_style: theme.font_regular{font_size: 14.0}
+            color: FOREGROUND
         }
     }
 
     // List item description/subtitle
-    pub MpListItemDescription = <Label> {
+    mod.widgets.MpListItemDescription = mod.widgets.Label{
         width: Fill
         height: Fit
-        draw_text: {
-            text_style: <THEME_FONT_REGULAR> { font_size: 12.0 }
-            color: (MUTED_FOREGROUND)
+        draw_text +: {
+            text_style: theme.font_regular{font_size: 12.0}
+            color: MUTED_FOREGROUND
         }
     }
 
     // List item trailing (action area)
-    pub MpListItemTrailing = <View> {
+    mod.widgets.MpListItemTrailing = mod.widgets.View{
         width: Fit
         height: Fit
-        align: { x: 0.5, y: 0.5 }
+        align: Align{x: 0.5, y: 0.5}
     }
 
     // ============================================================
     // List Divider
     // ============================================================
 
-    pub MpListDivider = <View> {
+    mod.widgets.MpListDivider = mod.widgets.SolidView{
         width: Fill
         height: 1
-        margin: { left: 16, right: 16 }
-        show_bg: true
-        draw_bg: {
-            color: (BORDER)
+        margin: Inset{left: 16.0, right: 16.0}
+        draw_bg +: {
+            color: BORDER
         }
     }
 
-    pub MpListDividerFull = <View> {
+    mod.widgets.MpListDividerFull = mod.widgets.SolidView{
         width: Fill
         height: 1
-        show_bg: true
-        draw_bg: {
-            color: (BORDER)
+        draw_bg +: {
+            color: BORDER
         }
     }
 
@@ -204,22 +200,21 @@ live_design! {
     // List Section Header
     // ============================================================
 
-    pub MpListSectionHeader = <View> {
+    mod.widgets.MpListSectionHeader = mod.widgets.SolidView{
         width: Fill
         height: Fit
-        padding: { left: 16, right: 16, top: 8, bottom: 8 }
+        padding: Inset{left: 16.0, right: 16.0, top: 8.0, bottom: 8.0}
 
-        show_bg: true
-        draw_bg: {
-            color: (MUTED)
+        draw_bg +: {
+            color: MUTED
         }
 
-        <Label> {
+        Label{
             width: Fill
             height: Fit
-            draw_text: {
-                text_style: <THEME_FONT_BOLD> { font_size: 12.0 }
-                color: (MUTED_FOREGROUND)
+            draw_text +: {
+                text_style: theme.font_bold{font_size: 12.0}
+                color: MUTED_FOREGROUND
             }
         }
     }
@@ -228,12 +223,12 @@ live_design! {
     // Compact List Item
     // ============================================================
 
-    pub MpListItemCompact = <View> {
+    mod.widgets.MpListItemCompact = mod.widgets.View{
         width: Fill
         height: Fit
-        padding: { left: 12, right: 12, top: 8, bottom: 8 }
+        padding: Inset{left: 12.0, right: 12.0, top: 8.0, bottom: 8.0}
         flow: Right
-        align: { y: 0.5 }
+        align: Align{y: 0.5}
         spacing: 8
     }
 
@@ -241,12 +236,12 @@ live_design! {
     // Large List Item
     // ============================================================
 
-    pub MpListItemLarge = <View> {
+    mod.widgets.MpListItemLarge = mod.widgets.View{
         width: Fill
         height: Fit
-        padding: { left: 20, right: 20, top: 16, bottom: 16 }
+        padding: Inset{left: 20.0, right: 20.0, top: 16.0, bottom: 16.0}
         flow: Right
-        align: { y: 0.5 }
+        align: Align{y: 0.5}
         spacing: 16
     }
 }

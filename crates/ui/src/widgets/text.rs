@@ -1,38 +1,38 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-
-    use crate::theme::colors::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.mp_theme.*
 
     // ============================================
     // Font Size Constants
     // ============================================
-    TEXT_FONT_SIZE_XS = 10.0
-    TEXT_FONT_SIZE_SM = 12.0
-    TEXT_FONT_SIZE_MD = 14.0
-    TEXT_FONT_SIZE_LG = 16.0
-    TEXT_FONT_SIZE_XL = 18.0
+    let TEXT_FONT_SIZE_XS = 10.0
+    let TEXT_FONT_SIZE_SM = 12.0
+    let TEXT_FONT_SIZE_MD = 14.0
+    let TEXT_FONT_SIZE_LG = 16.0
+    let TEXT_FONT_SIZE_XL = 18.0
 
     // Line height
-    TEXT_LINE_HEIGHT = 1.6
+    let TEXT_LINE_HEIGHT = 1.6
 
     // ============================================
     // Base Text Component (Paragraph-like)
     // ============================================
-    pub MpText = {{MpText}} {
-        width: Fill,
-        height: Fit,
+    mod.widgets.MpTextBase = #(MpText::register_widget(vm))
+    mod.widgets.MpText = set_type_default() do mod.widgets.MpTextBase{
+        width: Fill
+        height: Fit
+        // Word wrapping is controlled by the turtle flow in Makepad 2.0
+        flow: Flow.Right{wrap: true}
 
-        draw_text: {
-            text_style: <THEME_FONT_REGULAR> {
-                font_size: (TEXT_FONT_SIZE_MD)
-                line_spacing: (TEXT_LINE_HEIGHT)
+        draw_text +: {
+            text_style: theme.font_regular{
+                font_size: TEXT_FONT_SIZE_MD
+                line_spacing: TEXT_LINE_HEIGHT
             }
-            color: (FOREGROUND)
-            wrap: Word,
+            color: FOREGROUND
         }
 
         text: ""
@@ -41,57 +41,57 @@ live_design! {
     // ============================================
     // Size Variants
     // ============================================
-    pub MpTextXs = <MpText> {
-        draw_text: { text_style: { font_size: (TEXT_FONT_SIZE_XS) } }
+    mod.widgets.MpTextXs = mod.widgets.MpText{
+        draw_text +: { text_style: theme.font_regular{font_size: TEXT_FONT_SIZE_XS, line_spacing: TEXT_LINE_HEIGHT} }
     }
 
-    pub MpTextSm = <MpText> {
-        draw_text: { text_style: { font_size: (TEXT_FONT_SIZE_SM) } }
+    mod.widgets.MpTextSm = mod.widgets.MpText{
+        draw_text +: { text_style: theme.font_regular{font_size: TEXT_FONT_SIZE_SM, line_spacing: TEXT_LINE_HEIGHT} }
     }
 
-    pub MpTextMd = <MpText> {
-        draw_text: { text_style: { font_size: (TEXT_FONT_SIZE_MD) } }
+    mod.widgets.MpTextMd = mod.widgets.MpText{
+        draw_text +: { text_style: theme.font_regular{font_size: TEXT_FONT_SIZE_MD, line_spacing: TEXT_LINE_HEIGHT} }
     }
 
-    pub MpTextLg = <MpText> {
-        draw_text: { text_style: { font_size: (TEXT_FONT_SIZE_LG) } }
+    mod.widgets.MpTextLg = mod.widgets.MpText{
+        draw_text +: { text_style: theme.font_regular{font_size: TEXT_FONT_SIZE_LG, line_spacing: TEXT_LINE_HEIGHT} }
     }
 
-    pub MpTextXl = <MpText> {
-        draw_text: { text_style: { font_size: (TEXT_FONT_SIZE_XL) } }
+    mod.widgets.MpTextXl = mod.widgets.MpText{
+        draw_text +: { text_style: theme.font_regular{font_size: TEXT_FONT_SIZE_XL, line_spacing: TEXT_LINE_HEIGHT} }
     }
 
     // ============================================
     // Color Variants
     // ============================================
-    pub MpTextMuted = <MpText> {
-        draw_text: { color: (MUTED_FOREGROUND) }
+    mod.widgets.MpTextMuted = mod.widgets.MpText{
+        draw_text +: { color: MUTED_FOREGROUND }
     }
 
-    pub MpTextPrimary = <MpText> {
-        draw_text: { color: (PRIMARY) }
+    mod.widgets.MpTextPrimary = mod.widgets.MpText{
+        draw_text +: { color: PRIMARY }
     }
 
-    pub MpTextDanger = <MpText> {
-        draw_text: { color: (DANGER) }
+    mod.widgets.MpTextDanger = mod.widgets.MpText{
+        draw_text +: { color: DANGER }
     }
 
-    pub MpTextSuccess = <MpText> {
-        draw_text: { color: (SUCCESS) }
+    mod.widgets.MpTextSuccess = mod.widgets.MpText{
+        draw_text +: { color: SUCCESS }
     }
 
-    pub MpTextWarning = <MpText> {
-        draw_text: { color: (WARNING) }
+    mod.widgets.MpTextWarning = mod.widgets.MpText{
+        draw_text +: { color: WARNING }
     }
 
     // ============================================
     // Weight Variants
     // ============================================
-    pub MpTextBold = <MpText> {
-        draw_text: {
-            text_style: <THEME_FONT_BOLD> {
-                font_size: (TEXT_FONT_SIZE_MD)
-                line_spacing: (TEXT_LINE_HEIGHT)
+    mod.widgets.MpTextBold = mod.widgets.MpText{
+        draw_text +: {
+            text_style: theme.font_bold{
+                font_size: TEXT_FONT_SIZE_MD
+                line_spacing: TEXT_LINE_HEIGHT
             }
         }
     }
@@ -101,98 +101,103 @@ live_design! {
     // ============================================
 
     // Inline text (no word wrap, fits content)
-    pub MpTextInline = <MpText> {
-        width: Fit,
-        draw_text: { wrap: None }
+    mod.widgets.MpTextInline = mod.widgets.MpText{
+        width: Fit
+        flow: Flow.Right{wrap: false}
     }
 
     // Code/Monospace text
-    pub MpTextCode = <MpText> {
-        width: Fit,
-        padding: { left: 4, right: 4, top: 2, bottom: 2 }
+    mod.widgets.MpTextCode = mod.widgets.MpText{
+        width: Fit
+        flow: Flow.Right{wrap: false}
+        padding: Inset{left: 4.0, right: 4.0, top: 2.0, bottom: 2.0}
 
-        show_bg: true,
-        draw_bg: {
-            instance color: (MUTED)
-            instance radius: 4.0
+        show_bg: true
+        draw_bg +: {
+            color: instance(MUTED)
+            radius: instance(4.0)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                sdf.box(
-                    0.0,
-                    0.0,
-                    self.rect_size.x,
-                    self.rect_size.y,
-                    self.radius
-                );
-                sdf.fill(self.color);
-                return sdf.result;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, self.radius)
+                sdf.fill(self.color)
+                return sdf.result
             }
         }
 
-        draw_text: {
-            text_style: <THEME_FONT_CODE> {
+        draw_text +: {
+            text_style: theme.font_code{
                 font_size: 13.0
             }
-            wrap: None,
         }
     }
 
     // Blockquote style
-    pub MpTextBlockquote = <View> {
-        width: Fill,
-        height: Fit,
-        padding: { left: 16, top: 8, bottom: 8 }
-        margin: { top: 8, bottom: 8 }
+    mod.widgets.MpTextBlockquote = mod.widgets.View{
+        width: Fill
+        height: Fit
+        padding: Inset{left: 16.0, top: 8.0, bottom: 8.0}
+        margin: Inset{top: 8.0, bottom: 8.0}
 
-        show_bg: true,
-        draw_bg: {
-            instance border_color: (MUTED_FOREGROUND)
-            instance bg_color: #00000008
+        show_bg: true
+        draw_bg +: {
+            border_color: instance(MUTED_FOREGROUND)
+            bg_color: instance(#x00000008)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 // Left border
-                sdf.rect(0.0, 0.0, 3.0, self.rect_size.y);
-                sdf.fill(self.border_color);
+                sdf.rect(0.0, 0.0, 3.0, self.rect_size.y)
+                sdf.fill(self.border_color)
                 // Background
-                sdf.rect(0.0, 0.0, self.rect_size.x, self.rect_size.y);
-                sdf.fill(self.bg_color);
-                return sdf.result;
+                sdf.rect(0.0, 0.0, self.rect_size.x, self.rect_size.y)
+                sdf.fill(self.bg_color)
+                return sdf.result
             }
         }
 
-        <MpText> {
-            draw_text: {
-                color: (MUTED_FOREGROUND)
-                text_style: { font_size: (TEXT_FONT_SIZE_MD) }
+        mp_text := mod.widgets.MpText{
+            draw_text +: {
+                color: MUTED_FOREGROUND
+                text_style: theme.font_regular{
+                    font_size: TEXT_FONT_SIZE_MD
+                    line_spacing: TEXT_LINE_HEIGHT
+                }
             }
         }
     }
 
     // Lead text (larger, intro paragraph)
-    pub MpTextLead = <MpText> {
-        draw_text: {
-            text_style: {
-                font_size: (TEXT_FONT_SIZE_XL)
+    mod.widgets.MpTextLead = mod.widgets.MpText{
+        draw_text +: {
+            text_style: theme.font_regular{
+                font_size: TEXT_FONT_SIZE_XL
                 line_spacing: 1.7
             }
-            color: (MUTED_FOREGROUND)
+            color: MUTED_FOREGROUND
         }
     }
 
     // Small/Caption text
-    pub MpTextCaption = <MpText> {
-        draw_text: {
-            text_style: { font_size: (TEXT_FONT_SIZE_XS) }
-            color: (MUTED_FOREGROUND)
+    mod.widgets.MpTextCaption = mod.widgets.MpText{
+        draw_text +: {
+            text_style: theme.font_regular{
+                font_size: TEXT_FONT_SIZE_XS
+                line_spacing: TEXT_LINE_HEIGHT
+            }
+            color: MUTED_FOREGROUND
         }
     }
 }
 
 /// Text widget for paragraph-like text display with word wrapping
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct MpText {
+    #[uid]
+    uid: WidgetUid,
+    #[source]
+    source: ScriptObjectRef,
+
     #[redraw]
     #[live]
     draw_text: DrawText,

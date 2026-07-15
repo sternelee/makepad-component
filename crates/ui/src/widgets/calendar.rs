@@ -1,57 +1,58 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
 
-    pub MpCalendar = {{MpCalendar}} {
+    // Calendar grid widget - cells are laid out manually via turtle in draw_walk
+    mod.widgets.MpCalendarBase = #(MpCalendar::register_widget(vm))
+    mod.widgets.MpCalendar = set_type_default() do mod.widgets.MpCalendarBase{
         width: Fit
         height: Fit
         flow: Down
 
-        draw_bg: {
-            instance bg_color: #0000
+        draw_bg +: {
+            bg_color: instance(#x0000)
 
-            fn pixel(self) -> vec4 {
-                return self.bg_color;
+            pixel: fn() {
+                return self.bg_color
             }
         }
 
-        draw_cell: {
-            instance border_color: #5588bb66
-            instance border_width: 0.5
+        draw_cell +: {
+            border_color: instance(#x5588bb66)
+            border_width: instance(0.5)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 sdf.box(
                     self.border_width,
                     self.border_width,
                     self.rect_size.x - self.border_width * 2.0,
                     self.rect_size.y - self.border_width * 2.0,
                     2.0
-                );
-                sdf.fill_keep(self.color);
-                sdf.stroke(self.border_color, self.border_width);
-                return sdf.result;
+                )
+                sdf.fill_keep(self.color)
+                sdf.stroke(self.border_color, self.border_width)
+                return sdf.result
             }
         }
 
-        draw_text: {
-            text_style: <THEME_FONT_REGULAR> { font_size: 11.0, line_spacing: 1.3 }
-            color: #FFFFFF
+        draw_text +: {
+            text_style: theme.font_regular{font_size: 11.0, line_spacing: 1.3}
+            color: #xFFFFFF
         }
 
-        draw_header_text: {
-            text_style: <THEME_FONT_BOLD> { font_size: 13.0, line_spacing: 1.3 }
-            color: #FFFFFF
+        draw_header_text +: {
+            text_style: theme.font_bold{font_size: 13.0, line_spacing: 1.3}
+            color: #xFFFFFF
         }
 
-        draw_divider: {
-            color: #5588bb
+        draw_divider +: {
+            color: #x5588bb
 
-            fn pixel(self) -> vec4 {
-                return self.color;
+            pixel: fn() {
+                return self.color
             }
         }
     }
@@ -83,9 +84,13 @@ pub struct CalendarConfig {
 }
 
 /// Actions emitted by MpCalendar
-#[derive(Clone, Debug, DefaultNone)]
+#[derive(Clone, Debug, Default)]
 pub enum MpCalendarAction {
-    CellClicked { row: usize, col: usize },
+    CellClicked {
+        row: usize,
+        col: usize,
+    },
+    #[default]
     None,
 }
 
@@ -93,8 +98,13 @@ pub enum MpCalendarAction {
 // MpCalendar Widget
 // ============================================================================
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct MpCalendar {
+    #[uid]
+    uid: WidgetUid,
+    #[source]
+    source: ScriptObjectRef,
+
     #[redraw]
     #[live]
     draw_bg: DrawQuad,
@@ -201,7 +211,7 @@ impl MpCalendar {
 // ============================================================================
 
 impl Widget for MpCalendar {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         let mut needs_redraw = false;
 
         for (idx, area) in self.cell_areas.iter().enumerate() {
@@ -225,7 +235,6 @@ impl Widget for MpCalendar {
                         self.selected_cell = Some((row, col));
                         cx.widget_action(
                             self.widget_uid(),
-                            &scope.path,
                             MpCalendarAction::CellClicked { row, col },
                         );
                         needs_redraw = true;
@@ -341,7 +350,7 @@ impl Widget for MpCalendar {
                     Walk::new(Size::Fixed(col_width), Size::Fixed(row_height)),
                     Layout {
                         flow: Flow::Down,
-                        padding: Padding {
+                        padding: Inset {
                             left: 4.0,
                             right: 4.0,
                             top: 3.0,
@@ -479,7 +488,7 @@ impl MpCalendar {
             Walk {
                 width: Size::Fixed(total_width),
                 height: Size::fit(),
-                margin: Margin {
+                margin: Inset {
                     left: 0.0,
                     right: 0.0,
                     top: 12.0,
@@ -489,7 +498,7 @@ impl MpCalendar {
             },
             Layout {
                 flow: Flow::Down,
-                padding: Padding {
+                padding: Inset {
                     left: 16.0,
                     right: 16.0,
                     top: 14.0,
@@ -523,7 +532,7 @@ impl MpCalendar {
             Walk {
                 width: Size::Fixed(content_width),
                 height: Size::Fixed(1.0),
-                margin: Margin {
+                margin: Inset {
                     top: 4.0,
                     bottom: 8.0,
                     left: 0.0,
@@ -566,7 +575,7 @@ impl MpCalendar {
                 Walk {
                     width: Size::Fixed(content_width),
                     height: Size::fit(),
-                    margin: Margin {
+                    margin: Inset {
                         top: 2.0,
                         bottom: 6.0,
                         left: 0.0,
@@ -576,7 +585,7 @@ impl MpCalendar {
                 },
                 Layout {
                     flow: Flow::Down,
-                    padding: Padding {
+                    padding: Inset {
                         left: 12.0,
                         right: 12.0,
                         top: 8.0,
@@ -665,7 +674,7 @@ impl MpCalendar {
                     Walk {
                         width: Size::Fixed(content_width - 24.0),
                         height: Size::Fixed(1.0),
-                        margin: Margin {
+                        margin: Inset {
                             top: 0.0,
                             bottom: 0.0,
                             left: 12.0,

@@ -1,83 +1,80 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-
-    use crate::theme::colors::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.mp_theme.*
 
     // Horizontal Divider
-    pub MpDivider = <View> {
-        width: Fill,
-        height: 1,
-        show_bg: true,
-        draw_bg: {
-            color: (BORDER)
-        }
+    mod.widgets.MpDivider = mod.widgets.SolidView{
+        width: Fill
+        height: 1
+        show_bg: true
+        draw_bg +: { color: BORDER }
     }
 
     // Vertical Divider
-    pub MpDividerVertical = <View> {
-        width: 1,
-        height: Fill,
-        show_bg: true,
-        draw_bg: {
-            color: (BORDER)
-        }
+    mod.widgets.MpDividerVertical = mod.widgets.SolidView{
+        width: 1
+        height: Fill
+        show_bg: true
+        draw_bg +: { color: BORDER }
     }
 
     // Divider with margin
-    pub MpDividerWithMargin = <View> {
-        width: Fill,
-        height: Fit,
-        margin: { top: 16, bottom: 16 }
+    mod.widgets.MpDividerWithMargin = mod.widgets.View{
+        width: Fill
+        height: Fit
+        margin: Inset{top: 16.0, bottom: 16.0}
 
-        <View> {
-            width: Fill,
-            height: 1,
-            show_bg: true,
-            draw_bg: {
-                color: (BORDER)
-            }
+        SolidView{
+            width: Fill
+            height: 1
+            show_bg: true
+            draw_bg +: { color: BORDER }
         }
     }
 
     // Divider with label in center
-    pub MpDividerWithLabel = {{MpDividerWithLabel}} {
-        width: Fill,
-        height: Fit,
-        flow: Right,
-        align: { y: 0.5 }
+    mod.widgets.MpDividerWithLabelBase = #(MpDividerWithLabel::register_widget(vm))
+    mod.widgets.MpDividerWithLabel = set_type_default() do mod.widgets.MpDividerWithLabelBase{
+        width: Fill
+        height: Fit
+        flow: Right
+        align: Align{y: 0.5}
 
-        left_line = <View> {
-            width: Fill,
-            height: 1,
-            show_bg: true,
-            draw_bg: { color: (BORDER) }
+        text: ""
+
+        left_line := SolidView{
+            width: Fill
+            height: 1
+            show_bg: true
+            draw_bg +: { color: BORDER }
         }
 
-        label = <Label> {
-            width: Fit,
-            margin: { left: 12, right: 12 }
-            draw_text: {
-                text_style: <THEME_FONT_REGULAR>{ font_size: 12.0 }
-                color: (MUTED_FOREGROUND)
+        label := Label{
+            width: Fit
+            margin: Inset{left: 12.0, right: 12.0}
+            draw_text +: {
+                text_style: theme.font_regular{font_size: 12.0}
+                color: MUTED_FOREGROUND
             }
             text: ""
         }
 
-        right_line = <View> {
-            width: Fill,
-            height: 1,
-            show_bg: true,
-            draw_bg: { color: (BORDER) }
+        right_line := SolidView{
+            width: Fill
+            height: 1
+            show_bg: true
+            draw_bg +: { color: BORDER }
         }
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct MpDividerWithLabel {
+    #[source]
+    source: ScriptObjectRef,
     #[deref]
     view: View,
 
@@ -93,7 +90,7 @@ impl Widget for MpDividerWithLabel {
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         if !self.text.as_ref().is_empty() {
             self.view
-                .label(ids!(label))
+                .widget(cx, ids!(label))
                 .set_text(cx, self.text.as_ref());
         }
         self.view.draw_walk(cx, scope, walk)

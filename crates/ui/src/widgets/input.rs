@@ -1,62 +1,50 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-
-    // Icon paths
-    ICON_SEARCH = dep("crate://self/resources/icons/search.svg")
-    ICON_CLOSE = dep("crate://self/resources/icons/close.svg")
-    ICON_EYE = dep("crate://self/resources/icons/eye.svg")
-    ICON_EYE_OFF = dep("crate://self/resources/icons/eye-off.svg")
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
 
     // Base input style
-    MpInputBase = <TextInput> {
-        width: Fill,
-        height: Fit,
+    mod.widgets.MpInputBase = mod.widgets.TextInput{
+        width: Fill
+        height: Fit
 
-        padding: { left: 12, right: 12, top: 10, bottom: 10 }
+        padding: Inset{left: 12.0, right: 12.0, top: 10.0, bottom: 10.0}
 
         empty_text: "Enter text..."
 
-        draw_bg: {
-            instance hover: 0.0
-            instance focus: 0.0
-            instance disabled: 0.0
+        draw_bg +: {
+            border_radius: 6.0
+            border_width: uniform(1.0)
 
-            uniform border_radius: 6.0
-            uniform border_width: 1.0
+            bg_color: uniform(#xFFFFFF)
+            bg_color_hover: uniform(#xFAFAFA)
+            bg_color_focus: uniform(#xFFFFFF)
+            bg_color_disabled: uniform(#xF5F5F5)
 
-            // Colors
-            uniform bg_color: #FFFFFF
-            uniform bg_color_hover: #FAFAFA
-            uniform bg_color_focus: #FFFFFF
-            uniform bg_color_disabled: #F5F5F5
+            border_color: #xD1D1D6
+            border_color_hover: #xAEAEB2
+            border_color_focus: #x007AFF
+            border_color_disabled: #xD1D1D6
 
-            uniform border_color: #D1D1D6
-            uniform border_color_hover: #AEAEB2
-            uniform border_color_focus: #007AFF
-            uniform border_color_disabled: #D1D1D6
-
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
 
                 // Background
                 let bg = mix(
                     mix(self.bg_color, self.bg_color_hover, self.hover),
                     self.bg_color_focus,
                     self.focus
-                );
-                let bg_final = mix(bg, self.bg_color_disabled, self.disabled);
+                )
+                let bg_final = mix(bg, self.bg_color_disabled, self.disabled)
 
                 // Border
                 let border = mix(
                     mix(self.border_color, self.border_color_hover, self.hover),
                     self.border_color_focus,
                     self.focus
-                );
-                let border_final = mix(border, self.border_color_disabled, self.disabled);
+                )
+                let border_final = mix(border, self.border_color_disabled, self.disabled)
 
                 // Draw rounded rectangle
                 sdf.box(
@@ -65,187 +53,169 @@ live_design! {
                     self.rect_size.x - self.border_width * 2.0,
                     self.rect_size.y - self.border_width * 2.0,
                     self.border_radius
-                );
+                )
 
-                sdf.fill_keep(bg_final);
+                sdf.fill_keep(bg_final)
 
                 // Focus ring (thicker border when focused)
-                let border_w = mix(self.border_width, 2.0, self.focus);
-                sdf.stroke(border_final, border_w);
+                let border_w = mix(self.border_width, 2.0, self.focus)
+                sdf.stroke(border_final, border_w)
 
-                return sdf.result;
+                return sdf.result
             }
         }
 
-        draw_text: {
-            instance disabled: 0.0
+        draw_text +: {
+            color: #x3D3D3D
+            color_disabled: #xAEAEB2
+            color_empty: #xAEAEB2
 
-            uniform color: #3D3D3D
-            uniform color_disabled: #AEAEB2
-            uniform color_empty: #AEAEB2
-
-            text_style: <THEME_FONT_REGULAR> {
+            text_style: theme.font_regular{
                 font_size: 13.0
             }
 
-            fn get_color(self) -> vec4 {
+            get_color: fn() {
                 return mix(
                     mix(self.color, self.color_empty, self.empty),
                     self.color_disabled,
                     self.disabled
-                );
+                )
             }
         }
 
-        draw_cursor: {
-            instance focus: 0.0
-            uniform color: #007AFF
+        draw_cursor +: {
+            color: #x007AFF
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                sdf.box(0., 0., self.rect_size.x, self.rect_size.y, 1.0);
-                sdf.fill(mix(#0000, self.color, self.focus * (1.0 - self.blink)));
-                return sdf.result;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 1.0)
+                sdf.fill(mix(#x0000, self.color, self.focus * (1.0 - self.blink)))
+                return sdf.result
             }
         }
 
-        draw_selection: {
-            uniform color: #007AFF30
+        draw_selection +: {
+            color: #x007AFF30
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                sdf.box(0., 0., self.rect_size.x, self.rect_size.y, 2.0);
-                sdf.fill(self.color);
-                return sdf.result;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 2.0)
+                sdf.fill(self.color)
+                return sdf.result
             }
         }
 
-        animator: {
-            hover = {
-                default: off,
-                off = {
+        animator: Animator{
+            hover: {
+                default: @off
+                off: AnimatorState{
                     from: {all: Forward {duration: 0.15}}
-                    apply: {
-                        draw_bg: {hover: 0.0}
-                    }
+                    apply: {draw_bg: {hover: 0.0}}
                 }
-                on = {
+                on: AnimatorState{
                     from: {all: Forward {duration: 0.1}}
-                    apply: {
-                        draw_bg: {hover: 1.0}
-                    }
+                    apply: {draw_bg: {hover: 1.0}}
                 }
             }
-            focus = {
-                default: off,
-                off = {
+            focus: {
+                default: @off
+                off: AnimatorState{
                     from: {all: Forward {duration: 0.2}}
-                    apply: {
-                        draw_bg: {focus: 0.0}
-                        draw_cursor: {focus: 0.0}
-                    }
+                    apply: {draw_bg: {focus: 0.0} draw_cursor: {focus: 0.0}}
                 }
-                on = {
+                on: AnimatorState{
                     from: {all: Snap}
-                    apply: {
-                        draw_bg: {focus: 1.0}
-                        draw_cursor: {focus: 1.0}
-                    }
+                    apply: {draw_bg: {focus: 1.0} draw_cursor: {focus: 1.0}}
                 }
             }
-            disabled = {
-                default: off,
-                off = {
+            disabled: {
+                default: @off
+                off: AnimatorState{
                     from: {all: Forward {duration: 0.1}}
-                    apply: {
-                        draw_bg: {disabled: 0.0}
-                        draw_text: {disabled: 0.0}
-                    }
+                    apply: {draw_bg: {disabled: 0.0} draw_text: {disabled: 0.0}}
                 }
-                on = {
+                on: AnimatorState{
                     from: {all: Forward {duration: 0.1}}
-                    apply: {
-                        draw_bg: {disabled: 1.0}
-                        draw_text: {disabled: 1.0}
-                    }
+                    apply: {draw_bg: {disabled: 1.0} draw_text: {disabled: 1.0}}
                 }
             }
         }
     }
 
     // Default input
-    pub MpInput = <MpInputBase> {}
+    mod.widgets.MpInput = mod.widgets.MpInputBase{}
 
     // Small input
-    pub MpInputSmall = <MpInputBase> {
-        padding: { left: 8, right: 8, top: 6, bottom: 6 }
+    mod.widgets.MpInputSmall = mod.widgets.MpInputBase{
+        padding: Inset{left: 8.0, right: 8.0, top: 6.0, bottom: 6.0}
 
-        draw_bg: {
-            uniform border_radius: 4.0
+        draw_bg +: {
+            border_radius: 4.0
         }
 
-        draw_text: {
-            text_style: <THEME_FONT_REGULAR> {
+        draw_text +: {
+            text_style: theme.font_regular{
                 font_size: 12.0
             }
         }
     }
 
     // Large input
-    pub MpInputLarge = <MpInputBase> {
-        padding: { left: 16, right: 16, top: 14, bottom: 14 }
+    mod.widgets.MpInputLarge = mod.widgets.MpInputBase{
+        padding: Inset{left: 16.0, right: 16.0, top: 14.0, bottom: 14.0}
 
-        draw_bg: {
-            uniform border_radius: 8.0
+        draw_bg +: {
+            border_radius: 8.0
         }
 
-        draw_text: {
-            text_style: <THEME_FONT_REGULAR> {
+        draw_text +: {
+            text_style: theme.font_regular{
                 font_size: 16.0
             }
         }
     }
 
     // Password input with toggle icon
-    pub MpInputPassword = {{MpInputPassword}} {
-        width: Fill,
-        height: Fit,
+    mod.widgets.MpInputPasswordBase = #(MpInputPassword::register_widget(vm))
+    mod.widgets.MpInputPassword = set_type_default() do mod.widgets.MpInputPasswordBase{
+        width: Fill
+        height: Fit
 
-        flow: Right,
-        align: { y: 0.5 },
-        padding: { left: 12, right: 12, top: 10, bottom: 10 }
-        spacing: 8
+        flow: Right
+        align: Align{y: 0.5}
+        padding: Inset{left: 12.0, right: 12.0, top: 10.0, bottom: 10.0}
+        spacing: 8.0
 
-        show_bg: true,
-        draw_bg: {
-            instance hover: 0.0
-            instance focus: 0.0
+        show_bg: true
+        draw_bg +: {
+            hover: instance(0.0)
+            focus: instance(0.0)
 
-            uniform border_radius: 6.0
-            uniform border_width: 1.0
+            border_radius: uniform(6.0)
+            border_width: uniform(1.0)
 
-            uniform bg_color: #FFFFFF
-            uniform bg_color_hover: #FAFAFA
-            uniform bg_color_focus: #FFFFFF
+            bg_color: uniform(#xFFFFFF)
+            bg_color_hover: uniform(#xFAFAFA)
+            bg_color_focus: uniform(#xFFFFFF)
 
-            uniform border_color: #E0E0E0
-            uniform border_color_hover: #BDBDBD
-            uniform border_color_focus: #4A90D9
+            border_color: uniform(#xE0E0E0)
+            border_color_hover: uniform(#xBDBDBD)
+            border_color_focus: uniform(#x4A90D9)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
 
                 let bg = mix(
                     mix(self.bg_color, self.bg_color_hover, self.hover),
                     self.bg_color_focus,
                     self.focus
-                );
+                )
 
                 let border = mix(
                     mix(self.border_color, self.border_color_hover, self.hover),
                     self.border_color_focus,
                     self.focus
-                );
+                )
 
                 sdf.box(
                     self.border_width,
@@ -253,187 +223,204 @@ live_design! {
                     self.rect_size.x - self.border_width * 2.0,
                     self.rect_size.y - self.border_width * 2.0,
                     self.border_radius
-                );
+                )
 
-                sdf.fill_keep(bg);
-                let border_w = mix(self.border_width, 2.0, self.focus);
-                sdf.stroke(border, border_w);
+                sdf.fill_keep(bg)
+                let border_w = mix(self.border_width, 2.0, self.focus)
+                sdf.stroke(border, border_w)
 
-                return sdf.result;
+                return sdf.result
             }
         }
 
         // Password text input (borderless)
-        input = <TextInput> {
-            width: Fill,
-            height: Fit,
-            is_password: true,
+        input := TextInput{
+            width: Fill
+            height: Fit
+            is_password: true
             empty_text: "Enter password..."
 
-            draw_bg: {
-                fn pixel(self) -> vec4 {
-                    return #0000;
+            draw_bg +: {
+                pixel: fn() {
+                    return #x0000
                 }
             }
 
-            draw_text: {
-                text_style: <THEME_FONT_REGULAR> { font_size: 14.0 }
-                fn get_color(self) -> vec4 {
-                    return mix(#333333, #9E9E9E, self.empty);
+            draw_text +: {
+                text_style: theme.font_regular{font_size: 14.0}
+                get_color: fn() {
+                    return mix(#x333333, #x9E9E9E, self.empty)
                 }
             }
 
-            draw_cursor: {
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf.box(0., 0., self.rect_size.x, self.rect_size.y, 1.0);
-                    sdf.fill(mix(#0000, #4A90D9, self.focus * (1.0 - self.blink)));
-                    return sdf.result;
+            draw_cursor +: {
+                pixel: fn() {
+                    let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 1.0)
+                    sdf.fill(mix(#x0000, #x4A90D9, self.focus * (1.0 - self.blink)))
+                    return sdf.result
                 }
             }
 
-            draw_selection: {
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf.box(0., 0., self.rect_size.x, self.rect_size.y, 2.0);
-                    sdf.fill(#4A90D920);
-                    return sdf.result;
+            draw_selection +: {
+                pixel: fn() {
+                    let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 2.0)
+                    sdf.fill(#x4A90D920)
+                    return sdf.result
                 }
             }
         }
 
         // Eye icon for toggle visibility (clickable)
-        eye_icon = <Button> {
-            width: Fit,
-            height: Fit,
-            padding: 4,
-            draw_bg: {
-                fn pixel(self) -> vec4 {
-                    return #0000;
+        eye_icon := Button{
+            width: Fit
+            height: Fit
+            padding: 4
+            text: ""
+
+            draw_bg +: {
+                pixel: fn() {
+                    return #x0000
                 }
             }
-            draw_icon: {
-                svg_file: (ICON_EYE_OFF)
-                color: #9E9E9E
-                color_hover: #666666
+
+            draw_icon +: {
+                svg: crate_resource("self:resources/icons/eye-off.svg")
+                color: #x9E9E9E
             }
-            icon_walk: { width: 18.0, height: 18.0 }
+
+            icon_walk: Walk{width: 18.0, height: 18.0}
+
+            animator: Animator{
+                hover: {
+                    default: @off
+                    off: AnimatorState{
+                        from: {all: Forward {duration: 0.1}}
+                        apply: {draw_icon: {color: #x9E9E9E}}
+                    }
+                    on: AnimatorState{
+                        from: {all: Forward {duration: 0.1}}
+                        apply: {draw_icon: {color: #x666666}}
+                    }
+                }
+            }
         }
     }
 
     // Numeric input
-    pub MpInputNumeric = <MpInputBase> {
+    mod.widgets.MpInputNumeric = mod.widgets.MpInputBase{
         is_numeric_only: true
         empty_text: "Enter number..."
     }
 
     // Borderless input (for inline editing)
-    pub MpInputBorderless = <MpInputBase> {
-        draw_bg: {
-            uniform bg_color: #00000000
-            uniform bg_color_hover: #F5F5F5
-            uniform bg_color_focus: #00000000
-            uniform border_color: #00000000
-            uniform border_color_hover: #00000000
-            uniform border_color_focus: #4A90D9
+    mod.widgets.MpInputBorderless = mod.widgets.MpInputBase{
+        draw_bg +: {
+            bg_color: #x00000000
+            bg_color_hover: #xF5F5F5
+            bg_color_focus: #x00000000
+            border_color: #x00000000
+            border_color_hover: #x00000000
+            border_color_focus: #x4A90D9
         }
     }
 
     // Search input with icon (capsule/pill shape)
-    pub MpInputSearch = <View> {
-        width: Fill,
-        height: Fit,
+    mod.widgets.MpInputSearch = mod.widgets.View{
+        width: Fill
+        height: Fit
 
-        flow: Right,
-        align: { y: 0.5 },
-        padding: { left: 16, right: 16, top: 10, bottom: 10 }
-        spacing: 8
+        flow: Right
+        align: Align{y: 0.5}
+        padding: Inset{left: 16.0, right: 16.0, top: 10.0, bottom: 10.0}
+        spacing: 8.0
 
-        show_bg: true,
-        draw_bg: {
-            instance hover: 0.0
-            instance focus: 0.0
+        show_bg: true
+        draw_bg +: {
+            hover: instance(0.0)
+            focus: instance(0.0)
 
-            uniform bg_color: #E8E8ED
-            uniform bg_color_hover: #D1D1D6
-            uniform bg_color_focus: #FFFFFF
+            bg_color: uniform(#xE8E8ED)
+            bg_color_hover: uniform(#xD1D1D6)
+            bg_color_focus: uniform(#xFFFFFF)
 
-            uniform border_color: #AEAEB2
-            uniform border_color_hover: #AEAEB2
-            uniform border_color_focus: #007AFF
+            border_color: uniform(#xAEAEB2)
+            border_color_hover: uniform(#xAEAEB2)
+            border_color_focus: uniform(#x007AFF)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let sz = self.rect_size;
-                let r = sz.y * 0.5;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let sz = self.rect_size
+                let r = sz.y * 0.5
 
                 let bg = mix(
                     mix(self.bg_color, self.bg_color_hover, self.hover),
                     self.bg_color_focus,
                     self.focus
-                );
+                )
 
                 let border = mix(
                     mix(self.border_color, self.border_color_hover, self.hover),
                     self.border_color_focus,
                     self.focus
-                );
+                )
 
                 // Draw capsule: left circle + rectangle + right circle
-                sdf.circle(r, r, r);
-                sdf.rect(r, 0.0, sz.x - sz.y, sz.y);
-                sdf.circle(sz.x - r, r, r);
+                sdf.circle(r, r, r)
+                sdf.rect(r, 0.0, sz.x - sz.y, sz.y)
+                sdf.circle(sz.x - r, r, r)
 
-                sdf.fill_keep(bg);
-                sdf.stroke(border, 1.0);
+                sdf.fill_keep(bg)
+                sdf.stroke(border, 1.0)
 
-                return sdf.result;
+                return sdf.result
             }
         }
 
         // Search icon
-        search_icon = <Icon> {
-            icon_walk: { width: 14.0 }
-            draw_icon: {
-                svg_file: (ICON_SEARCH)
-                color: #86868B
+        search_icon := Icon{
+            icon_walk: Walk{width: 14.0, height: Fit}
+            draw_icon +: {
+                svg: crate_resource("self:resources/icons/search.svg")
+                color: #x86868B
             }
         }
 
         // Text input (borderless)
-        input = <TextInput> {
-            width: Fill,
-            height: Fit,
+        input := TextInput{
+            width: Fill
+            height: Fit
             empty_text: "Search..."
 
-            draw_bg: {
-                fn pixel(self) -> vec4 {
-                    return #0000;
+            draw_bg +: {
+                pixel: fn() {
+                    return #x0000
                 }
             }
 
-            draw_text: {
-                text_style: <THEME_FONT_REGULAR> { font_size: 13.0 }
-                fn get_color(self) -> vec4 {
-                    return mix(#3D3D3D, #86868B, self.empty);
+            draw_text +: {
+                text_style: theme.font_regular{font_size: 13.0}
+                get_color: fn() {
+                    return mix(#x3D3D3D, #x86868B, self.empty)
                 }
             }
 
-            draw_cursor: {
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf.box(0., 0., self.rect_size.x, self.rect_size.y, 1.0);
-                    sdf.fill(mix(#0000, #4A90D9, self.focus * (1.0 - self.blink)));
-                    return sdf.result;
+            draw_cursor +: {
+                pixel: fn() {
+                    let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 1.0)
+                    sdf.fill(mix(#x0000, #x4A90D9, self.focus * (1.0 - self.blink)))
+                    return sdf.result
                 }
             }
 
-            draw_selection: {
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf.box(0., 0., self.rect_size.x, self.rect_size.y, 2.0);
-                    sdf.fill(#4A90D920);
-                    return sdf.result;
+            draw_selection +: {
+                pixel: fn() {
+                    let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 2.0)
+                    sdf.fill(#x4A90D920)
+                    return sdf.result
                 }
             }
         }
@@ -443,8 +430,10 @@ live_design! {
 pub use makepad_widgets::text_input::TextInputAction as MpInputAction;
 
 // Password input widget with toggle visibility
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct MpInputPassword {
+    #[source]
+    source: ScriptObjectRef,
     #[deref]
     view: View,
     #[rust]
@@ -465,11 +454,11 @@ impl Widget for MpInputPassword {
 impl WidgetMatchEvent for MpInputPassword {
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions, _scope: &mut Scope) {
         // Handle eye icon button click
-        if self.view.button(ids!(eye_icon)).clicked(actions) {
+        if self.view.button(cx, ids!(eye_icon)).clicked(actions) {
             self.password_visible = !self.password_visible;
 
             // Toggle password visibility on the input
-            let input = self.view.text_input(ids!(input));
+            let input = self.view.text_input(cx, ids!(input));
             input.set_is_password(cx, !self.password_visible);
 
             self.view.redraw(cx);
@@ -481,7 +470,7 @@ impl MpInputPasswordRef {
     /// Get the current password text
     pub fn text(&self) -> String {
         if let Some(inner) = self.borrow() {
-            inner.view.text_input(ids!(input)).text()
+            inner.view.child(id!(input)).as_text_input().text()
         } else {
             String::new()
         }
@@ -490,7 +479,7 @@ impl MpInputPasswordRef {
     /// Set the password text
     pub fn set_text(&self, cx: &mut Cx, text: &str) {
         if let Some(inner) = self.borrow() {
-            inner.view.text_input(ids!(input)).set_text(cx, text);
+            inner.view.text_input(cx, ids!(input)).set_text(cx, text);
         }
     }
 }

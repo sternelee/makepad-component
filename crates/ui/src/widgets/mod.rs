@@ -1,3 +1,5 @@
+// Widget modules migrated to the Makepad 2.0 script_mod! API.
+
 pub mod accordion;
 pub mod alert;
 pub mod avatar;
@@ -49,35 +51,35 @@ pub use switch::*;
 pub use tab::*;
 pub use text::*;
 pub use tooltip::*;
-// dropdown, list 只定义 live_design 样式
+// dropdown, list are style-only (pure script_mod!, no Rust struct)
 
-use makepad_widgets::Cx;
+use makepad_widgets::*;
 
-pub fn live_design(cx: &mut Cx) {
-    crate::widgets::accordion::live_design(cx);
-    crate::widgets::alert::live_design(cx);
-    crate::widgets::calendar::live_design(cx);
-    crate::widgets::avatar::live_design(cx);
-    crate::widgets::badge::live_design(cx);
-    crate::widgets::button::live_design(cx);
-    crate::widgets::card::live_design(cx);
-    crate::widgets::checkbox::live_design(cx);
-    crate::widgets::divider::live_design(cx);
-    crate::widgets::dropdown::live_design(cx);
-    crate::widgets::input::live_design(cx);
-    crate::widgets::label::live_design(cx);
-    crate::widgets::list::live_design(cx);
-    crate::widgets::modal::live_design(cx);
-    crate::widgets::notification::live_design(cx);
-    crate::widgets::page_flip::live_design(cx);
-    crate::widgets::popover::live_design(cx);
-    crate::widgets::progress::live_design(cx);
-    crate::widgets::radio::live_design(cx);
-    crate::widgets::skeleton::live_design(cx);
-    crate::widgets::slider::live_design(cx);
-    crate::widgets::spinner::live_design(cx);
-    crate::widgets::switch::live_design(cx);
-    crate::widgets::tab::live_design(cx);
-    crate::widgets::text::live_design(cx);
-    crate::widgets::tooltip::live_design(cx);
+pub fn script_mod(vm: &mut ScriptVm) {
+    crate::widgets::accordion::script_mod(vm);
+    crate::widgets::alert::script_mod(vm);
+    crate::widgets::calendar::script_mod(vm);
+    crate::widgets::avatar::script_mod(vm);
+    crate::widgets::badge::script_mod(vm);
+    crate::widgets::button::script_mod(vm);
+    crate::widgets::card::script_mod(vm);
+    crate::widgets::checkbox::script_mod(vm);
+    crate::widgets::divider::script_mod(vm);
+    crate::widgets::dropdown::script_mod(vm);
+    crate::widgets::input::script_mod(vm);
+    crate::widgets::label::script_mod(vm);
+    crate::widgets::list::script_mod(vm);
+    crate::widgets::modal::script_mod(vm);
+    crate::widgets::notification::script_mod(vm);
+    crate::widgets::page_flip::script_mod(vm);
+    crate::widgets::popover::script_mod(vm);
+    crate::widgets::progress::script_mod(vm);
+    crate::widgets::radio::script_mod(vm);
+    crate::widgets::skeleton::script_mod(vm);
+    crate::widgets::slider::script_mod(vm);
+    crate::widgets::spinner::script_mod(vm);
+    crate::widgets::switch::script_mod(vm);
+    crate::widgets::tab::script_mod(vm);
+    crate::widgets::text::script_mod(vm);
+    crate::widgets::tooltip::script_mod(vm);
 }

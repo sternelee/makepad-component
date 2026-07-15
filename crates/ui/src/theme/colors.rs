@@ -1,74 +1,76 @@
 use makepad_widgets::*;
 
-live_design! {
-    // macOS System Colors (Apple HIG compliant)
-    // Primary accent color - System Blue
-    pub PRIMARY = #007AFF
-    pub PRIMARY_HOVER = #0066CC
-    pub PRIMARY_ACTIVE = #0055AA
-    pub PRIMARY_FOREGROUND = #ffffff
+script_mod! {
+    mod.mp_theme = {
+        // macOS System Colors (Apple HIG compliant)
+        // Primary accent color - System Blue
+        PRIMARY: #x007AFF
+        PRIMARY_HOVER: #x0066CC
+        PRIMARY_ACTIVE: #x0055AA
+        PRIMARY_FOREGROUND: #xffffff
 
-    // Secondary - System Gray
-    pub SECONDARY = #F5F5F7
-    pub SECONDARY_HOVER = #E8E8ED
-    pub SECONDARY_ACTIVE = #D1D1D6
-    pub SECONDARY_FOREGROUND = #1D1D1F
+        // Secondary - System Gray
+        SECONDARY: #xF5F5F7
+        SECONDARY_HOVER: #xE8E8ED
+        SECONDARY_ACTIVE: #xD1D1D6
+        SECONDARY_FOREGROUND: #x1D1D1F
 
-    // Danger - System Red
-    pub DANGER = #FF3B30
-    pub DANGER_HOVER = #D70015
-    pub DANGER_ACTIVE = #B9000D
-    pub DANGER_FOREGROUND = #ffffff
+        // Danger - System Red
+        DANGER: #xFF3B30
+        DANGER_HOVER: #xD70015
+        DANGER_ACTIVE: #xB9000D
+        DANGER_FOREGROUND: #xffffff
 
-    // Success - System Green (for switches, etc.)
-    pub SUCCESS = #34C759
-    pub SUCCESS_HOVER = #2DB840
-    pub SUCCESS_ACTIVE = #249A33
-    pub SUCCESS_FOREGROUND = #ffffff
+        // Success - System Green (for switches, etc.)
+        SUCCESS: #x34C759
+        SUCCESS_HOVER: #x2DB840
+        SUCCESS_ACTIVE: #x249A33
+        SUCCESS_FOREGROUND: #xffffff
 
-    // Warning - System Orange
-    pub WARNING = #FF9500
-    pub WARNING_HOVER = #E08600
-    pub WARNING_ACTIVE = #CC7700
-    pub WARNING_FOREGROUND = #ffffff
+        // Warning - System Orange
+        WARNING: #xFF9500
+        WARNING_HOVER: #xE08600
+        WARNING_ACTIVE: #xCC7700
+        WARNING_FOREGROUND: #xffffff
 
-    // Info - System Teal
-    pub INFO = #5AC8FA
-    pub INFO_HOVER = #4AB8EB
-    pub INFO_ACTIVE = #39A8DC
-    pub INFO_FOREGROUND = #ffffff
+        // Info - System Teal
+        INFO: #x5AC8FA
+        INFO_HOVER: #x4AB8EB
+        INFO_ACTIVE: #x39A8DC
+        INFO_FOREGROUND: #xffffff
 
-    // UI colors - macOS style (subtle grays)
-    pub BACKGROUND = #FFFFFF
-    pub FOREGROUND = #1D1D1F
-    pub BORDER = #D1D1D6
-    pub INPUT = #F5F5F7
-    pub RING = #007AFF
-    pub MUTED = #F5F5F7
-    pub MUTED_FOREGROUND = #86868B
+        // UI colors - macOS style (subtle grays)
+        BACKGROUND: #xFFFFFF
+        FOREGROUND: #x1D1D1F
+        BORDER: #xD1D1D6
+        INPUT: #xF5F5F7
+        RING: #x007AFF
+        MUTED: #xF5F5F7
+        MUTED_FOREGROUND: #x86868B
 
-    // Card colors
-    pub CARD = #FFFFFF
-    pub CARD_FOREGROUND = #1D1D1F
+        // Card colors
+        CARD: #xFFFFFF
+        CARD_FOREGROUND: #x1D1D1F
 
-    // Accent - System Purple (for variety)
-    pub ACCENT = #AF52DE
-    pub ACCENT_HOVER = #9B41C9
-    pub ACCENT_FOREGROUND = #ffffff
+        // Accent - System Purple (for variety)
+        ACCENT: #xAF52DE
+        ACCENT_HOVER: #x9B41C9
+        ACCENT_FOREGROUND: #xffffff
 
-    // Transparent
-    pub TRANSPARENT = #0000
+        // Transparent
+        TRANSPARENT: #x0000
 
-    // Additional macOS system colors for specific components
-    // Switch track colors (OFF state uses subtle gray)
-    pub SWITCH_TRACK_OFF = #E9E9EB
-    pub SWITCH_TRACK_OFF_HOVER = #D1D1D6
-    pub SWITCH_THUMB = #FFFFFF
+        // Additional macOS system colors for specific components
+        // Switch track colors (OFF state uses subtle gray)
+        SWITCH_TRACK_OFF: #xE9E9EB
+        SWITCH_TRACK_OFF_HOVER: #xD1D1D6
+        SWITCH_THUMB: #xFFFFFF
 
-    // Separator / Divider
-    pub DIVIDER = #C6C6C8
+        // Separator / Divider
+        DIVIDER: #xC6C6C8
 
-    // Selection / Highlight
-    pub SELECTION = #007AFF
-    pub SELECTION_FOREGROUND = #FFFFFF
+        // Selection / Highlight
+        SELECTION: #x007AFF
+        SELECTION_FOREGROUND: #xFFFFFF
+    }
 }

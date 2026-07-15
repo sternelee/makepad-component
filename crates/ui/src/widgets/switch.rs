@@ -1,144 +1,133 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.mp_theme.*
 
-    // Switch toggle component
-    pub MpSwitch = {{MpSwitch}} {
-        width: 44,
-        height: 24,
-        flow: Overlay,
+    // Switch toggle component - macOS style pill track with a sliding knob.
+    // Track and knob are drawn in a single SDF shader (the 2.0 animator cannot
+    // target named child views, so the old track/thumb_wrap/thumb view tree is
+    // merged here, matching the Toggle pattern in makepad's check_box.rs).
+    mod.widgets.MpSwitchBase = #(MpSwitch::register_widget(vm))
+    mod.widgets.MpSwitch = set_type_default() do mod.widgets.MpSwitchBase{
+        width: 44.0
+        height: 24.0
 
-        // Track background (capsule shape)
-        track = <View> {
-            width: Fill,
-            height: Fill,
-            show_bg: true,
-            draw_bg: {
-                instance on: 0.0
-                instance hover: 0.0
+        draw_bg +: {
+            on: instance(0.0)
+            hover: instance(0.0)
 
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    let sz = self.rect_size;
-                    let r = sz.y * 0.5;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let sz = self.rect_size
+                let r = sz.y * 0.5
 
-                    // Draw capsule: left circle + rectangle + right circle
-                    sdf.circle(r, r, r);
-                    sdf.rect(r, 0.0, sz.x - sz.y, sz.y);
-                    sdf.circle(sz.x - r, r, r);
+                // Track capsule: left circle + rectangle + right circle
+                sdf.circle(r, r, r)
+                sdf.rect(r, 0.0, sz.x - sz.y, sz.y)
+                sdf.circle(sz.x - r, r, r)
 
-                    // macOS style colors: subtle gray when off, system green when on
-                    let bg_off = #E9E9EB;
-                    let bg_on = #34C759;  // macOS system green
-                    let color = mix(bg_off, bg_on, self.on);
-                    // Subtle brighten on hover
-                    let color = mix(color, #FFFFFF, self.hover * 0.15);
+                // macOS style colors: subtle gray when off, system green when on
+                let mut color = mix(SWITCH_TRACK_OFF, SUCCESS, self.on)
+                // Subtle brighten on hover
+                color = mix(color, #xffffff, self.hover * 0.15)
 
-                    sdf.fill(color);
-                    return sdf.result;
-                }
+                sdf.fill(color)
+
+                // Thumb: white knob (18px at the default 44x24 size, 3px padding)
+                // sliding from the left end to the right end as `on` goes 0 -> 1
+                let thumb_r = r - 3.0
+                let knob_x = mix(r, sz.x - r, self.on)
+                sdf.circle(knob_x, r, thumb_r)
+                sdf.fill(SWITCH_THUMB)
+
+                return sdf.result
             }
         }
 
-        // Thumb container (for positioning)
-        thumb_wrap = <View> {
-            width: Fill,
-            height: Fill,
-            align: { x: 0.0, y: 0.5 }
-            padding: { left: 3, right: 3 }
-
-            thumb = <View> {
-                width: 18,
-                height: 18,
-                show_bg: true,
-                draw_bg: {
-                    fn pixel(self) -> vec4 {
-                        let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                        let radius = self.rect_size.y * 0.5;
-
-                        sdf.circle(radius, radius, radius);
-                        sdf.fill(#ffffff);
-
-                        return sdf.result;
-                    }
+        animator: Animator{
+            hover: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_bg: {hover: 0.0}}
+                }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.1}}
+                    apply: {draw_bg: {hover: 1.0}}
                 }
             }
-        }
-
-        animator: {
-            hover = {
-                default: off
-                off = {
-                    from: { all: Forward { duration: 0.15 } }
-                    apply: { track = { draw_bg: { hover: 0.0 } } }
+            on: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.2}}
+                    apply: {draw_bg: {on: 0.0}}
                 }
-                on = {
-                    from: { all: Forward { duration: 0.1 } }
-                    apply: { track = { draw_bg: { hover: 1.0 } } }
-                }
-            }
-            on = {
-                default: off
-                off = {
-                    from: { all: Forward { duration: 0.2 } }
-                    apply: {
-                        track = { draw_bg: { on: 0.0 } }
-                        thumb_wrap = { align: { x: 0.0 } }
-                    }
-                }
-                on = {
-                    from: { all: Forward { duration: 0.2 } }
-                    apply: {
-                        track = { draw_bg: { on: 1.0 } }
-                        thumb_wrap = { align: { x: 1.0 } }
-                    }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.2}}
+                    apply: {draw_bg: {on: 1.0}}
                 }
             }
         }
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, Widget, Animator)]
 pub struct MpSwitch {
-    #[deref]
-    view: View,
+    #[uid]
+    uid: WidgetUid,
+    #[source]
+    source: ScriptObjectRef,
+    #[apply_default]
+    animator: Animator,
+
+    #[redraw]
+    #[live]
+    draw_bg: DrawQuad,
+    #[walk]
+    walk: Walk,
+    #[layout]
+    layout: Layout,
 
     #[live]
     on: bool,
     #[live]
     disabled: bool,
 
-    #[animator]
-    animator: Animator,
-
     #[rust]
-    initialized: bool,
+    area: Area,
 }
 
-#[derive(Clone, Debug, DefaultNone)]
+impl ScriptHook for MpSwitch {
+    fn on_after_new(&mut self, vm: &mut ScriptVm) {
+        vm.with_cx_mut(|cx| {
+            let on = self.on;
+            self.animator_toggle(cx, on, Animate::No, ids!(on.on), ids!(on.off));
+        });
+    }
+}
+
+#[derive(Clone, Debug, Default)]
 pub enum MpSwitchAction {
     Changed(bool),
+    #[default]
     None,
 }
 
 impl Widget for MpSwitch {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         let uid = self.widget_uid();
 
         if self.animator_handle_event(cx, event).must_redraw() {
             self.redraw(cx);
         }
 
-        self.view.handle_event(cx, event, scope);
-
         if self.disabled {
             return;
         }
 
-        match event.hits(cx, self.view.area()) {
+        match event.hits(cx, self.area) {
             Hit::FingerHoverIn(_) => {
                 cx.set_cursor(MouseCursor::Hand);
                 self.animator_play(cx, ids!(hover.on));
@@ -150,14 +139,8 @@ impl Widget for MpSwitch {
             Hit::FingerUp(fe) => {
                 if fe.is_over {
                     self.on = !self.on;
-
-                    if self.on {
-                        self.animator_play(cx, ids!(on.on));
-                    } else {
-                        self.animator_play(cx, ids!(on.off));
-                    }
-
-                    cx.widget_action(uid, &scope.path, MpSwitchAction::Changed(self.on));
+                    self.animator_toggle(cx, self.on, Animate::Yes, ids!(on.on), ids!(on.off));
+                    cx.widget_action(uid, MpSwitchAction::Changed(self.on));
                     self.redraw(cx);
                 }
             }
@@ -165,15 +148,11 @@ impl Widget for MpSwitch {
         }
     }
 
-    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
-        // 首次绘制时同步状态，保留动画过渡
-        if !self.initialized {
-            self.initialized = true;
-            if self.on {
-                self.animator_play(cx, ids!(on.on));
-            }
-        }
-        self.view.draw_walk(cx, scope, walk)
+    fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        self.draw_bg.begin(cx, walk, self.layout);
+        self.draw_bg.end(cx);
+        self.area = self.draw_bg.area();
+        DrawStep::done()
     }
 }
 
@@ -184,11 +163,7 @@ impl MpSwitch {
 
     pub fn set_on(&mut self, cx: &mut Cx, on: bool) {
         self.on = on;
-        if on {
-            self.animator_play(cx, ids!(on.on));
-        } else {
-            self.animator_play(cx, ids!(on.off));
-        }
+        self.animator_toggle(cx, on, Animate::Yes, ids!(on.on), ids!(on.off));
         self.redraw(cx);
     }
 

@@ -1,30 +1,27 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-
-    use crate::theme::colors::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.mp_theme.*
 
     // ============================================================
     // MpPageFlip - Page switching container
     // ============================================================
 
     // Base PageFlip - simple page container
-    pub MpPageFlip = <PageFlip> {
+    mod.widgets.MpPageFlip = mod.widgets.PageFlip{
         width: Fill
         height: Fill
     }
 
     // PageFlip with background
-    pub MpPageFlipWithBg = <PageFlip> {
+    // NOTE: Makepad 2.0's PageFlip no longer has show_bg/draw_bg fields,
+    // so it cannot paint a background itself anymore. Give the pages
+    // inside it a backgrounded style (e.g. MpPageWithBg) instead.
+    mod.widgets.MpPageFlipWithBg = mod.widgets.PageFlip{
         width: Fill
         height: Fill
-        show_bg: true
-        draw_bg: {
-            color: (BACKGROUND)
-        }
     }
 
     // ============================================================
@@ -32,7 +29,7 @@ live_design! {
     // ============================================================
 
     // Basic page container
-    pub MpPage = <View> {
+    mod.widgets.MpPage = mod.widgets.View{
         width: Fill
         height: Fill
         flow: Down
@@ -40,39 +37,40 @@ live_design! {
     }
 
     // Page with centered content
-    pub MpPageCentered = <View> {
+    mod.widgets.MpPageCentered = mod.widgets.View{
         width: Fill
         height: Fill
         flow: Down
-        align: { x: 0.5, y: 0.5 }
+        align: Align{x: 0.5, y: 0.5}
         padding: 16
     }
 
     // Page with background
-    pub MpPageWithBg = <View> {
+    // (SolidView: its draw_bg shader actually paints `color`,
+    // a plain View's stock shader ignores it)
+    mod.widgets.MpPageWithBg = mod.widgets.SolidView{
         width: Fill
         height: Fill
         flow: Down
         padding: 16
-        show_bg: true
-        draw_bg: {
-            color: (CARD)
+        draw_bg +: {
+            color: CARD
         }
     }
 
     // Page with rounded card style
-    pub MpPageCard = <RoundedView> {
+    mod.widgets.MpPageCard = mod.widgets.RoundedView{
         width: Fill
         height: Fill
         flow: Down
         padding: 24
         margin: 16
 
-        draw_bg: {
-            color: (CARD)
+        draw_bg +: {
+            color: CARD
             border_radius: 8.0
-            border_width: 1.0
-            border_color: (BORDER)
+            border_size: 1.0
+            border_color: BORDER
         }
     }
 
@@ -81,54 +79,50 @@ live_design! {
     // ============================================================
 
     // Primary colored page
-    pub MpPagePrimary = <View> {
+    mod.widgets.MpPagePrimary = mod.widgets.SolidView{
         width: Fill
         height: Fill
         flow: Down
-        align: { x: 0.5, y: 0.5 }
+        align: Align{x: 0.5, y: 0.5}
         padding: 16
-        show_bg: true
-        draw_bg: {
-            color: (PRIMARY)
+        draw_bg +: {
+            color: PRIMARY
         }
     }
 
     // Secondary colored page
-    pub MpPageSecondary = <View> {
+    mod.widgets.MpPageSecondary = mod.widgets.SolidView{
         width: Fill
         height: Fill
         flow: Down
-        align: { x: 0.5, y: 0.5 }
+        align: Align{x: 0.5, y: 0.5}
         padding: 16
-        show_bg: true
-        draw_bg: {
-            color: (SECONDARY)
+        draw_bg +: {
+            color: SECONDARY
         }
     }
 
     // Muted colored page
-    pub MpPageMuted = <View> {
+    mod.widgets.MpPageMuted = mod.widgets.SolidView{
         width: Fill
         height: Fill
         flow: Down
-        align: { x: 0.5, y: 0.5 }
+        align: Align{x: 0.5, y: 0.5}
         padding: 16
-        show_bg: true
-        draw_bg: {
-            color: (MUTED)
+        draw_bg +: {
+            color: MUTED
         }
     }
 
     // Accent colored page
-    pub MpPageAccent = <View> {
+    mod.widgets.MpPageAccent = mod.widgets.SolidView{
         width: Fill
         height: Fill
         flow: Down
-        align: { x: 0.5, y: 0.5 }
+        align: Align{x: 0.5, y: 0.5}
         padding: 16
-        show_bg: true
-        draw_bg: {
-            color: (ACCENT)
+        draw_bg +: {
+            color: ACCENT
         }
     }
 }

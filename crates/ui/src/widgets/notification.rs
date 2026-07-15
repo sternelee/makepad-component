@@ -1,36 +1,278 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-
-    use crate::theme::colors::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.mp_theme.*
 
     // ============================================================
     // MpNotification - Toast/notification component
     // ============================================================
 
+    // Close button (X mark with hover animator)
+    mod.widgets.MpNotificationCloseButton = View{
+        width: 20
+        height: 20
+        cursor: MouseCursor.Hand
+        align: Align{x: 0.5, y: 0.5}
+
+        show_bg: true
+        draw_bg +: {
+            icon_color: instance(#x94a3b8)
+            hover: instance(0.0)
+
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+                let size = 5.0
+
+                let final_color = mix(self.icon_color, #x64748b, self.hover)
+
+                // X mark
+                sdf.move_to(c.x - size, c.y - size)
+                sdf.line_to(c.x + size, c.y + size)
+                sdf.stroke(final_color, 1.5)
+
+                sdf.move_to(c.x + size, c.y - size)
+                sdf.line_to(c.x - size, c.y + size)
+                sdf.stroke(final_color, 1.5)
+
+                return sdf.result
+            }
+        }
+
+        animator: Animator{
+            hover: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_bg: {hover: 0.0}}
+                }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.1}}
+                    apply: {draw_bg: {hover: 1.0}}
+                }
+            }
+        }
+    }
+
+    // ============================================================
+    // Icon templates (SDF drawn, one per notification type)
+    // ============================================================
+
+    // Default icon (info glyph, muted color)
+    mod.widgets.MpNotificationIcon = View{
+        width: 20
+        height: 20
+        align: Align{x: 0.5, y: 0.5}
+
+        show_bg: true
+        draw_bg +: {
+            icon_color: instance(MUTED_FOREGROUND)
+
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+                let r = min(c.x, c.y) - 1.0
+
+                // Info icon (circle with i)
+                sdf.circle(c.x, c.y, r)
+                sdf.stroke(self.icon_color, 1.5)
+
+                // Letter i - dot
+                sdf.circle(c.x, c.y - 3.0, 1.5)
+                sdf.fill(self.icon_color)
+                // Letter i - stem
+                sdf.rect(c.x - 1.0, c.y, 2.0, 5.0)
+                sdf.fill(self.icon_color)
+
+                return sdf.result
+            }
+        }
+    }
+
+    // Success icon (checkmark)
+    mod.widgets.MpNotificationIconSuccess = View{
+        width: 20
+        height: 20
+        align: Align{x: 0.5, y: 0.5}
+
+        show_bg: true
+        draw_bg +: {
+            icon_color: instance(SUCCESS)
+
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+
+                // Checkmark
+                sdf.move_to(c.x - 5.0, c.y)
+                sdf.line_to(c.x - 1.0, c.y + 4.0)
+                sdf.line_to(c.x + 6.0, c.y - 4.0)
+                sdf.stroke(self.icon_color, 2.0)
+
+                return sdf.result
+            }
+        }
+    }
+
+    // Error icon (X in circle)
+    mod.widgets.MpNotificationIconError = View{
+        width: 20
+        height: 20
+        align: Align{x: 0.5, y: 0.5}
+
+        show_bg: true
+        draw_bg +: {
+            icon_color: instance(DANGER)
+
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+                let r = min(c.x, c.y) - 1.0
+
+                // Circle
+                sdf.circle(c.x, c.y, r)
+                sdf.stroke(self.icon_color, 1.5)
+
+                // X mark
+                let size = 4.0
+                sdf.move_to(c.x - size, c.y - size)
+                sdf.line_to(c.x + size, c.y + size)
+                sdf.stroke(self.icon_color, 1.5)
+
+                sdf.move_to(c.x + size, c.y - size)
+                sdf.line_to(c.x - size, c.y + size)
+                sdf.stroke(self.icon_color, 1.5)
+
+                return sdf.result
+            }
+        }
+    }
+
+    // Warning icon (triangle with !)
+    mod.widgets.MpNotificationIconWarning = View{
+        width: 20
+        height: 20
+        align: Align{x: 0.5, y: 0.5}
+
+        show_bg: true
+        draw_bg +: {
+            icon_color: instance(WARNING)
+
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+
+                // Triangle
+                sdf.move_to(c.x, 2.0)
+                sdf.line_to(self.rect_size.x - 2.0, self.rect_size.y - 2.0)
+                sdf.line_to(2.0, self.rect_size.y - 2.0)
+                sdf.close_path()
+                sdf.stroke(self.icon_color, 1.5)
+
+                // Exclamation mark - stem
+                sdf.rect(c.x - 1.0, 7.0, 2.0, 5.0)
+                sdf.fill(self.icon_color)
+                // Exclamation mark - dot
+                sdf.circle(c.x, 15.0, 1.5)
+                sdf.fill(self.icon_color)
+
+                return sdf.result
+            }
+        }
+    }
+
+    // Info icon (circle with i, info color)
+    mod.widgets.MpNotificationIconInfo = View{
+        width: 20
+        height: 20
+        align: Align{x: 0.5, y: 0.5}
+
+        show_bg: true
+        draw_bg +: {
+            icon_color: instance(INFO)
+
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+                let r = min(c.x, c.y) - 1.0
+
+                // Circle
+                sdf.circle(c.x, c.y, r)
+                sdf.stroke(self.icon_color, 1.5)
+
+                // Letter i - dot
+                sdf.circle(c.x, c.y - 3.0, 1.5)
+                sdf.fill(self.icon_color)
+                // Letter i - stem
+                sdf.rect(c.x - 1.0, c.y, 2.0, 5.0)
+                sdf.fill(self.icon_color)
+
+                return sdf.result
+            }
+        }
+    }
+
+    // ============================================================
+    // Content subtree templates (title + message)
+    // Variants override nested colors/text by re-declaring these
+    // templates with the same ids; the entries apply in place.
+    // ============================================================
+
+    mod.widgets.MpNotificationTitle = Label{
+        width: Fill
+        height: Fit
+        draw_text +: {
+            text_style: theme.font_bold{font_size: 14.0}
+            color: FOREGROUND
+        }
+        text: "Notification"
+    }
+
+    mod.widgets.MpNotificationMessage = Label{
+        width: Fill
+        height: Fit
+        draw_text +: {
+            text_style: theme.font_regular{font_size: 13.0}
+            color: MUTED_FOREGROUND
+        }
+        text: ""
+    }
+
+    mod.widgets.MpNotificationContent = View{
+        width: Fill
+        height: Fit
+        flow: Down
+        spacing: 4
+
+        title := mod.widgets.MpNotificationTitle{}
+        message := mod.widgets.MpNotificationMessage{}
+    }
+
+    // ============================================================
     // Base notification
-    MpNotificationBase = <View> {
+    // ============================================================
+
+    mod.widgets.MpNotificationBase = View{
         width: 320
         height: Fit
         padding: 16
         flow: Right
         spacing: 12
-        align: { y: 0.0 }
+        align: Align{y: 0.0}
 
         show_bg: true
-        draw_bg: {
-            instance bg_color: (CARD)
-            instance border_radius: 8.0
-            instance border_color: (BORDER)
-            instance shadow_color: #0000001A
-            instance shadow_offset_y: 4.0
-            instance shadow_blur: 12.0
+        draw_bg +: {
+            bg_color: instance(CARD)
+            border_radius: instance(8.0)
+            border_color: instance(BORDER)
+            shadow_color: instance(#x0000001A)
+            shadow_offset_y: instance(4.0)
+            shadow_blur: instance(12.0)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
 
                 // Shadow
                 sdf.box(
@@ -39,10 +281,10 @@ live_design! {
                     self.rect_size.x,
                     self.rect_size.y,
                     self.border_radius
-                );
-                sdf.blur = self.shadow_blur;
-                sdf.fill(self.shadow_color);
-                sdf.blur = 0.0;
+                )
+                sdf.blur = self.shadow_blur
+                sdf.fill(self.shadow_color)
+                sdf.blur = 0.0
 
                 // Main card
                 sdf.box(
@@ -51,11 +293,11 @@ live_design! {
                     self.rect_size.x - 1.0,
                     self.rect_size.y - 1.0,
                     self.border_radius
-                );
-                sdf.fill_keep(self.bg_color);
-                sdf.stroke(self.border_color, 1.0);
+                )
+                sdf.fill_keep(self.bg_color)
+                sdf.stroke(self.border_color, 1.0)
 
-                return sdf.result;
+                return sdf.result
             }
         }
     }
@@ -64,174 +306,34 @@ live_design! {
     // Default Notification
     // ============================================================
 
-    pub MpNotification = <MpNotificationBase> {
-        icon = <View> {
-            width: 20
-            height: 20
-            align: { x: 0.5, y: 0.5 }
-
-            show_bg: true
-            draw_bg: {
-                instance icon_color: (MUTED_FOREGROUND)
-
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    let c = self.rect_size * 0.5;
-                    let r = min(c.x, c.y) - 1.0;
-
-                    // Info icon (circle with i)
-                    sdf.circle(c.x, c.y, r);
-                    sdf.stroke(self.icon_color, 1.5);
-
-                    // Letter i
-                    sdf.circle(c.x, c.y - 3.0, 1.5);
-                    sdf.fill(self.icon_color);
-                    sdf.rect(c.x - 1.0, c.y, 2.0, 5.0);
-                    sdf.fill(self.icon_color);
-
-                    return sdf.result;
-                }
-            }
-        }
-
-        content = <View> {
-            width: Fill
-            height: Fit
-            flow: Down
-            spacing: 4
-
-            title = <Label> {
-                width: Fill
-                height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_BOLD> { font_size: 14.0 }
-                    color: (FOREGROUND)
-                }
-                text: "Notification"
-            }
-
-            message = <Label> {
-                width: Fill
-                height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> { font_size: 13.0 }
-                    color: (MUTED_FOREGROUND)
-                }
-                text: ""
-            }
-        }
-
-        close = <View> {
-            width: 20
-            height: 20
-            cursor: Hand
-            align: { x: 0.5, y: 0.5 }
-
-            show_bg: true
-            draw_bg: {
-                instance icon_color: #94a3b8
-                instance hover: 0.0
-
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    let c = self.rect_size * 0.5;
-                    let size = 5.0;
-
-                    let final_color = mix(self.icon_color, #64748b, self.hover);
-
-                    // X mark
-                    sdf.move_to(c.x - size, c.y - size);
-                    sdf.line_to(c.x + size, c.y + size);
-                    sdf.stroke(final_color, 1.5);
-
-                    sdf.move_to(c.x + size, c.y - size);
-                    sdf.line_to(c.x - size, c.y + size);
-                    sdf.stroke(final_color, 1.5);
-
-                    return sdf.result;
-                }
-            }
-
-            animator: {
-                hover = {
-                    default: off
-                    off = {
-                        from: { all: Forward { duration: 0.15 } }
-                        apply: { draw_bg: { hover: 0.0 } }
-                    }
-                    on = {
-                        from: { all: Forward { duration: 0.1 } }
-                        apply: { draw_bg: { hover: 1.0 } }
-                    }
-                }
-            }
-        }
+    mod.widgets.MpNotification = mod.widgets.MpNotificationBase{
+        icon := mod.widgets.MpNotificationIcon{}
+        content := mod.widgets.MpNotificationContent{}
+        close := mod.widgets.MpNotificationCloseButton{}
     }
 
     // ============================================================
     // Success Notification
     // ============================================================
 
-    pub MpNotificationSuccess = <MpNotificationBase> {
-        draw_bg: {
-            border_color: #bbf7d0
+    mod.widgets.MpNotificationSuccess = mod.widgets.MpNotificationBase{
+        draw_bg +: {
+            border_color: instance(#xbbf7d0)
         }
 
-        icon = <View> {
-            width: 20
-            height: 20
-            align: { x: 0.5, y: 0.5 }
+        icon := mod.widgets.MpNotificationIconSuccess{}
 
-            show_bg: true
-            draw_bg: {
-                instance icon_color: (SUCCESS)
-
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    let c = self.rect_size * 0.5;
-
-                    // Checkmark
-                    sdf.move_to(c.x - 5.0, c.y);
-                    sdf.line_to(c.x - 1.0, c.y + 4.0);
-                    sdf.line_to(c.x + 6.0, c.y - 4.0);
-                    sdf.stroke(self.icon_color, 2.0);
-
-                    return sdf.result;
-                }
-            }
-        }
-
-        content = <View> {
-            width: Fill
-            height: Fit
-            flow: Down
-            spacing: 4
-
-            title = <Label> {
-                width: Fill
-                height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_BOLD> { font_size: 14.0 }
-                    color: (SUCCESS)
-                }
+        content := mod.widgets.MpNotificationContent{
+            title := mod.widgets.MpNotificationTitle{
+                draw_text +: { color: SUCCESS }
                 text: "Success"
             }
-
-            message = <Label> {
-                width: Fill
-                height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> { font_size: 13.0 }
-                    color: (MUTED_FOREGROUND)
-                }
-                text: ""
-            }
         }
 
-        close = <View> {
+        close := View{
             width: 20
             height: 20
-            cursor: Hand
+            cursor: MouseCursor.Hand
         }
     }
 
@@ -239,75 +341,24 @@ live_design! {
     // Error Notification
     // ============================================================
 
-    pub MpNotificationError = <MpNotificationBase> {
-        draw_bg: {
-            border_color: #fecaca
+    mod.widgets.MpNotificationError = mod.widgets.MpNotificationBase{
+        draw_bg +: {
+            border_color: instance(#xfecaca)
         }
 
-        icon = <View> {
-            width: 20
-            height: 20
-            align: { x: 0.5, y: 0.5 }
+        icon := mod.widgets.MpNotificationIconError{}
 
-            show_bg: true
-            draw_bg: {
-                instance icon_color: (DANGER)
-
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    let c = self.rect_size * 0.5;
-                    let r = min(c.x, c.y) - 1.0;
-
-                    // Circle
-                    sdf.circle(c.x, c.y, r);
-                    sdf.stroke(self.icon_color, 1.5);
-
-                    // X mark
-                    let size = 4.0;
-                    sdf.move_to(c.x - size, c.y - size);
-                    sdf.line_to(c.x + size, c.y + size);
-                    sdf.stroke(self.icon_color, 1.5);
-
-                    sdf.move_to(c.x + size, c.y - size);
-                    sdf.line_to(c.x - size, c.y + size);
-                    sdf.stroke(self.icon_color, 1.5);
-
-                    return sdf.result;
-                }
-            }
-        }
-
-        content = <View> {
-            width: Fill
-            height: Fit
-            flow: Down
-            spacing: 4
-
-            title = <Label> {
-                width: Fill
-                height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_BOLD> { font_size: 14.0 }
-                    color: (DANGER)
-                }
+        content := mod.widgets.MpNotificationContent{
+            title := mod.widgets.MpNotificationTitle{
+                draw_text +: { color: DANGER }
                 text: "Error"
             }
-
-            message = <Label> {
-                width: Fill
-                height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> { font_size: 13.0 }
-                    color: (MUTED_FOREGROUND)
-                }
-                text: ""
-            }
         }
 
-        close = <View> {
+        close := View{
             width: 20
             height: 20
-            cursor: Hand
+            cursor: MouseCursor.Hand
         }
     }
 
@@ -315,73 +366,24 @@ live_design! {
     // Warning Notification
     // ============================================================
 
-    pub MpNotificationWarning = <MpNotificationBase> {
-        draw_bg: {
-            border_color: #fde68a
+    mod.widgets.MpNotificationWarning = mod.widgets.MpNotificationBase{
+        draw_bg +: {
+            border_color: instance(#xfde68a)
         }
 
-        icon = <View> {
-            width: 20
-            height: 20
-            align: { x: 0.5, y: 0.5 }
+        icon := mod.widgets.MpNotificationIconWarning{}
 
-            show_bg: true
-            draw_bg: {
-                instance icon_color: (WARNING)
-
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    let c = self.rect_size * 0.5;
-
-                    // Triangle
-                    sdf.move_to(c.x, 2.0);
-                    sdf.line_to(self.rect_size.x - 2.0, self.rect_size.y - 2.0);
-                    sdf.line_to(2.0, self.rect_size.y - 2.0);
-                    sdf.close_path();
-                    sdf.stroke(self.icon_color, 1.5);
-
-                    // Exclamation mark
-                    sdf.rect(c.x - 1.0, 7.0, 2.0, 5.0);
-                    sdf.fill(self.icon_color);
-                    sdf.circle(c.x, 15.0, 1.5);
-                    sdf.fill(self.icon_color);
-
-                    return sdf.result;
-                }
-            }
-        }
-
-        content = <View> {
-            width: Fill
-            height: Fit
-            flow: Down
-            spacing: 4
-
-            title = <Label> {
-                width: Fill
-                height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_BOLD> { font_size: 14.0 }
-                    color: #b45309
-                }
+        content := mod.widgets.MpNotificationContent{
+            title := mod.widgets.MpNotificationTitle{
+                draw_text +: { color: #xb45309 }
                 text: "Warning"
             }
-
-            message = <Label> {
-                width: Fill
-                height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> { font_size: 13.0 }
-                    color: (MUTED_FOREGROUND)
-                }
-                text: ""
-            }
         }
 
-        close = <View> {
+        close := View{
             width: 20
             height: 20
-            cursor: Hand
+            cursor: MouseCursor.Hand
         }
     }
 
@@ -389,71 +391,24 @@ live_design! {
     // Info Notification
     // ============================================================
 
-    pub MpNotificationInfo = <MpNotificationBase> {
-        draw_bg: {
-            border_color: #a5f3fc
+    mod.widgets.MpNotificationInfo = mod.widgets.MpNotificationBase{
+        draw_bg +: {
+            border_color: instance(#xa5f3fc)
         }
 
-        icon = <View> {
-            width: 20
-            height: 20
-            align: { x: 0.5, y: 0.5 }
+        icon := mod.widgets.MpNotificationIconInfo{}
 
-            show_bg: true
-            draw_bg: {
-                instance icon_color: (INFO)
-
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    let c = self.rect_size * 0.5;
-                    let r = min(c.x, c.y) - 1.0;
-
-                    // Circle
-                    sdf.circle(c.x, c.y, r);
-                    sdf.stroke(self.icon_color, 1.5);
-
-                    // Letter i
-                    sdf.circle(c.x, c.y - 3.0, 1.5);
-                    sdf.fill(self.icon_color);
-                    sdf.rect(c.x - 1.0, c.y, 2.0, 5.0);
-                    sdf.fill(self.icon_color);
-
-                    return sdf.result;
-                }
-            }
-        }
-
-        content = <View> {
-            width: Fill
-            height: Fit
-            flow: Down
-            spacing: 4
-
-            title = <Label> {
-                width: Fill
-                height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_BOLD> { font_size: 14.0 }
-                    color: (INFO)
-                }
+        content := mod.widgets.MpNotificationContent{
+            title := mod.widgets.MpNotificationTitle{
+                draw_text +: { color: INFO }
                 text: "Info"
             }
-
-            message = <Label> {
-                width: Fill
-                height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> { font_size: 13.0 }
-                    color: (MUTED_FOREGROUND)
-                }
-                text: ""
-            }
         }
 
-        close = <View> {
+        close := View{
             width: 20
             height: 20
-            cursor: Hand
+            cursor: MouseCursor.Hand
         }
     }
 
@@ -461,16 +416,16 @@ live_design! {
     // Notification Container (for positioning)
     // ============================================================
 
-    pub MpNotificationContainer = <View> {
+    mod.widgets.MpNotificationContainer = View{
         width: Fill
         height: Fill
         flow: Overlay
 
         // Top-right corner positioning
-        align: { x: 1.0, y: 0.0 }
+        align: Align{x: 1.0, y: 0.0}
         padding: 16
 
-        notifications = <View> {
+        notifications := View{
             width: Fit
             height: Fit
             flow: Down
@@ -482,26 +437,27 @@ live_design! {
     // Interactive Notification Widget
     // ============================================================
 
-    pub MpNotificationWidget = {{MpNotificationWidget}} {
+    mod.widgets.MpNotificationWidgetBase = #(MpNotificationWidget::register_widget(vm))
+    mod.widgets.MpNotificationWidget = set_type_default() do mod.widgets.MpNotificationWidgetBase{
         width: 320
         height: Fit
         padding: 16
         flow: Right
         spacing: 12
-        align: { y: 0.0 }
+        align: Align{y: 0.0}
         visible: false
 
         show_bg: true
-        draw_bg: {
-            instance bg_color: (CARD)
-            instance border_radius: 8.0
-            instance border_color: (BORDER)
-            instance shadow_color: #0000001A
-            instance shadow_offset_y: 4.0
-            instance shadow_blur: 12.0
+        draw_bg +: {
+            bg_color: instance(CARD)
+            border_radius: instance(8.0)
+            border_color: instance(BORDER)
+            shadow_color: instance(#x0000001A)
+            shadow_offset_y: instance(4.0)
+            shadow_blur: instance(12.0)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
 
                 // Shadow
                 sdf.box(
@@ -510,10 +466,10 @@ live_design! {
                     self.rect_size.x,
                     self.rect_size.y,
                     self.border_radius
-                );
-                sdf.blur = self.shadow_blur;
-                sdf.fill(self.shadow_color);
-                sdf.blur = 0.0;
+                )
+                sdf.blur = self.shadow_blur
+                sdf.fill(self.shadow_color)
+                sdf.blur = 0.0
 
                 // Main card
                 sdf.box(
@@ -522,88 +478,39 @@ live_design! {
                     self.rect_size.x - 1.0,
                     self.rect_size.y - 1.0,
                     self.border_radius
-                );
-                sdf.fill_keep(self.bg_color);
-                sdf.stroke(self.border_color, 1.0);
+                )
+                sdf.fill_keep(self.bg_color)
+                sdf.stroke(self.border_color, 1.0)
 
-                return sdf.result;
+                return sdf.result
             }
         }
 
-        content = <View> {
-            width: Fill
-            height: Fit
-            flow: Down
-            spacing: 4
-
-            title = <Label> {
-                width: Fill
-                height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_BOLD> { font_size: 14.0 }
-                    color: (FOREGROUND)
-                }
-                text: "Notification"
-            }
-
-            message = <Label> {
-                width: Fill
-                height: Fit
-                draw_text: {
-                    text_style: <THEME_FONT_REGULAR> { font_size: 13.0 }
-                    color: (MUTED_FOREGROUND)
-                }
-                text: ""
-            }
-        }
-
-        close = <View> {
-            width: 20
-            height: 20
-            cursor: Hand
-            align: { x: 0.5, y: 0.5 }
-
-            show_bg: true
-            draw_bg: {
-                instance icon_color: #94a3b8
-                instance hover: 0.0
-
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    let c = self.rect_size * 0.5;
-                    let size = 5.0;
-
-                    let final_color = mix(self.icon_color, #64748b, self.hover);
-
-                    sdf.move_to(c.x - size, c.y - size);
-                    sdf.line_to(c.x + size, c.y + size);
-                    sdf.stroke(final_color, 1.5);
-
-                    sdf.move_to(c.x + size, c.y - size);
-                    sdf.line_to(c.x - size, c.y + size);
-                    sdf.stroke(final_color, 1.5);
-
-                    return sdf.result;
-                }
-            }
-        }
+        content := mod.widgets.MpNotificationContent{}
+        close := mod.widgets.MpNotificationCloseButton{}
     }
 }
 
 /// Notification actions
-#[derive(Clone, Debug, DefaultNone)]
+#[derive(Clone, Debug, Default)]
 pub enum MpNotificationAction {
+    #[default]
     None,
     Closed,
 }
 
 /// Interactive notification widget
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct MpNotificationWidget {
+    #[source]
+    source: ScriptObjectRef,
+
     #[deref]
     view: View,
 
-    #[live]
+    /// Whether the notification is visible
+    #[live(false)]
+    #[visible]
     visible: bool,
 }
 
@@ -615,22 +522,22 @@ impl Widget for MpNotificationWidget {
 
         self.view.handle_event(cx, event, scope);
 
+        let uid = self.widget_uid();
+
         // Handle close button
-        let close_btn = self.view.view(ids!(close));
+        let close_btn = self.view.view(cx, ids!(close));
         match event.hits(cx, close_btn.area()) {
             Hit::FingerHoverIn(_) => {
-                close_btn.apply_over(cx, live! { draw_bg: { hover: 1.0 } });
-                close_btn.redraw(cx);
+                close_btn.animator_play(cx, ids!(hover.on));
             }
             Hit::FingerHoverOut(_) => {
-                close_btn.apply_over(cx, live! { draw_bg: { hover: 0.0 } });
-                close_btn.redraw(cx);
+                close_btn.animator_play(cx, ids!(hover.off));
             }
             Hit::FingerUp(fe) => {
                 if fe.is_over {
                     self.visible = false;
                     self.redraw(cx);
-                    cx.widget_action(self.widget_uid(), &scope.path, MpNotificationAction::Closed);
+                    cx.widget_action(uid, MpNotificationAction::Closed);
                 }
             }
             _ => {}
@@ -660,12 +567,14 @@ impl MpNotificationWidget {
 
     /// Set the notification title
     pub fn set_title(&mut self, cx: &mut Cx, title: &str) {
-        self.view.label(ids!(content.title)).set_text(cx, title);
+        self.view.label(cx, ids!(content.title)).set_text(cx, title);
     }
 
     /// Set the notification message
     pub fn set_message(&mut self, cx: &mut Cx, message: &str) {
-        self.view.label(ids!(content.message)).set_text(cx, message);
+        self.view
+            .label(cx, ids!(content.message))
+            .set_text(cx, message);
     }
 
     /// Show with title and message

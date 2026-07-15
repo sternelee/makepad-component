@@ -1,307 +1,233 @@
 # Repository Guidelines for AI Agents
 
-This repository is a Rust workspace focused on Makepad widgets, the A2UI (Agent-to-UI) protocol renderer, and various demo applications.
+This repository is a Rust workspace focused on Makepad widgets, the A2UI (Agent-to-UI) protocol renderer, and various demo applications. It is read by AI coding agents — start here, then consult `README.md` (user-facing docs, A2UI protocol details) and `CLAUDE.md` (Claude Code-oriented supplement) as needed.
 
-## 1. Project Structure & Module Organization
+## 1. Project Overview
+
+`makepad-component` is a UI component library for the [Makepad](https://github.com/makepad/makepad) framework (GPU-accelerated, SDF shader-based, cross-platform Rust UI), plus:
+
+- A full **A2UI protocol renderer** that lets AI agents generate native UIs from declarative JSON (messages: `beginRendering`, `surfaceUpdate`, `dataModelUpdate`, `deleteSurface`, `userAction`).
+- A **charting library** (`makepad-plot`) with ~25 chart types including interactive 3D (surface, scatter, line).
+- Demo apps: widget showcase, A2UI demo, LLM bridge server, Raycast-style launcher, Gemini Live voice companion, cross-platform clipboard utilities.
+
+License: MIT OR Apache-2.0. Rust edition 2021.
+
+## 2. Workspace Structure
 
 ```
 makepad-component/
 ├── crates/
-│   ├── ui/                      # Core library (makepad-component)
+│   ├── ui/                      # Core library (crate name: makepad-component)
 │   │   └── src/
-│   │       ├── lib.rs           # Public API exports
-│   │       ├── widgets/         # Native Makepad widget implementations
+│   │       ├── lib.rs           # Re-exports: a2ui, theme, widgets (+ makepad_plot, makepad_widgets)
+│   │       ├── widgets/         # 26 native Makepad widgets (MpButton, MpSlider, ...)
 │   │       ├── a2ui/            # A2UI protocol renderer
-│   │       │   ├── message.rs   # Protocol types (serde JSON)
+│   │       │   ├── message.rs   # Protocol types (serde JSON, ComponentType enum)
 │   │       │   ├── processor.rs # Message → widget tree conversion
 │   │       │   ├── host.rs      # SSE client for A2A servers
-│   │       │   ├── data_model.rs
-│   │       │   ├── registry.rs
-│   │       │   └── surface/     # Component tree rendering
-│   │       └── theme/           # Color palettes, typography
-│   ├── makepad-plot/            # Charting library (29 chart types)
-│   ├── component-zoo/           # Widget showcase demo
-│   ├── a2ui-demo/               # A2UI demo + bridge servers
-│   ├── raycast-launcher/         # Raycast-style launcher app
-│   └── makepad-clipboard/        # Clipboard utilities
+│   │       │   ├── a2a_client.rs# A2A protocol client (JSON-RPC + SSE)
+│   │       │   ├── sse.rs       # SSE streaming client
+│   │       │   ├── data_model.rs, registry.rs, value.rs
+│   │       │   ├── chart_bridge/    # ChartComponent → makepad-plot bridge (basic/advanced/statistical)
+│   │       │   └── surface/         # Component tree rendering (widget, render_impl, events_impl,
+│   │       │                        #   render_charts_impl, render_calendar_impl, render_shader_stage_impl)
+│   │       └── theme/           # Color palettes (colors.rs)
+│   ├── makepad-plot/            # Charting library (plot/ has per-type modules: bar, line, pie,
+│   │                            #   scatter3d, surface3d, heatmap, treemap, contour, ...)
+│   ├── component-zoo/           # Widget showcase demo (src/app.rs)
+│   ├── a2ui-demo/               # A2UI demo app + bridge servers (multiple binaries, see §4)
+│   │   └── src/
+│   │       ├── main.rs, app/    # GUI app (logic, theme, sample_data, audio_player)
+│   │       ├── a2ui_bridge.rs + a2ui_bridge_impl/  # LLM → A2UI bridge (server, builder, tools, types, mureka)
+│   │       ├── watch_server.rs  # File-watching SSE server (port 8080)
+│   │       ├── mock_server.rs, streaming_main.rs, math_charts.rs, fft_demo.rs
+│   ├── raycast-launcher/        # Raycast-style launcher, Makepad 2.0 `script_mod!` API
+│   │                            #   (runtime Splash app loading from *-app.json descriptors)
+│   ├── gemini-talker/           # Gemini Live voice companion, Makepad 2.0 `script_mod!` API
+│   └── makepad-clipboard/       # Cross-platform clipboard (per-OS modules: macos/windows/linux/ios)
+├── docs/                        # A2UI guides (EN/CN), bridge docs, splash pitch
+├── skills/                      # Claude Code skills: makepad-screenshot, xor-shader-techniques
+├── serve_wasm.py                # HTTP server with COOP/COEP headers for the wasm build
+└── ui_live.json, chart_test.json, math_test.json, ...  # Sample A2UI JSON payloads
 ```
 
-## 2. Build, Test, and Lint Commands
+Crate-specific guidance exists in `crates/raycast-launcher/CLAUDE.md` and `crates/gemini-talker/CLAUDE.md` — read those before working in those crates. Note: parts of `crates/raycast-launcher/CLAUDE.md` are stale (it references `todo.rs`/`todo-app.json`; the current files are `app-todo.json`, `app-DarkCalc.json`, `app-weather.json` and there is no `todo.rs`).
 
-All commands execute from repository root.
+## 3. Dependencies & Toolchain
 
-### Build & Run
+- **Rust stable** (edition 2021), resolver "2".
+- `makepad-widgets` / `makepad-script` are pulled from the Makepad git repo (`https://github.com/makepad/makepad`, no branch/rev pinned in `Cargo.toml`; `Cargo.lock` currently pins commit `4f9ce7a8`).
+- The Makepad main branch has moved to the **2.0 Script API** (`script_mod!`, `#[derive(Script, ScriptHook)]`). Two API generations coexist in this workspace:
+  - Legacy `live_design!` + `#[derive(Live, LiveHook, Widget)]`: `crates/ui`, `makepad-plot`, `component-zoo`, `a2ui-demo`.
+  - New `script_mod!`: `gemini-talker`, `raycast-launcher`.
+
+### ⚠️ Current build status (verified 2026-07-15)
+
+The workspace does **not** fully compile against the currently locked makepad commit:
+
+- `cargo check -p makepad-plot` / `-p makepad-component` — **fails** (~857 errors: `live_design!`, `#[derive(Live)]`, `#[live]`/`#[rust]` attributes no longer exist in makepad 2.0). These crates need a Makepad 2.0 migration, or the `makepad-widgets` dependency must be pinned to an older pre-2.0 commit to build as-is.
+- `cargo check -p gemini-talker` — **fails** (4 errors: unresolved `gemini_live::prelude` import, type annotation errors).
+- `cargo check -p raycast-launcher` — **passes**.
+
+Before assuming a change broke something, check whether the failure pre-exists. When fixing builds, prefer pinning/updating the dependency deliberately over speculative edits, and record what you did.
+
+## 4. Build, Test, and Lint Commands
+
+All commands run from the repository root.
+
 ```bash
-cargo build --workspace                    # Full workspace build
-cargo check -p makepad-component           # Fast compile check for core
-cargo run -p component-zoo --bin component-zoo    # Widget showcase
-cargo run -p a2ui-demo --bin a2ui-demo            # A2UI demo app
-cargo run -p a2ui-demo --bin a2ui-bridge          # LLM bridge server
+# Build & check
+cargo build --workspace                     # Full workspace build
+cargo check -p makepad-component            # Core library (currently broken, see §3)
+cargo check -p raycast-launcher             # Known-good crate
+
+# Run demos
+cargo run -p component-zoo --bin component-zoo   # Widget showcase
+cargo run -p a2ui-demo --bin a2ui-demo           # A2UI demo app
+cargo run -p raycast-launcher                    # Raycast-style launcher
+cargo run -p gemini-talker                       # Gemini Live app (needs GEMINI_API_KEY)
+
+# a2ui-demo auxiliary binaries
+cargo run --bin a2ui-streaming
+cargo run --bin math-charts                     # Generates math_test.json / ui_live.json
+cargo run --bin fft-demo
+cargo run --bin watch-server --features mock-server      # Port 8080, watches ui_live.json
+cargo run --bin mock-a2a-server --features mock-server
+cargo build --bin a2ui-bridge --features a2ui-bridge     # LLM bridge server (see §7)
+
+# Testing
+cargo test --workspace
+cargo test -p makepad-component
+cargo test -p makepad-component -- test_name_substring        # Substring match
+cargo test -p makepad-component -- test_name --exact          # Exact match
+
+# Lint & format
+cargo clippy --workspace -- -D warnings
+cargo fmt --all
+cargo fmt --all -- --check
 ```
 
-### Testing
+### Feature flags (`a2ui-demo` crate)
+
+| Feature | Enables |
+|---------|---------|
+| `mock-server` | `watch-server`, `mock-a2a-server` binaries (tokio/hyper) |
+| `a2ui-bridge` | LLM bridge server (adds reqwest, futures-util) |
+| `mureka` | AI music generation (extends `a2ui-bridge`, requires `MUREKA_API_KEY`) |
+
+### WebAssembly build
+
 ```bash
-cargo test --workspace                     # Run all tests
-cargo test -p makepad-component           # Tests for specific crate
-cargo test -p makepad-component -- test_process_surface_update  # Single test (substring)
-cargo test -p makepad-component -- test_name --exact            # Exact match
+cargo install --force --git https://github.com/makepad/makepad.git --branch rik cargo-makepad
+cargo makepad wasm install-toolchain
+cargo makepad wasm build -p component-zoo --release
+python3 serve_wasm.py 8080   # serves with COOP/COEP headers required by Makepad wasm
 ```
 
-### Linting & Formatting
-```bash
-cargo clippy --workspace -- -D warnings   # Strict lint (fails on warnings)
-cargo fmt --all                          # Format all files
-cargo fmt --all -- --check               # Check without changes
-```
+## 5. Coding Style & Conventions
 
-## 3. Coding Style & Conventions
+### Naming
 
-### General Rust Style
-- **Edition**: Rust 2021 | **Indentation**: 4 spaces | **Line Length**: Default
-
-### Naming Conventions
 | Type | Convention | Example |
 |------|------------|---------|
 | Variables, functions, modules | `snake_case` | `draw_bg`, `handle_event` |
-| Structs, Enums, Traits | `UpperCamelCase` | `MpButton`, `MpButtonAction` |
+| Structs, enums, traits | `UpperCamelCase` | `MpButton`, `MpButtonAction` |
 | Constants, statics | `SCREAMING_SNAKE_CASE` | `MAX_WIDTH` |
-| Widget types (public) | `Mp` prefix | `MpButton`, `MpSlider`, `MpCheckbox` |
+| Public widget types | `Mp` prefix | `MpButton`, `MpSlider`, `MpCheckbox` |
 | Internal fields | `snake_case` | `draw_bg`, `animator` |
 
-### Import Organization
+### Import order
+
 ```rust
-use makepad_widgets::*;           // 1. External crate glob (makepad-widgets)
-use std::collections::HashMap;    // 2. Standard library
-use serde::{Deserialize, Serialize}; // 3. External crates
-use crate::a2ui::message::*;      // 4. Local modules (crate::)
-use super::data_model::*;         // 5. Parent module (super::)
+use makepad_widgets::*;              // 1. makepad-widgets glob
+use std::collections::HashMap;       // 2. std
+use serde::{Deserialize, Serialize}; // 3. external crates
+use crate::a2ui::message::*;         // 4. crate::
+use super::data_model::*;            // 5. super::
 ```
 
-### Public API Patterns (lib.rs / mod.rs)
+### Public API pattern (`lib.rs` / `mod.rs`)
+
 ```rust
-// lib.rs - Export public modules
 pub mod a2ui;
 pub mod theme;
 pub mod widgets;
 
-// widgets/mod.rs - Re-export with glob + individual overrides
-pub mod button;
-pub mod checkbox;
-// ... other modules
-pub use button::*;
-pub use checkbox::*;
-// dropdown, list only define live_design styles (no pub use)
-
-pub fn live_design(cx: &mut Cx) {
-    crate::widgets::button::live_design(cx);
-    // ... register all widgets
-}
+// widgets/mod.rs: `pub mod button;` + `pub use button::*;` per widget,
+// plus one `pub fn live_design(cx: &mut Cx)` registering every widget.
 ```
 
-## 4. Makepad DSL (`live_design!`)
+### Widget implementation pattern (legacy `live_design!` API)
 
-### Widget Definition Pattern
-```rust
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::theme::colors::*;
+- DSL: base widget `pub MpButton = {{MpButton}} { ... }` with `draw_bg` shader instances, `animator` states (`hover.on/off`, `pressed.on/off`); variants via inheritance: `pub MpButtonPrimary = <MpButton> { ... }`.
+- Struct: `#[derive(Live, LiveHook, Widget)]` with `#[live]`/`#[walk]`/`#[layout]`/`#[animator]`/`#[rust]` field attributes; `#[redraw]` on fields that must trigger redraws.
+- `impl Widget`: `handle_event` (animator first, then `event.hits(cx, self.area)` match on `Hit::FingerHoverIn/Down/Up`, emit `cx.widget_action(uid, &scope.path, MyAction::...)`) and `draw_walk` (`draw_bg.begin/end`, capture `self.area`, return `DrawStep::done()`).
+- Actions: `#[derive(Clone, Debug, DefaultNone)]` enum ending in `None`; add `clicked(&self, actions: &Actions) -> bool` helpers on both the widget and its `*Ref` type.
+- Keep DSL IDs stable and descriptive (`ids!(hover.on)`, `save_button`, `user_input`).
 
-    // Base component - {{WidgetName}} creates the struct
-    pub MpButton = {{MpButton}} {
-        width: Fit,
-        height: Fit,
-        padding: { left: 16, right: 16, top: 8, bottom: 8 }
+### Error handling
 
-        draw_bg: {
-            instance radius: 6.0
-            instance color: (PRIMARY)
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                sdf.box(/* ... */);
-                sdf.fill(self.color);
-                return sdf.result;
-            }
-        }
+- `Result`/`Option` + `?` for expected failures; `expect()` only for impossible states in library code; `log!` (from `makepad_widgets`) for GUI-path runtime errors.
 
-        animator: {
-            hover = {
-                default: off
-                off = { from: { all: Forward { duration: 0.15 } }
-                        apply: { draw_bg: { hover: 0.0 } } }
-                on = { from: { all: Forward { duration: 0.15 } }
-                       apply: { draw_bg: { hover: 1.0 } } }
-            }
-        }
-    }
+## 6. A2UI Architecture
 
-    // Variant inherits from base
-    pub MpButtonPrimary = <MpButton> {
-        draw_bg: { color: (PRIMARY) }
-    }
-}
+### Component pipeline
+
+```
+JSON message → A2uiMessageProcessor (processor.rs) → ProcessorEvent
+             → A2uiSurface (surface/) → Makepad widgets / makepad-plot charts
 ```
 
-### Struct with Live Derive
-```rust
-#[derive(Live, LiveHook, Widget)]
-pub struct MpButton {
-    #[redraw]           // Redraw on change
-    #[live]
-    draw_bg: DrawQuad,
-    #[live]
-    draw_text: DrawText,
-    #[walk]
-    walk: Walk,
-    #[layout]
-    layout: Layout,
-    #[live]
-    text: ArcStringMut,
-    #[live]
-    disabled: bool,
-    #[animator]
-    animator: Animator,
-    #[rust]             // Runtime-only field
-    area: Area,
-}
-```
+`message.rs` defines the serde types; `processor.rs` turns messages into events; `surface/` renders. `host.rs`/`sse.rs`/`a2a_client.rs` handle server connections.
 
-### ID Stability
-- **CRITICAL**: Keep DSL IDs stable and descriptive
-- Use `ids!()` macro for animator states: `ids!(hover.on)`
-- ID examples: `save_button`, `user_input`, `modal_dialog`
+### `ComponentType` variants (`a2ui/message.rs`)
 
-## 5. Error Handling
+Layout: `Column`, `Row`, `List`, `Card` · Display: `Text`, `Image`, `Icon`, `Divider` · Interactive: `Button`, `TextField`, `CheckBox`, `Slider`, `MultipleChoice` · Containers: `Modal`, `Tabs` · Visualization: `Chart`, `Calendar`, `AudioPlayer`, `ShaderStage` · Raycast-style: `Detail`, `Form`, `ActionPanel`, `Grid`, `PasswordField`, `TextArea`, `DatePicker`, `Dropdown`, `TagPicker`, `FilePicker`, `ListItem`, `DropdownItem`, `DropdownSection`, `TagPickerItem`.
 
-```rust
-// Prefer Result/Option for expected failures
-fn parse_message(json: &str) -> Result<A2uiMessage, ParseError> {
-    serde_json::from_str(json).map_err(ParseError::InvalidJson)
-}
+Children are an explicit ID list or a `{template: {componentId, dataBinding}}` reference (flat adjacency list — components reference each other by ID).
 
-// Use ? for propagation
-fn process_surface(json: &str) -> Result<Surface, ProcessorError> {
-    let msg = parse_message(json)?;
-    validate_surface(&msg)?;
-    Ok(msg)
-}
+### Adding a new A2UI component
 
-// Use expect() only for impossible states (library code)
-let widget = registry.get(id).expect("Widget must be registered in live_design");
+1. Add a variant to `ComponentType` in `a2ui/message.rs` (serde struct for its props).
+2. Handle it in `a2ui/processor.rs`.
+3. Add a render implementation in `a2ui/surface/` (new `render_*_impl.rs` if it's a new family).
+4. Register it in `ComponentRegistry` (`a2ui/registry.rs`).
+5. Verify with `cargo run -p a2ui-demo` and/or a JSON sample file.
 
-// Runtime errors in GUI paths
-use makepad_widgets::log;
-log!("Failed to render component: {}", error);
-```
+New chart types go in `makepad-plot/src/plot/` and are bridged in `a2ui/chart_bridge/`.
 
-## 6. Widget Implementation Pattern
+## 7. Servers, Ports, and LLM Configuration
 
-```rust
-// Action enum (custom actions)
-#[derive(Clone, Debug, DefaultNone)]
-pub enum MpButtonAction {
-    Clicked,
-    Pressed,
-    Released,
-    None,
-}
+| Server | Default port | Feature | Purpose |
+|--------|-------------|---------|---------|
+| A2UI Bridge | 8082 (`LLM_PORT`) | `a2ui-bridge` | LLM chat → A2UI JSON |
+| Watch Server | 8080 | `mock-server` | File watcher → SSE stream |
+| Mock A2A Server | 8080 | `mock-server` | Static A2A responses |
 
-impl Widget for MpButton {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        let uid = self.widget_uid();
-        if self.animator_handle_event(cx, event).must_redraw() {
-            self.redraw(cx);
-        }
-        if self.disabled { return; }
+The a2ui-demo app connects to `localhost:8082` by default; the watch-server port requires editing the URL in `crates/a2ui-demo/src/app/`.
 
-        match event.hits(cx, self.area) {
-            Hit::FingerHoverIn(_) => {
-                cx.set_cursor(MouseCursor::Hand);
-                self.animator_play(cx, ids!(hover.on));
-            }
-            Hit::FingerDown(_) => {
-                self.animator_play(cx, ids!(pressed.on));
-                cx.widget_action(uid, &scope.path, MpButtonAction::Pressed);
-            }
-            Hit::FingerUp(fe) => {
-                self.animator_play(cx, ids!(pressed.off));
-                if fe.is_over {
-                    cx.widget_action(uid, &scope.path, MpButtonAction::Clicked);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
-        self.draw_bg.begin(cx, walk, self.layout);
-        self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), self.text.as_ref());
-        self.draw_bg.end(cx);
-        self.area = self.draw_bg.area();
-        DrawStep::done()
-    }
-}
-
-// Helper methods
-impl MpButton {
-    pub fn clicked(&self, actions: &Actions) -> bool {
-        actions.find_widget_action(self.widget_uid())
-            .map(|a| matches!(a.cast::<MpButtonAction>(), MpButtonAction::Clicked))
-            .unwrap_or(false)
-    }
-}
-
-impl MpButtonRef {
-    pub fn clicked(&self, actions: &Actions) -> bool {
-        self.borrow().map(|inner| inner.clicked(actions)).unwrap_or(false)
-    }
-}
-```
-
-## 7. A2UI Protocol
-
-When adding new A2UI components:
-1. Add to `ComponentType` enum in `message.rs`
-2. Handle in `processor.rs` (parse component definition)
-3. Add render impl in `surface/render_impl.rs`
-4. Register in `ComponentRegistry`
-
-```rust
-// message.rs - Add component type
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "component")]
-pub enum ComponentType {
-    Text { text, usage_hint },
-    Button { child, primary, action },
-    // ... add new variants
-}
-```
+Bridge env vars: `LLM_API_URL` (default `https://api.moonshot.ai/v1/chat/completions`), `LLM_MODEL` (default `kimi-k2.5`), `LLM_API_KEY` (also reads `MOONSHOT_API_KEY`), `LLM_PORT`. The LLM must support tool/function calling; the bridge exposes ~11 tools (`create_text`, `create_button`, `create_chart`, `set_data`, `render_ui`, ...) and assembles valid A2UI JSON from the tool calls. Bridge endpoints: `POST /chat`, `POST /rpc`, `GET /live` (SSE), `POST /reset`, `GET /status`, `POST /inject`.
 
 ## 8. Testing Guidelines
 
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
+- Unit tests live in `#[cfg(test)] mod tests` at the bottom of the implementation file. Current coverage is concentrated in `crates/ui/src/a2ui/` (`message.rs`, `processor.rs`, `sse.rs`, `registry.rs`, `value.rs`, `data_model.rs`) plus one test in `gemini-talker/src/memory.rs`.
+- Use descriptive names: `test_should_fail_on_invalid_json`.
+- Prioritize `Processor` and `DataModel` correctness (A2UI protocol behavior).
+- UI changes are verified visually: `cargo run -p component-zoo` (widgets) or `cargo run -p a2ui-demo` (A2UI). The `makepad-screenshot` skill in `skills/` automates GUI screenshots.
+- Other crates have little or no test coverage; treat `cargo check -p <crate>` as the smoke test there.
+- No CI is configured (no `.github/` workflows) — run tests and clippy locally before submitting.
 
-    #[test]
-    fn test_surface_update_preserves_state() {
-        let mut processor = A2uiMessageProcessor::new(registry);
-        let events = processor.process_message(surface_update.clone());
-        assert!(matches!(events[0], ProcessorEvent::SurfaceUpdated(_)));
-    }
-}
-```
+## 9. Security Considerations
 
-- Place unit tests in `mod tests` at bottom of implementation file
-- Use descriptive names: `test_should_fail_on_invalid_json`
-- Prioritize `Processor` and `DataModel` testing (A2UI correctness)
-- For UI changes, verify visually: `cargo run -p component-zoo`
+- API keys are passed only via environment variables (`LLM_API_KEY`, `MOONSHOT_API_KEY`, `MUREKA_API_KEY`, `GEMINI_API_KEY`) — never hardcode them or commit files containing them.
+- A2UI is declarative JSON with no code execution by design, which makes it safe across trust boundaries; keep it that way when extending the protocol (the exception is `raycast-launcher`, which evaluates Splash code from local `*-app.json` descriptors in the Makepad script VM — only load descriptors from trusted local sources).
+- `raycast-launcher` writes local state files in its crate directory (`.chat-history.json`, updated app descriptors); `gemini-talker` persists data under the platform data dir. Don't delete these blindly — they may be user data.
+- `makepad-clipboard` contains per-OS unsafe FFI glue (objc2, win32, GTK, JNI); review platform-specific changes carefully and prefer the existing per-OS module structure.
 
-## 9. Commit & Pull Request Guidelines
+## 10. Commit Guidelines
 
-### Commit Messages
+Conventional-commit style, e.g.:
+
 ```
 feat: add MpSlider with range mode support
 fix: correct tooltip positioning at screen edges
@@ -311,28 +237,4 @@ test: add processor surface update tests
 chore: update makepad-widgets dependency
 ```
 
-### PR Content
-- Summary of changes and rationale
-- Evidence: `cargo test` and `cargo clippy` output
-- Visual changes: screenshots from `component-zoo`
-
-## 10. Proactive Agent Behavior
-
-### Before Modifying Widgets
-1. Read corresponding `live_design!` block to understand properties
-2. Check existing variants for inheritance patterns
-3. Run `cargo check -p makepad-component` after changes
-
-### A2UI Development
-1. New component type → Add to `ComponentType` enum + handler
-2. New chart type → Add to `chart_bridge/` module
-3. Always validate against A2UI protocol spec
-
-### Dependency Changes
-- `makepad-widgets`: External, pin to specific commit/branch
-- Run `cargo check --workspace` to catch downstream breakages
-
-### Code Review Triggers
-- Architecture changes → Consult Oracle first
-- New widget patterns → Document in AGENTS.md
-- 2+ failed fix attempts → Consult Oracle
+PRs should include a summary plus `cargo test` / `cargo clippy` evidence, and screenshots from `component-zoo` for visual changes. Given the current build state (§3), state explicitly which crates you verified compile.

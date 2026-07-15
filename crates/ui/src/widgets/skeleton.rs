@@ -1,92 +1,92 @@
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-
-    use crate::theme::colors::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.mp_theme.*
 
     // ============================================================
     // MpSkeleton - Loading placeholder component with shimmer animation
+    // The shimmer shaders read self.draw_pass.time (like LoadingSpinner);
+    // MpSkeletonWidget keeps repainting itself via NextFrame while loading.
     // ============================================================
 
     // Rectangular skeleton (default)
-    pub MpSkeleton = <View> {
+    mod.widgets.MpSkeleton = View{
         width: Fill
-        height: 20
+        height: 20.0
 
         show_bg: true
-        draw_bg: {
-            uniform color_base: #e5e7eb
-            uniform color_shimmer: #f3f4f6
-            uniform shimmer_width: 0.3
-            uniform shimmer_speed: 0.8
+        draw_bg +: {
+            color_base: uniform(#xe5e7eb)
+            color_shimmer: uniform(#xf3f4f6)
+            shimmer_width: uniform(0.3)
+            shimmer_speed: uniform(0.8)
 
-            fn pixel(self) -> vec4 {
-                let shimmer_pos = fract(self.time * self.shimmer_speed) * (1.0 + self.shimmer_width * 2.0) - self.shimmer_width;
-                let dist = abs(self.pos.x - shimmer_pos);
-                let shimmer = 1.0 - smoothstep(0.0, self.shimmer_width, dist);
-                let result_color = mix(self.color_base, self.color_shimmer, shimmer);
-                return result_color;
+            pixel: fn() {
+                let shimmer_pos = fract(self.draw_pass.time * self.shimmer_speed) * (1.0 + self.shimmer_width * 2.0) - self.shimmer_width
+                let dist = abs(self.pos.x - shimmer_pos)
+                let shimmer = 1.0 - smoothstep(0.0, self.shimmer_width, dist)
+                let result_color = mix(self.color_base, self.color_shimmer, shimmer)
+                return result_color
             }
         }
     }
 
     // Rounded skeleton
-    pub MpSkeletonRounded = <View> {
+    mod.widgets.MpSkeletonRounded = View{
         width: Fill
-        height: 20
+        height: 20.0
 
         show_bg: true
-        draw_bg: {
-            instance radius: 4.0
+        draw_bg +: {
+            radius: instance(4.0)
 
-            uniform color_base: #e5e7eb
-            uniform color_shimmer: #f3f4f6
-            uniform shimmer_speed: 0.8
+            color_base: uniform(#xe5e7eb)
+            color_shimmer: uniform(#xf3f4f6)
+            shimmer_speed: uniform(0.8)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
 
-                let shimmer_pos = fract(self.time * self.shimmer_speed) * 1.6 - 0.3;
-                let dist = abs(self.pos.x - shimmer_pos);
-                let shimmer = 1.0 - smoothstep(0.0, 0.3, dist);
-                let result_color = mix(self.color_base, self.color_shimmer, shimmer);
+                let shimmer_pos = fract(self.draw_pass.time * self.shimmer_speed) * 1.6 - 0.3
+                let dist = abs(self.pos.x - shimmer_pos)
+                let shimmer = 1.0 - smoothstep(0.0, 0.3, dist)
+                let result_color = mix(self.color_base, self.color_shimmer, shimmer)
 
-                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, self.radius);
-                sdf.fill(result_color);
+                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, self.radius)
+                sdf.fill(result_color)
 
-                return sdf.result;
+                return sdf.result
             }
         }
     }
 
     // Circle skeleton (for avatars)
-    pub MpSkeletonCircle = <View> {
-        width: 40
-        height: 40
+    mod.widgets.MpSkeletonCircle = View{
+        width: 40.0
+        height: 40.0
 
         show_bg: true
-        draw_bg: {
-            uniform color_base: #e5e7eb
-            uniform color_shimmer: #f3f4f6
-            uniform shimmer_speed: 0.8
+        draw_bg +: {
+            color_base: uniform(#xe5e7eb)
+            color_shimmer: uniform(#xf3f4f6)
+            shimmer_speed: uniform(0.8)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                let c = self.rect_size * 0.5;
-                let r = min(c.x, c.y);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let c = self.rect_size * 0.5
+                let r = min(c.x, c.y)
 
-                let shimmer_pos = fract(self.time * self.shimmer_speed) * 1.6 - 0.3;
-                let dist = abs(self.pos.x - shimmer_pos);
-                let shimmer = 1.0 - smoothstep(0.0, 0.3, dist);
-                let result_color = mix(self.color_base, self.color_shimmer, shimmer);
+                let shimmer_pos = fract(self.draw_pass.time * self.shimmer_speed) * 1.6 - 0.3
+                let dist = abs(self.pos.x - shimmer_pos)
+                let shimmer = 1.0 - smoothstep(0.0, 0.3, dist)
+                let result_color = mix(self.color_base, self.color_shimmer, shimmer)
 
-                sdf.circle(c.x, c.y, r);
-                sdf.fill(result_color);
+                sdf.circle(c.x, c.y, r)
+                sdf.fill(result_color)
 
-                return sdf.result;
+                return sdf.result
             }
         }
     }
@@ -96,107 +96,107 @@ live_design! {
     // ============================================================
 
     // Text line skeleton
-    pub MpSkeletonText = <MpSkeletonRounded> {
+    mod.widgets.MpSkeletonText = mod.widgets.MpSkeletonRounded{
         width: Fill
-        height: 16
-        draw_bg: { radius: 2.0 }
+        height: 16.0
+        draw_bg +: { radius: 2.0 }
     }
 
     // Title skeleton
-    pub MpSkeletonTitle = <MpSkeletonRounded> {
-        width: 200
-        height: 24
-        draw_bg: { radius: 4.0 }
+    mod.widgets.MpSkeletonTitle = mod.widgets.MpSkeletonRounded{
+        width: 200.0
+        height: 24.0
+        draw_bg +: { radius: 4.0 }
     }
 
     // Paragraph skeleton
-    pub MpSkeletonParagraph = <View> {
+    mod.widgets.MpSkeletonParagraph = View{
         width: Fill
         height: Fit
         flow: Down
-        spacing: 8
+        spacing: 8.0
 
-        <MpSkeletonText> { width: Fill }
-        <MpSkeletonText> { width: Fill }
-        <MpSkeletonText> { width: 280 }
+        MpSkeletonText{ width: Fill }
+        MpSkeletonText{ width: Fill }
+        MpSkeletonText{ width: 280.0 }
     }
 
     // Avatar skeleton sizes
-    pub MpSkeletonAvatarSmall = <MpSkeletonCircle> {
-        width: 32
-        height: 32
+    mod.widgets.MpSkeletonAvatarSmall = mod.widgets.MpSkeletonCircle{
+        width: 32.0
+        height: 32.0
     }
 
-    pub MpSkeletonAvatarLarge = <MpSkeletonCircle> {
-        width: 56
-        height: 56
+    mod.widgets.MpSkeletonAvatarLarge = mod.widgets.MpSkeletonCircle{
+        width: 56.0
+        height: 56.0
     }
 
     // ============================================================
     // Card skeleton
     // ============================================================
 
-    pub MpSkeletonCard = <RoundedView> {
+    mod.widgets.MpSkeletonCard = RoundedView{
         width: Fill
         height: Fit
         flow: Down
-        padding: 16
-        spacing: 12
+        padding: Inset{left: 16.0, right: 16.0, top: 16.0, bottom: 16.0}
+        spacing: 12.0
 
-        draw_bg: {
-            color: (CARD)
+        draw_bg +: {
+            color: CARD
             border_radius: 8.0
-            border_color: (BORDER)
+            border_color: BORDER
         }
 
-        <View> {
+        View{
             width: Fill
             height: Fit
             flow: Right
-            spacing: 12
-            align: { y: 0.5 }
+            spacing: 12.0
+            align: Align{y: 0.5}
 
-            <MpSkeletonCircle> {}
+            MpSkeletonCircle{}
 
-            <View> {
+            View{
                 width: Fill
                 height: Fit
                 flow: Down
-                spacing: 8
+                spacing: 8.0
 
-                <MpSkeletonRounded> { width: 120, height: 16 }
-                <MpSkeletonRounded> { width: 80, height: 12 }
+                MpSkeletonRounded{ width: 120.0, height: 16.0 }
+                MpSkeletonRounded{ width: 80.0, height: 12.0 }
             }
         }
 
-        <MpSkeletonParagraph> {}
+        MpSkeletonParagraph{}
     }
 
     // ============================================================
     // List item skeleton
     // ============================================================
 
-    pub MpSkeletonListItem = <View> {
+    mod.widgets.MpSkeletonListItem = View{
         width: Fill
         height: Fit
         flow: Right
-        padding: 12
-        spacing: 12
-        align: { y: 0.5 }
+        padding: Inset{left: 12.0, right: 12.0, top: 12.0, bottom: 12.0}
+        spacing: 12.0
+        align: Align{y: 0.5}
 
-        <MpSkeletonCircle> {
-            width: 40
-            height: 40
+        MpSkeletonCircle{
+            width: 40.0
+            height: 40.0
         }
 
-        <View> {
+        View{
             width: Fill
             height: Fit
             flow: Down
-            spacing: 6
+            spacing: 6.0
 
-            <MpSkeletonRounded> { width: 150, height: 16 }
-            <MpSkeletonRounded> { width: 100, height: 12 }
+            MpSkeletonRounded{ width: 150.0, height: 16.0 }
+            MpSkeletonRounded{ width: 100.0, height: 12.0 }
         }
     }
 
@@ -204,22 +204,23 @@ live_design! {
     // Interactive Skeleton Widget
     // ============================================================
 
-    pub MpSkeletonWidget = {{MpSkeletonWidget}} {
+    mod.widgets.MpSkeletonWidgetBase = #(MpSkeletonWidget::register_widget(vm))
+    mod.widgets.MpSkeletonWidget = set_type_default() do mod.widgets.MpSkeletonWidgetBase{
         width: Fill
         height: Fit
         flow: Overlay
 
-        skeleton = <View> {
+        skeleton := View{
             width: Fill
             height: Fit
             flow: Down
-            spacing: 8
+            spacing: 8.0
             visible: true
 
-            <MpSkeletonRounded> { width: Fill, height: 20 }
+            MpSkeletonRounded{ width: Fill, height: 20.0 }
         }
 
-        content = <View> {
+        content := View{
             width: Fill
             height: Fit
             visible: false
@@ -228,29 +229,46 @@ live_design! {
 }
 
 /// Skeleton widget actions
-#[derive(Clone, Debug, DefaultNone)]
+#[derive(Clone, Debug, Default)]
 pub enum MpSkeletonAction {
+    #[default]
     None,
     LoadingStarted,
     LoadingFinished,
 }
 
 /// Interactive skeleton widget with loading state control
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct MpSkeletonWidget {
+    #[source]
+    source: ScriptObjectRef,
+
     #[deref]
     view: View,
 
     #[live]
     loading: bool,
+
+    #[rust]
+    next_frame: NextFrame,
 }
 
 impl Widget for MpSkeletonWidget {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        // Keep the shimmer animation running while loading: the shaders read
+        // self.draw_pass.time, which only advances when the pass repaints.
+        if self.loading && self.next_frame.is_event(event).is_some() {
+            self.next_frame = cx.new_next_frame();
+            self.redraw(cx);
+        }
         self.view.handle_event(cx, event, scope);
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        // (Re)arm the animation driver while loading
+        if self.loading {
+            self.next_frame = cx.new_next_frame();
+        }
         self.view.draw_walk(cx, scope, walk)
     }
 }
@@ -259,8 +277,16 @@ impl MpSkeletonWidget {
     /// Set loading state - shows skeleton when true, content when false
     pub fn set_loading(&mut self, cx: &mut Cx, loading: bool) {
         self.loading = loading;
-        self.view.view(ids!(skeleton)).set_visible(cx, loading);
-        self.view.view(ids!(content)).set_visible(cx, !loading);
+        self.view
+            .widget(cx, ids!(skeleton))
+            .set_visible(cx, loading);
+        self.view
+            .widget(cx, ids!(content))
+            .set_visible(cx, !loading);
+        if loading {
+            // Kick off the animation driver
+            self.next_frame = cx.new_next_frame();
+        }
         self.redraw(cx);
     }
 
