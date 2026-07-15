@@ -115,8 +115,8 @@ script_mod! {
             color: CARD
         }
 
-        header := MpAccordionHeader{}
-        body := MpAccordionContentBase{}
+        header := mod.widgets.MpAccordionHeader{}
+        body := mod.widgets.MpAccordionContentBase{}
     }
 
     // ============================================================
@@ -158,8 +158,8 @@ script_mod! {
             border_color: BORDER
         }
 
-        header := MpAccordionHeader{}
-        body := MpAccordionContentBase{}
+        header := mod.widgets.MpAccordionHeader{}
+        body := mod.widgets.MpAccordionContentBase{}
     }
 
     // Ghost accordion (no background)
@@ -174,13 +174,13 @@ script_mod! {
         height: Fit
         flow: Down
 
-        header := MpAccordionHeader{
+        header := mod.widgets.MpAccordionHeader{
             draw_bg +: {
                 bg_color: #x00000000
                 bg_color_hover: #x0000000D
             }
         }
-        body := MpAccordionContentBase{}
+        body := mod.widgets.MpAccordionContentBase{}
     }
 
     // Divider between items

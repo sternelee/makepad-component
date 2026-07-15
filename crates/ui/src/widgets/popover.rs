@@ -5,6 +5,9 @@ script_mod! {
     use mod.widgets.*
     use mod.mp_theme.*
 
+    // Register MpPopoverTrigger enum for script VM
+    mod.widgets.MpPopoverTrigger = set_type_default() do #(MpPopoverTrigger::script_api(vm))
+
     // ============================================================
     // MpPopover - Popover/Dropdown panel component
     // ============================================================
@@ -452,7 +455,7 @@ script_mod! {
 
     // Top placement
     mod.widgets.MpPopoverTop = mod.widgets.MpPopoverWidget{
-        trigger: Hover
+        trigger: mod.widgets.MpPopoverTrigger.Hover
         content := {
             abs_pos: vec2(-30.0, -70.0)
             width: Fit
@@ -475,7 +478,7 @@ script_mod! {
 
     // Bottom placement
     mod.widgets.MpPopoverBottom = mod.widgets.MpPopoverWidget{
-        trigger: Hover
+        trigger: mod.widgets.MpPopoverTrigger.Hover
         content := {
             abs_pos: vec2(-30.0, 40.0)
             width: Fit
@@ -498,7 +501,7 @@ script_mod! {
 
     // Left placement
     mod.widgets.MpPopoverLeft = mod.widgets.MpPopoverWidget{
-        trigger: Hover
+        trigger: mod.widgets.MpPopoverTrigger.Hover
         content := {
             abs_pos: vec2(-105.0, -10.0)
             width: Fit
@@ -521,7 +524,7 @@ script_mod! {
 
     // Right placement
     mod.widgets.MpPopoverRight = mod.widgets.MpPopoverWidget{
-        trigger: Hover
+        trigger: mod.widgets.MpPopoverTrigger.Hover
         content := {
             abs_pos: vec2(90.0, -10.0)
             width: Fit

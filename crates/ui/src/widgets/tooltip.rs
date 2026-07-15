@@ -5,6 +5,9 @@ script_mod! {
     use mod.widgets.*
     use mod.mp_theme.*
 
+    // Register TooltipPosition enum for script VM
+    mod.widgets.TooltipPosition = set_type_default() do #(TooltipPosition::script_api(vm))
+
     let TOOLTIP_BG = #x1f2937
     let TOOLTIP_BORDER = #x374151
     let TOOLTIP_TEXT = #xf9fafb
@@ -157,10 +160,10 @@ script_mod! {
         popup := mod.widgets.MpTooltipPopup{}
     }
 
-    mod.widgets.MpTooltipTop = mod.widgets.MpTooltip{ position: Top }
-    mod.widgets.MpTooltipBottom = mod.widgets.MpTooltip{ position: Bottom }
-    mod.widgets.MpTooltipLeft = mod.widgets.MpTooltip{ position: Left }
-    mod.widgets.MpTooltipRight = mod.widgets.MpTooltip{ position: Right }
+    mod.widgets.MpTooltipTop = mod.widgets.MpTooltip{ position: mod.widgets.TooltipPosition.Top }
+    mod.widgets.MpTooltipBottom = mod.widgets.MpTooltip{ position: mod.widgets.TooltipPosition.Bottom }
+    mod.widgets.MpTooltipLeft = mod.widgets.MpTooltip{ position: mod.widgets.TooltipPosition.Left }
+    mod.widgets.MpTooltipRight = mod.widgets.MpTooltip{ position: mod.widgets.TooltipPosition.Right }
 }
 
 #[derive(Copy, Clone, Debug, Default, Script, ScriptHook, PartialEq)]
@@ -251,13 +254,12 @@ impl ScriptHook for MpTooltip {
 impl Widget for MpTooltip {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         // Handle delay timer first
-        if self.delay_timer.is_event(event).is_some()
-            && self.hovering && !self.popup_opened {
-                self.popup_opened = true;
-                self.popup_size = DVec2::default();
-                self.draw_list.as_mut().unwrap().redraw(cx);
-                self.redraw(cx);
-            }
+        if self.delay_timer.is_event(event).is_some() && self.hovering && !self.popup_opened {
+            self.popup_opened = true;
+            self.popup_size = DVec2::default();
+            self.draw_list.as_mut().unwrap().redraw(cx);
+            self.redraw(cx);
+        }
 
         // Manual hover tracking so child widgets keep their own hover behavior
         let hover_rect = if self.anchor_rect.size.x > 0.0 {

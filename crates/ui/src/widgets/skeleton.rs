@@ -116,9 +116,9 @@ script_mod! {
         flow: Down
         spacing: 8.0
 
-        MpSkeletonText{ width: Fill }
-        MpSkeletonText{ width: Fill }
-        MpSkeletonText{ width: 280.0 }
+        mod.widgets.MpSkeletonText{ width: Fill }
+        mod.widgets.MpSkeletonText{ width: Fill }
+        mod.widgets.MpSkeletonText{ width: 280.0 }
     }
 
     // Avatar skeleton sizes
@@ -156,7 +156,7 @@ script_mod! {
             spacing: 12.0
             align: Align{y: 0.5}
 
-            MpSkeletonCircle{}
+            mod.widgets.MpSkeletonCircle{}
 
             View{
                 width: Fill
@@ -164,12 +164,12 @@ script_mod! {
                 flow: Down
                 spacing: 8.0
 
-                MpSkeletonRounded{ width: 120.0, height: 16.0 }
-                MpSkeletonRounded{ width: 80.0, height: 12.0 }
+                mod.widgets.MpSkeletonRounded{ width: 120.0, height: 16.0 }
+                mod.widgets.MpSkeletonRounded{ width: 80.0, height: 12.0 }
             }
         }
 
-        MpSkeletonParagraph{}
+        mod.widgets.MpSkeletonParagraph{}
     }
 
     // ============================================================
@@ -184,7 +184,7 @@ script_mod! {
         spacing: 12.0
         align: Align{y: 0.5}
 
-        MpSkeletonCircle{
+        mod.widgets.MpSkeletonCircle{
             width: 40.0
             height: 40.0
         }
@@ -195,8 +195,8 @@ script_mod! {
             flow: Down
             spacing: 6.0
 
-            MpSkeletonRounded{ width: 150.0, height: 16.0 }
-            MpSkeletonRounded{ width: 100.0, height: 12.0 }
+            mod.widgets.MpSkeletonRounded{ width: 150.0, height: 16.0 }
+            mod.widgets.MpSkeletonRounded{ width: 100.0, height: 12.0 }
         }
     }
 
@@ -217,7 +217,7 @@ script_mod! {
             spacing: 8.0
             visible: true
 
-            MpSkeletonRounded{ width: Fill, height: 20.0 }
+            mod.widgets.MpSkeletonRounded{ width: Fill, height: 20.0 }
         }
 
         content := View{
