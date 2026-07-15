@@ -2,12 +2,12 @@
 
 use makepad_widgets::*;
 
-live_design! {
-    use link::shaders::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
 
     // Line drawing shader - draws a line segment using distance field
     // Supports solid, dashed, dotted, and dash-dot line styles
-    pub DrawPlotLine = {{DrawPlotLine}} {
+    DrawPlotLine: mod.std.set_type_default() do #(DrawPlotLine::script_api(vm)){
         fn pixel(self) -> vec4 {
             // Convert normalized pos to pixel coordinates within the rect
             let p = self.pos * self.rect_size;
@@ -67,7 +67,7 @@ live_design! {
 
     // Marker drawing shader - supports multiple marker shapes
     // marker_style: 0=circle, 1=square, 2=triangle_up, 3=triangle_down, 4=diamond, 5=cross, 6=plus, 7=star
-    pub DrawPlotPoint = {{DrawPlotPoint}} {
+    DrawPlotPoint: mod.std.set_type_default() do #(DrawPlotPoint::script_api(vm)){
         fn pixel(self) -> vec4 {
             let uv = self.pos - vec2(0.5, 0.5);
             let dist = length(uv);
@@ -140,10 +140,10 @@ live_design! {
     }
 
     // Bar drawing shader with gradient support
-    pub DrawPlotBar = {{DrawPlotBar}} {
+    DrawPlotBar: mod.std.set_type_default() do #(DrawPlotBar::script_api(vm)){
         fn pixel(self) -> vec4 {
             // Vertical gradient: interpolate from bottom to top
-            if self.gradient_enabled > 0.5 {
+            if (self.gradient_enabled > 0.5) {
                 let t = 1.0 - self.pos.y; // 0 at bottom, 1 at top
                 let final_color = mix(self.gradient_bottom_color, self.gradient_top_color, t);
                 return vec4(final_color.rgb * final_color.a, final_color.a);
@@ -153,10 +153,10 @@ live_design! {
     }
 
     // Fill region shader (for fill_between and area charts) with gradient support
-    pub DrawPlotFill = {{DrawPlotFill}} {
+    DrawPlotFill: mod.std.set_type_default() do #(DrawPlotFill::script_api(vm)){
         fn pixel(self) -> vec4 {
             // Vertical gradient for area fills
-            if self.gradient_enabled > 0.5 {
+            if (self.gradient_enabled > 0.5) {
                 let t = 1.0 - self.pos.y; // 0 at bottom, 1 at top
                 let final_color = mix(self.gradient_bottom_color, self.gradient_top_color, t);
                 return vec4(final_color.rgb * final_color.a, final_color.a);
@@ -166,23 +166,23 @@ live_design! {
     }
 
     // Pie slice drawing shader with radial gradient
-    pub DrawPieSlice = {{DrawPieSlice}} {
+    DrawPieSlice: mod.std.set_type_default() do #(DrawPieSlice::script_api(vm)){
         fn pixel(self) -> vec4 {
             let uv = self.pos - vec2(0.5, 0.5);
             let dist = length(uv);
 
             // Check if outside radius
-            if dist > 0.5 {
+            if (dist > 0.5) {
                 return vec4(0.0, 0.0, 0.0, 0.0);
             }
 
             // Calculate angle (atan2 returns -PI to PI)
             let angle = atan(uv.y, uv.x);
 
-            // Normalize angle to 0 to 2*PI (using 6.28318... = 2*PI)
+            // Normalize angle to 0 to 2*PI
             let norm_angle = mod(angle + 6.28318530718, 6.28318530718);
 
-            // Compute inside using step functions (avoid boolean variables)
+            // Compute inside using step functions
             let after_start = step(self.start_angle, norm_angle);
             let before_end = step(norm_angle, self.end_angle);
             let inside = after_start * before_end;
@@ -194,12 +194,12 @@ live_design! {
 
             let in_slice = max(inside, in_wrapped);
 
-            if in_slice > 0.5 {
+            if (in_slice > 0.5) {
                 let edge = 0.01;
                 let alpha = 1.0 - smoothstep(0.5 - edge, 0.5, dist);
 
                 // Radial gradient: from center to edge
-                if self.gradient_enabled > 0.5 {
+                if (self.gradient_enabled > 0.5) {
                     let t = dist * 2.0; // 0 at center, 1 at edge
                     let final_color = mix(self.gradient_center_color, self.gradient_outer_color, t);
                     return vec4(final_color.rgb * alpha, alpha * final_color.a);
@@ -212,7 +212,7 @@ live_design! {
     }
 
     // Arc drawing shader for donut charts with gradient support
-    pub DrawArc = {{DrawArc}} {
+    DrawArc: mod.std.set_type_default() do #(DrawArc::script_api(vm)){
         fn pixel(self) -> vec4 {
             let pi_val = 3.14159265;
             let two_pi_val = 6.28318530;
@@ -247,13 +247,13 @@ live_design! {
 
             let alpha_val = final_mask * aa_alpha;
 
-            if alpha_val < 0.01 {
+            if (alpha_val < 0.01) {
                 return vec4(0.0, 0.0, 0.0, 0.0);
             }
 
             // Radial or angular gradient
-            if self.gradient_enabled > 0.5 {
-                if self.gradient_type < 0.5 {
+            if (self.gradient_enabled > 0.5) {
+                if (self.gradient_type < 0.5) {
                     // Radial gradient: interpolate from inner to outer radius
                     let ring_width = outer_rad - inner_rad;
                     let t = clamp((distance - inner_rad) / ring_width, 0.0, 1.0);
@@ -272,13 +272,13 @@ live_design! {
     }
 
     // Point shader with radial gradient support
-    pub DrawPlotPointGradient = {{DrawPlotPointGradient}} {
+    DrawPlotPointGradient: mod.std.set_type_default() do #(DrawPlotPointGradient::script_api(vm)){
         fn pixel(self) -> vec4 {
             let uv = self.pos;
             let center = vec2(0.5, 0.5);
             let dist = distance(uv, center) * 2.0;
 
-            if dist > 1.0 {
+            if (dist > 1.0) {
                 return vec4(0.0, 0.0, 0.0, 0.0);
             }
 
@@ -286,7 +286,7 @@ live_design! {
             let alpha = 1.0 - smoothstep(1.0 - aa, 1.0, dist);
 
             // Radial gradient support
-            if self.gradient_enabled > 0.5 {
+            if (self.gradient_enabled > 0.5) {
                 let final_color = mix(self.gradient_center_color, self.gradient_outer_color, dist);
                 return vec4(final_color.rgb * final_color.a * alpha, final_color.a * alpha);
             }
@@ -294,8 +294,8 @@ live_design! {
         }
     }
 
-    // Triangle shader with barycentric coordinates for radar fills (from makepad-chart)
-    pub DrawTriangle = {{DrawTriangle}} {
+    // Triangle shader with barycentric coordinates for radar fills
+    DrawTriangle: mod.std.set_type_default() do #(DrawTriangle::script_api(vm)){
         fn pixel(self) -> vec4 {
             // Triangle vertices in normalized coordinates (0-1)
             let v0 = vec2(self.v0x, self.v0y);
@@ -312,7 +312,7 @@ live_design! {
             let d21 = dot(p - v0, v2 - v0);
 
             let denom = d00 * d11 - d01 * d01;
-            if abs(denom) < 0.0001 {
+            if (abs(denom) < 0.0001) {
                 return vec4(0.0, 0.0, 0.0, 0.0);
             }
 
@@ -322,19 +322,16 @@ live_design! {
             let w = 1.0 - u - v;
 
             // Anti-aliasing: smooth edges using distance to triangle boundary
-            let edge_dist = min(min(u, v), w);  // Distance to nearest edge
-            let alpha = smoothstep(0.0, 0.03, edge_dist);  // 0.03 = AA width
+            let edge_dist = min(min(u, v), w);
+            let alpha = smoothstep(0.0, 0.03, edge_dist);
 
             // Check if point is inside triangle (with AA margin)
-            if u >= -0.03 && v >= -0.03 && (u + v) <= 1.03 {
-                // Calculate final color with gradient support
-                if self.gradient_enabled > 0.5 {
-                    if self.gradient_type < 0.5 {
-                        // Radial gradient: v0 is center, v1/v2 are edges
+            if (u >= -0.03 && v >= -0.03 && (u + v) <= 1.03) {
+                if (self.gradient_enabled > 0.5) {
+                    if (self.gradient_type < 0.5) {
                         let final_color = mix(self.gradient_outer_color, self.gradient_center_color, w);
                         return vec4(final_color.rgb * final_color.a * alpha, final_color.a * alpha);
                     } else {
-                        // Vertical gradient: top to bottom based on Y position
                         let final_color = mix(self.gradient_center_color, self.gradient_outer_color, p.y);
                         return vec4(final_color.rgb * final_color.a * alpha, final_color.a * alpha);
                     }
@@ -372,7 +369,7 @@ pub enum MarkerStyle {
     Star = 7,
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawPlotLine {
     #[deref]
@@ -390,9 +387,9 @@ pub struct DrawPlotLine {
     #[live]
     pub line_width: f32,
     #[live]
-    pub line_style: f32, // 0=solid, 1=dashed, 2=dotted, 3=dashdot
+    pub line_style: f32,
     #[live]
-    pub dash_offset: f32, // Offset along line for continuous dash pattern
+    pub dash_offset: f32,
 }
 
 impl DrawPlotLine {
@@ -417,8 +414,7 @@ impl DrawPlotLine {
             return;
         }
 
-        // Calculate bounding rect with padding for the line width
-        let padding = width + 2.0; // Extra padding for anti-aliasing
+        let padding = width + 2.0;
         let rect = Rect {
             pos: dvec2(p1.x.min(p2.x) - padding, p1.y.min(p2.y) - padding),
             size: dvec2(
@@ -427,7 +423,6 @@ impl DrawPlotLine {
             ),
         };
 
-        // Set line endpoints in local coordinates (relative to rect)
         self.line_x1 = (p1.x - rect.pos.x) as f32;
         self.line_y1 = (p1.y - rect.pos.y) as f32;
         self.line_x2 = (p2.x - rect.pos.x) as f32;
@@ -440,7 +435,7 @@ impl DrawPlotLine {
     }
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawPlotPoint {
     #[deref]
@@ -448,7 +443,7 @@ pub struct DrawPlotPoint {
     #[live]
     pub color: Vec4,
     #[live]
-    pub marker_style: f32, // 0=circle, 1=square, 2=tri_up, 3=tri_down, 4=diamond, 5=cross, 6=plus, 7=star
+    pub marker_style: f32,
 }
 
 impl DrawPlotPoint {
@@ -469,7 +464,7 @@ impl DrawPlotPoint {
     }
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawPlotBar {
     #[deref]
@@ -504,7 +499,7 @@ impl DrawPlotBar {
     }
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawPlotFill {
     #[deref]
@@ -520,7 +515,6 @@ pub struct DrawPlotFill {
 }
 
 impl DrawPlotFill {
-    /// Draw a filled vertical strip (used for fill_between)
     pub fn draw_fill_strip(&mut self, cx: &mut Cx2d, x: f64, width: f64, y1: f64, y2: f64) {
         self.gradient_enabled = 0.0;
         let top = y1.min(y2);
@@ -532,7 +526,6 @@ impl DrawPlotFill {
         self.draw_abs(cx, rect);
     }
 
-    /// Draw a filled strip with vertical gradient
     pub fn draw_fill_strip_gradient(
         &mut self,
         cx: &mut Cx2d,
@@ -556,7 +549,7 @@ impl DrawPlotFill {
     }
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawPieSlice {
     #[deref]
@@ -620,7 +613,7 @@ impl DrawPieSlice {
 }
 
 /// Arc drawing for donut charts
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawArc {
     #[deref]
@@ -632,11 +625,11 @@ pub struct DrawArc {
     #[live]
     pub end_angle: f32,
     #[live(0.0)]
-    pub inner_radius: f32, // 0-1 ratio of outer radius
+    pub inner_radius: f32,
     #[live(0.0)]
     pub gradient_enabled: f32,
     #[live(0.0)]
-    pub gradient_type: f32, // 0=radial, 1=angular
+    pub gradient_type: f32,
     #[live]
     pub gradient_inner_color: Vec4,
     #[live]
@@ -694,7 +687,7 @@ impl DrawArc {
 }
 
 /// Point shader with gradient support
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawPlotPointGradient {
     #[deref]
@@ -739,7 +732,7 @@ impl DrawPlotPointGradient {
 }
 
 // DrawTriangle - for radar chart fills and other triangular shapes
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawTriangle {
     #[deref]
@@ -761,7 +754,7 @@ pub struct DrawTriangle {
     #[live(0.0)]
     pub gradient_enabled: f32,
     #[live(0.0)]
-    pub gradient_type: f32, // 0 = center-to-vertices, 1 = top-to-bottom
+    pub gradient_type: f32,
     #[live]
     pub gradient_center_color: Vec4,
     #[live]
@@ -769,9 +762,7 @@ pub struct DrawTriangle {
 }
 
 impl DrawTriangle {
-    /// Draw a filled triangle with the given vertices (in absolute coordinates)
     pub fn draw_triangle(&mut self, cx: &mut Cx2d, p0: DVec2, p1: DVec2, p2: DVec2) {
-        // Calculate bounding box
         let min_x = p0.x.min(p1.x).min(p2.x);
         let min_y = p0.y.min(p1.y).min(p2.y);
         let max_x = p0.x.max(p1.x).max(p2.x);
@@ -780,12 +771,10 @@ impl DrawTriangle {
         let width = max_x - min_x;
         let height = max_y - min_y;
 
-        // Avoid division by zero
         if width < 0.001 || height < 0.001 {
             return;
         }
 
-        // Convert to normalized coordinates (0-1 within bounding box)
         self.v0x = ((p0.x - min_x) / width) as f32;
         self.v0y = ((p0.y - min_y) / height) as f32;
         self.v1x = ((p1.x - min_x) / width) as f32;
@@ -802,7 +791,6 @@ impl DrawTriangle {
         self.draw_abs(cx, rect);
     }
 
-    /// Draw a filled triangle with gradient (center to vertices)
     pub fn draw_triangle_gradient(
         &mut self,
         cx: &mut Cx2d,
@@ -812,7 +800,6 @@ impl DrawTriangle {
         center_color: Vec4,
         outer_color: Vec4,
     ) {
-        // Calculate bounding box
         let min_x = p0.x.min(p1.x).min(p2.x);
         let min_y = p0.y.min(p1.y).min(p2.y);
         let max_x = p0.x.max(p1.x).max(p2.x);
@@ -825,7 +812,6 @@ impl DrawTriangle {
             return;
         }
 
-        // Convert to normalized coordinates
         self.v0x = ((p0.x - min_x) / width) as f32;
         self.v0y = ((p0.y - min_y) / height) as f32;
         self.v1x = ((p1.x - min_x) / width) as f32;
@@ -834,7 +820,7 @@ impl DrawTriangle {
         self.v2y = ((p2.y - min_y) / height) as f32;
 
         self.gradient_enabled = 1.0;
-        self.gradient_type = 0.0; // center-to-vertices gradient
+        self.gradient_type = 0.0;
         self.gradient_center_color = center_color;
         self.gradient_outer_color = outer_color;
 

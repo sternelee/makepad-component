@@ -2,16 +2,13 @@
 
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
 
-    pub PlotLabel = {{PlotLabel}} {
-        draw_text: {
-            text_style: <THEME_FONT_REGULAR> {
-                font_size: 10.0
-            }
-            color: #666666
+    mod.widgets.PlotLabel = set_type_default() do #(PlotLabel::script_api(vm)){
+        draw_text +: {
+            text_style: theme.font_regular{font_size: 10.0}
+            color: #x666666
         }
     }
 }
@@ -30,7 +27,7 @@ pub enum TextAnchor {
     BottomRight,
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 pub struct PlotLabel {
     #[live]
     pub draw_text: DrawText,
@@ -67,6 +64,6 @@ impl PlotLabel {
     }
 
     pub fn set_font_size(&mut self, size: f64) {
-        self.draw_text.font_scale = (size / 10.0) as f32; // Base font size is 10.0
+        self.draw_text.font_scale = (size / 10.0) as f32;
     }
 }

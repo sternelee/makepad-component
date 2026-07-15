@@ -3,29 +3,27 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub CandlestickChart = {{CandlestickChart}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.CandlestickChartBase = #(CandlestickChart::register_widget(vm))
+mod.widgets.CandlestickChart = set_type_default() do mod.widgets.CandlestickChartBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            axis_color: #8d8d99ff,
+            label_color: #d9d9d9ff
+            axis_color: #8d8d99ff
         }
     }
-
-    pub WaterfallChart = {{WaterfallChart}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+mod.widgets.WaterfallChartBase = #(WaterfallChart::register_widget(vm))
+mod.widgets.WaterfallChart = set_type_default() do mod.widgets.WaterfallChartBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            axis_color: #8d8d99ff,
+            label_color: #d9d9d9ff
+            axis_color: #8d8d99ff
         }
     }
 }
@@ -61,7 +59,7 @@ impl Candle {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct CandlestickChart {
     #[deref]
     #[live]
@@ -362,7 +360,7 @@ impl WaterfallEntry {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct WaterfallChart {
     #[deref]
     #[live]

@@ -3,29 +3,27 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub HistogramChart = {{HistogramChart}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.HistogramChartBase = #(HistogramChart::register_widget(vm))
+mod.widgets.HistogramChart = set_type_default() do mod.widgets.HistogramChartBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            grid_color: #40404d80,
+            label_color: #d9d9d9ff
+            grid_color: #40404d80
         }
     }
-
-    pub BoxPlotChart = {{BoxPlotChart}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+mod.widgets.BoxPlotChartBase = #(BoxPlotChart::register_widget(vm))
+mod.widgets.BoxPlotChart = set_type_default() do mod.widgets.BoxPlotChartBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            grid_color: #40404d80,
+            label_color: #d9d9d9ff
+            grid_color: #40404d80
         }
     }
 }
@@ -38,7 +36,7 @@ pub struct HistogramBin {
     pub count: usize,
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct HistogramChart {
     #[deref]
     #[live]
@@ -376,7 +374,7 @@ impl BoxPlotStats {
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let n = sorted.len();
-        let median = if n % 2 == 0 {
+        let median = if n.is_multiple_of(2) {
             (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0
         } else {
             sorted[n / 2]
@@ -443,7 +441,7 @@ impl BoxPlotItem {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct BoxPlotChart {
     #[deref]
     #[live]

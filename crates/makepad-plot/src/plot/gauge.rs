@@ -3,32 +3,30 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub GaugeChart = {{GaugeChart}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.GaugeChartBase = #(GaugeChart::register_widget(vm))
+mod.widgets.GaugeChart = set_type_default() do mod.widgets.GaugeChartBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
+            label_color: #d9d9d9ff
         }
     }
-
-    pub FunnelChart = {{FunnelChart}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+mod.widgets.FunnelChartBase = #(FunnelChart::register_widget(vm))
+mod.widgets.FunnelChart = set_type_default() do mod.widgets.FunnelChartBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
+            label_color: #d9d9d9ff
         }
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct GaugeChart {
     #[deref]
     #[live]
@@ -309,7 +307,7 @@ impl FunnelStage {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct FunnelChart {
     #[deref]
     #[live]

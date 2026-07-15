@@ -3,27 +3,25 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub ScatterPlot = {{ScatterPlot}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.ScatterPlotBase = #(ScatterPlot::register_widget(vm))
+mod.widgets.ScatterPlot = set_type_default() do mod.widgets.ScatterPlotBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            axis_color: #8d8d99ff,
-            grid_color: #40404d80,
-            legend_bg_color: #1e1e26d9,
-            legend_border_color: #59596699,
+            label_color: #d9d9d9ff
+            axis_color: #8d8d99ff
+            grid_color: #40404d80
+            legend_bg_color: #1e1e26d9
+            legend_border_color: #59596699
         }
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct ScatterPlot {
     #[deref]
     #[live]

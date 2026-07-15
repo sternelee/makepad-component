@@ -3,28 +3,26 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub LinePlot = {{LinePlot}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
-        math_label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.LinePlotBase = #(LinePlot::register_widget(vm))
+mod.widgets.LinePlot = set_type_default() do mod.widgets.LinePlotBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
+        math_label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            axis_color: #8d8d99ff,
-            grid_color: #40404d80,
-            legend_bg_color: #1e1e26d9,
-            legend_border_color: #59596699,
+            label_color: #d9d9d9ff
+            axis_color: #8d8d99ff
+            grid_color: #40404d80
+            legend_bg_color: #1e1e26d9
+            legend_border_color: #59596699
         }
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct LinePlot {
     #[deref]
     #[live]

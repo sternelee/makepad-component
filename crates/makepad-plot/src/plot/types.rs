@@ -3,20 +3,20 @@ use makepad_widgets::*;
 // Re-export styling enums
 pub use crate::elements::{LineStyle, MarkerStyle};
 
-live_design! {
-    pub ChartTheme = {{ChartTheme}} {
-        label_color: #d9d9d9ff,
-        axis_color: #8d8d99ff,
-        grid_color: #40404d80,
-        legend_bg_color: #1e1e26d9,
-        legend_border_color: #59596699,
+script_mod! {
+    mod.widgets.ChartTheme = set_type_default() do #(ChartTheme::script_api(vm)){
+        label_color: #xd9d9d9ff
+        axis_color: #x8d8d99ff
+        grid_color: #x40404d80
+        legend_bg_color: #x1e1e26d9
+        legend_border_color: #x59596699
     }
 }
 
 /// Shared chart theme colors for UI elements (labels, axes, grid, legend).
 /// Embed as `#[live] theme: ChartTheme` in each chart widget so users can
 /// override individual colors in DSL or at runtime.
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 pub struct ChartTheme {
     #[live]
     pub label_color: Vec4,
@@ -34,10 +34,10 @@ pub struct ChartTheme {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum StepStyle {
     #[default]
-    None, // Normal line (no step)
-    Pre,  // Step before the point (y value changes at x)
-    Post, // Step after the point (y value changes at next x)
-    Mid,  // Step in the middle between points
+    None,
+    Pre,
+    Post,
+    Mid,
 }
 
 /// Vertical line annotation
@@ -77,20 +77,19 @@ pub struct HSpan {
 // Color palette similar to matplotlib
 pub fn get_color(index: usize) -> Vec4 {
     let colors = [
-        vec4(0.12, 0.47, 0.71, 1.0), // blue
-        vec4(1.0, 0.5, 0.05, 1.0),   // orange
-        vec4(0.17, 0.63, 0.17, 1.0), // green
-        vec4(0.84, 0.15, 0.16, 1.0), // red
-        vec4(0.58, 0.40, 0.74, 1.0), // purple
-        vec4(0.55, 0.34, 0.29, 1.0), // brown
-        vec4(0.89, 0.47, 0.76, 1.0), // pink
-        vec4(0.5, 0.5, 0.5, 1.0),    // gray
+        vec4(0.12, 0.47, 0.71, 1.0),
+        vec4(1.0, 0.5, 0.05, 1.0),
+        vec4(0.17, 0.63, 0.17, 1.0),
+        vec4(0.84, 0.15, 0.16, 1.0),
+        vec4(0.58, 0.40, 0.74, 1.0),
+        vec4(0.55, 0.34, 0.29, 1.0),
+        vec4(0.89, 0.47, 0.76, 1.0),
+        vec4(0.5, 0.5, 0.5, 1.0),
     ];
     colors[index % colors.len()]
 }
 
 /// Lighten a color by blending towards white
-/// amount: 0.0 = no change, 1.0 = pure white
 pub fn lighten(color: Vec4, amount: f32) -> Vec4 {
     vec4(
         (color.x + (1.0 - color.x) * amount).min(1.0),
@@ -101,7 +100,6 @@ pub fn lighten(color: Vec4, amount: f32) -> Vec4 {
 }
 
 /// Darken a color by blending towards black
-/// amount: 0.0 = no change, 1.0 = pure black
 pub fn darken(color: Vec4, amount: f32) -> Vec4 {
     vec4(
         (color.x * (1.0 - amount)).max(0.0),
@@ -112,10 +110,9 @@ pub fn darken(color: Vec4, amount: f32) -> Vec4 {
 }
 
 /// Get a gradient color pair (center, outer) for radial gradients
-/// Creates a nice visual depth effect with lighter center and darker edge
 pub fn gradient_pair(color: Vec4) -> (Vec4, Vec4) {
-    let center = lighten(color, 0.4); // Bright center
-    let outer = darken(color, 0.15); // Slightly darker edge
+    let center = lighten(color, 0.4);
+    let outer = darken(color, 0.15);
     (center, outer)
 }
 
@@ -138,7 +135,6 @@ pub struct Series {
     pub step_style: StepStyle,
     pub line_width: Option<f64>,
     pub marker_size: Option<f64>,
-    // Error bar data
     pub xerr_minus: Option<Vec<f64>>,
     pub xerr_plus: Option<Vec<f64>>,
     pub yerr_minus: Option<Vec<f64>>,
@@ -200,28 +196,24 @@ impl Series {
         self
     }
 
-    /// Add symmetric y error bars
     pub fn with_yerr(mut self, yerr: Vec<f64>) -> Self {
         self.yerr_minus = Some(yerr.clone());
         self.yerr_plus = Some(yerr);
         self
     }
 
-    /// Add asymmetric y error bars
     pub fn with_yerr_asymmetric(mut self, yerr_minus: Vec<f64>, yerr_plus: Vec<f64>) -> Self {
         self.yerr_minus = Some(yerr_minus);
         self.yerr_plus = Some(yerr_plus);
         self
     }
 
-    /// Add symmetric x error bars
     pub fn with_xerr(mut self, xerr: Vec<f64>) -> Self {
         self.xerr_minus = Some(xerr.clone());
         self.xerr_plus = Some(xerr);
         self
     }
 
-    /// Add asymmetric x error bars
     pub fn with_xerr_asymmetric(mut self, xerr_minus: Vec<f64>, xerr_plus: Vec<f64>) -> Self {
         self.xerr_minus = Some(xerr_minus);
         self.xerr_plus = Some(xerr_plus);
@@ -278,7 +270,7 @@ pub struct TextAnnotation {
     pub y: f64,
     pub color: Vec4,
     pub font_size: f64,
-    pub is_math: bool, // If true, render as LaTeX using Math widget
+    pub is_math: bool,
 }
 
 /// Arrow annotation pointing from one location to another
@@ -291,7 +283,7 @@ pub struct ArrowAnnotation {
     pub color: Vec4,
     pub line_width: f64,
     pub head_size: f64,
-    pub text: Option<String>, // Optional label near the arrow start
+    pub text: Option<String>,
 }
 
 impl ArrowAnnotation {

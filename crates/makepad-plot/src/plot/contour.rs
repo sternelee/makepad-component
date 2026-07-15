@@ -3,33 +3,31 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub ContourPlot = {{ContourPlot}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.ContourPlotBase = #(ContourPlot::register_widget(vm))
+mod.widgets.ContourPlot = set_type_default() do mod.widgets.ContourPlotBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            axis_color: #8d8d99ff,
+            label_color: #d9d9d9ff
+            axis_color: #8d8d99ff
         }
     }
-
-    pub QuiverPlot = {{QuiverPlot}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+mod.widgets.QuiverPlotBase = #(QuiverPlot::register_widget(vm))
+mod.widgets.QuiverPlot = set_type_default() do mod.widgets.QuiverPlotBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
+            label_color: #d9d9d9ff
         }
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct ContourPlot {
     #[deref]
     #[live]
@@ -382,7 +380,7 @@ impl ContourPlotRef {
 // QuiverPlot Widget (Vector Field)
 // =============================================================================
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct QuiverPlot {
     #[deref]
     #[live]

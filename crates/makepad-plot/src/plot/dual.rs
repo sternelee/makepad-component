@@ -3,32 +3,30 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub SubplotGrid = {{SubplotGrid}} {
-        width: Fill,
-        height: Fill,
-        flow: Down,
-        spacing: 10.0,
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.SubplotGridBase = #(SubplotGrid::register_widget(vm))
+mod.widgets.SubplotGrid = set_type_default() do mod.widgets.SubplotGridBase{
+        width: Fill
+        height: Fill
+        flow: Down
+        spacing: 10.0
     }
-
-    pub LinePlotDual = {{LinePlotDual}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+mod.widgets.LinePlotDualBase = #(LinePlotDual::register_widget(vm))
+mod.widgets.LinePlotDual = set_type_default() do mod.widgets.LinePlotDualBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            axis_color: #8d8d99ff,
-            grid_color: #40404d80,
+            label_color: #d9d9d9ff
+            axis_color: #8d8d99ff
+            grid_color: #40404d80
         }
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct SubplotGrid {
     #[deref]
     #[live]
@@ -107,7 +105,7 @@ impl SubplotGridRef {
 // LinePlotDual - Line plot with dual y-axes (twinx support)
 // =============================================================================
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct LinePlotDual {
     #[deref]
     #[live]

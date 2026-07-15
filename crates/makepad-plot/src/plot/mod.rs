@@ -49,25 +49,25 @@ pub use types::*;
 
 use makepad_widgets::*;
 
-pub fn live_design(cx: &mut Cx) {
-    types::live_design(cx);
-    line::live_design(cx);
-    bar::live_design(cx);
-    scatter::live_design(cx);
-    pie::live_design(cx);
-    histogram::live_design(cx);
-    stem::live_design(cx);
-    heatmap::live_design(cx);
-    polar::live_design(cx);
-    contour::live_design(cx);
-    surface3d::live_design(cx);
-    scatter3d::live_design(cx);
-    dual::live_design(cx);
-    financial::live_design(cx);
-    gauge::live_design(cx);
-    treemap::live_design(cx);
-    bubble::live_design(cx);
-    area::live_design(cx);
-    stack::live_design(cx);
-    hexbin::live_design(cx);
+pub fn script_mod(vm: &mut ScriptVm) {
+    types::script_mod(vm);
+    line::script_mod(vm);
+    bar::script_mod(vm);
+    scatter::script_mod(vm);
+    pie::script_mod(vm);
+    histogram::script_mod(vm);
+    stem::script_mod(vm);
+    heatmap::script_mod(vm);
+    polar::script_mod(vm);
+    contour::script_mod(vm);
+    surface3d::script_mod(vm);
+    scatter3d::script_mod(vm);
+    dual::script_mod(vm);
+    financial::script_mod(vm);
+    gauge::script_mod(vm);
+    treemap::script_mod(vm);
+    bubble::script_mod(vm);
+    area::script_mod(vm);
+    stack::script_mod(vm);
+    hexbin::script_mod(vm);
 }

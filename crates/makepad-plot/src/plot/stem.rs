@@ -3,35 +3,33 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub StemPlot = {{StemPlot}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.StemPlotBase = #(StemPlot::register_widget(vm))
+mod.widgets.StemPlot = set_type_default() do mod.widgets.StemPlotBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            axis_color: #8d8d99ff,
-            grid_color: #40404d80,
+            label_color: #d9d9d9ff
+            axis_color: #8d8d99ff
+            grid_color: #40404d80
         }
     }
-
-    pub ViolinPlot = {{ViolinPlot}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+mod.widgets.ViolinPlotBase = #(ViolinPlot::register_widget(vm))
+mod.widgets.ViolinPlot = set_type_default() do mod.widgets.ViolinPlotBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            axis_color: #8d8d99ff,
+            label_color: #d9d9d9ff
+            axis_color: #8d8d99ff
         }
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct StemPlot {
     #[deref]
     #[live]
@@ -450,7 +448,7 @@ impl ViolinItem {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct ViolinPlot {
     #[deref]
     #[live]

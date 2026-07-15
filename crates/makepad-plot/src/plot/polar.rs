@@ -3,29 +3,27 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub PolarPlot = {{PolarPlot}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.PolarPlotBase = #(PolarPlot::register_widget(vm))
+mod.widgets.PolarPlot = set_type_default() do mod.widgets.PolarPlotBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
+            label_color: #d9d9d9ff
         }
     }
-
-    pub RadarChart = {{RadarChart}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+mod.widgets.RadarChartBase = #(RadarChart::register_widget(vm))
+mod.widgets.RadarChart = set_type_default() do mod.widgets.RadarChartBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            axis_color: #8d8d99ff,
-            grid_color: #40404d80,
+            label_color: #d9d9d9ff
+            axis_color: #8d8d99ff
+            grid_color: #40404d80
         }
     }
 }
@@ -69,7 +67,7 @@ impl PolarSeries {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct PolarPlot {
     #[deref]
     #[live]
@@ -324,7 +322,7 @@ impl RadarSeries {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct RadarChart {
     #[deref]
     #[live]

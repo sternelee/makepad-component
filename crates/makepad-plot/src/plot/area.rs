@@ -3,31 +3,29 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub AreaChart = {{AreaChart}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.AreaChartBase = #(AreaChart::register_widget(vm))
+mod.widgets.AreaChart = set_type_default() do mod.widgets.AreaChartBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            axis_color: #8d8d99ff,
-            grid_color: #40404d80,
+            label_color: #d9d9d9ff
+            axis_color: #8d8d99ff
+            grid_color: #40404d80
         }
     }
-
-    pub StepPlot = {{StepPlot}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+mod.widgets.StepPlotBase = #(StepPlot::register_widget(vm))
+mod.widgets.StepPlot = set_type_default() do mod.widgets.StepPlotBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            axis_color: #8d8d99ff,
-            grid_color: #40404d80,
+            label_color: #d9d9d9ff
+            axis_color: #8d8d99ff
+            grid_color: #40404d80
         }
     }
 }
@@ -61,7 +59,7 @@ impl AreaSeries {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct AreaChart {
     #[deref]
     #[live]
@@ -120,7 +118,7 @@ impl AreaChart {
     fn get_bounds(&self) -> (f64, f64, f64, f64) {
         let mut x_min = f64::MAX;
         let mut x_max = f64::MIN;
-        let mut y_min = 0.0f64;
+        let y_min = 0.0f64;
         let mut y_max = f64::MIN;
 
         if self.stacked {
@@ -248,7 +246,7 @@ impl Widget for AreaChart {
             let mut cumulative: Vec<f64> =
                 vec![0.0; self.series.first().map(|s| s.x.len()).unwrap_or(0)];
 
-            for (_idx, series) in self.series.iter().enumerate() {
+            for series in self.series.iter() {
                 if series.x.len() < 2 {
                     continue;
                 }
@@ -467,7 +465,7 @@ impl StepSeries {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct StepPlot {
     #[deref]
     #[live]

@@ -3,30 +3,28 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub PieChart = {{PieChart}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.PieChartBase = #(PieChart::register_widget(vm))
+mod.widgets.PieChart = set_type_default() do mod.widgets.PieChartBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            legend_bg_color: #1e1e26d9,
-            legend_border_color: #59596699,
+            label_color: #d9d9d9ff
+            legend_bg_color: #1e1e26d9
+            legend_border_color: #59596699
         }
     }
-
-    pub DonutChart = {{DonutChart}} {
-        width: Fill,
-        height: Fill,
+mod.widgets.DonutChartBase = #(DonutChart::register_widget(vm))
+mod.widgets.DonutChart = set_type_default() do mod.widgets.DonutChartBase{
+        width: Fill
+        height: Fill
         draw_arc: {}
-        label: <PlotLabel> {}
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
+            label_color: #d9d9d9ff
         }
     }
 }
@@ -54,7 +52,7 @@ impl PieSlice {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct PieChart {
     #[deref]
     #[live]
@@ -371,7 +369,7 @@ impl DonutSlice {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct DonutChart {
     #[deref]
     #[live]

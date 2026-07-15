@@ -3,27 +3,25 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub Scatter3D = {{Scatter3D}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.Scatter3DBase = #(Scatter3D::register_widget(vm))
+mod.widgets.Scatter3D = set_type_default() do mod.widgets.Scatter3DBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
+            label_color: #d9d9d9ff
         }
     }
-
-    pub Line3D = {{Line3D}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+mod.widgets.Line3DBase = #(Line3D::register_widget(vm))
+mod.widgets.Line3D = set_type_default() do mod.widgets.Line3DBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
+            label_color: #d9d9d9ff
         }
     }
 }
@@ -57,7 +55,7 @@ impl Point3D {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct Scatter3D {
     #[deref]
     #[live]
@@ -407,7 +405,7 @@ impl Line3DSeries {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct Line3D {
     #[deref]
     #[live]

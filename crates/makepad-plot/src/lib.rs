@@ -10,8 +10,8 @@ pub use text::*;
 
 use makepad_widgets::*;
 
-pub fn live_design(cx: &mut Cx) {
-    crate::elements::live_design(cx);
-    crate::text::live_design(cx);
-    crate::plot::live_design(cx);
+pub fn script_mod(vm: &mut ScriptVm) {
+    crate::elements::script_mod(vm);
+    crate::text::script_mod(vm);
+    crate::plot::script_mod(vm);
 }

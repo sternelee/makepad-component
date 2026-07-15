@@ -3,18 +3,16 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub Surface3D = {{Surface3D}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.Surface3DBase = #(Surface3D::register_widget(vm))
+mod.widgets.Surface3D = set_type_default() do mod.widgets.Surface3DBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
+            label_color: #d9d9d9ff
         }
     }
 }
@@ -70,8 +68,8 @@ impl View3D {
         let y1 = x * az.sin() + y * az.cos();
         let z1 = z;
 
-        let y2 = y1 * el.cos() - z1 * el.sin();
-        y2
+        
+        y1 * el.cos() - z1 * el.sin()
     }
 }
 
@@ -169,7 +167,7 @@ pub struct Surface3DCharts {
     pub map: std::collections::HashMap<String, Surface3DChart>,
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct Surface3D {
     #[deref]
     #[live]
@@ -295,7 +293,7 @@ impl Surface3D {
         self.charts
             .map
             .entry(chart_id.to_string())
-            .or_insert_with(Surface3DChart::default)
+            .or_default()
     }
 
     /// Draw a specific chart instance using its per-chart state.

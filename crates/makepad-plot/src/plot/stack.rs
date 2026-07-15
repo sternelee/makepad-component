@@ -3,31 +3,29 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub Stackplot = {{Stackplot}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.StackplotBase = #(Stackplot::register_widget(vm))
+mod.widgets.Stackplot = set_type_default() do mod.widgets.StackplotBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            axis_color: #8d8d99ff,
-            grid_color: #40404d80,
+            label_color: #d9d9d9ff
+            axis_color: #8d8d99ff
+            grid_color: #40404d80
         }
     }
-
-    pub Streamgraph = {{Streamgraph}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+mod.widgets.StreamgraphBase = #(Streamgraph::register_widget(vm))
+mod.widgets.Streamgraph = set_type_default() do mod.widgets.StreamgraphBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
-            axis_color: #8d8d99ff,
-            grid_color: #40404d80,
+            label_color: #d9d9d9ff
+            axis_color: #8d8d99ff
+            grid_color: #40404d80
         }
     }
 }
@@ -104,8 +102,10 @@ impl StackedPoint {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct Stackplot {
+    #[uid]
+    uid: WidgetUid,
     #[redraw]
     #[live]
     draw_bg: DrawQuad,
@@ -489,8 +489,10 @@ impl StreamSeries {
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct Streamgraph {
+    #[uid]
+    uid: WidgetUid,
     #[redraw]
     #[live]
     draw_bg: DrawQuad,

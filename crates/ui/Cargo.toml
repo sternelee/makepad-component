@@ -20,7 +20,6 @@ ureq = { version = "2.9", features = ["json"] }
 uuid = { version = "1.0", features = ["v4"] }
 
 [features]
-default = []
-# makepad-plot is still on the legacy live_design API and does not compile
-# against makepad 2.0. Do not enable until makepad-plot is migrated.
+default = ["plot"]
+# makepad-plot has been migrated to the Makepad 2.0 script_mod! API.
 plot = ["dep:makepad-plot"]

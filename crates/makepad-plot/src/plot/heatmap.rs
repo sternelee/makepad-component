@@ -3,32 +3,30 @@ use crate::elements::*;
 use crate::text::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
-    use crate::text::PlotLabel;
-
-    pub HeatmapChart = {{HeatmapChart}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+mod.widgets.HeatmapChartBase = #(HeatmapChart::register_widget(vm))
+mod.widgets.HeatmapChart = set_type_default() do mod.widgets.HeatmapChartBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
+            label_color: #d9d9d9ff
         }
     }
-
-    pub Heatmap = {{Heatmap}} {
-        width: Fill,
-        height: Fill,
-        label: <PlotLabel> {}
+mod.widgets.HeatmapBase = #(Heatmap::register_widget(vm))
+mod.widgets.Heatmap = set_type_default() do mod.widgets.HeatmapBase{
+        width: Fill
+        height: Fill
+        label: name := mod.widgets.PlotLabel{}
         theme: {
-            label_color: #d9d9d9ff,
+            label_color: #d9d9d9ff
         }
     }
 }
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct HeatmapChart {
     #[deref]
     #[live]
@@ -363,7 +361,7 @@ impl HeatmapChartRef {
 // Heatmap Widget (alias)
 // =============================================================================
 
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct Heatmap {
     #[deref]
     #[live]
