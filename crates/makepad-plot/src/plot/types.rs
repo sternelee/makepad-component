@@ -4,7 +4,7 @@ use makepad_widgets::*;
 pub use crate::elements::{LineStyle, MarkerStyle};
 
 script_mod! {
-    mod.widgets.ChartTheme = set_type_default() do #(ChartTheme::script_api(vm)){
+    mod.widgets.ChartTheme = mod.std.set_type_default() do #(ChartTheme::script_api(vm)){
         label_color: #xd9d9d9ff
         axis_color: #x8d8d99ff
         grid_color: #x40404d80

@@ -165,10 +165,9 @@ unsafe fn get_image_data(pasteboard: &NSPasteboard) -> (u32, u32, Vec<u8>) {
             let ptr = bytes.as_ptr() as *const u8;
             let len = bytes.len();
             for i in 0..len.saturating_sub(8) {
-                if *ptr.offset(i as isize) == 0xFF {
+                if *ptr.add(i) == 0xFF {
                     let marker = *ptr.offset(i as isize + 1);
-                    if marker >= 0xC0
-                        && marker <= 0xCF
+                    if (0xC0..=0xCF).contains(&marker)
                         && marker != 0xC4
                         && marker != 0xC8
                         && marker != 0xCC

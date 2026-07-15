@@ -7,8 +7,9 @@ script_mod! {
 
     // Line drawing shader - draws a line segment using distance field
     // Supports solid, dashed, dotted, and dash-dot line styles
-    DrawPlotLine: mod.std.set_type_default() do #(DrawPlotLine::script_api(vm)){
-        fn pixel(self) -> vec4 {
+    DrawPlotLine: mod.std.set_type_default() do #(DrawPlotLine::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
             // Convert normalized pos to pixel coordinates within the rect
             let p = self.pos * self.rect_size;
 
@@ -33,16 +34,16 @@ script_mod! {
             let dash_alpha = 1.0;
 
             // Dashed pattern (dash=10, gap=5)
-            let dashed_pattern = step(0.5, mod(pos_along_line / 15.0, 1.0) - 5.0 / 15.0 + 0.5);
+            let dashed_pattern = step(0.5, pos_along_line / 15.0 - floor(pos_along_line / 15.0) - 5.0 / 15.0 + 0.5);
 
             // Dotted pattern (dot=2, gap=4)
-            let dotted_pattern = step(0.5, mod(pos_along_line / 6.0, 1.0) - 4.0 / 6.0 + 0.5);
+            let dotted_pattern = step(0.5, pos_along_line / 6.0 - floor(pos_along_line / 6.0) - 4.0 / 6.0 + 0.5);
 
             // Dash-dot pattern (dash=10, gap=4, dot=2, gap=4) = period 20
-            let dashdot_pos = mod(pos_along_line, 20.0);
+            let dashdot_pos = pos_along_line - 20.0 * floor(pos_along_line / 20.0);
             let dashdot_pattern = max(
-                step(dashdot_pos, 10.0),  // dash part (0-10)
-                step(14.0, dashdot_pos) * step(dashdot_pos, 16.0)  // dot part (14-16)
+                step(dashdot_pos, 10.0),
+                step(14.0, dashdot_pos) * step(dashdot_pos, 16.0)
             );
 
             // Select pattern based on line_style
@@ -67,8 +68,9 @@ script_mod! {
 
     // Marker drawing shader - supports multiple marker shapes
     // marker_style: 0=circle, 1=square, 2=triangle_up, 3=triangle_down, 4=diamond, 5=cross, 6=plus, 7=star
-    DrawPlotPoint: mod.std.set_type_default() do #(DrawPlotPoint::script_api(vm)){
-        fn pixel(self) -> vec4 {
+    DrawPlotPoint: mod.std.set_type_default() do #(DrawPlotPoint::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
             let uv = self.pos - vec2(0.5, 0.5);
             let dist = length(uv);
             let edge = 0.05;
@@ -112,7 +114,7 @@ script_mod! {
             let plus_alpha = (1.0 - smoothstep(0.08 - edge, 0.08, plus_dist)) * step(dist, 0.45);
 
             // Star (style=7) - 5-pointed
-            let angle = atan(uv.y, uv.x);
+            let angle = atan2(uv.y, uv.x);
             let star_r = 0.35 + 0.15 * cos(angle * 5.0 + 1.57);
             let star_alpha = 1.0 - smoothstep(star_r - edge, star_r, dist);
 
@@ -140,8 +142,9 @@ script_mod! {
     }
 
     // Bar drawing shader with gradient support
-    DrawPlotBar: mod.std.set_type_default() do #(DrawPlotBar::script_api(vm)){
-        fn pixel(self) -> vec4 {
+    DrawPlotBar: mod.std.set_type_default() do #(DrawPlotBar::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
             // Vertical gradient: interpolate from bottom to top
             if (self.gradient_enabled > 0.5) {
                 let t = 1.0 - self.pos.y; // 0 at bottom, 1 at top
@@ -153,8 +156,9 @@ script_mod! {
     }
 
     // Fill region shader (for fill_between and area charts) with gradient support
-    DrawPlotFill: mod.std.set_type_default() do #(DrawPlotFill::script_api(vm)){
-        fn pixel(self) -> vec4 {
+    DrawPlotFill: mod.std.set_type_default() do #(DrawPlotFill::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
             // Vertical gradient for area fills
             if (self.gradient_enabled > 0.5) {
                 let t = 1.0 - self.pos.y; // 0 at bottom, 1 at top
@@ -166,8 +170,9 @@ script_mod! {
     }
 
     // Pie slice drawing shader with radial gradient
-    DrawPieSlice: mod.std.set_type_default() do #(DrawPieSlice::script_api(vm)){
-        fn pixel(self) -> vec4 {
+    DrawPieSlice: mod.std.set_type_default() do #(DrawPieSlice::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
             let uv = self.pos - vec2(0.5, 0.5);
             let dist = length(uv);
 
@@ -177,10 +182,10 @@ script_mod! {
             }
 
             // Calculate angle (atan2 returns -PI to PI)
-            let angle = atan(uv.y, uv.x);
+            let angle = atan2(uv.y, uv.x);
 
             // Normalize angle to 0 to 2*PI
-            let norm_angle = mod(angle + 6.28318530718, 6.28318530718);
+            let norm_angle = angle + 6.28318530718 - 6.28318530718 * floor((angle + 6.28318530718) / 6.28318530718);
 
             // Compute inside using step functions
             let after_start = step(self.start_angle, norm_angle);
@@ -188,7 +193,7 @@ script_mod! {
             let inside = after_start * before_end;
 
             // Handle wrap-around with modulo
-            let wrapped_end = mod(self.end_angle, 6.28318530718);
+            let wrapped_end = self.end_angle - 6.28318530718 * floor(self.end_angle / 6.28318530718);
             let is_wrapped = step(6.28318530718, self.end_angle);
             let in_wrapped = step(norm_angle, wrapped_end) * is_wrapped * step(0.0, wrapped_end - norm_angle);
 
@@ -212,8 +217,9 @@ script_mod! {
     }
 
     // Arc drawing shader for donut charts with gradient support
-    DrawArc: mod.std.set_type_default() do #(DrawArc::script_api(vm)){
-        fn pixel(self) -> vec4 {
+    DrawArc: mod.std.set_type_default() do #(DrawArc::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
             let pi_val = 3.14159265;
             let two_pi_val = 6.28318530;
 
@@ -228,11 +234,11 @@ script_mod! {
             let dist_mask = step(inner_rad, distance) * step(distance, outer_rad);
 
             // Calculate angle using atan2
-            let pixel_ang = atan(py, px);
+            let pixel_ang = atan2(py, px);
             let sweep_val = self.end_angle - self.start_angle;
             let rel_ang = pixel_ang - self.start_angle;
             let norm_ang = rel_ang + two_pi_val * 4.0;
-            let wrap_ang = mod(norm_ang, two_pi_val);
+            let wrap_ang = norm_ang - two_pi_val * floor(norm_ang / two_pi_val);
 
             // Angle mask: check if within sweep
             let ang_mask = step(wrap_ang, sweep_val) * step(0.001, sweep_val);
@@ -247,33 +253,35 @@ script_mod! {
 
             let alpha_val = final_mask * aa_alpha;
 
-            if (alpha_val < 0.01) {
-                return vec4(0.0, 0.0, 0.0, 0.0);
-            }
+            let mut result = vec4(self.color.rgb * alpha_val, self.color.a * alpha_val);
 
             // Radial or angular gradient
-            if (self.gradient_enabled > 0.5) {
+            if (alpha_val >= 0.01 && self.gradient_enabled > 0.5) {
                 if (self.gradient_type < 0.5) {
                     // Radial gradient: interpolate from inner to outer radius
                     let ring_width = outer_rad - inner_rad;
                     let t = clamp((distance - inner_rad) / ring_width, 0.0, 1.0);
                     let final_color = mix(self.gradient_inner_color, self.gradient_outer_color, t);
-                    return vec4(final_color.rgb * alpha_val, final_color.a * alpha_val);
+                    result = vec4(final_color.rgb * alpha_val, final_color.a * alpha_val);
                 } else {
                     // Angular gradient: interpolate along arc sweep
                     let t = clamp(wrap_ang / sweep_val, 0.0, 1.0);
                     let final_color = mix(self.gradient_inner_color, self.gradient_outer_color, t);
-                    return vec4(final_color.rgb * alpha_val, final_color.a * alpha_val);
+                    result = vec4(final_color.rgb * alpha_val, final_color.a * alpha_val);
                 }
             }
+            if (alpha_val < 0.01) {
+                result = vec4(0.0, 0.0, 0.0, 0.0);
+            }
 
-            return vec4(self.color.rgb * alpha_val, self.color.a * alpha_val);
+            return result;
         }
     }
 
     // Point shader with radial gradient support
-    DrawPlotPointGradient: mod.std.set_type_default() do #(DrawPlotPointGradient::script_api(vm)){
-        fn pixel(self) -> vec4 {
+    DrawPlotPointGradient: mod.std.set_type_default() do #(DrawPlotPointGradient::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
             let uv = self.pos;
             let center = vec2(0.5, 0.5);
             let dist = distance(uv, center) * 2.0;
@@ -295,8 +303,9 @@ script_mod! {
     }
 
     // Triangle shader with barycentric coordinates for radar fills
-    DrawTriangle: mod.std.set_type_default() do #(DrawTriangle::script_api(vm)){
-        fn pixel(self) -> vec4 {
+    DrawTriangle: mod.std.set_type_default() do #(DrawTriangle::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
             // Triangle vertices in normalized coordinates (0-1)
             let v0 = vec2(self.v0x, self.v0y);
             let v1 = vec2(self.v1x, self.v1y);
@@ -326,20 +335,21 @@ script_mod! {
             let alpha = smoothstep(0.0, 0.03, edge_dist);
 
             // Check if point is inside triangle (with AA margin)
+            let mut result = vec4(0.0, 0.0, 0.0, 0.0);
             if (u >= -0.03 && v >= -0.03 && (u + v) <= 1.03) {
+                result = vec4(self.color.rgb * self.color.a * alpha, self.color.a * alpha);
                 if (self.gradient_enabled > 0.5) {
                     if (self.gradient_type < 0.5) {
                         let final_color = mix(self.gradient_outer_color, self.gradient_center_color, w);
-                        return vec4(final_color.rgb * final_color.a * alpha, final_color.a * alpha);
+                        result = vec4(final_color.rgb * final_color.a * alpha, final_color.a * alpha);
                     } else {
                         let final_color = mix(self.gradient_center_color, self.gradient_outer_color, p.y);
-                        return vec4(final_color.rgb * final_color.a * alpha, final_color.a * alpha);
+                        result = vec4(final_color.rgb * final_color.a * alpha, final_color.a * alpha);
                     }
                 }
-                return vec4(self.color.rgb * self.color.a * alpha, self.color.a * alpha);
             }
 
-            return vec4(0.0, 0.0, 0.0, 0.0);
+            return result;
         }
     }
 }
@@ -404,7 +414,7 @@ impl DrawPlotLine {
         p2: DVec2,
         width: f64,
         style: LineStyle,
-        dash_offset: f64,
+        dash_offset: f64
     ) {
         let dx = p2.x - p1.x;
         let dy = p2.y - p1.y;
@@ -419,7 +429,7 @@ impl DrawPlotLine {
             pos: dvec2(p1.x.min(p2.x) - padding, p1.y.min(p2.y) - padding),
             size: dvec2(
                 (p2.x - p1.x).abs() + padding * 2.0,
-                (p2.y - p1.y).abs() + padding * 2.0,
+                (p2.y - p1.y).abs() + padding * 2.0
             ),
         };
 
@@ -490,7 +500,7 @@ impl DrawPlotBar {
         cx: &mut Cx2d,
         rect: Rect,
         bottom_color: Vec4,
-        top_color: Vec4,
+        top_color: Vec4
     ) {
         self.gradient_enabled = 1.0;
         self.gradient_bottom_color = bottom_color;
@@ -534,7 +544,7 @@ impl DrawPlotFill {
         y1: f64,
         y2: f64,
         bottom_color: Vec4,
-        top_color: Vec4,
+        top_color: Vec4
     ) {
         self.gradient_enabled = 1.0;
         self.gradient_bottom_color = bottom_color;
@@ -575,7 +585,7 @@ impl DrawPieSlice {
         center: DVec2,
         radius: f64,
         start_angle: f64,
-        end_angle: f64,
+        end_angle: f64
     ) {
         self.gradient_enabled = 0.0;
         self.start_angle = start_angle as f32;
@@ -596,7 +606,7 @@ impl DrawPieSlice {
         start_angle: f64,
         end_angle: f64,
         center_color: Vec4,
-        outer_color: Vec4,
+        outer_color: Vec4
     ) {
         self.gradient_enabled = 1.0;
         self.gradient_center_color = center_color;
@@ -644,7 +654,7 @@ impl DrawArc {
         outer_radius: f64,
         inner_radius_ratio: f64,
         start_angle: f64,
-        end_angle: f64,
+        end_angle: f64
     ) {
         self.gradient_enabled = 0.0;
         self.start_angle = start_angle as f32;
@@ -668,7 +678,7 @@ impl DrawArc {
         end_angle: f64,
         inner_color: Vec4,
         outer_color: Vec4,
-        gradient_type: i32,
+        gradient_type: i32
     ) {
         self.gradient_enabled = 1.0;
         self.gradient_type = gradient_type as f32;
@@ -718,7 +728,7 @@ impl DrawPlotPointGradient {
         center: DVec2,
         radius: f64,
         center_color: Vec4,
-        outer_color: Vec4,
+        outer_color: Vec4
     ) {
         self.gradient_enabled = 1.0;
         self.gradient_center_color = center_color;
@@ -798,7 +808,7 @@ impl DrawTriangle {
         p1: DVec2,
         p2: DVec2,
         center_color: Vec4,
-        outer_color: Vec4,
+        outer_color: Vec4
     ) {
         let min_x = p0.x.min(p1.x).min(p2.x);
         let min_y = p0.y.min(p1.y).min(p2.y);

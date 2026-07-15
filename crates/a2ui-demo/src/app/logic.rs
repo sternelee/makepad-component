@@ -1,6 +1,5 @@
 use makepad_component::a2ui::*;
 use makepad_component::widgets::button::MpButtonAction;
-use makepad_widgets::makepad_platform::live_atomic::AtomicGetSet;
 use makepad_widgets::*;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -73,68 +72,70 @@ fn preload_audio_urls(urls: Vec<(String, String)>, pcm_cache: PcmCache) {
     }
 }
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.theme.*
 
-    use makepad_component::theme::colors::*;
-    use makepad_component::a2ui::surface::widget::*;
-    use makepad_component::widgets::dropdown::*;
-    use makepad_component::widgets::button::*;
+    // Runtime-editable theme color values for apply_theme()
+    mod.a2ui_theme = {
+        bg_primary: #1a1a2e
+        bg_surface: #222244
+        text_primary: #FFFFFF
+        text_secondary: #888888
+        status_color: #4CAF50
+    }
 
-    // Main Application
-    App = {{App}} {
-        ui: <Root> {
-            main_window = <Window> {
+    startup() do #(App::script_component(vm)){
+        ui: Root{
+            main_window := Window{
                 show_bg: true
                 width: Fill
                 height: Fill
 
-                body = <View> {
+                body := mod.widgets.SolidView{
                     width: Fill
                     height: Fill
                     flow: Down
-                    padding: 20.0
+                    padding: Inset{left: 20.0 right: 20.0 top: 20.0 bottom: 20.0}
                     spacing: 16.0
-                    show_bg: true
-                    draw_bg: { color: #1a1a2e }
+                    draw_bg.color: mod.a2ui_theme.bg_primary
 
                     // Header row: Title on left, Theme dropdown on right
-                    header_row = <View> {
+                    header_row := View{
                         width: Fill
                         height: Fit
                         flow: Right
-                        align: { y: 0.5 }
+                        align: Align{y: 0.5}
 
                         // Title and description column
-                        <View> {
+                        View{
                             width: Fill
                             height: Fit
                             flow: Down
                             spacing: 4.0
 
                             // Title - changes based on mode
-                            title_label = <Label> {
+                            title_label := Label{
                                 text: "A2UI Demo"
-                                draw_text: {
-                                    text_style: <THEME_FONT_BOLD> { font_size: 24.0 }
-                                    color: #FFFFFF
+                                draw_text +: {
+                                    text_style: theme.font_bold{font_size: 24.0}
+                                    color: mod.a2ui_theme.text_primary
                                 }
                             }
 
                             // Description
-                            desc_label = <Label> {
+                            desc_label := Label{
                                 text: "Static: Product Catalog | Streaming: Payment Checkout"
-                                draw_text: {
-                                    text_style: <THEME_FONT_REGULAR> { font_size: 14.0 }
-                                    color: #888888
+                                draw_text +: {
+                                    text_style: theme.font_regular{font_size: 14.0}
+                                    color: mod.a2ui_theme.text_secondary
                                 }
                             }
                         }
 
                         // Theme dropdown in top-right corner
-                        theme_dropdown = <MpDropdownSmall> {
+                        theme_dropdown := mod.widgets.MpDropdownSmall{
                             width: Fit
                             height: Fit
                             labels: ["Dark Purple", "Cloud White", "Soft Gray"]
@@ -143,118 +144,68 @@ live_design! {
                     }
 
                     // Control buttons row
-                    controls_row = <View> {
+                    controls_row := View{
                         width: Fill
                         height: Fit
                         flow: Right
                         spacing: 10.0
 
-                        // Load static data button
-                        load_btn = <MpButton> {
+                        load_btn := mod.widgets.MpButton{
                             text: "🛒 Product Catalog"
-                            draw_text: { color: #FFFFFF }
-                            draw_bg: {
-                                color: #0066CC
-                                color_hover: #0055AA
-                                color_pressed: #004488
-                            }
                         }
-
-                        // Math charts demo button
-                        math_btn = <MpButton> {
+                        math_btn := mod.widgets.MpButton{
                             text: "📐 Math Charts"
-                            draw_text: { color: #FFFFFF }
-                            draw_bg: {
-                                color: #AA6600
-                                color_hover: #995500
-                                color_pressed: #884400
-                            }
                         }
-
-                        // Travel app demo button
-                        travel_btn = <MpButton> {
+                        travel_btn := mod.widgets.MpButton{
                             text: "✈ Travel Planner"
-                            draw_text: { color: #FFFFFF }
-                            draw_bg: {
-                                color: #CC3366
-                                color_hover: #AA2255
-                                color_pressed: #881144
-                            }
                         }
-
-                        // Calendar view button
-                        calendar_btn = <MpButton> {
+                        calendar_btn := mod.widgets.MpButton{
                             text: "📅 Calendar"
-                            draw_text: { color: #FFFFFF }
-                            draw_bg: {
-                                color: #6633AA
-                                color_hover: #552299
-                                color_pressed: #441188
-                            }
                         }
-
-                        // Music Player demo button
-                        music_btn = <MpButton> {
+                        music_btn := mod.widgets.MpButton{
                             text: "🎵 Music"
-                            draw_text: { color: #FFFFFF }
-                            draw_bg: {
-                                color: #CC3366
-                                color_hover: #BB2255
-                                color_pressed: #AA1144
-                            }
                         }
-
-                        // Cyber Sound Art demo button
-                        cyber_art_btn = <MpButton> {
+                        cyber_art_btn := mod.widgets.MpButton{
                             text: "🎨 Cyber Art"
-                            draw_text: { color: #FFFFFF }
-                            draw_bg: {
-                                color: #9933CC
-                                color_hover: #8822BB
-                                color_pressed: #7711AA
-                            }
                         }
-
-                        // Connect to server button
-                        connect_btn = <MpButton> {
+                        connect_btn := mod.widgets.MpButton{
                             text: "🎨 Live Editor"
-                            draw_text: { color: #FFFFFF }
-                            draw_bg: {
-                                color: #00AA66
-                                color_hover: #009955
-                                color_pressed: #008844
-                            }
                         }
 
-                        // Server URL input
-                        server_url = <Label> {
+                        // Server URL label
+                        server_url := Label{
                             text: "localhost:8081"
-                            draw_text: { color: #666666 }
+                            draw_text +: { color: mod.a2ui_theme.text_secondary }
                         }
                     }
 
-                    // Status label - green color for visibility
-                    status_label = <Label> {
+                    // Status label
+                    status_label := Label{
                         text: "Select a demo mode above"
-                        draw_text: {
-                            color: #4CAF50
-                            text_style: { font_size: 16.0 }
+                        draw_text +: {
+                            color: mod.a2ui_theme.status_color
+                            text_style: theme.font_regular{font_size: 16.0}
                         }
                     }
 
                     // A2UI Surface container with scroll
-                    surface_container = <ScrollYView> {
+                    surface_container := ScrollYView{
                         width: Fill
                         height: Fill
                         show_bg: true
-                        draw_bg: { color: #222244 }
+                        draw_bg +: {
+                            color: instance(mod.a2ui_theme.bg_surface)
+                            pixel: fn() {
+                                return self.color
+                            }
+                        }
 
-                        <View> {
+                        View{
                             width: Fill
                             height: Fit
-                            padding: 16.0
+                            padding: Inset{left: 16.0 right: 16.0 top: 16.0 bottom: 16.0}
 
-                            a2ui_surface = <A2uiSurface> {
+                            a2ui_surface := mod.widgets.A2uiSurface{
                                 width: Fill
                                 height: Fit
                             }
@@ -268,7 +219,8 @@ live_design! {
 
 app_main!(App);
 
-#[derive(Live, LiveHook)]
+
+#[derive(Script, ScriptHook)]
 pub struct App {
     #[live]
     ui: WidgetRef,
@@ -321,166 +273,61 @@ pub struct App {
     pcm_cache: PcmCache,
 }
 
-impl LiveRegister for App {
-    fn live_register(cx: &mut Cx) {
-        makepad_widgets::live_design(cx);
-        makepad_component::live_design(cx);
-    }
-}
-
 impl App {
     /// Apply the current theme colors to all UI elements
     fn apply_theme(&mut self, cx: &mut Cx) {
         let colors = self.current_theme.colors();
 
-        // Apply body background (main container)
-        self.ui.view(ids!(body)).apply_over(
-            cx,
-            live! {
-                draw_bg: { color: (colors.bg_primary) }
-            },
-        );
+        fn pack(c: Vec4) -> u32 {
+            let r = (c.x.clamp(0.0, 1.0) * 255.0) as u32;
+            let g = (c.y.clamp(0.0, 1.0) * 255.0) as u32;
+            let b = (c.z.clamp(0.0, 1.0) * 255.0) as u32;
+            let a = (c.w.clamp(0.0, 1.0) * 255.0) as u32;
+            (r << 24) | (g << 16) | (b << 8) | a
+        }
 
-        // Apply header row background (in case it needs distinction)
-        self.ui.view(ids!(header_row)).apply_over(
-            cx,
-            live! {
-                draw_bg: { color: (colors.bg_primary) }
-            },
-        );
+        // Update the shared theme color values in the script heap
+        cx.with_vm(|vm| {
+            let m = vm.module(id!(a2ui_theme));
+            let t = NoTrap;
+            vm.bx
+                .heap
+                .set_value(m, id!(bg_primary).into(), ScriptValue::from_color(pack(colors.bg_primary)), t);
+            vm.bx
+                .heap
+                .set_value(m, id!(bg_surface).into(), ScriptValue::from_color(pack(colors.bg_surface)), t);
+            vm.bx
+                .heap
+                .set_value(m, id!(text_primary).into(), ScriptValue::from_color(pack(colors.text_primary)), t);
+            vm.bx
+                .heap
+                .set_value(m, id!(text_secondary).into(), ScriptValue::from_color(pack(colors.text_secondary)), t);
+            vm.bx
+                .heap
+                .set_value(m, id!(status_color).into(), ScriptValue::from_color(pack(colors.status_color)), t);
+        });
 
-        // Apply controls row background
-        self.ui.view(ids!(controls_row)).apply_over(
-            cx,
-            live! {
-                draw_bg: { color: (colors.bg_primary) }
-            },
-        );
+        // Re-apply the themed colors to each element
+        let mut body = self.ui.view(cx, ids!(body));
+        script_apply_eval!(cx, body, { draw_bg +: { color: mod.a2ui_theme.bg_primary } });
 
-        // Apply title color
-        self.ui.label(ids!(title_label)).apply_over(
-            cx,
-            live! {
-                draw_text: { color: (colors.text_primary) }
-            },
-        );
+        let mut surface_container = self.ui.view(cx, ids!(surface_container));
+        script_apply_eval!(cx, surface_container, { draw_bg +: { color: mod.a2ui_theme.bg_surface } });
 
-        // Apply description color
-        self.ui.label(ids!(desc_label)).apply_over(
-            cx,
-            live! {
-                draw_text: { color: (colors.text_secondary) }
-            },
-        );
+        let mut title_label = self.ui.label(cx, ids!(title_label));
+        script_apply_eval!(cx, title_label, { draw_text +: { color: mod.a2ui_theme.text_primary } });
 
-        // Apply button colors - keep text white for contrast
-        let white = vec4(1.0, 1.0, 1.0, 1.0);
+        let mut desc_label = self.ui.label(cx, ids!(desc_label));
+        script_apply_eval!(cx, desc_label, { draw_text +: { color: mod.a2ui_theme.text_secondary } });
 
-        // Calculate hover/pressed colors (slightly darker versions)
-        let accent_hover = vec4(
-            colors.accent.x * 0.85,
-            colors.accent.y * 0.85,
-            colors.accent.z * 0.85,
-            1.0,
-        );
-        let accent_pressed = vec4(
-            colors.accent.x * 0.7,
-            colors.accent.y * 0.7,
-            colors.accent.z * 0.7,
-            1.0,
-        );
-        let secondary_hover = vec4(
-            colors.accent_secondary.x * 0.85,
-            colors.accent_secondary.y * 0.85,
-            colors.accent_secondary.z * 0.85,
-            1.0,
-        );
-        let secondary_pressed = vec4(
-            colors.accent_secondary.x * 0.7,
-            colors.accent_secondary.y * 0.7,
-            colors.accent_secondary.z * 0.7,
-            1.0,
-        );
+        let mut server_url = self.ui.label(cx, ids!(server_url));
+        script_apply_eval!(cx, server_url, { draw_text +: { color: mod.a2ui_theme.text_secondary } });
 
-        self.ui.button(ids!(load_btn)).apply_over(
-            cx,
-            live! {
-                draw_bg: {
-                    color: (colors.accent)
-                    color_hover: (accent_hover)
-                    color_pressed: (accent_pressed)
-                }
-                draw_text: { color: (white) }
-            },
-        );
-
-        self.ui.button(ids!(connect_btn)).apply_over(
-            cx,
-            live! {
-                draw_bg: {
-                    color: (colors.accent_secondary)
-                    color_hover: (secondary_hover)
-                    color_pressed: (secondary_pressed)
-                }
-                draw_text: { color: (white) }
-            },
-        );
-
-        // Apply server URL label color
-        self.ui.label(ids!(server_url)).apply_over(
-            cx,
-            live! {
-                draw_text: { color: (colors.text_secondary) }
-            },
-        );
-
-        // Apply status label color
-        self.ui.label(ids!(status_label)).apply_over(
-            cx,
-            live! {
-                draw_text: { color: (colors.status_color) }
-            },
-        );
-
-        // Apply surface container background
-        self.ui.view(ids!(surface_container)).apply_over(
-            cx,
-            live! {
-                draw_bg: { color: (colors.bg_surface) }
-            },
-        );
-
-        // Apply theme-appropriate dropdown styling
-        let is_light = self.current_theme == Theme::Light;
-        let dropdown_text = if is_light {
-            vec4(0.04, 0.04, 0.04, 1.0) // dark text
-        } else {
-            vec4(1.0, 1.0, 1.0, 1.0) // white text
-        };
-        let dropdown_bg = if is_light {
-            vec4(1.0, 1.0, 1.0, 1.0) // white bg
-        } else {
-            vec4(0.2, 0.2, 0.33, 1.0) // dark purple bg
-        };
-        let dropdown_border = if is_light {
-            vec4(0.83, 0.83, 0.83, 1.0) // light border
-        } else {
-            vec4(0.33, 0.33, 0.47, 1.0) // dark border
-        };
-
-        self.ui.drop_down(ids!(theme_dropdown)).apply_over(
-            cx,
-            live! {
-                draw_text: { color: (dropdown_text) }
-                draw_bg: {
-                    color: (dropdown_bg)
-                    border_color: (dropdown_border)
-                }
-            },
-        );
+        let mut status_label = self.ui.label(cx, ids!(status_label));
+        script_apply_eval!(cx, status_label, { draw_text +: { color: mod.a2ui_theme.status_color } });
 
         // Apply theme to A2UI surface content
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
             let a2ui_colors = self.current_theme.a2ui_colors();
             surface.set_theme_colors(cx, &a2ui_colors);
@@ -491,7 +338,7 @@ impl App {
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
         // Handle theme dropdown selection
-        if let Some(index) = self.ui.drop_down(ids!(theme_dropdown)).selected(&actions) {
+        if let Some(index) = self.ui.drop_down(cx, ids!(theme_dropdown)).selected(&actions) {
             let new_theme = Theme::from_index(index);
             if new_theme != self.current_theme {
                 self.current_theme = new_theme;
@@ -501,7 +348,7 @@ impl App {
         }
 
         // Handle "Math Charts" button click (MpButton)
-        let math_btn_ref = self.ui.widget(ids!(math_btn));
+        let math_btn_ref = self.ui.widget(cx, ids!(math_btn));
         if let Some(item) = actions.find_widget_action(math_btn_ref.widget_uid()) {
             if matches!(item.cast::<MpButtonAction>(), MpButtonAction::Clicked) {
                 self.load_math_charts(cx);
@@ -509,7 +356,7 @@ impl App {
         }
 
         // Handle "Travel Planner" button click (MpButton)
-        let travel_btn_ref = self.ui.widget(ids!(travel_btn));
+        let travel_btn_ref = self.ui.widget(cx, ids!(travel_btn));
         if let Some(item) = actions.find_widget_action(travel_btn_ref.widget_uid()) {
             if matches!(item.cast::<MpButtonAction>(), MpButtonAction::Clicked) {
                 self.load_travel_app(cx);
@@ -517,7 +364,7 @@ impl App {
         }
 
         // Handle "Calendar" button click (MpButton)
-        let calendar_btn_ref = self.ui.widget(ids!(calendar_btn));
+        let calendar_btn_ref = self.ui.widget(cx, ids!(calendar_btn));
         if let Some(item) = actions.find_widget_action(calendar_btn_ref.widget_uid()) {
             if matches!(item.cast::<MpButtonAction>(), MpButtonAction::Clicked) {
                 self.load_calendar_travel(cx);
@@ -525,7 +372,7 @@ impl App {
         }
 
         // Handle "Music Player" button click (MpButton)
-        let music_btn_ref = self.ui.widget(ids!(music_btn));
+        let music_btn_ref = self.ui.widget(cx, ids!(music_btn));
         if let Some(item) = actions.find_widget_action(music_btn_ref.widget_uid()) {
             if matches!(item.cast::<MpButtonAction>(), MpButtonAction::Clicked) {
                 self.load_music_player(cx);
@@ -533,7 +380,7 @@ impl App {
         }
 
         // Handle "Cyber Art" button click (MpButton)
-        let cyber_art_btn_ref = self.ui.widget(ids!(cyber_art_btn));
+        let cyber_art_btn_ref = self.ui.widget(cx, ids!(cyber_art_btn));
         if let Some(item) = actions.find_widget_action(cyber_art_btn_ref.widget_uid()) {
             if matches!(item.cast::<MpButtonAction>(), MpButtonAction::Clicked) {
                 self.load_json_file(cx, "cyber_art.json", "🎨 Cyber Sound Art");
@@ -541,7 +388,7 @@ impl App {
         }
 
         // Handle "Load Static Data" button click (MpButton)
-        let load_btn_ref = self.ui.widget(ids!(load_btn));
+        let load_btn_ref = self.ui.widget(cx, ids!(load_btn));
         if let Some(item) = actions.find_widget_action(load_btn_ref.widget_uid()) {
             if matches!(item.cast::<MpButtonAction>(), MpButtonAction::Clicked) {
                 self.load_a2ui_data(cx);
@@ -549,7 +396,7 @@ impl App {
         }
 
         // Handle "Connect to Server" button click (MpButton)
-        let connect_btn_ref = self.ui.widget(ids!(connect_btn));
+        let connect_btn_ref = self.ui.widget(cx, ids!(connect_btn));
         if let Some(item) = actions.find_widget_action(connect_btn_ref.widget_uid()) {
             if matches!(item.cast::<MpButtonAction>(), MpButtonAction::Clicked) {
                 self.connect_to_server(cx);
@@ -557,7 +404,7 @@ impl App {
         }
 
         // Handle A2UI surface actions
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         if let Some(item) = actions.find_widget_action(surface_ref.widget_uid()) {
             match item.cast::<A2uiSurfaceAction>() {
                 A2uiSurfaceAction::UserAction(user_action) => {
@@ -570,16 +417,16 @@ impl App {
                         match user_action.action.name.as_str() {
                             "confirmPayment" => {
                                 self.ui
-                                    .label(ids!(status_label))
+                                    .label(cx, ids!(status_label))
                                     .set_text(cx, "✅ Processing payment...");
                             }
                             "cancelPayment" => {
                                 self.ui
-                                    .label(ids!(status_label))
+                                    .label(cx, ids!(status_label))
                                     .set_text(cx, "❌ Payment cancelled");
                             }
                             _ => {
-                                self.ui.label(ids!(status_label)).set_text(
+                                self.ui.label(cx, ids!(status_label)).set_text(
                                     cx,
                                     &format!("📤 Action: {}", user_action.action.name),
                                 );
@@ -590,7 +437,7 @@ impl App {
                         if user_action.action.name == "addToCart" {
                             if let Some(product_id) = user_action.action.context.get("productId") {
                                 self.ui
-                                    .label(ids!(status_label))
+                                    .label(cx, ids!(status_label))
                                     .set_text(cx, &format!("🛒 Added {} to cart!", product_id));
                             }
                         } else if user_action.action.name == "switchEffect" {
@@ -610,7 +457,7 @@ impl App {
                                     }
                                 }
                                 self.ui
-                                    .label(ids!(status_label))
+                                    .label(cx, ids!(status_label))
                                     .set_text(cx, &format!("🎨 Effect: {}", effect_str));
                             }
                         } else if user_action.action.name == "calendarCellClick" {
@@ -675,10 +522,10 @@ impl App {
                             } else {
                                 format!("📅 Day {} | {} | {}", col + 1, time_slot, detail)
                             };
-                            self.ui.label(ids!(status_label)).set_text(cx, &status);
+                            self.ui.label(cx, ids!(status_label)).set_text(cx, &status);
                         } else {
                             self.ui
-                                .label(ids!(status_label))
+                                .label(cx, ids!(status_label))
                                 .set_text(cx, &format!("🎯 Action: {}", user_action.action.name));
                         }
                     }
@@ -696,12 +543,12 @@ impl App {
                         self.playing_audio_component_id = None;
 
                         // Update surface state for button display
-                        let surface = self.ui.a2ui_surface(ids!(a2ui_surface));
+                        let surface = self.ui.a2ui_surface(cx, ids!(a2ui_surface));
                         surface.set_playing_component(None);
                         surface.set_audio_amplitude(0.0);
 
                         self.ui
-                            .label(ids!(status_label))
+                            .label(cx, ids!(status_label))
                             .set_text(cx, &format!("⏹ Stopped: {}", title));
                         log!("Stopped: {}", title);
                     } else {
@@ -712,7 +559,7 @@ impl App {
                         self.playing_audio_component_id = Some(component_id.clone());
 
                         // Update surface state for button display
-                        let surface = self.ui.a2ui_surface(ids!(a2ui_surface));
+                        let surface = self.ui.a2ui_surface(cx, ids!(a2ui_surface));
                         surface.set_playing_component(Some(component_id.clone()));
 
                         // Ensure audio output callback is registered
@@ -733,7 +580,7 @@ impl App {
                             // Instant playback from memory cache
                             log!("Instant playback from PCM cache: {}", cache_path);
                             self.ui
-                                .label(ids!(status_label))
+                                .label(cx, ids!(status_label))
                                 .set_text(cx, &format!("▶ {}", title));
                             if !self.audio_output_registered {
                                 start_audio_output(
@@ -761,7 +608,7 @@ impl App {
                             } else {
                                 format!("⏳ Downloading: {}", title)
                             };
-                            self.ui.label(ids!(status_label)).set_text(cx, &status_msg);
+                            self.ui.label(cx, ids!(status_label)).set_text(cx, &status_msg);
 
                             if !self.audio_output_registered {
                                 start_audio_output(
@@ -880,7 +727,7 @@ impl App {
                     }
                     // Update status to show the change
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, &format!("📝 Updated {}", path));
                     self.ui.redraw(cx);
                 }
@@ -902,14 +749,14 @@ impl App {
 
         // Clear surface BEFORE connecting - this ensures a fresh start
         // The BeginRendering message will create a new surface
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
             surface.clear();
         }
 
         // Update title for streaming mode
         self.ui
-            .label(ids!(title_label))
+            .label(cx, ids!(title_label))
             .set_text(cx, "🎨 Live A2UI Editor");
 
         // Connect to /rpc for initial UI load
@@ -923,7 +770,7 @@ impl App {
         match host.connect("Live mode") {
             Ok(()) => {
                 self.ui
-                    .label(ids!(status_label))
+                    .label(cx, ids!(status_label))
                     .set_text(cx, "🔗 Connecting to live server...");
                 self.host = Some(host);
                 self.is_streaming = true;
@@ -937,7 +784,7 @@ impl App {
             }
             Err(e) => {
                 self.ui
-                    .label(ids!(status_label))
+                    .label(cx, ids!(status_label))
                     .set_text(cx, &format!("❌ Connection failed: {}", e));
             }
         }
@@ -990,7 +837,7 @@ impl App {
         self.host = None;
         self.is_streaming = false;
         self.ui
-            .label(ids!(status_label))
+            .label(cx, ids!(status_label))
             .set_text(cx, "🔌 Disconnected from server");
         self.ui.redraw(cx);
     }
@@ -1046,7 +893,7 @@ impl App {
             if batch_hash != self.last_content_hash {
                 self.last_content_hash = batch_hash;
 
-                let surface_ref = self.ui.widget(ids!(a2ui_surface));
+                let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
                 for msg in messages {
                     log!("Received A2uiMessage: {:?}", msg);
                     if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
@@ -1067,13 +914,13 @@ impl App {
 
                 if self.live_mode {
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, "🎨 Live UI Updated");
                     self.loaded = true;
                     // Keep polling for new content updates
                 } else {
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, "💳 Streaming payment UI...");
                 }
                 needs_redraw = true;
@@ -1084,11 +931,11 @@ impl App {
             if !self.live_mode {
                 if state == "completed" {
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, "✅ Payment page ready");
                 } else {
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, &format!("💳 {}", state));
                 }
                 needs_redraw = true;
@@ -1097,7 +944,7 @@ impl App {
 
         if had_error {
             self.ui
-                .label(ids!(status_label))
+                .label(cx, ids!(status_label))
                 .set_text(cx, &format!("❌ Error: {}", error_msg));
             needs_redraw = true;
         }
@@ -1107,7 +954,7 @@ impl App {
             self.is_streaming = false;
             if !self.live_mode {
                 self.ui
-                    .label(ids!(status_label))
+                    .label(cx, ids!(status_label))
                     .set_text(cx, "⚫ Disconnected from server");
                 needs_redraw = true;
             }
@@ -1129,7 +976,7 @@ impl App {
             return;
         }
 
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         let mut needs_redraw = false;
 
         for event in events {
@@ -1144,7 +991,7 @@ impl App {
                         log!("🔴 LIVE: Processed {} events", events.len());
                     }
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, "🔴 Streaming component...");
                     needs_redraw = true;
                 }
@@ -1174,21 +1021,21 @@ impl App {
         self.live_mode = false;
 
         // Clear the surface before loading new data
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
             surface.clear();
         }
 
         // Update title for static mode
         self.ui
-            .label(ids!(title_label))
+            .label(cx, ids!(title_label))
             .set_text(cx, "🛒 Product Catalog");
 
         // Sample A2UI JSON for a product catalog
         let a2ui_json = get_sample_product_catalog();
 
         // Get the A2uiSurface widget ref and process the JSON
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         let result = {
             if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
                 match surface.process_json(&a2ui_json) {
@@ -1213,12 +1060,12 @@ impl App {
         // Update status label - use emoji to highlight static data mode
         if let Some(count) = result {
             self.ui
-                .label(ids!(status_label))
+                .label(cx, ids!(status_label))
                 .set_text(cx, &format!("🟢 Static Mode | {} events loaded", count));
             self.loaded = true;
         } else {
             self.ui
-                .label(ids!(status_label))
+                .label(cx, ids!(status_label))
                 .set_text(cx, "🔴 Error loading A2UI data");
         }
 
@@ -1233,13 +1080,13 @@ impl App {
         self.live_mode = false;
 
         // Clear the surface before loading
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
             surface.clear();
         }
 
         self.ui
-            .label(ids!(title_label))
+            .label(cx, ids!(title_label))
             .set_text(cx, "Personal Travel Planner");
 
         // Load travel_app.json from current directory
@@ -1247,14 +1094,14 @@ impl App {
             Ok(s) => s,
             Err(e) => {
                 self.ui
-                    .label(ids!(status_label))
+                    .label(cx, ids!(status_label))
                     .set_text(cx, &format!("Error: travel_app.json not found ({})", e));
                 self.ui.redraw(cx);
                 return;
             }
         };
 
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         let result = {
             if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
                 match surface.process_json(&json_str) {
@@ -1273,14 +1120,14 @@ impl App {
         };
 
         if let Some(count) = result {
-            self.ui.label(ids!(status_label)).set_text(
+            self.ui.label(cx, ids!(status_label)).set_text(
                 cx,
                 &format!("Travel Planner | {} events | Tokyo 7-Day Trip", count),
             );
             self.loaded = true;
         } else {
             self.ui
-                .label(ids!(status_label))
+                .label(cx, ids!(status_label))
                 .set_text(cx, "Error loading travel app data");
         }
 
@@ -1295,20 +1142,20 @@ impl App {
         self.live_mode = false;
 
         // Clear the surface before loading
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
             surface.clear();
         }
 
         self.ui
-            .label(ids!(title_label))
+            .label(cx, ids!(title_label))
             .set_text(cx, "🗼 Tokyo 7-Day Travel Planner");
 
         // Load calendar_travel.json from current directory
         let json_str = match std::fs::read_to_string("calendar_travel.json") {
             Ok(s) => s,
             Err(e) => {
-                self.ui.label(ids!(status_label)).set_text(
+                self.ui.label(cx, ids!(status_label)).set_text(
                     cx,
                     &format!("Error: calendar_travel.json not found ({})", e),
                 );
@@ -1317,7 +1164,7 @@ impl App {
             }
         };
 
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         let result = {
             if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
                 match surface.process_json(&json_str) {
@@ -1336,14 +1183,14 @@ impl App {
         };
 
         if let Some(count) = result {
-            self.ui.label(ids!(status_label)).set_text(
+            self.ui.label(cx, ids!(status_label)).set_text(
                 cx,
                 &format!("Calendar View | {} events | Tokyo 7-Day Trip", count),
             );
             self.loaded = true;
         } else {
             self.ui
-                .label(ids!(status_label))
+                .label(cx, ids!(status_label))
                 .set_text(cx, "Error loading calendar travel data");
         }
 
@@ -1356,25 +1203,25 @@ impl App {
         self.is_streaming = false;
         self.live_mode = false;
 
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
             surface.clear();
         }
 
-        self.ui.label(ids!(title_label)).set_text(cx, title);
+        self.ui.label(cx, ids!(title_label)).set_text(cx, title);
 
         let json_str = match std::fs::read_to_string(path) {
             Ok(s) => s,
             Err(e) => {
                 self.ui
-                    .label(ids!(status_label))
+                    .label(cx, ids!(status_label))
                     .set_text(cx, &format!("Error: {} not found ({})", path, e));
                 self.ui.redraw(cx);
                 return;
             }
         };
 
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         let result = {
             if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
                 match surface.process_json(&json_str) {
@@ -1402,12 +1249,12 @@ impl App {
                 }
             }
             self.ui
-                .label(ids!(status_label))
+                .label(cx, ids!(status_label))
                 .set_text(cx, &format!("Ready to play | {} events loaded", count));
             self.loaded = true;
         } else {
             self.ui
-                .label(ids!(status_label))
+                .label(cx, ids!(status_label))
                 .set_text(cx, &format!("Error loading {}", path));
         }
 
@@ -1422,18 +1269,18 @@ impl App {
         self.live_mode = false;
 
         // Clear the surface before loading
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
             surface.clear();
         }
 
         self.ui
-            .label(ids!(title_label))
+            .label(cx, ids!(title_label))
             .set_text(cx, "🎵 Makepad Music Player");
 
         let a2ui_json = get_sample_music_player();
 
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         let result = {
             if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
                 match surface.process_json(&a2ui_json) {
@@ -1460,14 +1307,14 @@ impl App {
                     preload_audio_urls(urls, self.pcm_cache.clone());
                 }
             }
-            self.ui.label(ids!(status_label)).set_text(
+            self.ui.label(cx, ids!(status_label)).set_text(
                 cx,
                 &format!("🎵 Music Player | {} events | 3 songs ready", count),
             );
             self.loaded = true;
         } else {
             self.ui
-                .label(ids!(status_label))
+                .label(cx, ids!(status_label))
                 .set_text(cx, "Error loading music player data");
         }
 
@@ -1482,27 +1329,27 @@ impl App {
         self.live_mode = false;
 
         // Clear the surface before loading
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
             surface.clear();
         }
 
         self.ui
-            .label(ids!(title_label))
+            .label(cx, ids!(title_label))
             .set_text(cx, "Famous Mathematical Functions");
 
         // Try to load math_test.json from current directory
         let json_str = match std::fs::read_to_string("math_test.json") {
             Ok(s) => s,
             Err(e) => {
-                self.ui.label(ids!(status_label))
+                self.ui.label(cx, ids!(status_label))
                     .set_text(cx, &format!("Error: math_test.json not found ({}). Run: cargo run -p a2ui-demo --bin math-charts", e));
                 self.ui.redraw(cx);
                 return;
             }
         };
 
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         let result = {
             if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
                 match surface.process_json(&json_str) {
@@ -1521,12 +1368,12 @@ impl App {
         };
 
         if let Some(count) = result {
-            self.ui.label(ids!(status_label))
+            self.ui.label(cx, ids!(status_label))
                 .set_text(cx, &format!("Math Demo | {} events | Chebyshev, Fourier, Rosenbrock, Himmelblau, Legendre, Rastrigin", count));
             self.loaded = true;
         } else {
             self.ui
-                .label(ids!(status_label))
+                .label(cx, ids!(status_label))
                 .set_text(cx, "Error loading math charts data");
         }
 
@@ -1535,6 +1382,12 @@ impl App {
 }
 
 impl AppMain for App {
+    fn script_mod(vm: &mut ScriptVm) -> ScriptValue {
+        makepad_widgets::script_mod(vm);
+        makepad_component::script_mod(vm);
+        self::script_mod(vm)
+    }
+
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
         // Auto-load math charts on startup if math_test.json exists
         if let Event::Startup = event {
@@ -1556,7 +1409,7 @@ impl AppMain for App {
                 let amp = self.audio_state.amplitude.get() as f32;
                 let is_playing = self.audio_state.is_playing.load(Ordering::Relaxed);
 
-                let surface = self.ui.a2ui_surface(ids!(a2ui_surface));
+                let surface = self.ui.a2ui_surface(cx, ids!(a2ui_surface));
                 surface.set_audio_amplitude(amp);
 
                 // If playback finished, update UI state
@@ -1565,14 +1418,14 @@ impl AppMain for App {
                     surface.set_audio_amplitude(0.0);
                     self.playing_audio_component_id = None;
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, "⏹ Playback finished");
                 } else if is_playing {
                     // Update status with playback position
                     let pos = self.audio_state.position_secs.get();
                     let dur = self.audio_state.duration_secs.get();
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, &format!("🎵 Playing {:.0}s / {:.0}s", pos, dur));
                 }
 

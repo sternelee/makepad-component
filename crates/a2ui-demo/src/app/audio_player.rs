@@ -1,19 +1,31 @@
 //! Native audio playback using Makepad's cross-platform audio system.
 //!
 //! Decodes MP3/AAC files via symphonia and streams PCM through `cx.audio_output()`.
-//! Uses `LiveAtomic` (f64a) for lock-free volume/amplitude sharing between
+//! Uses a lock-free atomic f64 (`f64a`) for volume/amplitude sharing between
 //! the audio thread and the UI thread, following the Makepad audio example pattern.
 
-use makepad_widgets::makepad_platform::live_atomic::{f64a, AtomicGetSet};
 use makepad_widgets::*;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+
+/// Lock-free atomic f64 (replacement for the removed `live_atomic::f64a`).
+pub struct f64a(AtomicU64);
+
+#[allow(non_snake_case)]
+impl f64a {
+    #[inline]
+    pub fn get(&self) -> f64 {
+        f64::from_bits(self.0.load(Ordering::Relaxed))
+    }
+    #[inline]
+    pub fn set(&self, val: f64) {
+        self.0.store(val.to_bits(), Ordering::Relaxed);
+    }
+}
 
 /// Create an `f64a` (atomic f64) from a plain f64 value.
 fn new_f64a(val: f64) -> f64a {
-    use std::sync::atomic::AtomicU64;
-    // f64a wraps AtomicU64 storing f64 bits
-    unsafe { std::mem::transmute::<AtomicU64, f64a>(AtomicU64::new(val.to_bits())) }
+    f64a(AtomicU64::new(val.to_bits()))
 }
 
 /// Shared state between the audio output callback (real-time thread) and the UI thread.

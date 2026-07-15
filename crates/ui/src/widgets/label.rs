@@ -185,7 +185,7 @@ pub struct MpLabel {
 
     #[redraw]
     #[live]
-    draw_text: DrawText,
+    pub draw_text: DrawText,
     #[live]
     draw_secondary: DrawText,
 

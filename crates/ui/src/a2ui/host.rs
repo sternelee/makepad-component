@@ -3,17 +3,15 @@
 //! Manages the connection between an A2A agent and the A2uiSurface widget.
 //! Handles streaming, message processing, and user action forwarding.
 
-use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::thread;
 
 use makepad_widgets::*;
-use serde_json::Value;
 
 use super::a2a_client::{A2aClient, A2aEventStream, A2aStreamEvent};
 use super::message::{A2uiMessage, UserAction};
 use super::processor::ProcessorEvent;
-use super::surface::{A2uiSurface, A2uiSurfaceAction};
+use super::surface::A2uiSurface;
 
 /// A2UI Host configuration
 #[derive(Clone, Debug)]

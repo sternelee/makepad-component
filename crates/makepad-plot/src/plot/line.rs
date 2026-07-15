@@ -10,9 +10,9 @@ mod.widgets.LinePlotBase = #(LinePlot::register_widget(vm))
 mod.widgets.LinePlot = set_type_default() do mod.widgets.LinePlotBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        math_label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        math_label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
             axis_color: #8d8d99ff
             grid_color: #40404d80

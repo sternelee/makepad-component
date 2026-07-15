@@ -10,8 +10,8 @@ mod.widgets.PieChartBase = #(PieChart::register_widget(vm))
 mod.widgets.PieChart = set_type_default() do mod.widgets.PieChartBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
             legend_bg_color: #1e1e26d9
             legend_border_color: #59596699
@@ -21,9 +21,8 @@ mod.widgets.DonutChartBase = #(DonutChart::register_widget(vm))
 mod.widgets.DonutChart = set_type_default() do mod.widgets.DonutChartBase{
         width: Fill
         height: Fill
-        draw_arc: {}
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
         }
     }

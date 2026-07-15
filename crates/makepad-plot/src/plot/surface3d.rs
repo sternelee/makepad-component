@@ -10,8 +10,8 @@ mod.widgets.Surface3DBase = #(Surface3D::register_widget(vm))
 mod.widgets.Surface3D = set_type_default() do mod.widgets.Surface3DBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
         }
     }

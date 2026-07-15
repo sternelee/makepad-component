@@ -1,6 +1,10 @@
 //! A2uiSurface widget definition and core implementation
 
 use makepad_plot::*;
+#[allow(unused_imports)]
+use makepad_plot::plot::area::AreaChart;
+#[allow(unused_imports)]
+use makepad_plot::plot::financial::CandlestickChart;
 use makepad_widgets::*;
 
 use crate::a2ui::{
@@ -22,314 +26,204 @@ use crate::widgets::{
 
 use super::draw_types::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.theme.*
 
-    use makepad_plot::plot::line::LinePlot;
-    use makepad_plot::plot::bar::BarPlot;
-    use makepad_plot::plot::scatter::ScatterPlot;
-    use makepad_plot::plot::pie::PieChart;
-    use makepad_plot::plot::area::AreaChart;
-    use makepad_plot::plot::polar::RadarChart;
-    use makepad_plot::plot::gauge::GaugeChart;
-    use makepad_plot::plot::bubble::BubbleChart;
-    use makepad_plot::plot::financial::CandlestickChart;
-    use makepad_plot::plot::heatmap::HeatmapChart;
-    use makepad_plot::plot::treemap::Treemap;
-    use makepad_plot::plot::hexbin::SankeyDiagram;
-    use makepad_plot::plot::histogram::HistogramChart;
-    use makepad_plot::plot::histogram::BoxPlotChart;
-    use makepad_plot::plot::pie::DonutChart;
-    use makepad_plot::plot::stem::StemPlot;
-    use makepad_plot::plot::stem::ViolinPlot;
-    use makepad_plot::plot::polar::PolarPlot;
-    use makepad_plot::plot::contour::ContourPlot;
-    use makepad_plot::plot::financial::WaterfallChart;
-    use makepad_plot::plot::gauge::FunnelChart;
-    use makepad_plot::plot::area::StepPlot;
-    use makepad_plot::plot::stack::Stackplot;
-    use makepad_plot::plot::hexbin::HexbinChart;
-    use makepad_plot::plot::stack::Streamgraph;
-    use makepad_plot::plot::surface3d::Surface3D;
-    use makepad_plot::plot::scatter3d::Scatter3D;
-    use makepad_plot::plot::scatter3d::Line3D;
+    mod.widgets.A2uiSurfaceBase = #(A2uiSurface::register_widget(vm))
 
-    use crate::theme::colors::*;
+    // Dark-themed text input for A2UI forms (used by the widget pool)
+    mod.widgets.A2uiTextInput = mod.widgets.TextInput{
+        width: 200
+        height: Fit
+        padding: Inset{left: 12 right: 12 top: 8 bottom: 8}
+        empty_text: ""
 
-    use crate::a2ui::surface::draw_types::DrawA2uiImage;
-    use crate::a2ui::surface::draw_types::DrawA2uiChartLine;
-    use crate::a2ui::surface::draw_types::DrawA2uiArc;
-    use crate::a2ui::surface::draw_types::DrawA2uiQuad;
-    use crate::a2ui::surface::draw_types::DrawAudioBars;
-    use crate::a2ui::surface::draw_types::DrawTaiji;
-    use crate::a2ui::surface::draw_types::DrawAurora;
-    use crate::a2ui::surface::draw_types::DrawReef;
-    use crate::a2ui::surface::draw_types::DrawFractalRainbow;
-    use crate::a2ui::surface::draw_types::DrawGlowingLattice;
-    use crate::a2ui::surface::draw_types::DrawJellyfish;
-    use crate::a2ui::surface::draw_types::DrawTurbulenceFire;
+        draw_bg +: {
+            hover: instance(0.0)
+            focus: instance(0.0)
 
-    use crate::widgets::calendar::MpCalendar;
+            border_radius: uniform(6.0)
+            border_width: uniform(1.0)
+            bg_color: uniform(#2a3a5a)
+            border_color: uniform(#5588bb)
+            border_color_focus: uniform(#3B82F6)
 
-    // Widget templates for pool cloning
-    use crate::widgets::button::MpButton;
-    use crate::widgets::checkbox::MpCheckbox;
-    use crate::widgets::slider::MpSlider;
-    use crate::widgets::label::MpLabel;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(
+                    self.border_width,
+                    self.border_width,
+                    self.rect_size.x - self.border_width * 2.0,
+                    self.rect_size.y - self.border_width * 2.0,
+                    self.border_radius
+                )
+                sdf.fill_keep(self.bg_color)
+                let border = mix(self.border_color, self.border_color_focus, self.focus)
+                sdf.stroke(border, self.border_width)
+                return sdf.result
+            }
+        }
 
-    pub A2uiSurface = {{A2uiSurface}} {
+        draw_text +: {
+            text_style: theme.font_regular{font_size: 14.0}
+            get_color: fn() {
+                return mix(#FFFFFF, #888888, self.empty)
+            }
+        }
+
+        draw_cursor +: {
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0., 0., self.rect_size.x, self.rect_size.y, 1.0)
+                sdf.fill(mix(#0000, #3B82F6, self.focus * (1.0 - self.blink)))
+                return sdf.result
+            }
+        }
+
+        draw_selection +: {
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0., 0., self.rect_size.x, self.rect_size.y, 2.0)
+                sdf.fill(#3B82F620)
+                return sdf.result
+            }
+        }
+
+        animator: Animator{
+            hover: {default: @off
+                off: AnimatorState{from: {all: Forward{duration: 0.15}} apply: {draw_bg: {hover: 0.0}}}
+                on: AnimatorState{from: {all: Forward{duration: 0.1}} apply: {draw_bg: {hover: 1.0}}}
+            }
+            focus: {default: @off
+                off: AnimatorState{from: {all: Forward{duration: 0.2}} apply: {draw_bg: {focus: 0.0} draw_cursor: {focus: 0.0}}}
+                on: AnimatorState{from: {all: Snap} apply: {draw_bg: {focus: 1.0} draw_cursor: {focus: 1.0}}}
+            }
+        }
+    }
+
+    mod.widgets.A2uiSurface = mod.std.set_type_default() do mod.widgets.A2uiSurfaceBase{
         width: Fill
         height: Fill
         flow: Down
 
-        draw_bg: {
-            instance bg_color: #1a1a2e
-
-            fn pixel(self) -> vec4 {
-                return self.bg_color;
-            }
+        draw_bg +: {
+            color: #1a1a2e
         }
 
         // Card background (DrawColor begin/end pattern for Card containers)
-        draw_card: {
+        draw_card +: {
             color: #2a3a5a
-            instance border_color: #5588bb
-            instance border_radius: 8.0
-            instance border_width: 1.0
+            border_color: uniform(#5588bb)
+            border_radius: uniform(8.0)
+            border_width: uniform(1.0)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 sdf.box(
                     self.border_width,
                     self.border_width,
                     self.rect_size.x - self.border_width * 2.0,
                     self.rect_size.y - self.border_width * 2.0,
                     max(1.0, self.border_radius)
-                );
-                sdf.fill_keep(self.color);
-                sdf.stroke(self.border_color, self.border_width);
-                return sdf.result;
+                )
+                sdf.fill_keep(self.color)
+                sdf.stroke(self.border_color, self.border_width)
+                return sdf.result
             }
         }
 
-        draw_image_placeholder: {
-            instance border_radius: 4.0
+        draw_image_placeholder +: {
+            border_radius: uniform(4.0)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                sdf.box(1.0, 1.0, self.rect_size.x - 2.0, self.rect_size.y - 2.0, self.border_radius);
-                let stripe_width = 8.0;
-                let pos = self.pos * self.rect_size;
-                let stripe = mod(pos.x + pos.y, stripe_width * 2.0);
-                let is_stripe = step(stripe_width, stripe);
-                let color1 = vec4(0.25, 0.28, 0.35, 1.0);
-                let color2 = vec4(0.30, 0.33, 0.40, 1.0);
-                let bg_color = mix(color1, color2, is_stripe);
-                sdf.fill(bg_color);
-                return sdf.result;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(1.0, 1.0, self.rect_size.x - 2.0, self.rect_size.y - 2.0, self.border_radius)
+                let stripe_width = 8.0
+                let pos = self.pos * self.rect_size
+                let stripe = pos.x + pos.y - (stripe_width * 2.0) * floor((pos.x + pos.y) / (stripe_width * 2.0))
+                let is_stripe = step(stripe_width, stripe)
+                let color1 = vec4(0.25, 0.28, 0.35, 1.0)
+                let color2 = vec4(0.30, 0.33, 0.40, 1.0)
+                let bg_color = mix(color1, color2, is_stripe)
+                sdf.fill(bg_color)
+                return sdf.result
             }
         }
 
-        draw_image_text: {
-            text_style: <THEME_FONT_REGULAR> {
-                font_size: 11.0
-            }
+        draw_image_text +: {
+            text_style: theme.font_regular{font_size: 11.0}
             color: #888888
         }
 
-        draw_image: <DrawA2uiImage> {}
-
-        draw_chart_line: <DrawA2uiChartLine> {}
-        draw_chart_arc: <DrawA2uiArc> {}
-        draw_chart_text: {
-            text_style: <THEME_FONT_REGULAR> {
-                font_size: 10.0
-            }
+        draw_chart_text +: {
+            text_style: theme.font_regular{font_size: 10.0}
             color: #AABBCC
         }
-        draw_chart_quad: <DrawA2uiQuad> {}
 
         // Divider draw
-        draw_divider: {
+        draw_divider +: {
             color: #5588bb
-
-            fn pixel(self) -> vec4 {
-                return self.color;
-            }
         }
 
-        // Calendar widget template
-        tpl_calendar: <MpCalendar> {}
-
-        plot_line: <LinePlot> {}
-        plot_bar: <BarPlot> {}
-        plot_scatter: <ScatterPlot> {}
-        plot_pie: <PieChart> {}
-        plot_area: <AreaChart> {}
-        plot_radar: <RadarChart> {}
-        plot_gauge: <GaugeChart> {}
-        plot_bubble: <BubbleChart> {}
-        plot_candlestick: <CandlestickChart> {}
-        plot_heatmap: <HeatmapChart> {}
-        plot_treemap: <Treemap> {}
-        plot_sankey: <SankeyDiagram> {}
-        plot_histogram: <HistogramChart> {}
-        plot_boxplot: <BoxPlotChart> {}
-        plot_donut: <DonutChart> {}
-        plot_stem: <StemPlot> {}
-        plot_violin: <ViolinPlot> {}
-        plot_polar: <PolarPlot> {}
-        plot_contour: <ContourPlot> {}
-        plot_waterfall: <WaterfallChart> {}
-        plot_funnel: <FunnelChart> {}
-        plot_step: <StepPlot> {}
-        plot_stackplot: <Stackplot> {}
-        plot_hexbin: <HexbinChart> {}
-        plot_streamgraph: <Streamgraph> {}
-        plot_surface3d: <Surface3D> {}
-        plot_scatter3d: <Scatter3D> {}
-        plot_line3d: <Line3D> {}
-        draw_aurora: <DrawAurora> {}
-        draw_reef: <DrawReef> {}
-        draw_fractal_rainbow: <DrawFractalRainbow> {}
-        draw_glowing_lattice: <DrawGlowingLattice> {}
-        draw_jellyfish: <DrawJellyfish> {}
-        draw_turbulence_fire: <DrawTurbulenceFire> {}
-
-        draw_audio_bars: <DrawAudioBars> {}
-        draw_taiji: <DrawTaiji> {}
+        // makepad-plot chart widgets
+        plot_line := mod.widgets.LinePlot{}
+        plot_bar := mod.widgets.BarPlot{}
+        plot_scatter := mod.widgets.ScatterPlot{}
+        plot_pie := mod.widgets.PieChart{}
+        plot_area := mod.widgets.AreaChart{}
+        plot_radar := mod.widgets.RadarChart{}
+        plot_gauge := mod.widgets.GaugeChart{}
+        plot_bubble := mod.widgets.BubbleChart{}
+        plot_candlestick := mod.widgets.CandlestickChart{}
+        plot_heatmap := mod.widgets.HeatmapChart{}
+        plot_treemap := mod.widgets.Treemap{}
+        plot_sankey := mod.widgets.SankeyDiagram{}
+        plot_histogram := mod.widgets.HistogramChart{}
+        plot_boxplot := mod.widgets.BoxPlotChart{}
+        plot_donut := mod.widgets.DonutChart{}
+        plot_stem := mod.widgets.StemPlot{}
+        plot_violin := mod.widgets.ViolinPlot{}
+        plot_polar := mod.widgets.PolarPlot{}
+        plot_contour := mod.widgets.ContourPlot{}
+        plot_waterfall := mod.widgets.WaterfallChart{}
+        plot_funnel := mod.widgets.FunnelChart{}
+        plot_step := mod.widgets.StepPlot{}
+        plot_stackplot := mod.widgets.Stackplot{}
+        plot_hexbin := mod.widgets.HexbinChart{}
+        plot_streamgraph := mod.widgets.Streamgraph{}
+        plot_surface3d := mod.widgets.Surface3D{}
+        plot_scatter3d := mod.widgets.Scatter3D{}
+        plot_line3d := mod.widgets.Line3D{}
 
         // Audio player button (draw_button/draw_button_text still used by audio player)
-        draw_button: {
-            instance border_radius: 6.0
+        draw_button +: {
+            border_radius: uniform(6.0)
 
-            fn pixel(self) -> vec4 {
-                let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                sdf.box(1.0, 1.0, self.rect_size.x - 2.0, self.rect_size.y - 2.0, self.border_radius);
-                sdf.fill(self.color);
-                return sdf.result;
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(1.0, 1.0, self.rect_size.x - 2.0, self.rect_size.y - 2.0, self.border_radius)
+                sdf.fill(self.color)
+                return sdf.result
             }
         }
 
-        draw_button_text: {
-            text_style: <THEME_FONT_BOLD> {
-                font_size: 14.0
-                line_spacing: 1.4
-            }
+        draw_button_text +: {
+            text_style: theme.font_bold{font_size: 14.0 line_spacing: 1.4}
             color: #FFFFFF
         }
 
-        draw_card_text: {
-            text_style: <THEME_FONT_REGULAR> {
-                font_size: 14.0
-                line_spacing: 1.4
-            }
+        draw_card_text +: {
+            text_style: theme.font_regular{font_size: 14.0 line_spacing: 1.4}
             color: #FFFFFF
         }
 
-        // Widget templates for pool cloning
-        // Override text colors for dark A2UI background (#1a1a2e / #2a3a5a)
-        tpl_button: <MpButton> {}
-        tpl_checkbox: <MpCheckbox> {
-            // Override label color for dark bg
-            draw_label: { color: #E0E0E0 }
-        }
-        tpl_slider: <MpSlider> { width: 200 }
-        tpl_label: <MpLabel> {
-            draw_text: {
-                color: #E0E0E0
-            }
-        }
-        tpl_text_input: <TextInput> {
-            width: 200
-            height: Fit
-            padding: { left: 12, right: 12, top: 8, bottom: 8 }
-            empty_text: ""
-
-            draw_bg: {
-                instance hover: 0.0
-                instance focus: 0.0
-
-                uniform border_radius: 6.0
-                uniform border_width: 1.0
-                uniform bg_color: #2a3a5a
-                uniform border_color: #5588bb
-                uniform border_color_focus: #3B82F6
-
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf.box(
-                        self.border_width,
-                        self.border_width,
-                        self.rect_size.x - self.border_width * 2.0,
-                        self.rect_size.y - self.border_width * 2.0,
-                        self.border_radius
-                    );
-                    sdf.fill_keep(self.bg_color);
-                    let border = mix(self.border_color, self.border_color_focus, self.focus);
-                    sdf.stroke(border, self.border_width);
-                    return sdf.result;
-                }
-            }
-
-            draw_text: {
-                text_style: <THEME_FONT_REGULAR> { font_size: 14.0 }
-                fn get_color(self) -> vec4 {
-                    return mix(#FFFFFF, #888888, self.empty);
-                }
-            }
-
-            draw_cursor: {
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf.box(0., 0., self.rect_size.x, self.rect_size.y, 1.0);
-                    sdf.fill(mix(#0000, #3B82F6, self.focus * (1.0 - self.blink)));
-                    return sdf.result;
-                }
-            }
-
-            draw_selection: {
-                fn pixel(self) -> vec4 {
-                    let sdf = Sdf2d::viewport(self.pos * self.rect_size);
-                    sdf.box(0., 0., self.rect_size.x, self.rect_size.y, 2.0);
-                    sdf.fill(#3B82F620);
-                    return sdf.result;
-                }
-            }
-
-            animator: {
-                hover = {
-                    default: off,
-                    off = {
-                        from: {all: Forward {duration: 0.15}}
-                        apply: { draw_bg: {hover: 0.0} }
-                    }
-                    on = {
-                        from: {all: Forward {duration: 0.1}}
-                        apply: { draw_bg: {hover: 1.0} }
-                    }
-                }
-                focus = {
-                    default: off,
-                    off = {
-                        from: {all: Forward {duration: 0.2}}
-                        apply: { draw_bg: {focus: 0.0}, draw_cursor: {focus: 0.0} }
-                    }
-                    on = {
-                        from: {all: Snap}
-                        apply: { draw_bg: {focus: 1.0}, draw_cursor: {focus: 1.0} }
-                    }
-                }
-            }
-        }
-
-        img_headphones: dep("crate://self/resources/headphones.jpg")
-        img_mouse: dep("crate://self/resources/mouse.jpg")
-        img_keyboard: dep("crate://self/resources/keyboard.jpg")
-        img_alipay: dep("crate://self/resources/alipay.png")
-        img_wechat: dep("crate://self/resources/wechat.png")
+        img_headphones: crate_resource("self:resources/headphones.jpg")
+        img_mouse: crate_resource("self:resources/mouse.jpg")
+        img_keyboard: crate_resource("self:resources/keyboard.jpg")
+        img_alipay: crate_resource("self:resources/alipay.png")
+        img_wechat: crate_resource("self:resources/wechat.png")
     }
 }
 
@@ -338,11 +232,17 @@ live_design! {
 // ============================================================================
 
 /// The root container for rendering A2UI component trees.
-#[derive(Live, LiveHook, Widget)]
+#[derive(Script, ScriptHook, Widget)]
 pub struct A2uiSurface {
+    #[uid]
+    uid: WidgetUid,
+
+    #[source]
+    source: ScriptObjectRef,
+
     #[redraw]
     #[live]
-    draw_bg: DrawQuad,
+    draw_bg: DrawColor,
 
     #[walk]
     walk: Walk,
@@ -499,17 +399,11 @@ pub struct A2uiSurface {
     // Widget pool templates (used to clone new pool instances)
     // ============================================================================
     #[live]
-    tpl_button: Option<LivePtr>,
     #[live]
-    tpl_checkbox: Option<LivePtr>,
     #[live]
-    tpl_slider: Option<LivePtr>,
     #[live]
-    tpl_label: Option<LivePtr>,
     #[live]
-    tpl_text_input: Option<LivePtr>,
     #[live]
-    tpl_calendar: Option<LivePtr>,
 
     // ============================================================================
     // Widget pools
@@ -565,15 +459,15 @@ pub struct A2uiSurface {
     // Image sources (preloaded)
     // ============================================================================
     #[live]
-    img_headphones: LiveDependency,
+    img_headphones: Option<ScriptHandleRef>,
     #[live]
-    img_mouse: LiveDependency,
+    img_mouse: Option<ScriptHandleRef>,
     #[live]
-    img_keyboard: LiveDependency,
+    img_keyboard: Option<ScriptHandleRef>,
     #[live]
-    img_alipay: LiveDependency,
+    img_alipay: Option<ScriptHandleRef>,
     #[live]
-    img_wechat: LiveDependency,
+    img_wechat: Option<ScriptHandleRef>,
 
     /// Loaded textures for images
     #[rust]
@@ -586,10 +480,6 @@ pub struct A2uiSurface {
     texture_alipay: Option<Texture>,
     #[rust]
     texture_wechat: Option<Texture>,
-
-    /// Surface ID
-    #[live]
-    surface_id: LiveValue,
 
     /// The message processor (manages surfaces and data models)
     #[rust]
@@ -669,125 +559,62 @@ impl A2uiSurface {
     }
 
     /// Apply theme colors to all A2UI components
-    pub fn set_theme_colors(&mut self, cx: &mut Cx, colors: &A2uiThemeColors) {
+    pub fn set_theme_colors(&mut self, _cx: &mut Cx, colors: &A2uiThemeColors) {
         // Apply surface background
-        self.draw_bg.apply_over(
-            cx,
-            live! {
-                bg_color: (colors.bg_surface)
-            },
-        );
+        self.draw_bg.color = colors.bg_surface;
 
         // Apply card colors
-        self.draw_card.apply_over(
-            cx,
-            live! {
-                color: (colors.bg_card)
-                border_color: (colors.border_color)
-            },
-        );
+        self.draw_card.color = colors.bg_card;
 
         // Apply divider color
-        self.draw_divider.apply_over(
-            cx,
-            live! {
-                color: (colors.border_color)
-            },
-        );
+        self.draw_divider.color = colors.border_color;
 
         // Apply image placeholder text
-        self.draw_image_text.apply_over(
-            cx,
-            live! {
-                color: (colors.text_secondary)
-            },
-        );
+        self.draw_image_text.color = colors.text_secondary;
 
         // Apply button color for audio player
-        self.draw_button.apply_over(
-            cx,
-            live! {
-                color: (colors.accent)
-            },
-        );
+        self.draw_button.color = colors.accent;
 
-        self.draw_button_text.apply_over(
-            cx,
-            live! {
-                color: (vec4(1.0, 1.0, 1.0, 1.0))
-            },
-        );
+        self.draw_button_text.color = vec4(1.0, 1.0, 1.0, 1.0);
 
-        self.draw_card_text.apply_over(
-            cx,
-            live! {
-                color: (colors.text_primary)
-            },
-        );
+        self.draw_card_text.color = colors.text_primary;
     }
 
-    /// Load image textures from LiveDependency resources
+    /// Load image textures from crate_resource handles
     fn load_image_textures(&mut self, cx: &mut Cx) {
         use makepad_widgets::image_cache::ImageBuffer;
 
-        // Load headphones image (JPG)
+        fn load(cx: &mut Cx, src: &Option<ScriptHandleRef>, jpg: bool) -> Option<Texture> {
+            let handle_ref = src.as_ref()?;
+            let handle = handle_ref.as_handle();
+            let data = if let Some(data) = cx.get_resource(handle) {
+                data
+            } else {
+                cx.load_script_resource(handle);
+                cx.get_resource(handle)?
+            };
+            let image = if jpg {
+                ImageBuffer::from_jpg(&data).ok()?
+            } else {
+                ImageBuffer::from_png(&data).ok()?
+            };
+            Some(image.into_new_texture(cx))
+        }
+
         if self.texture_headphones.is_none() {
-            let path = self.img_headphones.as_str();
-            if !path.is_empty() {
-                if let Ok(data) = cx.get_dependency(path) {
-                    if let Ok(image) = ImageBuffer::from_jpg(&data) {
-                        self.texture_headphones = Some(image.into_new_texture(cx));
-                    }
-                }
-            }
+            self.texture_headphones = load(cx, &self.img_headphones, true);
         }
-
-        // Load mouse image (JPG)
         if self.texture_mouse.is_none() {
-            let path = self.img_mouse.as_str();
-            if !path.is_empty() {
-                if let Ok(data) = cx.get_dependency(path) {
-                    if let Ok(image) = ImageBuffer::from_jpg(&data) {
-                        self.texture_mouse = Some(image.into_new_texture(cx));
-                    }
-                }
-            }
+            self.texture_mouse = load(cx, &self.img_mouse, true);
         }
-
-        // Load keyboard image (JPG)
         if self.texture_keyboard.is_none() {
-            let path = self.img_keyboard.as_str();
-            if !path.is_empty() {
-                if let Ok(data) = cx.get_dependency(path) {
-                    if let Ok(image) = ImageBuffer::from_jpg(&data) {
-                        self.texture_keyboard = Some(image.into_new_texture(cx));
-                    }
-                }
-            }
+            self.texture_keyboard = load(cx, &self.img_keyboard, true);
         }
-
-        // Load Alipay icon (PNG)
         if self.texture_alipay.is_none() {
-            let path = self.img_alipay.as_str();
-            if !path.is_empty() {
-                if let Ok(data) = cx.get_dependency(path) {
-                    if let Ok(image) = ImageBuffer::from_png(&data) {
-                        self.texture_alipay = Some(image.into_new_texture(cx));
-                    }
-                }
-            }
+            self.texture_alipay = load(cx, &self.img_alipay, false);
         }
-
-        // Load WeChat icon (PNG)
         if self.texture_wechat.is_none() {
-            let path = self.img_wechat.as_str();
-            if !path.is_empty() {
-                if let Ok(data) = cx.get_dependency(path) {
-                    if let Ok(image) = ImageBuffer::from_png(&data) {
-                        self.texture_wechat = Some(image.into_new_texture(cx));
-                    }
-                }
-            }
+            self.texture_wechat = load(cx, &self.img_wechat, false);
         }
     }
 
@@ -869,10 +696,19 @@ impl A2uiSurface {
         "main".to_string()
     }
 
+    /// Instantiate a widget of type T from its registered object in mod.widgets
+    fn new_from_mod<T: ScriptNew>(cx: &mut Cx, id: LiveId) -> T {
+        cx.with_vm(|vm| {
+            let widgets = vm.module(id!(widgets));
+            let value = vm.bx.heap.value(widgets, id.into(), NoTrap);
+            T::script_from_value(vm, value)
+        })
+    }
+
     /// Get or lazily create the MpCalendar instance
     fn ensure_calendar(&mut self, cx: &mut Cx) -> &mut MpCalendar {
         if self.mp_calendar.is_none() {
-            self.mp_calendar = Some(MpCalendar::new_from_ptr(cx, self.tpl_calendar));
+            self.mp_calendar = Some(cx.with_vm(MpCalendar::script_new_with_default));
         }
         self.mp_calendar.as_mut().unwrap()
     }
@@ -880,7 +716,7 @@ impl A2uiSurface {
     /// Get or grow a button from the pool
     fn pool_button(&mut self, cx: &mut Cx, idx: usize) -> &mut MpButton {
         while self.mp_buttons.len() <= idx {
-            let new_btn = MpButton::new_from_ptr(cx, self.tpl_button);
+            let new_btn = cx.with_vm(MpButton::script_new_with_default);
             self.mp_buttons.push(new_btn);
         }
         &mut self.mp_buttons[idx]
@@ -889,7 +725,9 @@ impl A2uiSurface {
     /// Get or grow a checkbox from the pool
     fn pool_checkbox(&mut self, cx: &mut Cx, idx: usize) -> &mut MpCheckbox {
         while self.mp_checkboxes.len() <= idx {
-            let new_cb = MpCheckbox::new_from_ptr(cx, self.tpl_checkbox);
+            let mut new_cb = cx.with_vm(MpCheckbox::script_new_with_default);
+            // Override label color for dark bg
+            script_apply_eval!(cx, new_cb, { draw_label +: { color: #E0E0E0 } });
             self.mp_checkboxes.push(new_cb);
         }
         &mut self.mp_checkboxes[idx]
@@ -898,7 +736,8 @@ impl A2uiSurface {
     /// Get or grow a slider from the pool
     fn pool_slider(&mut self, cx: &mut Cx, idx: usize) -> &mut MpSlider {
         while self.mp_sliders.len() <= idx {
-            let new_sl = MpSlider::new_from_ptr(cx, self.tpl_slider);
+            let mut new_sl = cx.with_vm(MpSlider::script_new_with_default);
+            script_apply_eval!(cx, new_sl, { width: 200 });
             self.mp_sliders.push(new_sl);
         }
         &mut self.mp_sliders[idx]
@@ -907,7 +746,8 @@ impl A2uiSurface {
     /// Get or grow a label from the pool
     fn pool_label(&mut self, cx: &mut Cx, idx: usize) -> &mut MpLabel {
         while self.mp_labels.len() <= idx {
-            let new_lb = MpLabel::new_from_ptr(cx, self.tpl_label);
+            let mut new_lb = cx.with_vm(MpLabel::script_new_with_default);
+            script_apply_eval!(cx, new_lb, { draw_text +: { color: #E0E0E0 } });
             self.mp_labels.push(new_lb);
         }
         &mut self.mp_labels[idx]
@@ -916,7 +756,7 @@ impl A2uiSurface {
     /// Get or grow a text input from the pool
     fn pool_text_input(&mut self, cx: &mut Cx, idx: usize) -> &mut TextInput {
         while self.mp_text_inputs.len() <= idx {
-            let new_ti = TextInput::new_from_ptr(cx, self.tpl_text_input);
+            let new_ti = Self::new_from_mod::<TextInput>(cx, id!(A2uiTextInput));
             self.mp_text_inputs.push(new_ti);
         }
         &mut self.mp_text_inputs[idx]

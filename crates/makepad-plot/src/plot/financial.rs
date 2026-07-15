@@ -10,8 +10,8 @@ mod.widgets.CandlestickChartBase = #(CandlestickChart::register_widget(vm))
 mod.widgets.CandlestickChart = set_type_default() do mod.widgets.CandlestickChartBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
             axis_color: #8d8d99ff
         }
@@ -20,8 +20,8 @@ mod.widgets.WaterfallChartBase = #(WaterfallChart::register_widget(vm))
 mod.widgets.WaterfallChart = set_type_default() do mod.widgets.WaterfallChartBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
             axis_color: #8d8d99ff
         }

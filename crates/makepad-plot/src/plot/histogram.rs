@@ -10,8 +10,8 @@ mod.widgets.HistogramChartBase = #(HistogramChart::register_widget(vm))
 mod.widgets.HistogramChart = set_type_default() do mod.widgets.HistogramChartBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
             grid_color: #40404d80
         }
@@ -20,8 +20,8 @@ mod.widgets.BoxPlotChartBase = #(BoxPlotChart::register_widget(vm))
 mod.widgets.BoxPlotChart = set_type_default() do mod.widgets.BoxPlotChartBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
             grid_color: #40404d80
         }

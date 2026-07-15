@@ -6,88 +6,83 @@
 use makepad_component::a2ui::*;
 use makepad_widgets::*;
 
-live_design! {
-    use link::theme::*;
-    use link::shaders::*;
-    use link::widgets::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
+    use mod.widgets.*
+    use mod.theme.*
 
-    use makepad_component::theme::colors::*;
-    use makepad_component::a2ui::surface::*;
-
-    // Streaming Demo App
-    StreamingApp = {{StreamingApp}} {
-        ui: <Root> {
-            main_window = <Window> {
+    startup() do #(StreamingApp::script_component(vm)){
+        ui: Root{
+            main_window := Window{
                 show_bg: true
                 width: Fill
                 height: Fill
+                pass +: { clear_color: #1a1a2e }
 
-                draw_bg: {
-                    fn pixel(self) -> vec4 {
-                        return #1a1a2e;
-                    }
-                }
-
-                body = <View> {
+                body := mod.widgets.SolidView{
                     width: Fill
                     height: Fill
                     flow: Down
-                    padding: 20.0
+                    padding: Inset{left: 20.0 right: 20.0 top: 20.0 bottom: 20.0}
                     spacing: 16.0
+                    draw_bg.color: #1a1a2e
 
                     // Title
-                    <Label> {
+                    Label{
                         text: "A2UI Streaming Demo"
-                        draw_text: {
-                            text_style: <THEME_FONT_BOLD> { font_size: 24.0 }
+                        draw_text +: {
+                            text_style: theme.font_bold{font_size: 24.0}
                             color: #FFFFFF
                         }
                     }
 
                     // Connection controls
-                    <View> {
+                    View{
                         width: Fill
                         height: Fit
                         flow: Right
                         spacing: 10.0
-                        align: { y: 0.5 }
+                        align: Align{y: 0.5}
 
-                        <Label> {
+                        Label{
                             text: "Server:"
-                            draw_text: { color: #888888 }
+                            draw_text +: { color: #888888 }
                         }
 
-                        server_url = <Label> {
+                        server_url := Label{
                             text: "http://localhost:8080/rpc"
-                            draw_text: { color: #FFFFFF }
+                            draw_text +: { color: #FFFFFF }
                         }
 
-                        connect_btn = <Button> {
+                        connect_btn := Button{
                             text: "Connect"
-                            draw_text: { color: #FFFFFF }
-                            draw_bg: { color: #0066CC }
                         }
                     }
 
                     // Status
-                    status_label = <Label> {
+                    status_label := Label{
                         text: "Not connected"
-                        draw_text: { color: #888888 }
+                        draw_text +: { color: #888888 }
                     }
 
                     // A2UI Surface with scroll
-                    <ScrollYView> {
+                    ScrollYView{
                         width: Fill
                         height: Fill
                         show_bg: true
-                        draw_bg: { color: #222244 }
+                        draw_bg +: {
+                            color: instance(#222244)
+                            pixel: fn() {
+                                return self.color
+                            }
+                        }
 
-                        <View> {
+                        View{
                             width: Fill
                             height: Fit
-                            padding: 16.0
+                            padding: Inset{left: 16.0 right: 16.0 top: 16.0 bottom: 16.0}
 
-                            a2ui_surface = <A2uiSurface> {
+                            a2ui_surface := mod.widgets.A2uiSurface{
                                 width: Fill
                                 height: Fit
                             }
@@ -99,7 +94,7 @@ live_design! {
     }
 }
 
-#[derive(Live, LiveHook)]
+#[derive(Script, ScriptHook)]
 pub struct StreamingApp {
     #[live]
     ui: WidgetRef,
@@ -111,18 +106,11 @@ pub struct StreamingApp {
     is_connecting: bool,
 }
 
-impl LiveRegister for StreamingApp {
-    fn live_register(cx: &mut Cx) {
-        makepad_widgets::live_design(cx);
-        makepad_component::live_design(cx);
-    }
-}
-
 impl StreamingApp {
     fn connect(&mut self, cx: &mut Cx) {
         if self.host.is_some() {
             self.ui
-                .label(ids!(status_label))
+                .label(cx, ids!(status_label))
                 .set_text(cx, "Already connected");
             return;
         }
@@ -137,14 +125,14 @@ impl StreamingApp {
         match host.connect("Hello, show me a greeting UI") {
             Ok(()) => {
                 self.ui
-                    .label(ids!(status_label))
+                    .label(cx, ids!(status_label))
                     .set_text(cx, "Connecting...");
                 self.host = Some(host);
                 self.is_connecting = true;
             }
             Err(e) => {
                 self.ui
-                    .label(ids!(status_label))
+                    .label(cx, ids!(status_label))
                     .set_text(cx, &format!("Connection failed: {}", e));
             }
         }
@@ -163,13 +151,13 @@ impl StreamingApp {
         }
 
         // Get surface widget
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
 
         for event in events {
             match event {
                 A2uiHostEvent::Connected => {
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, "Connected! Receiving UI...");
                     self.is_connecting = false;
                 }
@@ -180,22 +168,22 @@ impl StreamingApp {
                         log!("Processed message, {} events", events.len());
                     }
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, "Receiving UI updates...");
                 }
                 A2uiHostEvent::TaskStatus { task_id, state } => {
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, &format!("Task {}: {}", task_id, state));
                 }
                 A2uiHostEvent::Error(e) => {
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, &format!("Error: {}", e));
                 }
                 A2uiHostEvent::Disconnected => {
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, "Disconnected");
                     self.host = None;
                 }
@@ -207,12 +195,12 @@ impl StreamingApp {
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
         // Handle connect button
-        if self.ui.button(ids!(connect_btn)).clicked(&actions) {
+        if self.ui.button(cx, ids!(connect_btn)).clicked(&actions) {
             self.connect(cx);
         }
 
         // Handle A2UI surface actions
-        let surface_ref = self.ui.widget(ids!(a2ui_surface));
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
         if let Some(item) = actions.find_widget_action(surface_ref.widget_uid()) {
             match item.cast::<A2uiSurfaceAction>() {
                 A2uiSurfaceAction::UserAction(user_action) => {
@@ -223,7 +211,7 @@ impl StreamingApp {
                         }
                     }
                     self.ui
-                        .label(ids!(status_label))
+                        .label(cx, ids!(status_label))
                         .set_text(cx, &format!("Action: {}", user_action.action.name));
                     self.ui.redraw(cx);
                 }
@@ -270,6 +258,12 @@ impl StreamingApp {
 }
 
 impl AppMain for StreamingApp {
+    fn script_mod(vm: &mut ScriptVm) -> ScriptValue {
+        makepad_widgets::script_mod(vm);
+        makepad_component::script_mod(vm);
+        self::script_mod(vm)
+    }
+
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
         // Poll host for new messages (on every frame if connecting)
         if self.host.is_some() {

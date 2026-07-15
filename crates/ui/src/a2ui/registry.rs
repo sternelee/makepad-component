@@ -377,6 +377,106 @@ impl ComponentRegistry {
             implemented: true,
         });
 
+        // Raycast-style containers
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Detail,
+            makepad_widget: "View",
+            description: "Raycast-style detail view (markdown content + metadata)",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Form,
+            makepad_widget: "View",
+            description: "Raycast-style form container",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::ActionPanel,
+            makepad_widget: "View",
+            description: "Raycast-style action panel with action buttons",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Grid,
+            makepad_widget: "View",
+            description: "Raycast-style grid layout container",
+            implemented: true,
+        });
+
+        // Raycast-style form components
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::PasswordField,
+            makepad_widget: "TextInput",
+            description: "Password input with hidden text",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::TextArea,
+            makepad_widget: "TextInput",
+            description: "Multi-line text input (rendered as larger TextInput)",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::DatePicker,
+            makepad_widget: "TextInput",
+            description: "Date picker input field",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Dropdown,
+            makepad_widget: "MpDropdown",
+            description: "Raycast-style dropdown selection",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::TagPicker,
+            makepad_widget: "View",
+            description: "Raycast-style tag picker with selectable tokens",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::FilePicker,
+            makepad_widget: "TextInput",
+            description: "File picker input with browse button",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::ListItem,
+            makepad_widget: "View",
+            description: "Raycast-style list item with icon, title and accessories",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::DropdownItem,
+            makepad_widget: "Label",
+            description: "Dropdown item (rendered as child of Dropdown)",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::DropdownSection,
+            makepad_widget: "View",
+            description: "Dropdown section (rendered as child of Dropdown)",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::TagPickerItem,
+            makepad_widget: "View",
+            description: "Tag picker item (rendered as child of TagPicker)",
+            implemented: true,
+        });
+
         registry
     }
 

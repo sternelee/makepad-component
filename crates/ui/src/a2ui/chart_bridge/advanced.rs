@@ -1,6 +1,5 @@
 use crate::a2ui::data_model::DataModel;
 use crate::a2ui::message::*;
-use crate::a2ui::processor::resolve_string_value_scoped;
 use makepad_plot::*;
 use makepad_widgets::*;
 

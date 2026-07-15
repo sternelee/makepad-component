@@ -10,8 +10,8 @@ mod.widgets.HeatmapChartBase = #(HeatmapChart::register_widget(vm))
 mod.widgets.HeatmapChart = set_type_default() do mod.widgets.HeatmapChartBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
         }
     }
@@ -19,8 +19,8 @@ mod.widgets.HeatmapBase = #(Heatmap::register_widget(vm))
 mod.widgets.Heatmap = set_type_default() do mod.widgets.HeatmapBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
         }
     }

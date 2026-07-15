@@ -25,6 +25,7 @@ required-features = ["mock-server"]
 [[bin]]
 name = "a2ui-bridge"
 path = "src/a2ui_bridge.rs"
+required-features = ["a2ui-bridge"]
 
 [[bin]]
 name = "math-charts"

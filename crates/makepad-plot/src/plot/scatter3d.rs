@@ -10,8 +10,8 @@ mod.widgets.Scatter3DBase = #(Scatter3D::register_widget(vm))
 mod.widgets.Scatter3D = set_type_default() do mod.widgets.Scatter3DBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
         }
     }
@@ -19,8 +19,8 @@ mod.widgets.Line3DBase = #(Line3D::register_widget(vm))
 mod.widgets.Line3D = set_type_default() do mod.widgets.Line3DBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
         }
     }

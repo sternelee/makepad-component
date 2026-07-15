@@ -227,12 +227,6 @@ impl DataModel {
 
         path.trim_start_matches('/')
             .split('/')
-            .map(|s| {
-                // Unescape JSON Pointer special sequences
-                // ~1 -> /
-                // ~0 -> ~
-                s // TODO: implement proper unescaping if needed
-            })
             .collect()
     }
 
@@ -410,7 +404,7 @@ impl SurfaceDataModels {
     pub fn get_or_create(&mut self, surface_id: &str) -> &mut DataModel {
         self.models
             .entry(surface_id.to_string())
-            .or_insert_with(DataModel::new)
+            .or_default()
     }
 
     /// Get a data model for a surface

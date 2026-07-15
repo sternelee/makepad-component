@@ -10,8 +10,8 @@ mod.widgets.AreaChartBase = #(AreaChart::register_widget(vm))
 mod.widgets.AreaChart = set_type_default() do mod.widgets.AreaChartBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
             axis_color: #8d8d99ff
             grid_color: #40404d80
@@ -21,8 +21,8 @@ mod.widgets.StepPlotBase = #(StepPlot::register_widget(vm))
 mod.widgets.StepPlot = set_type_default() do mod.widgets.StepPlotBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
             axis_color: #8d8d99ff
             grid_color: #40404d80

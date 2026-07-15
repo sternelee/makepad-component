@@ -306,7 +306,7 @@ impl A2uiSurface {
         );
 
         // Check if this audio component is currently playing
-        let is_playing = self.playing_component_id.as_ref().map(|s| s.as_str()) == Some(component_id);
+        let is_playing = self.playing_component_id.as_deref() == Some(component_id);
 
         let title = audio_player
             .title
@@ -327,12 +327,12 @@ impl A2uiSurface {
             let walk = Walk {
                 width: Size::fill(),
                 height: Size::fit(),
-                margin: Margin { top: 8.0, bottom: 8.0, left: 0.0, right: 0.0 },
+                margin: Inset { top: 8.0, bottom: 8.0, left: 0.0, right: 0.0 },
                 ..Walk::default()
             };
             let layout = Layout {
                 flow: Flow::Down,
-                padding: Padding {
+                padding: Inset {
                     left: 16.0,
                     right: 16.0,
                     top: 12.0,
@@ -401,7 +401,7 @@ impl A2uiSurface {
             let bars_walk = Walk {
                 width: Size::Fixed(180.0),
                 height: Size::Fixed(56.0),
-                margin: Margin { left: 16.0, ..Margin::default() },
+                margin: Inset { left: 16.0, ..Inset::default() },
                 ..Walk::default()
             };
             self.draw_audio_bars.is_playing = if is_playing { 1.0 } else { 0.0 };
@@ -414,7 +414,7 @@ impl A2uiSurface {
             let taiji_walk = Walk {
                 width: Size::Fixed(taiji_size),
                 height: Size::Fixed(taiji_size),
-                margin: Margin { left: 8.0, ..Margin::default() },
+                margin: Inset { left: 8.0, ..Inset::default() },
                 ..Walk::default()
             };
             // taiji_anim is a monotonically increasing time counter
@@ -440,7 +440,7 @@ impl A2uiSurface {
         // Play button
         let button_walk = Walk::fit();
         let button_layout = Layout {
-            padding: Padding {
+            padding: Inset {
                 left: 20.0,
                 right: 20.0,
                 top: 10.0,

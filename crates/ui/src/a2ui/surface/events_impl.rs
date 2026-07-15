@@ -45,10 +45,7 @@ impl Widget for A2uiSurface {
                                 action_def,
                                 btn_scope.as_deref(),
                             );
-                            cx.widget_action(
-                                self.widget_uid(),
-                                &scope.path,
-                                A2uiSurfaceAction::UserAction(user_action),
+                            cx.widget_action(self.widget_uid(), A2uiSurfaceAction::UserAction(user_action),
                             );
                         }
                     }
@@ -62,10 +59,7 @@ impl Widget for A2uiSurface {
                 if let MpCheckboxAction::Changed(new_value) = action.cast::<MpCheckboxAction>() {
                     if let Some((_, binding_path, _)) = self.checkbox_meta.get(idx) {
                         if let Some(path) = binding_path {
-                            cx.widget_action(
-                                self.widget_uid(),
-                                &scope.path,
-                                A2uiSurfaceAction::DataModelChanged {
+                            cx.widget_action(self.widget_uid(), A2uiSurfaceAction::DataModelChanged {
                                     surface_id: surface_id.clone(),
                                     path: path.clone(),
                                     value: serde_json::Value::Bool(new_value),
@@ -90,10 +84,7 @@ impl Widget for A2uiSurface {
                                     serde_json::json!({"start": start, "end": end})
                                 }
                             };
-                            cx.widget_action(
-                                self.widget_uid(),
-                                &scope.path,
-                                A2uiSurfaceAction::DataModelChanged {
+                            cx.widget_action(self.widget_uid(), A2uiSurfaceAction::DataModelChanged {
                                     surface_id: surface_id.clone(),
                                     path: path.clone(),
                                     value,
@@ -112,10 +103,7 @@ impl Widget for A2uiSurface {
                 if let TextInputAction::Changed(new_text) = action.cast::<TextInputAction>() {
                     if let Some((_, binding_path, _)) = self.text_input_meta.get(idx) {
                         if let Some(path) = binding_path {
-                            cx.widget_action(
-                                self.widget_uid(),
-                                &scope.path,
-                                A2uiSurfaceAction::DataModelChanged {
+                            cx.widget_action(self.widget_uid(), A2uiSurfaceAction::DataModelChanged {
                                     surface_id: surface_id.clone(),
                                     path: path.clone(),
                                     value: serde_json::Value::String(new_text),
@@ -147,10 +135,7 @@ impl Widget for A2uiSurface {
                     },
                     component_id: Some("calendar-view".to_string()),
                 };
-                cx.widget_action(
-                    self.widget_uid(),
-                    &scope.path,
-                    A2uiSurfaceAction::UserAction(user_action),
+                cx.widget_action(self.widget_uid(), A2uiSurfaceAction::UserAction(user_action),
                 );
                 needs_redraw = true;
             }
@@ -176,10 +161,7 @@ impl Widget for A2uiSurface {
                 Hit::FingerDown(_) => {
                     self.hovered_audio_player_idx = Some(idx);
                     if let Some((component_id, url, title)) = self.audio_player_data.get(idx).cloned() {
-                        cx.widget_action(
-                            self.widget_uid(),
-                            &scope.path,
-                            A2uiSurfaceAction::PlayAudio {
+                        cx.widget_action(self.widget_uid(), A2uiSurfaceAction::PlayAudio {
                                 component_id,
                                 url,
                                 title,

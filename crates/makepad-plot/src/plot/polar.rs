@@ -10,8 +10,8 @@ mod.widgets.PolarPlotBase = #(PolarPlot::register_widget(vm))
 mod.widgets.PolarPlot = set_type_default() do mod.widgets.PolarPlotBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
         }
     }
@@ -19,8 +19,8 @@ mod.widgets.RadarChartBase = #(RadarChart::register_widget(vm))
 mod.widgets.RadarChart = set_type_default() do mod.widgets.RadarChartBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
             axis_color: #8d8d99ff
             grid_color: #40404d80

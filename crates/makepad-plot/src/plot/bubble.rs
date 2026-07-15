@@ -10,8 +10,8 @@ mod.widgets.BubbleChartBase = #(BubbleChart::register_widget(vm))
 mod.widgets.BubbleChart = set_type_default() do mod.widgets.BubbleChartBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
             grid_color: #40404d80
         }

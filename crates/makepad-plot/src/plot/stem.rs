@@ -10,8 +10,8 @@ mod.widgets.StemPlotBase = #(StemPlot::register_widget(vm))
 mod.widgets.StemPlot = set_type_default() do mod.widgets.StemPlotBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
             axis_color: #8d8d99ff
             grid_color: #40404d80
@@ -21,8 +21,8 @@ mod.widgets.ViolinPlotBase = #(ViolinPlot::register_widget(vm))
 mod.widgets.ViolinPlot = set_type_default() do mod.widgets.ViolinPlotBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
             axis_color: #8d8d99ff
         }

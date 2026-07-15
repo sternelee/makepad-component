@@ -10,8 +10,8 @@ mod.widgets.ContourPlotBase = #(ContourPlot::register_widget(vm))
 mod.widgets.ContourPlot = set_type_default() do mod.widgets.ContourPlotBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
             axis_color: #8d8d99ff
         }
@@ -20,8 +20,8 @@ mod.widgets.QuiverPlotBase = #(QuiverPlot::register_widget(vm))
 mod.widgets.QuiverPlot = set_type_default() do mod.widgets.QuiverPlotBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
         }
     }

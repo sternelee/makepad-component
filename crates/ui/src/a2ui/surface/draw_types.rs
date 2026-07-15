@@ -1,24 +1,26 @@
 use crate::a2ui::message::UserAction;
 use makepad_widgets::*;
 
-live_design! {
-    use link::shaders::*;
+script_mod! {
+    use mod.prelude.widgets_internal.*
 
-    pub DrawA2uiImage = {{DrawA2uiImage}} {
-        texture image: texture2d
-        instance border_radius: 4.0
+    DrawA2uiImage: mod.std.set_type_default() do #(DrawA2uiImage::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        image: texture_2d(float)
+        border_radius: instance(4.0)
 
-        fn pixel(self) -> vec4 {
-            let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+        pixel: fn() {
+            let sdf = Sdf2d.viewport(self.pos * self.rect_size);
             sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, self.border_radius);
-            let img_color = sample2d(self.image, self.pos);
+            let img_color = self.image.sample_as_bgra(self.pos);
             sdf.fill(img_color);
             return sdf.result;
         }
     }
 
-    pub DrawA2uiChartLine = {{DrawA2uiChartLine}} {
-        fn pixel(self) -> vec4 {
+    DrawA2uiChartLine: mod.std.set_type_default() do #(DrawA2uiChartLine::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
             let uv = self.pos;
             let p1 = vec2(self.x1, self.y1);
             let p2 = vec2(self.x2, self.y2);
@@ -41,8 +43,9 @@ live_design! {
         }
     }
 
-    pub DrawA2uiArc = {{DrawA2uiArc}} {
-        fn pixel(self) -> vec4 {
+    DrawA2uiArc: mod.std.set_type_default() do #(DrawA2uiArc::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
             let two_pi_val = 6.28318530;
             let px = self.pos.x - 0.5;
             let py = self.pos.y - 0.5;
@@ -50,11 +53,11 @@ live_design! {
             let inner_rad = self.inner_radius * 0.5;
             let outer_rad = 0.5;
             let dist_mask = step(inner_rad, distance) * step(distance, outer_rad);
-            let pixel_ang = atan(py, px);
+            let pixel_ang = atan2(py, px);
             let sweep_val = self.end_angle - self.start_angle;
             let rel_ang = pixel_ang - self.start_angle;
             let norm_ang = rel_ang + two_pi_val * 4.0;
-            let wrap_ang = mod(norm_ang, two_pi_val);
+            let wrap_ang = norm_ang - two_pi_val * floor(norm_ang / two_pi_val);
             let ang_mask = step(wrap_ang, sweep_val) * step(0.001, sweep_val);
             let final_mask = dist_mask * ang_mask;
             let edge_aa = 0.008;
@@ -66,8 +69,9 @@ live_design! {
         }
     }
 
-    pub DrawA2uiQuad = {{DrawA2uiQuad}} {
-        fn pixel(self) -> vec4 {
+    DrawA2uiQuad: mod.std.set_type_default() do #(DrawA2uiQuad::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
             let p = self.pos * self.rect_size;
             let p0 = vec2(self.p0x, self.p0y);
             let p1 = vec2(self.p1x, self.p1y);
@@ -98,16 +102,17 @@ live_design! {
         }
     }
 
-    pub DrawAudioBars = {{DrawAudioBars}} {
-        fn pixel(self) -> vec4 {
-            let sdf = Sdf2d::viewport(self.pos * self.rect_size);
+    DrawAudioBars: mod.std.set_type_default() do #(DrawAudioBars::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
+            let sdf = Sdf2d.viewport(self.pos * self.rect_size);
 
             // ── Fractal rainbow background (code golf shader) ──
             // Speed modulated by audio: idle=slow, playing=fast, amplitude boosts energy
             let amp = clamp(self.amplitude * 3.0, 0.0, 1.0);
             let use_real_amp = step(0.001, self.amplitude);
             let speed = mix(0.6, mix(1.5, 1.5 + amp * 2.0, use_real_amp), self.is_playing);
-            let t = self.time * speed;
+            let t = self.draw_pass.time * speed;
             let ar = self.rect_size.x / max(self.rect_size.y, 1.0);
 
             // Fractal: (FC.xy*2.-r)/r.y/.3 with amplitude-reactive zoom
@@ -163,13 +168,13 @@ live_design! {
                 let phase = fi * 0.7;
 
                 // Idle: gentle breathing
-                let idle_wave = sin(self.time * 2.5 + phase) * 0.3 + 0.45;
-                let idle_sub = sin(self.time * 1.3 + phase * 1.7) * 0.1;
+                let idle_wave = sin(self.draw_pass.time * 2.5 + phase) * 0.3 + 0.45;
+                let idle_sub = sin(self.draw_pass.time * 1.3 + phase * 1.7) * 0.1;
                 let idle_total = idle_wave + idle_sub;
 
                 // Playing: energetic multi-frequency
-                let play_wave1 = sin(self.time * 6.0 + phase) * 0.35;
-                let play_wave2 = sin(self.time * 3.5 + phase * 2.1) * 0.2;
+                let play_wave1 = sin(self.draw_pass.time * 6.0 + phase) * 0.35;
+                let play_wave2 = sin(self.draw_pass.time * 3.5 + phase * 2.1) * 0.2;
                 let play_base = play_wave1 + play_wave2 + 0.55;
 
                 let real_wave = play_base * amp;
@@ -199,9 +204,10 @@ live_design! {
     // ============================================================
 
     // Aurora - volumetric light through cosine lattice
-    pub DrawAurora = {{DrawAurora}} {
-        fn pixel(self) -> vec4 {
-            let t = self.time * (0.3 + self.amplitude * 2.0) * self.speed;
+    DrawAurora: mod.std.set_type_default() do #(DrawAurora::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
+            let t = self.draw_pass.time * (0.3 + self.amplitude * 2.0) * self.speed;
             let rx = self.rect_size.x;
             let ry = self.rect_size.y;
             let fc = vec3(self.pos.x * rx, (1.0 - self.pos.y) * ry, 0.0);
@@ -235,9 +241,10 @@ live_design! {
     }
 
     // Reef - underwater coral reef
-    pub DrawReef = {{DrawReef}} {
-        fn pixel(self) -> vec4 {
-            let t = self.time * 0.3 * self.speed;
+    DrawReef: mod.std.set_type_default() do #(DrawReef::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
+            let t = self.draw_pass.time * 0.3 * self.speed;
             let rx = self.rect_size.x;
             let ry = self.rect_size.y;
             let fc = vec3(self.pos.x * rx, (1.0 - self.pos.y) * ry, 0.0);
@@ -285,9 +292,10 @@ live_design! {
     }
 
     // Fractal Rainbow - code golf style rainbow fractal
-    pub DrawFractalRainbow = {{DrawFractalRainbow}} {
-        fn pixel(self) -> vec4 {
-            let t = self.time * (0.8 + self.amplitude * 1.5) * self.speed;
+    DrawFractalRainbow: mod.std.set_type_default() do #(DrawFractalRainbow::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
+            let t = self.draw_pass.time * (0.8 + self.amplitude * 1.5) * self.speed;
             let ar = self.rect_size.x / max(self.rect_size.y, 1.0);
             let zoom = (0.3 - self.amplitude * 0.1) * self.zoom;
             let p = (self.pos * 2.0 - vec2(1.0, 1.0)) * vec2(ar, 1.0) / zoom;
@@ -323,10 +331,11 @@ live_design! {
     }
 
     // Glowing Lattice - observer effect
-    pub DrawGlowingLattice = {{DrawGlowingLattice}} {
-        fn pixel(self) -> vec4 {
+    DrawGlowingLattice: mod.std.set_type_default() do #(DrawGlowingLattice::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
             let r = self.rect_size;
-            let t = self.time * (0.8 + self.amplitude * 1.5) * self.speed;
+            let t = self.draw_pass.time * (0.8 + self.amplitude * 1.5) * self.speed;
             let fc = self.pos * r;
             let p = (fc * 2.0 - r) / r.y / (0.2 * self.zoom);
             let mut o = vec4(0.0, 0.0, 0.0, 0.0);
@@ -363,9 +372,10 @@ live_design! {
     }
 
     // Jellyfish - point-cloud bioluminescent jellyfish
-    pub DrawJellyfish = {{DrawJellyfish}} {
-        fn pixel(self) -> vec4 {
-            let t = self.time * 0.8 * self.speed;
+    DrawJellyfish: mod.std.set_type_default() do #(DrawJellyfish::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
+            let t = self.draw_pass.time * 0.8 * self.speed;
             let aspect = self.rect_size.x / self.rect_size.y;
             let view_scale = 900.0 / self.zoom;
             let px = (self.pos.x - 0.5) * view_scale * aspect;
@@ -383,7 +393,7 @@ live_design! {
             let bell_expand = 1.0 + self.amplitude * 0.5;
             for i in 0..120 {
                 let fi = float(i);
-                let ix = mod(fi, 10.0);
+                let ix = fi - 10.0 * floor(fi / 10.0);
                 let iy = floor(fi / 10.0);
                 let x = ix * 17.0;
                 let y = iy * 15.5;
@@ -391,7 +401,7 @@ live_design! {
                 let e = y / 8.0 - 13.0;
                 let d = (k * k + e * e) / 59.0 + 4.0;
                 let bell = (1.0 + 0.8 * exp(-(d - 4.0))) * bell_expand;
-                let q = 60.0 - 3.0 * sin(atan(k, e))
+                let q = 60.0 - 3.0 * sin(atan2(k, e))
                       + k * (3.0 + 4.0 / d * sin(d * d - 2.0 * t));
                 let c = d / 2.0 + e / 99.0 - t / 18.0;
                 let u = 3.0 * q * sin(c) * bell + sin(t * 0.04) * 25.0;
@@ -404,7 +414,7 @@ live_design! {
                              + exp(-dist2 / 50.0) * 0.08
                              + exp(-dist2 / 250.0) * 0.02) * self.glow;
                     let hue = y * 0.016 + k * 0.12
-                            + atan(k, e) * 0.25 + d * 0.06
+                            + atan2(k, e) * 0.25 + d * 0.06
                             + self.color_shift / 6.2832;
                     o = o + vec4(
                         glow * (0.5 + 0.5 * cos(6.2832 * hue)),
@@ -426,9 +436,10 @@ live_design! {
     // Turbulence Fire - Xor-style layered sine-wave fluid fire
     // Technique: multi-octave turbulence with golden-angle rotation,
     // volumetric glow accumulation, and tanh tonemapping.
-    pub DrawTurbulenceFire = {{DrawTurbulenceFire}} {
-        fn pixel(self) -> vec4 {
-            let t = self.time * (0.6 + self.amplitude * 2.0) * self.speed;
+    DrawTurbulenceFire: mod.std.set_type_default() do #(DrawTurbulenceFire::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        pixel: fn() {
+            let t = self.draw_pass.time * (0.6 + self.amplitude * 2.0) * self.speed;
             let ar = self.rect_size.x / max(self.rect_size.y, 1.0);
 
             // Normalized coords: bottom-center origin, y goes up
@@ -506,7 +517,7 @@ live_design! {
                 ec.x = tmp;
                 let fi = float(i);
                 let p = ec + fi * 2.618;
-                let cell = mod(p, vec2(2.0, 2.0)) - vec2(1.0, 1.0);
+                let cell = p - vec2(2.0, 2.0) * floor(p / vec2(2.0, 2.0)) - vec2(1.0, 1.0);
                 let len = length(cell);
                 ember = ember + max(0.0, 1.0 - len) / max(len, 0.01) * 0.005;
             }
@@ -530,8 +541,9 @@ live_design! {
     }
 
     // Liquid Glass Taiji - rotates with audio rhythm
-    pub DrawTaiji = {{DrawTaiji}} {
-        fn background(self, uv: vec2, time: float) -> vec4 {
+    DrawTaiji: mod.std.set_type_default() do #(DrawTaiji::script_shader(vm)){
+        ..mod.draw.DrawQuad
+        background: fn(uv: vec2, time: float) {
             let t = time * 0.5;
             let r1 = sin(uv.x * 10.0 + t) * 0.5 + 0.5;
             let g1 = sin(uv.y * 8.0 - t * 0.7) * 0.5 + 0.5;
@@ -542,7 +554,7 @@ live_design! {
             return vec4(0.3 + r1 * 0.4 + r2, 0.3 + g1 * 0.4 + g2, 0.4 + b1 * 0.4 + b2, 1.0);
         }
 
-        fn pixel(self) -> vec4 {
+        pixel: fn() {
             let c = self.rect_size * 0.5;
             let r = min(c.x, c.y) - 4.0;
             let p = self.pos * self.rect_size;
@@ -609,7 +621,7 @@ live_design! {
             // Edge dispersion (rainbow at edges)
             let edge_dist = r - dist;
             let edge_zone = smoothstep(15.0, 0.0, edge_dist);
-            let edge_angle = atan(ry, rx);
+            let edge_angle = atan2(ry, rx);
             let rainbow_r = sin(edge_angle * 2.0 + self.anim * 3.0) * 0.5 + 0.5;
             let rainbow_g = sin(edge_angle * 2.0 + self.anim * 3.0 + 2.094) * 0.5 + 0.5;
             let rainbow_b = sin(edge_angle * 2.0 + self.anim * 3.0 + 4.188) * 0.5 + 0.5;
@@ -752,8 +764,9 @@ impl A2uiThemeColors {
 // ============================================================================
 
 /// Actions emitted by A2uiSurface widget
-#[derive(Clone, Debug, DefaultNone)]
+#[derive(Clone, Debug, Default)]
 pub enum A2uiSurfaceAction {
+    #[default]
     None,
     /// User triggered an action (e.g., button click)
     UserAction(UserAction),
@@ -775,7 +788,7 @@ pub enum A2uiSurfaceAction {
 // DrawA2uiImage - for rendering images with border radius
 // ============================================================================
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawA2uiImage {
     #[deref]
@@ -786,7 +799,7 @@ pub struct DrawA2uiImage {
 // DrawA2uiChartLine - for rendering line chart segments (chord chart)
 // ============================================================================
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawA2uiChartLine {
     #[deref]
@@ -809,7 +822,7 @@ pub struct DrawA2uiChartLine {
 // DrawA2uiArc - for rendering pie chart slices
 // ============================================================================
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawA2uiArc {
     #[deref]
@@ -829,7 +842,7 @@ pub struct DrawA2uiArc {
 // DrawAudioBars - for rendering audio waveform visualization
 // ============================================================================
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawA2uiQuad {
     #[deref]
@@ -857,7 +870,7 @@ pub struct DrawA2uiQuad {
     pub p3y: f32,
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawAudioBars {
     #[deref]
@@ -872,7 +885,7 @@ pub struct DrawAudioBars {
 // Shader Stage draw types (5 effects with amplitude modulation)
 // ============================================================================
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawAurora {
     #[deref]
@@ -889,7 +902,7 @@ pub struct DrawAurora {
     pub color_shift: f32,
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawReef {
     #[deref]
@@ -906,7 +919,7 @@ pub struct DrawReef {
     pub color_shift: f32,
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawFractalRainbow {
     #[deref]
@@ -923,7 +936,7 @@ pub struct DrawFractalRainbow {
     pub color_shift: f32,
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawGlowingLattice {
     #[deref]
@@ -940,7 +953,7 @@ pub struct DrawGlowingLattice {
     pub color_shift: f32,
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawJellyfish {
     #[deref]
@@ -957,7 +970,7 @@ pub struct DrawJellyfish {
     pub color_shift: f32,
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawTurbulenceFire {
     #[deref]
@@ -974,7 +987,7 @@ pub struct DrawTurbulenceFire {
     pub color_shift: f32,
 }
 
-#[derive(Live, LiveHook, LiveRegister)]
+#[derive(Script, ScriptHook)]
 #[repr(C)]
 pub struct DrawTaiji {
     #[deref]

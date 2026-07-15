@@ -359,9 +359,7 @@ impl A2uiSurface {
             self.label_count += 1;
             let label = self.pool_label(cx, label_idx);
             label.set_text(&text_value);
-            label.apply_over(cx, live! {
-                draw_text: { text_style: { font_size: (font_size) } }
-            });
+            label.draw_text.text_style.font_size = font_size;
             let _ = label.draw_walk(cx, &mut Scope::empty(), Walk::fit());
         }
     }
@@ -412,7 +410,7 @@ impl A2uiSurface {
 
         // Fallback to placeholder
         let layout = Layout {
-            padding: Padding {
+            padding: Inset {
                 left: 4.0,
                 right: 4.0,
                 top: 4.0,
@@ -440,12 +438,12 @@ impl A2uiSurface {
         card: &CardComponent,
     ) {
         let walk = Walk {
-            margin: Margin { left: 0.0, right: 0.0, top: 8.0, bottom: 8.0 },
+            margin: Inset { left: 0.0, right: 0.0, top: 8.0, bottom: 8.0 },
             ..Walk::fill_fit()
         };
         let layout = Layout {
             flow: Flow::Down,
-            padding: Padding {
+            padding: Inset {
                 left: 16.0,
                 right: 16.0,
                 top: 12.0,
@@ -692,7 +690,7 @@ impl A2uiSurface {
         let walk = Walk {
             width: Size::fill(),
             height: Size::Fixed(1.0),
-            margin: Margin { top: 8.0, bottom: 8.0, left: 0.0, right: 0.0 },
+            margin: Inset { top: 8.0, bottom: 8.0, left: 0.0, right: 0.0 },
             ..Walk::default()
         };
         self.draw_divider.draw_walk(cx, walk);
@@ -787,7 +785,7 @@ impl A2uiSurface {
         let layout = Layout {
             flow: Flow::Down,
             spacing: 12.0,
-            padding: Padding {
+            padding: Inset {
                 left: 16.0,
                 right: 16.0,
                 top: 12.0,
@@ -855,7 +853,7 @@ impl A2uiSurface {
         let layout = Layout {
             flow: Flow::Down,
             spacing: 16.0,
-            padding: Padding {
+            padding: Inset {
                 left: 16.0,
                 right: 16.0,
                 top: 12.0,
@@ -898,7 +896,7 @@ impl A2uiSurface {
         let layout = Layout {
             flow: Flow::Down,
             spacing: 4.0,
-            padding: Padding {
+            padding: Inset {
                 left: 8.0,
                 right: 8.0,
                 top: 4.0,
@@ -1261,7 +1259,7 @@ impl A2uiSurface {
             flow: Flow::right(),
             spacing: 12.0,
             align: Align { x: 0.0, y: 0.5 },
-            padding: Padding {
+            padding: Inset {
                 left: 12.0,
                 right: 12.0,
                 top: 8.0,

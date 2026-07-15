@@ -10,8 +10,8 @@ mod.widgets.GaugeChartBase = #(GaugeChart::register_widget(vm))
 mod.widgets.GaugeChart = set_type_default() do mod.widgets.GaugeChartBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
         }
     }
@@ -19,8 +19,8 @@ mod.widgets.FunnelChartBase = #(FunnelChart::register_widget(vm))
 mod.widgets.FunnelChart = set_type_default() do mod.widgets.FunnelChartBase{
         width: Fill
         height: Fill
-        label: name := mod.widgets.PlotLabel{}
-        theme: {
+        label := mod.widgets.PlotLabel{}
+        theme +: {
             label_color: #d9d9d9ff
         }
     }

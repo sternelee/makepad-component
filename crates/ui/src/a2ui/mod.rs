@@ -55,9 +55,9 @@ pub use sse::*;
 pub use surface::*;
 pub use value::*;
 
-use makepad_widgets::Cx;
+use makepad_widgets::*;
 
-/// Initialize A2UI live design components
-pub fn live_design(cx: &mut Cx) {
-    crate::a2ui::surface::live_design(cx);
+/// Initialize A2UI script components
+pub fn script_mod(vm: &mut ScriptVm) -> ScriptValue {
+    crate::a2ui::surface::script_mod(vm)
 }

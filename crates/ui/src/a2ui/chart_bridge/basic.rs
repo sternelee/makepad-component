@@ -1,10 +1,13 @@
 use crate::a2ui::data_model::DataModel;
 use crate::a2ui::message::*;
-use crate::a2ui::processor::resolve_string_value_scoped;
 use makepad_plot::*;
+#[allow(unused_imports)]
+use makepad_plot::plot::area::AreaChart;
+#[allow(unused_imports)]
+use makepad_plot::plot::financial::{Candle, CandlestickChart};
 use makepad_widgets::*;
 
-use super::{get_bridge_color, parse_colormap, parse_hex_color, resolve_title};
+use super::{get_bridge_color, parse_colormap, resolve_title};
 
 // ============================================================================
 // Line Chart Bridge
@@ -493,11 +496,10 @@ pub fn render_sankey(
     for _pass in 0..node_count {
         for (i, series) in chart.series.iter().enumerate() {
             for (j, &val) in series.values.iter().enumerate() {
-                if val > 0.0 && i != j && j < node_count {
-                    if layers[j] <= layers[i] {
+                if val > 0.0 && i != j && j < node_count
+                    && layers[j] <= layers[i] {
                         layers[j] = layers[i] + 1;
                     }
-                }
             }
         }
     }
