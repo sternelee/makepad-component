@@ -57,17 +57,14 @@ Crate-specific guidance exists in `crates/raycast-launcher/CLAUDE.md` and `crate
 
 - **Rust stable** (edition 2021), resolver "2".
 - `makepad-widgets` / `makepad-script` are pulled from the Makepad git repo (`https://github.com/makepad/makepad`, no branch/rev pinned in `Cargo.toml`; `Cargo.lock` currently pins commit `4f9ce7a8`).
-- The Makepad main branch has moved to the **2.0 Script API** (`script_mod!`, `#[derive(Script, ScriptHook)]`). Two API generations coexist in this workspace:
-  - Legacy `live_design!` + `#[derive(Live, LiveHook, Widget)]`: `crates/ui`, `makepad-plot`, `component-zoo`, `a2ui-demo`.
-  - New `script_mod!`: `gemini-talker`, `raycast-launcher`.
+- Two API generations used to coexist in this workspace; the Makepad 2.0 migration (July 2026) moved every crate to `script_mod!`. The App entry pattern is: `impl AppMain for App { fn script_mod(vm) -> ScriptValue { ...; self::script_mod(vm) } }` with the `ui: Root{...}` tree inside a `startup() do #(App::script_component(vm)){...}` block as the last expression of the `script_mod!` block.
 
-### ⚠️ Current build status (verified 2026-07-15)
+### ⚠️ Current build status (verified 2026-07-15, updated after the Makepad 2.0 migration)
 
-The workspace does **not** fully compile against the currently locked makepad commit:
+The workspace has been migrated to the Makepad 2.0 `script_mod!` API. Everything compiles against the currently locked makepad commit except `gemini-talker`:
 
-- `cargo check -p makepad-plot` / `-p makepad-component` — **fails** (~857 errors: `live_design!`, `#[derive(Live)]`, `#[live]`/`#[rust]` attributes no longer exist in makepad 2.0). These crates need a Makepad 2.0 migration, or the `makepad-widgets` dependency must be pinned to an older pre-2.0 commit to build as-is.
-- `cargo check -p gemini-talker` — **fails** (4 errors: unresolved `gemini_live::prelude` import, type annotation errors).
-- `cargo check -p raycast-launcher` — **passes**.
+- `cargo check -p makepad-component` / `-p makepad-plot` / `-p component-zoo` / `-p a2ui-demo` / `-p makepad-clipboard` / `-p raycast-launcher` — **pass**. The legacy `live_design!` API is gone from these crates; all widget/shader registration now happens through `script_mod!` blocks wired into each crate's `script_mod(vm)` function.
+- `cargo check -p gemini-talker` — **fails** (4 pre-existing errors: unresolved `gemini_live::prelude` import, type annotation errors). Unrelated to the script_mod migration.
 
 Before assuming a change broke something, check whether the failure pre-exists. When fixing builds, prefer pinning/updating the dependency deliberately over speculative edits, and record what you did.
 
@@ -110,7 +107,7 @@ cargo fmt --all -- --check
 ### Feature flags (`a2ui-demo` crate)
 
 | Feature | Enables |
-|---------|---------|
+| --------- | --------- |
 | `mock-server` | `watch-server`, `mock-a2a-server` binaries (tokio/hyper) |
 | `a2ui-bridge` | LLM bridge server (adds reqwest, futures-util) |
 | `mureka` | AI music generation (extends `a2ui-bridge`, requires `MUREKA_API_KEY`) |
@@ -129,7 +126,7 @@ python3 serve_wasm.py 8080   # serves with COOP/COEP headers required by Makepad
 ### Naming
 
 | Type | Convention | Example |
-|------|------------|---------|
+| ------ | ------------ | --------- |
 | Variables, functions, modules | `snake_case` | `draw_bg`, `handle_event` |
 | Structs, enums, traits | `UpperCamelCase` | `MpButton`, `MpButtonAction` |
 | Constants, statics | `SCREAMING_SNAKE_CASE` | `MAX_WIDTH` |
@@ -199,7 +196,7 @@ New chart types go in `makepad-plot/src/plot/` and are bridged in `a2ui/chart_br
 ## 7. Servers, Ports, and LLM Configuration
 
 | Server | Default port | Feature | Purpose |
-|--------|-------------|---------|---------|
+| -------- | ------------- | --------- | --------- |
 | A2UI Bridge | 8082 (`LLM_PORT`) | `a2ui-bridge` | LLM chat → A2UI JSON |
 | Watch Server | 8080 | `mock-server` | File watcher → SSE stream |
 | Mock A2A Server | 8080 | `mock-server` | Static A2A responses |
