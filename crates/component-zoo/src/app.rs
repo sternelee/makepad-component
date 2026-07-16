@@ -4652,8 +4652,16 @@ impl Widget for ShaderArtCanvas {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
-        script_apply_eval!(cx, self.draw_bg, {
-            speed: #(self.speed as f32)
+        // Push the widget's speed into the shader instance. NOTE: script_apply_eval
+        // on a bare draw struct recompiles the shader with a proto-less object and
+        // fails; an Animate apply only fills instance values.
+        cx.with_vm(|vm| {
+            let obj = vm.bx.heap.new_object();
+            vm.bx
+                .heap
+                .set_value(obj, id!(speed).into(), self.speed.into(), NoTrap);
+            self.draw_bg
+                .script_apply(vm, &Apply::Animate, &mut Scope::default(), obj.into());
         });
         self.animator_play(cx, ids!(anim.on));
         self.draw_bg.begin(cx, walk, self.layout);
@@ -4695,8 +4703,16 @@ impl Widget for ShaderArt2Canvas {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
-        script_apply_eval!(cx, self.draw_bg, {
-            speed: #(self.speed as f32)
+        // Push the widget's speed into the shader instance. NOTE: script_apply_eval
+        // on a bare draw struct recompiles the shader with a proto-less object and
+        // fails; an Animate apply only fills instance values.
+        cx.with_vm(|vm| {
+            let obj = vm.bx.heap.new_object();
+            vm.bx
+                .heap
+                .set_value(obj, id!(speed).into(), self.speed.into(), NoTrap);
+            self.draw_bg
+                .script_apply(vm, &Apply::Animate, &mut Scope::default(), obj.into());
         });
         self.animator_play(cx, ids!(anim.on));
         self.draw_bg.begin(cx, walk, self.layout);
@@ -4738,8 +4754,16 @@ impl Widget for ShaderMathCanvas {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
-        script_apply_eval!(cx, self.draw_bg, {
-            speed: #(self.speed as f32)
+        // Push the widget's speed into the shader instance. NOTE: script_apply_eval
+        // on a bare draw struct recompiles the shader with a proto-less object and
+        // fails; an Animate apply only fills instance values.
+        cx.with_vm(|vm| {
+            let obj = vm.bx.heap.new_object();
+            vm.bx
+                .heap
+                .set_value(obj, id!(speed).into(), self.speed.into(), NoTrap);
+            self.draw_bg
+                .script_apply(vm, &Apply::Animate, &mut Scope::default(), obj.into());
         });
         self.animator_play(cx, ids!(anim.on));
         self.draw_bg.begin(cx, walk, self.layout);
@@ -6095,14 +6119,14 @@ impl App {
             if page_idx == self.current_page {
                 let mut btn = btn;
                 script_apply_eval!(cx, btn, {
-                    draw_bg: { color: (active_bg), color_hover: (active_hover), color_pressed: (active_pressed) }
-                    draw_text: { color: (active_text) }
+                    draw_bg +: { color: #(active_bg), color_hover: #(active_hover), color_pressed: #(active_pressed) }
+                    draw_text +: { color: #(active_text) }
                 });
             } else {
                 let mut btn = btn;
                 script_apply_eval!(cx, btn, {
-                    draw_bg: { color: (inactive_bg), color_hover: (inactive_hover), color_pressed: (inactive_pressed) }
-                    draw_text: { color: (inactive_text) }
+                    draw_bg +: { color: #(inactive_bg), color_hover: #(inactive_hover), color_pressed: #(inactive_pressed) }
+                    draw_text +: { color: #(inactive_text) }
                 });
             }
         }
