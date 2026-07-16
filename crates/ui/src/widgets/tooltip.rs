@@ -417,7 +417,7 @@ impl MpTooltip {
         }
 
         script_apply_eval!(cx, popup, {
-            padding: Inset{left: #(padding.left), right: #(padding.right), top: #(padding.top), bottom: #(padding.bottom)}
+            padding: mod.turtle.Inset{left: #(padding.left), right: #(padding.right), top: #(padding.top), bottom: #(padding.bottom)}
             draw_bg: {
                 arrow_dir: #(arrow_dir as f32)
                 arrow_size: #(vec2(self.arrow_size.x as f32, self.arrow_size.y as f32))

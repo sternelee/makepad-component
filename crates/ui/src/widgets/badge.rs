@@ -259,7 +259,7 @@ impl MpBadge {
         let right = -self.badge_offset.x;
         let mut indicator = self.view(cx, ids!(badge_wrapper.indicator));
         script_apply_eval!(cx, indicator, {
-            margin: Inset{top: #(top), right: #(right)}
+            margin: mod.turtle.Inset{top: #(top), right: #(right)}
         });
     }
 
