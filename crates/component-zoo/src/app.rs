@@ -7,9 +7,12 @@ use makepad_component::widgets::MpCheckboxWidgetRefExt;
 use makepad_component::widgets::MpModalAction;
 use makepad_component::widgets::MpModalWidgetWidgetRefExt;
 use makepad_component::widgets::MpNotificationWidgetWidgetRefExt;
+use makepad_component::widgets::MpCollapsibleTriggerWidgetRefExt;
 use makepad_component::widgets::MpPopoverWidgetWidgetRefExt;
 use makepad_component::widgets::MpProgressWidgetRefExt;
 use makepad_component::widgets::MpRadioWidgetRefExt;
+use makepad_component::widgets::MpSheetWidgetRefExt;
+use makepad_component::widgets::MpSheetTriggerWidgetRefExt;
 use makepad_component::widgets::MpSkeletonWidgetWidgetRefExt;
 use makepad_component::widgets::MpSliderWidgetRefExt;
 use makepad_component::widgets::MpSwitchWidgetRefExt;
@@ -1151,6 +1154,7 @@ startup() do #(App::script_component(vm)){
                         cat_shader_math := CategoryTab{ text: "Shader Math" }
                         cat_splash := CategoryTab{ text: "Splash" }
                         cat_json := CategoryTab{ text: "JSON Render" }
+                        cat_shadcn := CategoryTab{ text: "Shadcn" }
                     }
                 }
 
@@ -4548,7 +4552,208 @@ startup() do #(App::script_component(vm)){
                     // ============================================================
                     page_splash := mod.widgets.SplashDemo{}
                     page_json := mod.widgets.JsonRenderDemo{}
-                }
+                    page_shadcn := View{
+                        width: Fill, height: Fit,
+                        flow: Down,
+                        padding: Inset{left: 24, right: 24, top: 16, bottom: 16},
+                        spacing: 20.0,
+
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 20.0} color: FOREGROUND }
+                            text: "Shadcn-Style Components"
+                        }
+
+                        // ============================================================
+                        // Collapsible
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            text: "Collapsible"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 4, right: 4, top: 4, bottom: 4}
+
+                            demo_collapsible_1 := View{
+                                width: Fill, height: Fit,
+                                flow: Down,
+
+                                collapsible_trigger := mod.widgets.MpCollapsibleTrigger{ label: { text: "What is shadcn/ui?" } }
+                                collapsible_content := mod.widgets.MpCollapsibleContent{
+                                    visible: false
+                                    Label{
+                                        draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: MUTED_FOREGROUND }
+                                        text: "shadcn/ui is a collection of re-usable components built with Radix UI and Tailwind CSS. This Makepad port brings the same patterns to native desktop apps."
+                                    }
+                                }
+                            }
+
+                            demo_collapsible_2 := View{
+                                width: Fill, height: Fit,
+                                flow: Down,
+
+                                collapsible_trigger2 := mod.widgets.MpCollapsibleTrigger{ label: { text: "How does it work?" } }
+                                collapsible_content2 := mod.widgets.MpCollapsibleContent{
+                                    visible: false
+                                    Label{
+                                        draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: MUTED_FOREGROUND }
+                                        text: "Each component follows macOS design conventions while maintaining the composability and variant system from shadcn. Components are built with Makepad's script_mod! DSL and Rust widget structs."
+                                    }
+                                }
+                            }
+                        }
+
+                        // ============================================================
+                        // Link
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            text: "Link"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 8.0,
+                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            View{
+                                width: Fill, height: Fit,
+                                flow: Right,
+                                spacing: 8.0,
+                                align: Align{y: 0.5}
+
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Default:" }
+                                demo_link := mod.widgets.MpLink{ text: "Click here" }
+                            }
+                            View{
+                                width: Fill, height: Fit,
+                                flow: Right,
+                                spacing: 8.0,
+                                align: Align{y: 0.5}
+
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Muted:" }
+                                mod.widgets.MpLinkMuted{ text: "Learn more" }
+                            }
+                            View{
+                                width: Fill, height: Fit,
+                                flow: Right,
+                                spacing: 8.0,
+                                align: Align{y: 0.5}
+
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Ghost:" }
+                                mod.widgets.MpLinkGhost{ text: "Visit site" }
+                            }
+                            View{
+                                width: Fill, height: Fit,
+                                flow: Right,
+                                spacing: 8.0,
+                                align: Align{y: 0.5}
+
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Destructive:" }
+                                mod.widgets.MpLinkDestructive{ text: "Delete account" }
+                            }
+                            View{
+                                width: Fill, height: Fit,
+                                flow: Right,
+                                spacing: 8.0,
+                                align: Align{y: 0.5}
+
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Small / Large:" }
+                                mod.widgets.MpLinkSmall{ text: "small" }
+                                mod.widgets.MpLinkLarge{ text: "LARGE" }
+                            }
+                        }
+
+                        // ============================================================
+                        // Breadcrumb
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            text: "Breadcrumb"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 8.0,
+                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            demo_breadcrumb := View{
+                                width: Fill, height: Fit,
+                                flow: Right,
+                                spacing: 4.0,
+                                align: Align{y: 0.5}
+
+                                mod.widgets.MpBreadcrumbItem{ text: "Home" }
+                                mod.widgets.MpBreadcrumbSeparator{ text: "/" }
+                                mod.widgets.MpBreadcrumbItem{ text: "Components" }
+                                mod.widgets.MpBreadcrumbSeparator{ text: "/" }
+                                mod.widgets.MpBreadcrumbItem{ text: "UI" }
+                                mod.widgets.MpBreadcrumbSeparator{ text: "/" }
+                                mod.widgets.MpBreadcrumbItem{ active: true, text: "Collapsible" }
+                            }
+                        }
+
+                        // ============================================================
+                        // Textarea
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            text: "Textarea"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 8.0,
+                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Default:" }
+                            demo_textarea := mod.widgets.MpTextArea{ placeholder: "Type your message here..." }
+
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Small:" }
+                            mod.widgets.MpTextAreaSmall{ placeholder: "Small textarea" }
+
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Large:" }
+                            mod.widgets.MpTextAreaLarge{ placeholder: "Large textarea" }
+                        }
+
+                        // ============================================================
+                        // Sheet
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            text: "Sheet"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 8.0,
+                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            View{
+                                width: Fill, height: Fit,
+                                flow: Right,
+                                spacing: 8.0,
+                                align: Align{y: 0.5}
+
+                                demo_sheet_trigger := mod.widgets.MpSheetTrigger{ 0: mod.widgets.MpButtonPrimary{ text: "Open Sheet" } }
+                            }
+                        }
+
+                        // Sheet panel (overlay + content)
+                        demo_sheet := mod.widgets.MpSheet{}
+                    }
+                    } // close PageFlip
                 } // close main_content
 
                 // Modal overlay - must be after main_content to appear on top
@@ -5652,6 +5857,9 @@ impl MatchEvent for App {
         if self.ui.mp_tab(cx, ids!(cat_json)).clicked(actions) {
             self.select_category(cx, 10);
         }
+        if self.ui.mp_tab(cx, ids!(cat_shadcn)).clicked(actions) {
+            self.select_category(cx, 11);
+        }
 
         // Handle counter button
         if self.ui.mp_button(cx, ids!(counter_btn)).clicked(actions) {
@@ -6132,6 +6340,27 @@ impl MatchEvent for App {
         if self.ui.mp_tab(cx, ids!(tab_s_map)).clicked(actions) {
             self.select_tab(cx, "segmented", 2, "Map");
         }
+
+        // Handle collapsible toggles
+        if self.ui.mp_collapsible_trigger(cx, ids!(collapsible_trigger)).toggled(actions) {
+            let current = self.ui.view(cx, ids!(collapsible_content)).visible();
+            self.ui.view(cx, ids!(collapsible_content)).set_visible(cx, !current);
+            self.ui.redraw(cx);
+        }
+        if self.ui.mp_collapsible_trigger(cx, ids!(collapsible_trigger2)).toggled(actions) {
+            let current = self.ui.view(cx, ids!(collapsible_content2)).visible();
+            self.ui.view(cx, ids!(collapsible_content2)).set_visible(cx, !current);
+            self.ui.redraw(cx);
+        }
+
+        // Handle sheet trigger
+        if self.ui.mp_sheet_trigger(cx, ids!(demo_sheet_trigger)).opened(actions) {
+            self.ui.mp_sheet(cx, ids!(demo_sheet)).set_open(cx, true);
+            self.ui.mp_sheet(cx, ids!(demo_sheet)).set_title(cx, "Sheet Demo");
+        }
+        if self.ui.mp_sheet(cx, ids!(demo_sheet)).closed(actions) {
+            // Sheet close handled internally
+        }
     }
 }
 
@@ -6173,6 +6402,9 @@ impl App {
         self.ui
             .mp_tab(cx, ids!(cat_json))
             .set_selected(cx, index == 10);
+        self.ui
+            .mp_tab(cx, ids!(cat_shadcn))
+            .set_selected(cx, index == 11);
 
         // Switch page
         let page_id = match index {
@@ -6187,6 +6419,7 @@ impl App {
             8 => id!(page_shader_math),
             9 => id!(page_splash),
             10 => id!(page_json),
+            11 => id!(page_shadcn),
             _ => id!(page_form),
         };
         self.ui
