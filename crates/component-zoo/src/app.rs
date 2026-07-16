@@ -4564,6 +4564,30 @@ startup() do #(App::script_component(vm)){
                         }
 
                         // ============================================================
+                        // Theme Switcher
+                        // ============================================================
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Right,
+                            spacing: 12.0,
+                            align: Align{y: 0.5},
+                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 10, bottom: 10}
+
+                            Label{
+                                draw_text +: { text_style: theme.font_bold{font_size: 14.0} color: FOREGROUND }
+                                text: "Theme:"
+                            }
+                            theme_toggle_btn := mod.widgets.MpButtonOutline{
+                                text: "Toggle Dark Mode"
+                            }
+                            theme_status := Label{
+                                draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: MUTED_FOREGROUND }
+                                text: "Light"
+                            }
+                        }
+
+                        // ============================================================
                         // Collapsible
                         // ============================================================
                         Label{
@@ -4821,6 +4845,23 @@ startup() do #(App::script_component(vm)){
                                     footer +: {
                                         dialog_close_btn := mod.widgets.MpButtonGhost{ text: "Cancel" }
                                         dialog_confirm_btn := mod.widgets.MpButtonPrimary{ text: "Confirm" }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Command palette overlay (hidden unless opened via ⌘K)
+                        demo_command := mod.widgets.MpCommandPalette{
+                            panel +: {
+                                list +: {
+                                    cmd_group := View{ width: Fill, height: Fit, flow: Down
+                                        cmd_search := mod.widgets.MpCommandItem{ label: { text: "Search files..." } shortcut: { text: "⌘K" } }
+                                        cmd_new := mod.widgets.MpCommandItem{ label: { text: "New document" } shortcut: { text: "⌘N" } }
+                                        cmd_open := mod.widgets.MpCommandItem{ label: { text: "Open project..." } shortcut: { text: "⌘O" } }
+                                    }
+                                    cmd_group2 := View{ width: Fill, height: Fit, flow: Down
+                                        cmd_settings := mod.widgets.MpCommandItem{ label: { text: "Settings" } shortcut: { text: "⌘," } }
+                                        cmd_logout := mod.widgets.MpCommandItem{ label: { text: "Sign out" } }
                                     }
                                 }
                             }
@@ -6596,18 +6637,42 @@ impl MatchEvent for App {
         self.ui.mp_sheet(cx, ids!(demo_sheet)).closed(actions);
 
         // Handle dialog open/close
-        if self.ui.mp_button(cx, ids!(demo_dialog_trigger)).clicked(actions) {
-            if let Some(mut w) = self.ui.widget(cx, ids!(demo_dialog)).borrow_mut::<makepad_component::widgets::MpDialog>() {
+        if self
+            .ui
+            .mp_button(cx, ids!(demo_dialog_trigger))
+            .clicked(actions)
+        {
+            if let Some(mut w) = self
+                .ui
+                .widget(cx, ids!(demo_dialog))
+                .borrow_mut::<makepad_component::widgets::MpDialog>()
+            {
                 w.open(cx);
             }
         }
-        if self.ui.mp_button(cx, ids!(dialog_close_btn)).clicked(actions) {
-            if let Some(mut w) = self.ui.widget(cx, ids!(demo_dialog)).borrow_mut::<makepad_component::widgets::MpDialog>() {
+        if self
+            .ui
+            .mp_button(cx, ids!(dialog_close_btn))
+            .clicked(actions)
+        {
+            if let Some(mut w) = self
+                .ui
+                .widget(cx, ids!(demo_dialog))
+                .borrow_mut::<makepad_component::widgets::MpDialog>()
+            {
                 w.close(cx);
             }
         }
-        if self.ui.mp_button(cx, ids!(dialog_confirm_btn)).clicked(actions) {
-            if let Some(mut w) = self.ui.widget(cx, ids!(demo_dialog)).borrow_mut::<makepad_component::widgets::MpDialog>() {
+        if self
+            .ui
+            .mp_button(cx, ids!(dialog_confirm_btn))
+            .clicked(actions)
+        {
+            if let Some(mut w) = self
+                .ui
+                .widget(cx, ids!(demo_dialog))
+                .borrow_mut::<makepad_component::widgets::MpDialog>()
+            {
                 w.close(cx);
             }
         }
