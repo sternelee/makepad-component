@@ -107,9 +107,15 @@ mod.widgets.ShaderCanvas = set_type_default() do mod.widgets.ShaderCanvasBase{
 
     animator: Animator{
         anim: {
-            default: @on
+            // default must NOT be `on`: Animator::play() early-returns when
+            // current_state_id (which falls back to `default`) equals the
+            // target state and no track exists yet, so the loop would never
+            // start and anim_time would stay pinned at 0 (static shader).
+            default: @off
+            off: AnimatorState{ from: {all: Forward {duration: 0.0}} }
             on: AnimatorState{
                 from: {all: Loop {duration: 10.0, end: 1.0}}
+                redraw: true
                 apply: {
                     draw_bg: {
                         anim_time: [{time: 0.0, value: 0.0}, {time: 1.0, value: 62.83}]
@@ -198,9 +204,13 @@ mod.widgets.ShaderArtCanvas = set_type_default() do mod.widgets.ShaderArtCanvasB
 
     animator: Animator{
         anim: {
-            default: @on
+            // default must NOT be `on` (see ShaderCanvas note): play() would
+            // early-return and anim_time would never advance.
+            default: @off
+            off: AnimatorState{ from: {all: Forward {duration: 0.0}} }
             on: AnimatorState{
                 from: {all: Loop {duration: 15.0, end: 1.0}}
+                redraw: true
                 apply: {
                     draw_bg: {
                         anim_time: [{time: 0.0, value: 0.0}, {time: 1.0, value: 94.25}]
@@ -396,9 +406,13 @@ mod.widgets.ShaderArt2Canvas = set_type_default() do mod.widgets.ShaderArt2Canva
 
     animator: Animator{
         anim: {
-            default: @on
+            // default must NOT be `on` (see ShaderCanvas note): play() would
+            // early-return and anim_time would never advance.
+            default: @off
+            off: AnimatorState{ from: {all: Forward {duration: 0.0}} }
             on: AnimatorState{
                 from: {all: Loop {duration: 20.0, end: 1.0}}
+                redraw: true
                 apply: {
                     draw_bg: {
                         anim_time: [{time: 0.0, value: 0.0}, {time: 1.0, value: 125.66}]
@@ -493,9 +507,13 @@ mod.widgets.ShaderMathCanvas = set_type_default() do mod.widgets.ShaderMathCanva
 
     animator: Animator{
         anim: {
-            default: @on
+            // default must NOT be `on` (see ShaderCanvas note): play() would
+            // early-return and anim_time would never advance.
+            default: @off
+            off: AnimatorState{ from: {all: Forward {duration: 0.0}} }
             on: AnimatorState{
                 from: {all: Loop {duration: 20.0, end: 1.0}}
+                redraw: true
                 apply: {
                     draw_bg: {
                         anim_time: [{time: 0.0, value: 0.0}, {time: 1.0, value: 125.66}]
@@ -1142,7 +1160,7 @@ startup() do #(App::script_component(vm)){
                 category_pages := PageFlip{
                     width: Fill,
                     height: Fill,
-                    active_page: @page_form,
+                    active_page: @page_shader_art,
 
                     // ============================================================
                     // Form Controls Page
@@ -4602,17 +4620,52 @@ pub struct ShaderCanvas {
     layout: Layout,
     #[rust]
     area: Area,
+    #[rust]
+    start_time: f64,
+    #[rust]
+    next_frame: Option<NextFrame>,
 }
 
 impl Widget for ShaderCanvas {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
+        // Self-driven next-frame loop keeps the shader animating independent of
+        // the Animator track (which can fail to start when its default state is
+        // the same as the target state — see play() early-return).
+        if let Some(nf) = &self.next_frame {
+            if nf.is_event(event).is_some() {
+                self.next_frame = Some(cx.new_next_frame());
+                self.redraw(cx);
+            }
+        }
         if self.animator_handle_event(cx, event).must_redraw() {
             self.redraw(cx);
         }
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
-        self.animator_play(cx, ids!(anim.on));
+        // Drive anim_time straight from the draw clock. The animator is kept as
+        // a secondary redraw source, but we don't rely on it for the time value:
+        // pushing any instance via script_apply(Animate) rewrites the whole
+        // instance set, which would otherwise reset anim_time to 0 each frame.
+        let now = cx.time();
+        if self.start_time < 0.0 {
+            self.start_time = now;
+        }
+        let anim_time = (now - self.start_time) * 2.0 * std::f64::consts::PI;
+        cx.with_vm(|vm| {
+            let obj = vm.bx.heap.new_object();
+            vm.bx
+                .heap
+                .set_value(obj, id!(anim_time).into(), anim_time.into(), NoTrap);
+            self.draw_bg
+                .script_apply(vm, &Apply::Animate, &mut Scope::default(), obj.into());
+        });
+        if !self.animator_in_state(cx, ids!(anim.on)) {
+            self.animator_play(cx, ids!(anim.on));
+        }
+        if self.next_frame.is_none() {
+            self.next_frame = Some(cx.new_next_frame());
+        }
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
@@ -4642,28 +4695,51 @@ pub struct ShaderArtCanvas {
     area: Area,
     #[live]
     speed: f64,
+    #[rust]
+    start_time: f64,
+    #[rust]
+    next_frame: Option<NextFrame>,
 }
 
 impl Widget for ShaderArtCanvas {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
+        if let Some(nf) = &self.next_frame {
+            if nf.is_event(event).is_some() {
+                self.next_frame = Some(cx.new_next_frame());
+                self.redraw(cx);
+            }
+        }
         if self.animator_handle_event(cx, event).must_redraw() {
             self.redraw(cx);
         }
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
-        // Push the widget's speed into the shader instance. NOTE: script_apply_eval
-        // on a bare draw struct recompiles the shader with a proto-less object and
-        // fails; an Animate apply only fills instance values.
+        // Drive anim_time from the draw clock so the shader keeps moving. The
+        // per-frame speed push below uses script_apply(Animate), which rewrites
+        // the whole instance set and would otherwise reset anim_time to 0.
+        let now = cx.time();
+        if self.start_time < 0.0 {
+            self.start_time = now;
+        }
+        let anim_time = (now - self.start_time) * 2.0 * std::f64::consts::PI;
         cx.with_vm(|vm| {
             let obj = vm.bx.heap.new_object();
+            vm.bx
+                .heap
+                .set_value(obj, id!(anim_time).into(), anim_time.into(), NoTrap);
             vm.bx
                 .heap
                 .set_value(obj, id!(speed).into(), self.speed.into(), NoTrap);
             self.draw_bg
                 .script_apply(vm, &Apply::Animate, &mut Scope::default(), obj.into());
         });
-        self.animator_play(cx, ids!(anim.on));
+        if !self.animator_in_state(cx, ids!(anim.on)) {
+            self.animator_play(cx, ids!(anim.on));
+        }
+        if self.next_frame.is_none() {
+            self.next_frame = Some(cx.new_next_frame());
+        }
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
@@ -4693,28 +4769,51 @@ pub struct ShaderArt2Canvas {
     area: Area,
     #[live]
     speed: f64,
+    #[rust]
+    start_time: f64,
+    #[rust]
+    next_frame: Option<NextFrame>,
 }
 
 impl Widget for ShaderArt2Canvas {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
+        if let Some(nf) = &self.next_frame {
+            if nf.is_event(event).is_some() {
+                self.next_frame = Some(cx.new_next_frame());
+                self.redraw(cx);
+            }
+        }
         if self.animator_handle_event(cx, event).must_redraw() {
             self.redraw(cx);
         }
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
-        // Push the widget's speed into the shader instance. NOTE: script_apply_eval
-        // on a bare draw struct recompiles the shader with a proto-less object and
-        // fails; an Animate apply only fills instance values.
+        // Drive anim_time from the draw clock so the shader keeps moving. The
+        // per-frame speed push below uses script_apply(Animate), which rewrites
+        // the whole instance set and would otherwise reset anim_time to 0.
+        let now = cx.time();
+        if self.start_time < 0.0 {
+            self.start_time = now;
+        }
+        let anim_time = (now - self.start_time) * 2.0 * std::f64::consts::PI;
         cx.with_vm(|vm| {
             let obj = vm.bx.heap.new_object();
+            vm.bx
+                .heap
+                .set_value(obj, id!(anim_time).into(), anim_time.into(), NoTrap);
             vm.bx
                 .heap
                 .set_value(obj, id!(speed).into(), self.speed.into(), NoTrap);
             self.draw_bg
                 .script_apply(vm, &Apply::Animate, &mut Scope::default(), obj.into());
         });
-        self.animator_play(cx, ids!(anim.on));
+        if !self.animator_in_state(cx, ids!(anim.on)) {
+            self.animator_play(cx, ids!(anim.on));
+        }
+        if self.next_frame.is_none() {
+            self.next_frame = Some(cx.new_next_frame());
+        }
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
@@ -4744,28 +4843,51 @@ pub struct ShaderMathCanvas {
     area: Area,
     #[live]
     speed: f64,
+    #[rust]
+    start_time: f64,
+    #[rust]
+    next_frame: Option<NextFrame>,
 }
 
 impl Widget for ShaderMathCanvas {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
+        if let Some(nf) = &self.next_frame {
+            if nf.is_event(event).is_some() {
+                self.next_frame = Some(cx.new_next_frame());
+                self.redraw(cx);
+            }
+        }
         if self.animator_handle_event(cx, event).must_redraw() {
             self.redraw(cx);
         }
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
-        // Push the widget's speed into the shader instance. NOTE: script_apply_eval
-        // on a bare draw struct recompiles the shader with a proto-less object and
-        // fails; an Animate apply only fills instance values.
+        // Drive anim_time from the draw clock so the shader keeps moving. The
+        // per-frame speed push below uses script_apply(Animate), which rewrites
+        // the whole instance set and would otherwise reset anim_time to 0.
+        let now = cx.time();
+        if self.start_time < 0.0 {
+            self.start_time = now;
+        }
+        let anim_time = (now - self.start_time) * 2.0 * std::f64::consts::PI;
         cx.with_vm(|vm| {
             let obj = vm.bx.heap.new_object();
+            vm.bx
+                .heap
+                .set_value(obj, id!(anim_time).into(), anim_time.into(), NoTrap);
             vm.bx
                 .heap
                 .set_value(obj, id!(speed).into(), self.speed.into(), NoTrap);
             self.draw_bg
                 .script_apply(vm, &Apply::Animate, &mut Scope::default(), obj.into());
         });
-        self.animator_play(cx, ids!(anim.on));
+        if !self.animator_in_state(cx, ids!(anim.on)) {
+            self.animator_play(cx, ids!(anim.on));
+        }
+        if self.next_frame.is_none() {
+            self.next_frame = Some(cx.new_next_frame());
+        }
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
