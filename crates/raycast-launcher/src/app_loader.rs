@@ -189,7 +189,7 @@ pub fn set_splash_search(cx: &mut Cx, search: &str) {
         let app_val = heap.value(state_obj, ScriptValue::from_id(id!(app)), NoTrap);
         let Some(app_obj) = app_val.as_object() else { return; };
         let sv = heap.new_string_from_str(search);
-        heap.set_value_def(app_obj, ScriptValue::from_id(id!(search)), sv.into());
+        heap.set_value_def(app_obj, ScriptValue::from_id(id!(search)), sv);
     });
 }
 

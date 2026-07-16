@@ -14,11 +14,9 @@ script_mod! {
     mod.widgets.MpLink = set_type_default() do mod.widgets.MpLinkBase{
         width: Fit
         height: Fit
-        cursor: MouseCursor.Hand
-
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
-            color: instance(PRIMARY)
+            color: #x3B82F6
             underline: instance(0.0)
             get_color: fn() {
                 // Blend between normal and muted for disabled state
@@ -58,21 +56,21 @@ script_mod! {
     // Variant: Muted link (secondary color)
     mod.widgets.MpLinkMuted = mod.widgets.MpLink{
         draw_text +: {
-            color: instance(MUTED_FOREGROUND)
+            color: #x94A3B8
         }
     }
 
     // Variant: Ghost link (muted foreground, no primary color)
     mod.widgets.MpLinkGhost = mod.widgets.MpLink{
         draw_text +: {
-            color: instance(FOREGROUND)
+            color: #x1D1D1F
         }
     }
 
     // Variant: Destructive link
     mod.widgets.MpLinkDestructive = mod.widgets.MpLink{
         draw_text +: {
-            color: instance(DANGER)
+            color: #xEF4444
         }
     }
 

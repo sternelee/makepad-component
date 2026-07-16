@@ -15,9 +15,9 @@ script_mod! {
         width: Fill
         height: Fit
         padding: Inset{left: 12.0, right: 12.0, top: 10.0, bottom: 10.0}
-        min_height: 80.0
+        
 
-        show_bg: true
+        
         draw_bg +: {
             bg_color: instance(INPUT)
             border_color: instance(BORDER)

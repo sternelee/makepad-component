@@ -338,7 +338,7 @@ impl App {
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
         // Handle theme dropdown selection
-        if let Some(index) = self.ui.drop_down(cx, ids!(theme_dropdown)).selected(&actions) {
+        if let Some(index) = self.ui.drop_down(cx, ids!(theme_dropdown)).selected(actions) {
             let new_theme = Theme::from_index(index);
             if new_theme != self.current_theme {
                 self.current_theme = new_theme;

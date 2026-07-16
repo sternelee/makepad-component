@@ -195,7 +195,7 @@ impl StreamingApp {
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
         // Handle connect button
-        if self.ui.button(cx, ids!(connect_btn)).clicked(&actions) {
+        if self.ui.button(cx, ids!(connect_btn)).clicked(actions) {
             self.connect(cx);
         }
 

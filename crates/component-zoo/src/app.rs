@@ -4820,7 +4820,7 @@ startup() do #(App::script_component(vm)){
                                 demo_select := mod.widgets.MpSelect{
                                     trigger +: {
                                         label: { text: "Select a framework" }
-                                        placeholder_text: "Choose..."
+                                        // placeholder_text removed (not valid in DSL)
                                     }
                                     dropdown +: {
                                         demo_opt_react := mod.widgets.MpSelectOption{ value: "React", label: { text: "React" } }

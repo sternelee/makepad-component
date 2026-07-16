@@ -22,8 +22,8 @@ script_mod! {
     mod.widgets.MpHoverCardContent = set_type_default() do mod.widgets.MpHoverCardContentBase{
         width: Fit
         height: Fit
-        min_width: 200.0
-        max_width: 320.0
+        
+        
         padding: Inset{left: 12.0, right: 12.0, top: 12.0, bottom: 12.0}
         flow: Down
         spacing: 8.0

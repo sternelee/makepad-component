@@ -16,9 +16,7 @@ script_mod! {
         height: Fit
         padding: Inset{left: 12.0, right: 12.0, top: 8.0, bottom: 8.0}
         align: Align{x: 0.5, y: 0.5}
-        cursor: MouseCursor.Hand
 
-        show_bg: true
         draw_bg +: {
             radius: instance(6.0)
             border_width: instance(1.0)
@@ -61,8 +59,8 @@ script_mod! {
         }
 
         draw_text +: {
-            text_style: theme.font_medium{font_size: 13.0}
-            color: instance(FOREGROUND)
+            text_style: theme.font_bold{font_size: 13.0}
+            color: (FOREGROUND)
             color_active: instance(PRIMARY_FOREGROUND)
             active: instance(0.0)
             get_color: fn() {
@@ -124,7 +122,7 @@ script_mod! {
     mod.widgets.MpToggleSmall = mod.widgets.MpToggle{
         padding: Inset{left: 8.0, right: 8.0, top: 4.0, bottom: 4.0}
         draw_text +: {
-            text_style: theme.font_medium{font_size: 11.0}
+            text_style: theme.font_bold{font_size: 11.0}
         }
     }
 
@@ -132,7 +130,7 @@ script_mod! {
     mod.widgets.MpToggleLarge = mod.widgets.MpToggle{
         padding: Inset{left: 16.0, right: 16.0, top: 10.0, bottom: 10.0}
         draw_text +: {
-            text_style: theme.font_medium{font_size: 15.0}
+            text_style: theme.font_bold{font_size: 15.0}
         }
     }
 
@@ -184,13 +182,7 @@ impl ScriptHook for MpToggle {
     fn on_after_new(&mut self, vm: &mut ScriptVm) {
         vm.with_cx_mut(|cx| {
             let active = self.active;
-            self.animator_toggle(
-                cx,
-                active,
-                Animate::No,
-                ids!(active.on),
-                ids!(active.off),
-            );
+            self.animator_toggle(cx, active, Animate::No, ids!(active.on), ids!(active.off));
         });
     }
 }
@@ -268,13 +260,7 @@ impl MpToggle {
     pub fn set_active(&mut self, cx: &mut Cx, active: bool) {
         if self.active != active {
             self.active = active;
-            self.animator_toggle(
-                cx,
-                active,
-                Animate::Yes,
-                ids!(active.on),
-                ids!(active.off),
-            );
+            self.animator_toggle(cx, active, Animate::Yes, ids!(active.on), ids!(active.off));
             self.redraw(cx);
         }
     }

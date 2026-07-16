@@ -116,11 +116,14 @@ impl MpThemeProvider {
     pub fn set_dark_mode(&mut self, cx: &mut Cx, dark: bool) {
         if self.dark_mode != dark {
             self.dark_mode = dark;
-            cx.widget_action(self.widget_uid(), if dark {
-                MpThemeAction::SetDark
-            } else {
-                MpThemeAction::SetLight
-            });
+            cx.widget_action(
+                self.widget_uid(),
+                if dark {
+                    MpThemeAction::SetDark
+                } else {
+                    MpThemeAction::SetLight
+                },
+            );
             self.redraw(cx);
         }
     }

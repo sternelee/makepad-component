@@ -25,14 +25,14 @@ script_mod! {
         height: 36
         padding: Inset{left: 0.0, right: 0.0, top: 0.0, bottom: 0.0}
         align: Align{x: 0.5, y: 0.5}
-        cursor: MouseCursor.Hand
+        
 
-        show_bg: true
+        
         draw_bg +: {
             radius: instance(6.0)
-            bg_color: instance(#x0000)
-            bg_hover: instance(#xf1f5f9)
-            bg_active: instance(PRIMARY)
+            bg_color: #x0000
+            bg_hover: #xf1f5f9
+            bg_active: (PRIMARY)
             hover: instance(0.0)
             active: instance(0.0)
 
@@ -51,8 +51,8 @@ script_mod! {
 
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
-            color: instance(FOREGROUND)
-            color_active: instance(PRIMARY_FOREGROUND)
+            color: (FOREGROUND)
+            color_active: (PRIMARY_FOREGROUND)
             active: instance(0.0)
             get_color: fn() {
                 return mix(self.color, self.color_active, self.active)
@@ -97,13 +97,13 @@ script_mod! {
         height: 36
         padding: Inset{left: 0.0, right: 0.0, top: 0.0, bottom: 0.0}
         align: Align{x: 0.5, y: 0.5}
-        cursor: MouseCursor.Hand
+        
 
-        show_bg: true
+        
         draw_bg +: {
             radius: instance(6.0)
-            bg_color: instance(#x0000)
-            bg_hover: instance(#xf1f5f9)
+            bg_color: #x0000
+            bg_hover: #xf1f5f9
             hover: instance(0.0)
 
             pixel: fn() {
@@ -164,11 +164,11 @@ script_mod! {
     }
 
     // Pagination ellipsis
-    mod.widgets.MpPaginationEllipsis = mod.widgets.View{
+    mod.widgets.MpPaginationEllipsis = mod.widgets.Label{
         width: 36
         height: 36
         align: Align{x: 0.5, y: 0.5}
-        cursor: MouseCursor.Arrow
+        
 
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
@@ -224,7 +224,6 @@ pub struct MpPaginationItem {
     page_num: usize,
 }
 
-
 impl Widget for MpPaginationItem {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         let uid = self.widget_uid();
@@ -272,13 +271,7 @@ impl MpPaginationItem {
     pub fn set_active(&mut self, cx: &mut Cx, active: bool) {
         if self.active != active {
             self.active = active;
-            self.animator_toggle(
-                cx,
-                active,
-                Animate::Yes,
-                ids!(active.on),
-                ids!(active.off),
-            );
+            self.animator_toggle(cx, active, Animate::Yes, ids!(active.on), ids!(active.off));
             self.redraw(cx);
         }
     }

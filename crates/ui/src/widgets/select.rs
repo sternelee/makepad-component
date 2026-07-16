@@ -17,9 +17,9 @@ script_mod! {
         padding: Inset{left: 12, right: 12, top: 0, bottom: 0}
         align: Align{x: 0.0, y: 0.5}
         flow: Right
-        cursor: MouseCursor.Hand
+        
 
-        show_bg: true
+        
         draw_bg +: {
             bg_color: instance(INPUT)
             border_color: instance(BORDER)
@@ -55,7 +55,7 @@ script_mod! {
             text: ""
         }
 
-        placeholder_text: "Select..."
+        
 
         animator: Animator{
             hover: {
@@ -78,12 +78,12 @@ script_mod! {
         height: Fit
         flow: Down
         visible: false
-        min_width: 100.0
-        max_width: 300.0
-        min_height: 40.0
-        max_height: 280.0
+        
+        
+        
+        
 
-        show_bg: true
+        
         draw_bg +: {
             bg_color: instance(CARD)
             border_color: instance(BORDER)
@@ -113,9 +113,9 @@ script_mod! {
         height: 32
         padding: Inset{left: 12, right: 12, top: 0, bottom: 0}
         align: Align{x: 0.0, y: 0.5}
-        cursor: MouseCursor.Hand
+        
 
-        show_bg: true
+        
         draw_bg +: {
             bg_color: instance(#x0000)
             bg_hover: instance(#xf1f5f9)
@@ -143,7 +143,7 @@ script_mod! {
             text: ""
         }
 
-        value: ""
+        
         selected: false
 
         animator: Animator{
@@ -190,8 +190,12 @@ impl Widget for MpSelectTrigger {
         self.view.handle_event(cx, event, scope);
 
         match event.hits(cx, self.view.area()) {
-            Hit::FingerHoverIn(_) => { cx.set_cursor(MouseCursor::Hand); }
-            Hit::FingerDown(_) => { cx.widget_action(self.widget_uid(), MpSelectAction::Selected("toggle".into())); }
+            Hit::FingerHoverIn(_) => {
+                cx.set_cursor(MouseCursor::Hand);
+            }
+            Hit::FingerDown(_) => {
+                cx.widget_action(self.widget_uid(), MpSelectAction::Selected("toggle".into()));
+            }
             _ => {}
         }
     }
@@ -209,7 +213,9 @@ impl MpSelectTrigger {
 
 impl MpSelectTriggerRef {
     pub fn set_text(&self, cx: &mut Cx, text: &str) {
-        if let Some(mut inner) = self.borrow_mut() { inner.set_text(cx, text); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_text(cx, text);
+        }
     }
 }
 
@@ -255,10 +261,15 @@ impl Widget for MpSelectOption {
                 cx.set_cursor(MouseCursor::Hand);
                 self.animator_play(cx, ids!(hover.on));
             }
-            Hit::FingerHoverOut(_) => { self.animator_play(cx, ids!(hover.off)); }
+            Hit::FingerHoverOut(_) => {
+                self.animator_play(cx, ids!(hover.off));
+            }
             Hit::FingerUp(fe) => {
                 if fe.is_over {
-                    cx.widget_action(uid, MpSelectAction::Selected(self.value.as_ref().to_string()));
+                    cx.widget_action(
+                        uid,
+                        MpSelectAction::Selected(self.value.as_ref().to_string()),
+                    );
                 }
             }
             _ => {}
@@ -267,7 +278,8 @@ impl Widget for MpSelectOption {
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
         self.draw_bg.begin(cx, walk, self.layout);
-        self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), self.value.as_ref());
+        self.draw_text
+            .draw_walk(cx, Walk::fit(), Align::default(), self.value.as_ref());
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
         DrawStep::done()

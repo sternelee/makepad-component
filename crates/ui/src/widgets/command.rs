@@ -70,7 +70,7 @@ script_mod! {
             }
         }
 
-        placeholder: "Type a command or search..."
+        // placeholder stored as Rust field, not DSL property
 
         animator: Animator{
             focus: {
@@ -141,8 +141,8 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_regular{font_size: 13.0}
-                color: instance(FOREGROUND)
-                color_selected: instance(PRIMARY_FOREGROUND)
+                color: (FOREGROUND)
+                color_selected: (PRIMARY_FOREGROUND)
                 selected: instance(0.0)
                 get_color: fn() { return mix(self.color, self.color_selected, self.selected) }
             }
@@ -160,8 +160,7 @@ script_mod! {
             text: ""
         }
 
-        value: ""
-        shortcut_str: ""
+
         selected: false
 
         animator: Animator{
@@ -191,7 +190,6 @@ script_mod! {
         panel := RoundedView{
             width: 480
             height: Fit
-            max_height: 400
             align: Align{x: 0.5, y: 0.3}
             flow: Down
 
@@ -215,16 +213,12 @@ script_mod! {
                 padding: Inset{left: 4, right: 4, top: 8, bottom: 8}
             }
 
-            empty := View{
+            empty := Label{
                 width: Fill
                 height: 80
                 align: Align{x: 0.5, y: 0.5}
                 visible: false
-
-                draw_text +: {
-                    text_style: theme.font_regular{font_size: 14.0}
-                    color: MUTED_FOREGROUND
-                }
+                draw_text +: { text_style: theme.font_regular{font_size: 14.0} color: MUTED_FOREGROUND }
                 text: "No results found."
             }
         }
@@ -294,7 +288,9 @@ impl Widget for MpCommandItem {
                 cx.set_cursor(MouseCursor::Hand);
                 self.animator_play(cx, ids!(hover.on));
             }
-            Hit::FingerHoverOut(_) => { self.animator_play(cx, ids!(hover.off)); }
+            Hit::FingerHoverOut(_) => {
+                self.animator_play(cx, ids!(hover.off));
+            }
             Hit::FingerUp(fe) => {
                 if fe.is_over {
                     cx.widget_action(uid, MpCommandAction::Selected(String::new()));
@@ -313,7 +309,13 @@ impl MpCommandItem {
     pub fn set_selected(&mut self, cx: &mut Cx, selected: bool) {
         if self.selected != selected {
             self.selected = selected;
-            self.animator_toggle(cx, selected, Animate::Yes, ids!(active.on), ids!(active.off));
+            self.animator_toggle(
+                cx,
+                selected,
+                Animate::Yes,
+                ids!(active.on),
+                ids!(active.off),
+            );
             self.redraw(cx);
         }
     }
@@ -383,19 +385,29 @@ impl MpCommandPalette {
         self.redraw(cx);
     }
 
-    pub fn is_open(&self) -> bool { self.open }
+    pub fn is_open(&self) -> bool {
+        self.open
+    }
 }
 
 impl MpCommandPaletteRef {
     pub fn open(&self, cx: &mut Cx) {
-        if let Some(mut inner) = self.borrow_mut() { inner.open(cx); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.open(cx);
+        }
     }
 
     pub fn close(&self, cx: &mut Cx) {
-        if let Some(mut inner) = self.borrow_mut() { inner.close(cx); }
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.close(cx);
+        }
     }
 
     pub fn is_open(&self) -> bool {
-        if let Some(inner) = self.borrow() { inner.is_open() } else { false }
+        if let Some(inner) = self.borrow() {
+            inner.is_open()
+        } else {
+            false
+        }
     }
 }

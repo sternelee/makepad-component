@@ -18,20 +18,18 @@ script_mod! {
         align: Align{y: 0.5}
     }
 
-    // Breadcrumb item (clickable)
+    // Breadcrumb item (clickable) — registered widget inherits full widget capabilities
     mod.widgets.MpBreadcrumbItemBase = #(MpBreadcrumbItem::register_widget(vm))
     mod.widgets.MpBreadcrumbItem = set_type_default() do mod.widgets.MpBreadcrumbItemBase{
         width: Fit
         height: Fit
-        cursor: MouseCursor.Hand
 
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
-            color: instance(PRIMARY)
+            color: #x3B82F6
         }
 
         text: ""
-
         active: false
 
         animator: Animator{
@@ -39,34 +37,32 @@ script_mod! {
                 default: @off
                 off: AnimatorState{
                     from: {all: Forward {duration: 0.15}}
-                    apply: {draw_text: {color: PRIMARY}}
+                    apply: {draw_text: {color: #x3B82F6}}
                 }
                 on: AnimatorState{
                     from: {all: Forward {duration: 0.15}}
-                    apply: {draw_text: {color: PRIMARY_HOVER}}
+                    apply: {draw_text: {color: #x2563EB}}
                 }
             }
         }
     }
 
-    // Breadcrumb separator
-    mod.widgets.MpBreadcrumbSeparator = mod.widgets.View{
+    // Breadcrumb separator — keep as View, no draw_text needed
+    mod.widgets.MpBreadcrumbSeparator = mod.widgets.Label{
         width: Fit
         height: Fit
-        padding: Inset{left: 4.0, right: 4.0}
-
+        margin: Inset{left: 4.0, right: 4.0}
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
-            color: MUTED_FOREGROUND
+            color: #x94A3B8
         }
         text: "/"
     }
 
     // Active breadcrumb (last item, not clickable)
     mod.widgets.MpBreadcrumbActive = set_type_default() do mod.widgets.MpBreadcrumbItemBase{
-        cursor: MouseCursor.Arrow
         draw_text +: {
-            color: instance(FOREGROUND)
+            color: #x1D1D1F
         }
     }
 }
