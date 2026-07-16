@@ -4754,6 +4754,79 @@ startup() do #(App::script_component(vm)){
                         demo_sheet := mod.widgets.MpSheet{}
 
                         // ============================================================
+                        // Dialog
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            text: "Dialog"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 8.0,
+                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            View{
+                                width: Fill, height: Fit, flow: Right, spacing: 8.0, align: Align{y: 0.5}
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Click to open:" }
+                                demo_dialog_trigger := mod.widgets.MpButtonPrimary{ text: "Open Dialog" }
+                            }
+                        }
+
+                        // ============================================================
+                        // Select
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            text: "Select"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 8.0,
+                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            View{
+                                width: Fill, height: Fit, flow: Right, spacing: 8.0, align: Align{y: 0.5}
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Framework:" }
+                                demo_select := mod.widgets.MpSelect{
+                                    trigger +: {
+                                        label: { text: "Select a framework" }
+                                        placeholder_text: "Choose..."
+                                    }
+                                    dropdown +: {
+                                        demo_opt_react := mod.widgets.MpSelectOption{ value: "React", label: { text: "React" } }
+                                        demo_opt_vue := mod.widgets.MpSelectOption{ value: "Vue", label: { text: "Vue" } }
+                                        demo_opt_svelte := mod.widgets.MpSelectOption{ value: "Svelte", label: { text: "Svelte" } }
+                                        demo_opt_solid := mod.widgets.MpSelectOption{ value: "Solid", label: { text: "Solid" } }
+                                    }
+                                }
+                            }
+                        }
+                        // Dialog overlay (hidden unless opened)
+                        demo_dialog := mod.widgets.MpDialog{
+                            content +: {
+                                dialog +: {
+                                    header +: {
+                                        title +: { text: "Welcome to shadcn Dialog!" }
+                                        description +: { text: "This dialog has smooth fade-in animation." }
+                                    }
+                                    body +: {
+                                        Label{ draw_text +: { text_style: theme.font_regular{font_size: 14.0} color: FOREGROUND } text: "Dialog content with custom children." }
+                                    }
+                                    footer +: {
+                                        dialog_close_btn := mod.widgets.MpButtonGhost{ text: "Cancel" }
+                                        dialog_confirm_btn := mod.widgets.MpButtonPrimary{ text: "Confirm" }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ============================================================
                         // Separator
                         // ============================================================
                         Label{
@@ -6520,8 +6593,23 @@ impl MatchEvent for App {
                 .mp_sheet(cx, ids!(demo_sheet))
                 .set_title(cx, "Sheet Demo");
         }
-        if self.ui.mp_sheet(cx, ids!(demo_sheet)).closed(actions) {
-            // Sheet close handled internally
+        self.ui.mp_sheet(cx, ids!(demo_sheet)).closed(actions);
+
+        // Handle dialog open/close
+        if self.ui.mp_button(cx, ids!(demo_dialog_trigger)).clicked(actions) {
+            if let Some(mut w) = self.ui.widget(cx, ids!(demo_dialog)).borrow_mut::<makepad_component::widgets::MpDialog>() {
+                w.open(cx);
+            }
+        }
+        if self.ui.mp_button(cx, ids!(dialog_close_btn)).clicked(actions) {
+            if let Some(mut w) = self.ui.widget(cx, ids!(demo_dialog)).borrow_mut::<makepad_component::widgets::MpDialog>() {
+                w.close(cx);
+            }
+        }
+        if self.ui.mp_button(cx, ids!(dialog_confirm_btn)).clicked(actions) {
+            if let Some(mut w) = self.ui.widget(cx, ids!(demo_dialog)).borrow_mut::<makepad_component::widgets::MpDialog>() {
+                w.close(cx);
+            }
         }
     }
 }
