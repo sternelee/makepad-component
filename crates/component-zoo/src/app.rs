@@ -4,15 +4,15 @@ use makepad_component::widgets::MpButtonWidgetExt;
 use makepad_component::widgets::MpButtonWidgetRefExt;
 use makepad_component::widgets::MpCardAction;
 use makepad_component::widgets::MpCheckboxWidgetRefExt;
+use makepad_component::widgets::MpCollapsibleTriggerWidgetRefExt;
 use makepad_component::widgets::MpModalAction;
 use makepad_component::widgets::MpModalWidgetWidgetRefExt;
 use makepad_component::widgets::MpNotificationWidgetWidgetRefExt;
-use makepad_component::widgets::MpCollapsibleTriggerWidgetRefExt;
 use makepad_component::widgets::MpPopoverWidgetWidgetRefExt;
 use makepad_component::widgets::MpProgressWidgetRefExt;
 use makepad_component::widgets::MpRadioWidgetRefExt;
-use makepad_component::widgets::MpSheetWidgetRefExt;
 use makepad_component::widgets::MpSheetTriggerWidgetRefExt;
+use makepad_component::widgets::MpSheetWidgetRefExt;
 use makepad_component::widgets::MpSkeletonWidgetWidgetRefExt;
 use makepad_component::widgets::MpSliderWidgetRefExt;
 use makepad_component::widgets::MpSwitchWidgetRefExt;
@@ -4752,8 +4752,152 @@ startup() do #(App::script_component(vm)){
 
                         // Sheet panel (overlay + content)
                         demo_sheet := mod.widgets.MpSheet{}
+
+                        // ============================================================
+                        // Separator
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            text: "Separator"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 12.0,
+                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Default:" }
+                            mod.widgets.MpSeparator{}
+
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "With label:" }
+                            mod.widgets.MpSeparatorWithLabel{ label: { text: "OR" } }
+
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Subtle:" }
+                            mod.widgets.MpSeparatorSubtle{}
+
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Vertical:" }
+                            View{ width: Fill, height: 60, flow: Right, spacing: 8.0, align: Align{y: 0.5}
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: FOREGROUND } text: "Left" }
+                                mod.widgets.MpSeparatorVertical{}
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: FOREGROUND } text: "Right" }
+                            }
+                        }
+
+                        // ============================================================
+                        // Toggle
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            text: "Toggle"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 8.0,
+                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            View{
+                                width: Fill, height: Fit,
+                                flow: Right,
+                                spacing: 8.0,
+                                align: Align{y: 0.5}
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Default:" }
+                                demo_toggle_bold := mod.widgets.MpToggle{ text: "Bold" }
+                                mod.widgets.MpToggle{ text: "Italic" }
+                                mod.widgets.MpToggle{ text: "Underline" }
+                            }
+                            View{
+                                width: Fill, height: Fit,
+                                flow: Right,
+                                spacing: 8.0,
+                                align: Align{y: 0.5}
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Ghost:" }
+                                mod.widgets.MpToggleGhost{ text: "Bold" }
+                                mod.widgets.MpToggleGhost{ text: "Italic" }
+                            }
+                            View{
+                                width: Fill, height: Fit,
+                                flow: Right,
+                                spacing: 8.0,
+                                align: Align{y: 0.5}
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Sizes:" }
+                                demo_toggle_sm := mod.widgets.MpToggleSmall{ text: "Small" }
+                                demo_toggle_lg := mod.widgets.MpToggleLarge{ text: "Large" }
+                            }
+                        }
+
+                        // ============================================================
+                        // Pagination
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            text: "Pagination"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 8.0,
+                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            View{
+                                width: Fill, height: Fit,
+                                align: Align{x: 0.5},
+
+                                mod.widgets.MpPagination{
+                                    demo_prev := mod.widgets.MpPaginationPrev{}
+                                    demo_page1 := mod.widgets.MpPaginationItem{ text: "1", active: true }
+                                    demo_page2 := mod.widgets.MpPaginationItem{ text: "2" }
+                                    demo_page3 := mod.widgets.MpPaginationItem{ text: "3" }
+                                    mod.widgets.MpPaginationEllipsis{}
+                                    demo_page10 := mod.widgets.MpPaginationItem{ text: "10" }
+                                    demo_next := mod.widgets.MpPaginationNext{}
+                                }
+                            }
+
+                            View{
+                                width: Fill, height: Fit,
+                                align: Align{x: 0.5},
+
+                                mod.widgets.MpPagination{
+                                    demo_prev2 := mod.widgets.MpPaginationPrev{}
+                                    mod.widgets.MpPaginationItem{ text: "1" }
+                                    mod.widgets.MpPaginationItem{ text: "2" }
+                                    mod.widgets.MpPaginationItem{ text: "3" }
+                                    mod.widgets.MpPaginationItem{ text: "4" }
+                                    mod.widgets.MpPaginationItem{ text: "5", active: true }
+                                    demo_next2 := mod.widgets.MpPaginationNext{}
+                                }
+                            }
+                        }
+
+                        // ============================================================
+                        // HoverCard
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            text: "HoverCard"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 8.0,
+                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            View{
+                                width: Fill, height: Fit, flow: Right, spacing: 8.0, align: Align{y: 0.5}
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Hover 🔍 over this text to see more details (hover_card requires app-level integration)" }
+                            }
+                        }
                     }
-                    } // close PageFlip
+                } // close PageFlip
                 } // close main_content
 
                 // Modal overlay - must be after main_content to appear on top
@@ -6342,21 +6486,39 @@ impl MatchEvent for App {
         }
 
         // Handle collapsible toggles
-        if self.ui.mp_collapsible_trigger(cx, ids!(collapsible_trigger)).toggled(actions) {
+        if self
+            .ui
+            .mp_collapsible_trigger(cx, ids!(collapsible_trigger))
+            .toggled(actions)
+        {
             let current = self.ui.view(cx, ids!(collapsible_content)).visible();
-            self.ui.view(cx, ids!(collapsible_content)).set_visible(cx, !current);
+            self.ui
+                .view(cx, ids!(collapsible_content))
+                .set_visible(cx, !current);
             self.ui.redraw(cx);
         }
-        if self.ui.mp_collapsible_trigger(cx, ids!(collapsible_trigger2)).toggled(actions) {
+        if self
+            .ui
+            .mp_collapsible_trigger(cx, ids!(collapsible_trigger2))
+            .toggled(actions)
+        {
             let current = self.ui.view(cx, ids!(collapsible_content2)).visible();
-            self.ui.view(cx, ids!(collapsible_content2)).set_visible(cx, !current);
+            self.ui
+                .view(cx, ids!(collapsible_content2))
+                .set_visible(cx, !current);
             self.ui.redraw(cx);
         }
 
         // Handle sheet trigger
-        if self.ui.mp_sheet_trigger(cx, ids!(demo_sheet_trigger)).opened(actions) {
+        if self
+            .ui
+            .mp_sheet_trigger(cx, ids!(demo_sheet_trigger))
+            .opened(actions)
+        {
             self.ui.mp_sheet(cx, ids!(demo_sheet)).set_open(cx, true);
-            self.ui.mp_sheet(cx, ids!(demo_sheet)).set_title(cx, "Sheet Demo");
+            self.ui
+                .mp_sheet(cx, ids!(demo_sheet))
+                .set_title(cx, "Sheet Demo");
         }
         if self.ui.mp_sheet(cx, ids!(demo_sheet)).closed(actions) {
             // Sheet close handled internally

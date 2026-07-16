@@ -206,13 +206,7 @@ impl ScriptHook for MpSheet {
     fn on_after_new(&mut self, vm: &mut ScriptVm) {
         vm.with_cx_mut(|cx| {
             let open = self.open;
-            self.animator_toggle(
-                cx,
-                open,
-                Animate::No,
-                ids!(open.on),
-                ids!(open.off),
-            );
+            self.animator_toggle(cx, open, Animate::No, ids!(open.on), ids!(open.off));
         });
     }
 }
@@ -256,13 +250,7 @@ impl MpSheet {
     pub fn set_open(&mut self, cx: &mut Cx, open: bool) {
         if self.open != open {
             self.open = open;
-            self.animator_toggle(
-                cx,
-                open,
-                Animate::Yes,
-                ids!(open.on),
-                ids!(open.off),
-            );
+            self.animator_toggle(cx, open, Animate::Yes, ids!(open.on), ids!(open.off));
             if open {
                 self.view.widget(cx, ids!(overlay)).set_visible(cx, true);
                 self.view.widget(cx, ids!(content)).set_visible(cx, true);
