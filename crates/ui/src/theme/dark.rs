@@ -1,21 +1,21 @@
 use makepad_widgets::*;
 
+// ============================================================
+// Dark Mode Theme Palette
+// ============================================================
+
 script_mod! {
     mod.mp_theme_dark = {
-        // === Dark Mode - shadcn-style HSL equivalents as hex ===
-        // Primary accents
         PRIMARY: #x60A5FA
         PRIMARY_HOVER: #x3B82F6
         PRIMARY_ACTIVE: #x2563EB
         PRIMARY_FOREGROUND: #x0F172A
 
-        // Secondary
         SECONDARY: #x1E293B
         SECONDARY_HOVER: #x334155
         SECONDARY_ACTIVE: #x475569
         SECONDARY_FOREGROUND: #xF1F5F9
 
-        // Semantic colors (more vibrant in dark)
         DANGER: #xF87171
         DANGER_HOVER: #xEF4444
         DANGER_ACTIVE: #xDC2626
@@ -36,7 +36,6 @@ script_mod! {
         INFO_ACTIVE: #x0284C7
         INFO_FOREGROUND: #x0F172A
 
-        // UI surfaces (dark)
         BACKGROUND: #x0F172A
         FOREGROUND: #xF8FAFC
         BORDER: #x334155
@@ -65,7 +64,7 @@ script_mod! {
 }
 
 // ============================================================
-// MpThemeProvider - Theme switcher widget
+// MpThemeState - Central theme state holder
 // ============================================================
 
 #[derive(Clone, Debug, Default)]
@@ -77,8 +76,10 @@ pub enum MpThemeAction {
     None,
 }
 
+/// Theme state holder - tracks light/dark mode.
+/// Uses `#[deref] view: View` so it can be placed in the widget tree.
 #[derive(Script, ScriptHook, Widget)]
-pub struct MpThemeProvider {
+pub struct MpThemeState {
     #[source]
     source: ScriptObjectRef,
     #[deref]
@@ -89,7 +90,7 @@ pub struct MpThemeProvider {
     dark_mode: bool,
 }
 
-impl Widget for MpThemeProvider {
+impl Widget for MpThemeState {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         self.view.handle_event(cx, event, scope);
     }
@@ -99,16 +100,17 @@ impl Widget for MpThemeProvider {
     }
 }
 
-impl MpThemeProvider {
+impl MpThemeState {
     /// Toggle between light and dark mode
     pub fn toggle(&mut self, cx: &mut Cx) {
         self.dark_mode = !self.dark_mode;
-        cx.widget_action(self.widget_uid(), MpThemeAction::Toggle);
-        if self.dark_mode {
-            cx.widget_action(self.widget_uid(), MpThemeAction::SetDark);
+        let action = if self.dark_mode {
+            MpThemeAction::SetDark
         } else {
-            cx.widget_action(self.widget_uid(), MpThemeAction::SetLight);
-        }
+            MpThemeAction::SetLight
+        };
+        cx.widget_action(self.widget_uid(), MpThemeAction::Toggle);
+        cx.widget_action(self.widget_uid(), action);
         self.redraw(cx);
     }
 
@@ -116,14 +118,12 @@ impl MpThemeProvider {
     pub fn set_dark_mode(&mut self, cx: &mut Cx, dark: bool) {
         if self.dark_mode != dark {
             self.dark_mode = dark;
-            cx.widget_action(
-                self.widget_uid(),
-                if dark {
-                    MpThemeAction::SetDark
-                } else {
-                    MpThemeAction::SetLight
-                },
-            );
+            let action = if dark {
+                MpThemeAction::SetDark
+            } else {
+                MpThemeAction::SetLight
+            };
+            cx.widget_action(self.widget_uid(), action);
             self.redraw(cx);
         }
     }
@@ -133,7 +133,7 @@ impl MpThemeProvider {
     }
 }
 
-impl MpThemeProviderRef {
+impl MpThemeStateRef {
     pub fn toggle(&self, cx: &mut Cx) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.toggle(cx);

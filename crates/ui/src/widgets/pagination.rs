@@ -25,9 +25,9 @@ script_mod! {
         height: 36
         padding: Inset{left: 0.0, right: 0.0, top: 0.0, bottom: 0.0}
         align: Align{x: 0.5, y: 0.5}
-        
 
-        
+
+
         draw_bg +: {
             radius: instance(6.0)
             bg_color: #x0000
@@ -97,9 +97,9 @@ script_mod! {
         height: 36
         padding: Inset{left: 0.0, right: 0.0, top: 0.0, bottom: 0.0}
         align: Align{x: 0.5, y: 0.5}
-        
 
-        
+
+
         draw_bg +: {
             radius: instance(6.0)
             bg_color: #x0000
@@ -168,7 +168,7 @@ script_mod! {
         width: 36
         height: 36
         align: Align{x: 0.5, y: 0.5}
-        
+
 
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}

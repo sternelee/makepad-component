@@ -17,9 +17,9 @@ script_mod! {
         padding: Inset{left: 12, right: 12, top: 0, bottom: 0}
         align: Align{x: 0.0, y: 0.5}
         flow: Right
-        
 
-        
+
+
         draw_bg +: {
             bg_color: instance(INPUT)
             border_color: instance(BORDER)
@@ -55,7 +55,7 @@ script_mod! {
             text: ""
         }
 
-        
+
 
         animator: Animator{
             hover: {
@@ -78,12 +78,12 @@ script_mod! {
         height: Fit
         flow: Down
         visible: false
-        
-        
-        
-        
 
-        
+
+
+
+
+
         draw_bg +: {
             bg_color: instance(CARD)
             border_color: instance(BORDER)
@@ -113,9 +113,9 @@ script_mod! {
         height: 32
         padding: Inset{left: 12, right: 12, top: 0, bottom: 0}
         align: Align{x: 0.0, y: 0.5}
-        
 
-        
+
+
         draw_bg +: {
             bg_color: instance(#x0000)
             bg_hover: instance(#xf1f5f9)
@@ -143,7 +143,7 @@ script_mod! {
             text: ""
         }
 
-        
+
         selected: false
 
         animator: Animator{

@@ -1,3 +1,4 @@
+use makepad_component::theme::dark::MpThemeState;
 use makepad_component::widgets::MpAvatarWidgetRefExt;
 use makepad_component::widgets::MpBadgeWidgetRefExt;
 use makepad_component::widgets::MpButtonWidgetExt;
@@ -5041,6 +5042,11 @@ startup() do #(App::script_component(vm)){
                 }
             } // close demo_modal
 
+                // Theme state provider
+                theme_state := mod.widgets.MpThemeProvider{
+                    dark_mode: false,
+                }
+
                 // Notification overlay - positioned at top-right
                 View {
                     width: Fill,
@@ -6675,6 +6681,29 @@ impl MatchEvent for App {
             {
                 w.close(cx);
             }
+        }
+
+        // Handle theme toggle button
+        if self
+            .ui
+            .mp_button(cx, ids!(theme_toggle_btn))
+            .clicked(actions)
+        {
+            let is_dark = self
+                .ui
+                .widget(cx, ids!(theme_state))
+                .borrow_mut::<MpThemeState>()
+                .map(|ts| ts.is_dark())
+                .unwrap_or(false);
+            if let Some(mut ts) = self
+                .ui
+                .widget(cx, ids!(theme_state))
+                .borrow_mut::<MpThemeState>()
+            {
+                ts.toggle(cx)
+            }
+            let new_mode = if is_dark { "Light" } else { "Dark" };
+            self.ui.label(cx, ids!(theme_status)).set_text(cx, new_mode);
         }
     }
 }
