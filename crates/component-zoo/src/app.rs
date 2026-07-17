@@ -1165,7 +1165,7 @@ startup() do #(App::script_component(vm)){
                 category_pages := PageFlip{
                     width: Fill,
                     height: Fill,
-                    active_page: @page_shader_art,
+                    active_page: @page_shadcn,
 
                     // ============================================================
                     // Form Controls Page
