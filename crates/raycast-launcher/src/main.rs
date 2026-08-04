@@ -625,7 +625,7 @@ script_mod! {
                     text_style: theme.font_regular {font_size: 20}
                     color: mod.tc.text_primary
                 }
-                draw_select +: {
+                draw_selection +: {
                     color: mod.tc.selection
                 }
             }
