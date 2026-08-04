@@ -108,44 +108,69 @@ script_mod! {
 
         mode_input_row := View{
             width: Fill
-            height: Fit
+            height: 44
             flow: Right
             align: VCenter
             spacing: 8
-            margin: Inset{top: 10}
+            padding: Inset{left: 16 right: 16}
 
             mode_back_wrap := View{
                 visible: false
                 width: Fit
                 height: Fit
                 mode_back_btn := Button{
-                    text: "‹ Back"
-                    padding: Inset{left: 10 right: 10 top: 7 bottom: 7}
+                    width: 24
+                    height: 24
+                    text: ""
+                    draw_bg +: {
+                        glyph_col: uniform(mod.tc.text_secondary)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            // 返回 chevron ‹
+                            sdf.move_to(14.0 5.0)
+                            sdf.line_to(8.0 12.0)
+                            sdf.line_to(14.0 19.0)
+                            sdf.stroke(self.glyph_col 1.6)
+                            return sdf.result
+                        }
+                    }
+                }
+            }
+
+            search_glyph := View{
+                width: 20
+                height: 24
+                show_bg: true
+                draw_bg +: {
+                    glyph_col: uniform(mod.tc.text_secondary)
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        // 放大镜
+                        sdf.circle(8.5 9.5 5.5)
+                        sdf.stroke(self.glyph_col 1.6)
+                        sdf.move_to(12.8 13.8)
+                        sdf.line_to(17.0 18.0)
+                        sdf.stroke(self.glyph_col 1.6)
+                        return sdf.result
+                    }
                 }
             }
 
             mode_input := TextInput{
                 width: Fill
                 height: Fit
-                empty_text: "Search applications and commands…"
-                padding: Inset{left: 12 right: 12 top: 10 bottom: 10}
+                empty_text: "Search for apps and commands..."
                 draw_bg +: {
-                    border_color: instance(#x3e4653)
-                    focus: instance(0.0)
                     pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 10.0)
-                        let fill_base = #x1f2329
-                        let fill_focus = #x242a33
-                        let border_focus = #x6ea9ff
-                        sdf.fill(mix(fill_base fill_focus self.focus * 0.65))
-                        sdf.stroke(mix(self.border_color border_focus self.focus) 1.0)
-                        return sdf.result
+                        return #x00000000
                     }
                 }
                 draw_text +: {
-                    text_style: theme.font_bold {font_size: 13}
-                    color: #xf4f6fb
+                    text_style: theme.font_regular {font_size: 20}
+                    color: mod.tc.text_primary
+                }
+                draw_select +: {
+                    color: mod.tc.selection
                 }
             }
 
@@ -154,16 +179,26 @@ script_mod! {
                 width: Fit
                 height: Fit
                 mode_action_btn := Button{
-                    text: "Add"
-                    padding: Inset{left: 12 right: 12 top: 7 bottom: 7}
-                }
-            }
-
-            mode_hint_label := Label{
-                text: ""
-                draw_text +: {
-                    text_style: theme.font_regular {font_size: 10}
-                    color: #x8f9caf
+                    text: "Send"
+                    padding: Inset{left: 12 right: 12 top: 6 bottom: 6}
+                    draw_bg +: {
+                        top_col: uniform(mod.tc.glass_top)
+                        bot_col: uniform(mod.tc.glass_bottom)
+                        stroke_col: uniform(mod.tc.glass_stroke)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            let r = self.rect_size.y * 0.5
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y r)
+                            let g = mix(self.top_col self.bot_col self.pos.y)
+                            sdf.fill(g)
+                            sdf.stroke(self.stroke_col 1.0)
+                            return sdf.result
+                        }
+                    }
+                    draw_text +: {
+                        text_style: theme.font_bold {font_size: 12}
+                        color: mod.tc.text_primary
+                    }
                 }
             }
         }
@@ -1095,71 +1130,27 @@ fn load_launcher_items() -> Vec<LauncherItem> {
 
 impl LauncherPanel {
     pub(crate) fn sync_mode_input(&mut self, cx: &mut Cx) {
-        let (
-            empty_text,
-            text,
-            read_only,
-            show_back,
-            show_action,
-            action_text,
-            action_disabled,
-            row_spacing,
-            mode_hint_text,
-        ) = if self.show_todo && self.splash_has_search {
-            (
-                "Search tasks...",
-                "",
-                false, // editable — search via Rust, focus never lost on Splash reload
-                true,  // show_back
-                false, // no action button
-                "Add",
-                false,
-                8.0,
-                "Type to search  |  Esc Back",
-            )
-        } else if self.show_chat {
-            (
-                "Describe a UI to create",
-                self.chat_draft.as_str(),
-                self.chat_loading,
-                true,
-                true,
-                if self.chat_loading {
-                    "Sending..."
-                } else {
-                    "Send"
-                },
-                self.chat_loading,
-                8.0,
-                if self.chat_loading {
-                    "Esc Back"
-                } else {
-                    "Enter Send  |  Esc Back"
-                },
-            )
-        } else {
-            (
-                "Search apps and commands...",
-                self.query.as_str(),
-                false,
-                false,
-                false,
-                "Add",
-                false,
-                0.0,
-                "Up/Down Select  |  Enter Open",
-            )
-        };
+        let (empty_text, text, read_only, show_back, show_action, action_text, action_disabled) =
+            if self.show_todo && self.splash_has_search {
+                ("Search tasks...", "", false, true, false, "Add", false)
+            } else if self.show_chat {
+                (
+                    "Describe a UI to create",
+                    self.chat_draft.as_str(),
+                    self.chat_loading,
+                    true,
+                    true,
+                    if self.chat_loading { "Sending..." } else { "Send" },
+                    self.chat_loading,
+                )
+            } else {
+                ("Search for apps and commands...", self.query.as_str(), false, false, false, "Add", false)
+            };
 
-        if let Some(mut v) = self.view.view(cx, ids!(mode_input_row)).borrow_mut() {
-            v.layout.spacing = row_spacing;
-        }
         self.view
             .text_input(cx, ids!(mode_input))
             .set_empty_text(cx, empty_text.to_string());
-        self.view
-            .text_input(cx, ids!(mode_input))
-            .set_text(cx, text);
+        self.view.text_input(cx, ids!(mode_input)).set_text(cx, text);
         self.view
             .text_input(cx, ids!(mode_input))
             .set_is_read_only(cx, read_only);
@@ -1169,6 +1160,10 @@ impl LauncherPanel {
         self.view
             .widget(cx, ids!(mode_back_btn))
             .set_visible(cx, show_back);
+        // 子模式显示 chevron，launcher 模式显示放大镜
+        self.view
+            .widget(cx, ids!(search_glyph))
+            .set_visible(cx, !show_back);
         let action_btn = self.view.button(cx, ids!(mode_action_btn));
         self.view
             .widget(cx, ids!(mode_action_wrap))
@@ -1178,9 +1173,6 @@ impl LauncherPanel {
             .set_visible(cx, show_action);
         action_btn.set_text(cx, action_text);
         action_btn.set_disabled(cx, action_disabled);
-        self.view
-            .label(cx, ids!(mode_hint_label))
-            .set_text(cx, mode_hint_text);
     }
 
     fn icon_cache_path(icns_path: &Path) -> Option<PathBuf> {
