@@ -14,6 +14,24 @@ mod chat_list;
 script_mod! {
     use mod.prelude.widgets.*
 
+    // ── tinycast Theme 移植令牌（单一来源；着色器内用 uniform(mod.tc.*) 引用）──
+    mod.tc = {
+        surface: #xff101013          // 面板表面（black 0.40 叠极暗底）
+        hairline: #x14ffffff         // white 0.08 面板外边框
+        selection: #x1affffff        // white 0.10 选中行
+        row_hover: #x0dffffff        // white 0.05 悬停行
+        control_surface: #x1affffff  // white 0.10 填充 keycap
+        border: #x33ffffff           // white 0.20 描边 keycap
+        text_primary: #xf2ffffff     // white 0.95
+        text_secondary: #x99ffffff   // white 0.60
+        text_tertiary: #x66ffffff    // white 0.40
+        glass_top: #x24ffffff        // white 0.14
+        glass_bottom: #x10ffffff     // white 0.06
+        glass_stroke: #x38ffffff     // white 0.22
+        separator: #x1affffff        // white 0.10
+        scrollbar: #x4dffffff        // white 0.30
+    }
+
     mod.widgets.ChatListBase = #(chat_list::ChatList::register_widget(vm))
     mod.widgets.ChatList = set_type_default() do mod.widgets.ChatListBase{
         width: Fill
@@ -79,6 +97,7 @@ script_mod! {
         padding: Inset{left: 16 right: 16 top: 14 bottom: 14}
         show_bg: true
         draw_bg +: {
+            surface_col: uniform(mod.tc.surface)
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 13.0)
@@ -165,7 +184,7 @@ script_mod! {
                     text: "Launcher"
                     draw_text +: {
                         text_style: theme.font_bold {font_size: 17}
-                        color: #xf9fbff
+                        color: mod.tc.text_primary
                     }
                 }
                 Label{
