@@ -1144,6 +1144,7 @@ startup() do #(App::script_component(vm)){
                     padding: Inset{ left: 24, right: 24, bottom: 16 },
 
                     mod.widgets.MpTabBarPill {
+                        cat_shadcn := CategoryTab{ text: "Shadcn" }
                         cat_form := CategoryTab{ text: "Form" }
                         cat_display := CategoryTab{ text: "Display" }
                         cat_nav := CategoryTab{ text: "Navigation" }
@@ -1155,7 +1156,6 @@ startup() do #(App::script_component(vm)){
                         cat_shader_math := CategoryTab{ text: "Shader Math" }
                         cat_splash := CategoryTab{ text: "Splash" }
                         cat_json := CategoryTab{ text: "JSON Render" }
-                        cat_shadcn := CategoryTab{ text: "Shadcn" }
                     }
                 }
 
