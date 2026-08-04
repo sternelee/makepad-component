@@ -32,6 +32,39 @@ script_mod! {
         scrollbar: #x4dffffff        // white 0.30
     }
 
+    mod.widgets.KeyCap = View{
+        width: Fit
+        height: 18
+        align: Center
+        padding: Inset{left: 6 right: 6}
+        show_bg: true
+        draw_bg +: {
+            filled: uniform(1.0)
+            fill_col: uniform(mod.tc.control_surface)
+            stroke_col: uniform(mod.tc.border)
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 6.0)
+                if self.filled > 0.5 {
+                    sdf.fill(self.fill_col)
+                } else {
+                    sdf.stroke(self.stroke_col 1.0)
+                }
+                return sdf.result
+            }
+        }
+        caption := Label{
+            text: ""
+            draw_text +: {
+                text_style: theme.font_bold {font_size: 10}
+                color: mod.tc.text_secondary
+            }
+        }
+    }
+    mod.widgets.KeyCapOutline = mod.widgets.KeyCap{
+        draw_bg +: { filled: uniform(0.0) }
+    }
+
     mod.widgets.ChatListBase = #(chat_list::ChatList::register_widget(vm))
     mod.widgets.ChatList = set_type_default() do mod.widgets.ChatListBase{
         width: Fill
@@ -203,6 +236,108 @@ script_mod! {
             }
         }
 
+        bottom_bar := View{
+            width: Fill
+            height: 52
+            flow: Right
+            align: VCenter
+            spacing: 10
+            padding: Inset{left: 12 right: 12}
+            margin: Inset{top: 423}   // 475 - 52，Overlay 钉底
+
+            menu_circle := View{
+                width: 36
+                height: 36
+                flow: Overlay
+                align: Center
+                show_bg: true
+                draw_bg +: {
+                    top_col: uniform(mod.tc.glass_top)
+                    bot_col: uniform(mod.tc.glass_bottom)
+                    stroke_col: uniform(mod.tc.glass_stroke)
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.circle(self.rect_size.x * 0.5 self.rect_size.y * 0.5 18.0)
+                        let g = mix(self.top_col self.bot_col self.pos.y)
+                        sdf.fill(g)
+                        sdf.stroke(self.stroke_col 1.0)
+                        return sdf.result
+                    }
+                }
+                Label{
+                    text: "···"
+                    draw_text +: {
+                        text_style: theme.font_bold {font_size: 12}
+                        color: mod.tc.text_secondary
+                    }
+                }
+            }
+
+            status_label := Label{
+                width: Fill
+                text: ""
+                draw_text +: {
+                    text_style: theme.font_regular {font_size: 11}
+                    color: mod.tc.text_tertiary
+                }
+            }
+
+            action_capsule := View{
+                width: Fit
+                height: 34
+                flow: Right
+                align: VCenter
+                spacing: 8
+                padding: Inset{left: 14 right: 10}
+                show_bg: true
+                draw_bg +: {
+                    top_col: uniform(mod.tc.glass_top)
+                    bot_col: uniform(mod.tc.glass_bottom)
+                    stroke_col: uniform(mod.tc.glass_stroke)
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        let r = self.rect_size.y * 0.5
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y r)
+                        let g = mix(self.top_col self.bot_col self.pos.y)
+                        // 顶部内侧高光
+                        let hl = pow(1.0 - self.pos.y 3.0) * 0.12
+                        let g = g + vec4(hl hl hl hl)
+                        sdf.fill(g)
+                        sdf.stroke(self.stroke_col 1.0)
+                        return sdf.result
+                    }
+                }
+
+                primary_action_label := Label{
+                    text: "Open Application"
+                    draw_text +: {
+                        text_style: theme.font_bold {font_size: 12}
+                        color: mod.tc.text_primary
+                    }
+                }
+
+                mod.widgets.KeyCap{ caption := Label{ text: "↵" } }
+
+                View{
+                    width: 1
+                    height: 16
+                    show_bg: true
+                    draw_bg +: { color: mod.tc.separator }
+                }
+
+                Label{
+                    text: "Actions"
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 12}
+                        color: mod.tc.text_secondary
+                    }
+                }
+
+                mod.widgets.KeyCapOutline{ caption := Label{ text: "⌘" } }
+                mod.widgets.KeyCapOutline{ caption := Label{ text: "K" } }
+            }
+        }
+
         launcher_view := View{
             width: Fill
             height: Fill
@@ -226,32 +361,6 @@ script_mod! {
                     draw_text +: {
                         text_style: theme.font_regular {font_size: 10}
                         color: #x8f9caf
-                    }
-                }
-            }
-
-            top_count_row := View{
-                visible: false
-                width: Fill
-                height: Fit
-                flow: Right
-                align: VCenter
-                padding: Inset{left: 10 right: 10 top: 6 bottom: 6}
-                show_bg: true
-                draw_bg +: {
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 7.0)
-                        sdf.fill(#x1b2028)
-                        sdf.stroke(#x303745 1.0)
-                        return sdf.result
-                    }
-                }
-                result_count := Label{
-                    text: ""
-                    draw_text +: {
-                        text_style: theme.font_regular {font_size: 11}
-                        color: #xa7b0c1
                     }
                 }
             }
@@ -408,41 +517,6 @@ script_mod! {
                         let a = clamp((py - (self.rect_size.y - 80.0)) / 80.0 0.0 1.0)
                         let c = self.surface_col
                         return vec4(c.x * a c.y * a c.z * a a)
-                    }
-                }
-            }
-
-            View{
-                visible: true
-                width: Fill
-                height: Fit
-                flow: Right
-                align: VCenter
-                spacing: 8
-                padding: Inset{left: 10 right: 10 top: 6 bottom: 6}
-                show_bg: true
-                draw_bg +: {
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 7.0)
-                        sdf.fill(#x1b2028)
-                        sdf.stroke(#x303745 1.0)
-                        return sdf.result
-                    }
-                }
-                status_label := Label{
-                    width: Fill
-                    text: ""
-                    draw_text +: {
-                        text_style: theme.font_regular {font_size: 10}
-                        color: #x7fb9ff
-                    }
-                }
-                status_keys_label := Label{
-                    text: "Up/Down Select  |  Enter Open  |  Double Click Open"
-                    draw_text +: {
-                        text_style: theme.font_regular {font_size: 10}
-                        color: #x8f9caf
                     }
                 }
             }
@@ -757,7 +831,6 @@ enum LaunchTarget {
 #[derive(Clone)]
 struct LauncherItem {
     app_name: String,
-    subtitle: String,
     category: String,
     search_key: String,
     bundle_path: Option<String>,
@@ -888,7 +961,6 @@ fn launcher_item(
 
     LauncherItem {
         app_name,
-        subtitle,
         category,
         search_key,
         bundle_path,
@@ -1340,43 +1412,8 @@ impl LauncherPanel {
         self.view
             .widget(cx, ids!(empty_state))
             .set_visible(cx, !has_results);
-        let mut command_count = 0usize;
-        let mut app_count = 0usize;
-        for idx in &self.filtered_indices {
-            if let Some(item) = self.all_items.get(*idx) {
-                if item.category == "Command" {
-                    command_count += 1;
-                } else {
-                    app_count += 1;
-                }
-            }
-        }
-        let selected_text = if self.filtered_indices.is_empty() {
-            "0 selected".to_string()
-        } else {
-            format!(
-                "{} selected",
-                self.selected_index
-                    .saturating_add(1)
-                    .min(self.filtered_indices.len())
-            )
-        };
-        let count_text = format!(
-            "{} result(s)  |  {}  |  {} app / {} cmd",
-            self.filtered_indices.len(),
-            selected_text,
-            app_count,
-            command_count
-        );
-        self.view.label(cx, ids!(result_count)).set_text(cx, "");
-        if has_results {
-            self.view
-                .label(cx, ids!(empty_title))
-                .set_text(cx, "No Results");
-            self.view
-                .label(cx, ids!(empty_desc))
-                .set_text(cx, "Try another keyword, or use /todo and /chat");
-        } else {
+
+        if !has_results {
             let q = self.query.trim();
             if q.is_empty() {
                 self.view
@@ -1386,9 +1423,7 @@ impl LauncherPanel {
                     .label(cx, ids!(empty_desc))
                     .set_text(cx, "Type app or command name. Try: todo, chat, terminal");
             } else {
-                self.view
-                    .label(cx, ids!(empty_title))
-                    .set_text(cx, "No Results");
+                self.view.label(cx, ids!(empty_title)).set_text(cx, "No Results");
                 self.view
                     .label(cx, ids!(empty_desc))
                     .set_text(cx, &format!("No match for \"{}\". Try /todo or /chat", q));
@@ -1397,10 +1432,17 @@ impl LauncherPanel {
 
         self.view
             .label(cx, ids!(status_label))
-            .set_text(cx, &count_text);
+            .set_text(cx, &format!("{} results", self.filtered_indices.len()));
+
+        // 动作胶囊主动作随选中项类别切换
+        let action_text = match self.selected_item() {
+            Some(item) if item.category == "Command" => "Run Command",
+            Some(_) => "Open Application",
+            None => "Open Application",
+        };
         self.view
-            .label(cx, ids!(status_keys_label))
-            .set_text(cx, "Up/Down Select  |  Enter Open  |  Double Click Open");
+            .label(cx, ids!(primary_action_label))
+            .set_text(cx, action_text);
     }
 
     fn launch_selected(&mut self, cx: &mut Cx) {
