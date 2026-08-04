@@ -293,52 +293,51 @@ script_mod! {
                 width: Fill
                 height: Fill
                 flow: Down
-                spacing: 1
+                spacing: 0
+
+                scroll_bar := ScrollBar{
+                    draw_bg +: {
+                        size: uniform(2.0)
+                        border_radius: uniform(1.0)
+                        color: uniform(mod.tc.scrollbar)
+                        color_hover: uniform(#x6bffffff)   // white 0.42
+                        color_drag: uniform(#x80ffffff)   // white 0.50
+                    }
+                }
 
                 ResultRow := View{
                     width: Fill
                     height: Fit
-                    margin: Inset{top: 2 bottom: 2}
+                    margin: Inset{top: 2 bottom: 2 left: 8 right: 8}
 
                     row_bg := View{
                         width: Fill
                         height: Fit
                         flow: Down
-                        spacing: 2
-                        padding: Inset{left: 11 right: 11 top: 8 bottom: 8}
+                        spacing: 4
+                        padding: Inset{left: 8 right: 8 top: 6 bottom: 6}
                         show_bg: true
                         draw_bg +: {
                             selected: instance(0.0)
                             hovered: instance(0.0)
-                            command: instance(0.0)
-                            builtin: instance(0.0)
+                            sel_col: uniform(mod.tc.selection)
+                            hov_col: uniform(mod.tc.row_hover)
                             pixel: fn() {
                                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                                sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 7.0)
-                                let base = #x242a32
-                                let hover = #x2b333f
-                                let command_tint = #x3a3530
-                                let builtin_tint = #x2d3240
-                                let tinted = mix(base command_tint self.command * 0.42)
-                                let tinted = mix(tinted builtin_tint self.builtin * 0.62)
-                                let active = mix(#x3a79de #x4f7de0 self.builtin)
-                                let hovered_mix = mix(base hover self.hovered)
-                                let hover_tinted = mix(hovered_mix tinted max(self.command self.builtin) * 0.32)
-                                sdf.fill(mix(hover_tinted active self.selected))
-                                let stroke_color = mix(#x323a45 #x4b5d78 self.hovered)
-                                let stroke_color = mix(stroke_color #x8f7044 self.command * 0.5)
-                                let stroke_color = mix(stroke_color #x6177a1 self.builtin * 0.6)
-                                sdf.stroke(mix(stroke_color #x79adff self.selected) 1.0)
+                                sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 10.0)
+                                let c = mix(#x00000000 self.hov_col self.hovered)
+                                let c = mix(c self.sel_col self.selected)
+                                sdf.fill(c)
                                 return sdf.result
                             }
                         }
 
                         group_label := Label{
                             text: "Applications"
-                            margin: Inset{bottom: 2}
+                            margin: Inset{bottom: 4}
                             draw_text +: {
-                                text_style: theme.font_bold {font_size: 9}
-                                color: #x8fa0ba
+                                text_style: theme.font_bold {font_size: 11}
+                                color: mod.tc.text_secondary
                             }
                         }
 
@@ -347,29 +346,17 @@ script_mod! {
                             height: Fit
                             flow: Right
                             align: VCenter
-                            spacing: 9
+                            spacing: 10
 
                             icon_wrap := View{
                                 width: 24
                                 height: 24
                                 flow: Overlay
                                 align: Center
-                                show_bg: true
-                                draw_bg +: {
-                                    bg_color: instance(#x1a1f26)
-                                    border_color: instance(#x323a45)
-                                    pixel: fn() {
-                                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 6.0)
-                                        sdf.fill(self.bg_color)
-                                        sdf.stroke(self.border_color 1.0)
-                                        return sdf.result
-                                    }
-                                }
 
                                 app_icon := Image{
-                                    width: 22
-                                    height: 22
+                                    width: 24
+                                    height: 24
                                     fit: ImageFit.Smallest
                                 }
 
@@ -377,7 +364,7 @@ script_mod! {
                                     text: "A"
                                     draw_text +: {
                                         text_style: theme.font_bold {font_size: 12}
-                                        color: #xdce3ee
+                                        color: mod.tc.text_secondary
                                     }
                                 }
                             }
@@ -386,69 +373,17 @@ script_mod! {
                                 width: Fill
                                 text: "App"
                                 draw_text +: {
-                                    text_style: theme.font_bold {font_size: 13}
-                                    color: #xfffdff
+                                    text_style: theme.font_regular {font_size: 13}
+                                    color: mod.tc.text_primary
                                 }
                             }
 
-                            app_meta_chip := View{
-                                width: Fit
-                                height: Fit
-                                padding: Inset{left: 7 right: 7 top: 2 bottom: 2}
-                                show_bg: true
-                                draw_bg +: {
-                                    fill_color: instance(#x202733)
-                                    border_color: instance(#x3b4658)
-                                    pixel: fn() {
-                                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 5.0)
-                                        sdf.fill(self.fill_color)
-                                        sdf.stroke(self.border_color 1.0)
-                                        return sdf.result
-                                    }
+                            app_meta := Label{
+                                text: "Category"
+                                draw_text +: {
+                                    text_style: theme.font_regular {font_size: 11}
+                                    color: mod.tc.text_tertiary
                                 }
-                                app_meta := Label{
-                                    text: "Category"
-                                    draw_text +: {
-                                        text_style: theme.font_regular {font_size: 9}
-                                        color: #xa7b2c5
-                                    }
-                                }
-                            }
-
-                            action_hint_chip := View{
-                                visible: false
-                                width: Fit
-                                height: Fit
-                                padding: Inset{left: 7 right: 7 top: 2 bottom: 2}
-                                show_bg: true
-                                draw_bg +: {
-                                    fill_color: instance(#x253043)
-                                    border_color: instance(#x435a7f)
-                                    pixel: fn() {
-                                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 5.0)
-                                        sdf.fill(self.fill_color)
-                                        sdf.stroke(self.border_color 1.0)
-                                        return sdf.result
-                                    }
-                                }
-                                action_hint_text := Label{
-                                    text: "Open ↩"
-                                    draw_text +: {
-                                        text_style: theme.font_regular {font_size: 9}
-                                        color: #xbfd2ef
-                                    }
-                                }
-                            }
-                        }
-
-                        app_desc := Label{
-                            width: Fill
-                            text: "Description"
-                            draw_text +: {
-                                text_style: theme.font_regular {font_size: 10}
-                                color: #x8d9bae
                             }
                         }
                     }
@@ -1140,17 +1075,31 @@ impl LauncherPanel {
                     self.chat_loading,
                     true,
                     true,
-                    if self.chat_loading { "Sending..." } else { "Send" },
+                    if self.chat_loading {
+                        "Sending..."
+                    } else {
+                        "Send"
+                    },
                     self.chat_loading,
                 )
             } else {
-                ("Search for apps and commands...", self.query.as_str(), false, false, false, "Add", false)
+                (
+                    "Search for apps and commands...",
+                    self.query.as_str(),
+                    false,
+                    false,
+                    false,
+                    "Add",
+                    false,
+                )
             };
 
         self.view
             .text_input(cx, ids!(mode_input))
             .set_empty_text(cx, empty_text.to_string());
-        self.view.text_input(cx, ids!(mode_input)).set_text(cx, text);
+        self.view
+            .text_input(cx, ids!(mode_input))
+            .set_text(cx, text);
         self.view
             .text_input(cx, ids!(mode_input))
             .set_is_read_only(cx, read_only);
@@ -1817,35 +1766,24 @@ impl Widget for LauncherPanel {
                 while let Some(item_id) = list.next_visible_item(cx) {
                     if let Some(source_idx) = self.filtered_indices.get(item_id) {
                         let source_idx = *source_idx;
-                        let (
-                            app_name,
-                            category,
-                            subtitle,
-                            fallback,
-                            is_command,
-                            is_builtin,
-                            group_name,
-                        ) = if let Some(entry) = self.all_items.get(source_idx) {
-                            let is_builtin = matches!(
-                                entry.launch,
-                                LaunchTarget::OpenChat | LaunchTarget::OpenSplashApp(_)
-                            );
-                            (
-                                entry.app_name.clone(),
-                                entry.category.clone(),
-                                entry.subtitle.clone(),
-                                entry.icon_fallback.clone(),
-                                entry.category == "Command",
-                                is_builtin,
-                                Self::group_name_for(entry),
-                            )
-                        } else {
-                            continue;
-                        };
+                        let (app_name, category, fallback, is_command, group_name) =
+                            if let Some(entry) = self.all_items.get(source_idx) {
+                                (
+                                    entry.app_name.clone(),
+                                    entry.category.clone(),
+                                    entry.icon_fallback.clone(),
+                                    entry.category == "Command",
+                                    Self::group_name_for(entry),
+                                )
+                            } else {
+                                continue;
+                            };
 
                         let icon_path = self.resolve_icon_for_index(source_idx);
 
                         let row = list.item(cx, item_id, live_id!(ResultRow));
+
+                        // section header：组切换时显示；非首个组 header 上方加 12pt 间距
                         let show_group = if item_id == 0 {
                             true
                         } else if let Some(prev_source_idx) = self.filtered_indices.get(item_id - 1)
@@ -1858,55 +1796,15 @@ impl Widget for LauncherPanel {
                         } else {
                             false
                         };
-                        row.widget(cx, ids!(group_label))
-                            .set_visible(cx, show_group);
+                        row.widget(cx, ids!(group_label)).set_visible(cx, show_group);
                         row.label(cx, ids!(group_label)).set_text(cx, group_name);
-                        let group_color = match group_name {
-                            "Built-in" => vec4(0.52, 0.69, 1.0, 1.0),
-                            "Commands" => vec4(0.95, 0.75, 0.46, 1.0),
-                            _ => vec4(0.56, 0.63, 0.73, 1.0),
-                        };
-                        if let Some(mut label) = row.label(cx, ids!(group_label)).borrow_mut() {
-                            label.draw_text.color = group_color;
+                        if let Some(mut v) = row.view(cx, ids!(row_bg)).borrow_mut() {
+                            v.walk.margin.top = if show_group && item_id != 0 { 12.0 } else { 0.0 };
                         }
+
                         row.label(cx, ids!(app_name)).set_text(cx, &app_name);
                         row.label(cx, ids!(app_meta)).set_text(cx, &category);
-                        row.label(cx, ids!(app_desc)).set_text(cx, &subtitle);
-                        row.label(cx, ids!(app_icon_fallback))
-                            .set_text(cx, &fallback);
-                        let action_text = if is_command { "Run ↩" } else { "Open ↩" };
-                        row.label(cx, ids!(action_hint_text))
-                            .set_text(cx, action_text);
-                        let meta_color = if category == "Command" {
-                            vec4(0.96, 0.75, 0.44, 1.0)
-                        } else {
-                            vec4(0.65, 0.70, 0.78, 1.0)
-                        };
-                        let meta_chip_fill = if category == "Command" {
-                            vec4(0.28, 0.23, 0.17, 1.0)
-                        } else {
-                            vec4(0.13, 0.16, 0.20, 1.0)
-                        };
-                        let meta_chip_stroke = if category == "Command" {
-                            vec4(0.55, 0.44, 0.27, 1.0)
-                        } else {
-                            vec4(0.23, 0.29, 0.36, 1.0)
-                        };
-                        if let Some(mut label) = row.label(cx, ids!(app_meta)).borrow_mut() {
-                            label.draw_text.color = meta_color;
-                        }
-                        if let Some(mut view) = row.view(cx, ids!(app_meta_chip)).borrow_mut() {
-                            view.draw_bg.draw_vars.set_dyn_instance(
-                                cx,
-                                live_id!(fill_color),
-                                &v4a(meta_chip_fill),
-                            );
-                            view.draw_bg.draw_vars.set_dyn_instance(
-                                cx,
-                                live_id!(border_color),
-                                &v4a(meta_chip_stroke),
-                            );
-                        }
+                        row.label(cx, ids!(app_icon_fallback)).set_text(cx, &fallback);
 
                         if let Some(path) = icon_path {
                             let loaded = row
@@ -1914,123 +1812,21 @@ impl Widget for LauncherPanel {
                                 .load_image_file_by_path(cx, Path::new(&path))
                                 .is_ok();
                             row.widget(cx, ids!(app_icon)).set_visible(cx, loaded);
-                            row.widget(cx, ids!(app_icon_fallback))
-                                .set_visible(cx, !loaded);
-                            let icon_bg = if loaded {
-                                vec4(0.0, 0.0, 0.0, 0.0)
-                            } else {
-                                vec4(0.102, 0.122, 0.149, 1.0)
-                            };
-                            let icon_stroke = if loaded {
-                                vec4(0.0, 0.0, 0.0, 0.0)
-                            } else {
-                                vec4(0.196, 0.227, 0.271, 1.0)
-                            };
-                            if let Some(mut view) = row.view(cx, ids!(icon_wrap)).borrow_mut() {
-                                view.draw_bg.draw_vars.set_dyn_instance(
-                                    cx,
-                                    live_id!(bg_color),
-                                    &v4a(icon_bg),
-                                );
-                                view.draw_bg.draw_vars.set_dyn_instance(
-                                    cx,
-                                    live_id!(border_color),
-                                    &v4a(icon_stroke),
-                                );
-                            }
+                            row.widget(cx, ids!(app_icon_fallback)).set_visible(cx, !loaded);
                         } else {
                             row.widget(cx, ids!(app_icon)).set_visible(cx, false);
-                            row.widget(cx, ids!(app_icon_fallback))
-                                .set_visible(cx, true);
-                            if let Some(mut view) = row.view(cx, ids!(icon_wrap)).borrow_mut() {
-                                view.draw_bg.draw_vars.set_dyn_instance(
-                                    cx,
-                                    live_id!(bg_color),
-                                    &v4a(vec4(0.102, 0.122, 0.149, 1.0)),
-                                );
-                                view.draw_bg.draw_vars.set_dyn_instance(
-                                    cx,
-                                    live_id!(border_color),
-                                    &v4a(vec4(0.196, 0.227, 0.271, 1.0)),
-                                );
-                            }
+                            row.widget(cx, ids!(app_icon_fallback)).set_visible(cx, true);
                         }
 
-                        let selected = if item_id == self.selected_index {
-                            1.0
-                        } else {
-                            0.0
-                        };
-                        let hovered = if Some(item_id) == self.hovered_index {
-                            1.0
-                        } else {
-                            0.0
-                        };
-                        row.widget(cx, ids!(action_hint_chip))
-                            .set_visible(cx, selected > 0.5 || hovered > 0.5);
-                        let hint_bg = if selected > 0.5 {
-                            vec4(0.20, 0.30, 0.44, 1.0)
-                        } else {
-                            vec4(0.15, 0.20, 0.28, 1.0)
-                        };
-                        let hint_stroke = if selected > 0.5 {
-                            vec4(0.45, 0.60, 0.82, 1.0)
-                        } else {
-                            vec4(0.27, 0.35, 0.49, 1.0)
-                        };
-                        if let Some(mut view) = row.view(cx, ids!(action_hint_chip)).borrow_mut() {
-                            view.draw_bg.draw_vars.set_dyn_instance(
-                                cx,
-                                live_id!(fill_color),
-                                &v4a(hint_bg),
-                            );
-                            view.draw_bg.draw_vars.set_dyn_instance(
-                                cx,
-                                live_id!(border_color),
-                                &v4a(hint_stroke),
-                            );
-                        }
-                        let title_color = if selected > 0.5 {
-                            vec4(0.98, 0.99, 1.0, 1.0)
-                        } else {
-                            vec4(0.92, 0.94, 0.98, 1.0)
-                        };
-                        if let Some(mut label) = row.label(cx, ids!(app_name)).borrow_mut() {
-                            label.draw_text.color = title_color;
-                        }
-                        let desc_color = if selected > 0.5 {
-                            vec4(0.86, 0.91, 0.98, 1.0)
-                        } else if hovered > 0.5 {
-                            vec4(0.67, 0.74, 0.85, 1.0)
-                        } else {
-                            vec4(0.55, 0.61, 0.68, 1.0)
-                        };
-                        if let Some(mut label) = row.label(cx, ids!(app_desc)).borrow_mut() {
-                            label.draw_text.color = desc_color;
-                        }
-                        let command = if is_command { 1.0 } else { 0.0 };
-                        let builtin = if is_builtin { 1.0 } else { 0.0 };
+                        let selected = if item_id == self.selected_index { 1.0 } else { 0.0 };
+                        let hovered = if Some(item_id) == self.hovered_index { 1.0 } else { 0.0 };
                         if let Some(mut view) = row.view(cx, ids!(row_bg)).borrow_mut() {
-                            view.draw_bg.draw_vars.set_dyn_instance(
-                                cx,
-                                live_id!(selected),
-                                &[selected],
-                            );
-                            view.draw_bg.draw_vars.set_dyn_instance(
-                                cx,
-                                live_id!(hovered),
-                                &[hovered],
-                            );
-                            view.draw_bg.draw_vars.set_dyn_instance(
-                                cx,
-                                live_id!(command),
-                                &[command],
-                            );
-                            view.draw_bg.draw_vars.set_dyn_instance(
-                                cx,
-                                live_id!(builtin),
-                                &[builtin],
-                            );
+                            view.draw_bg
+                                .draw_vars
+                                .set_dyn_instance(cx, live_id!(selected), &[selected]);
+                            view.draw_bg
+                                .draw_vars
+                                .set_dyn_instance(cx, live_id!(hovered), &[hovered]);
                         }
                         row.draw_all(cx, &mut Scope::empty());
                         if let Some(area) = row
@@ -2040,6 +1836,8 @@ impl Widget for LauncherPanel {
                         {
                             self.row_hit_rects.push((item_id, area.rect(cx)));
                         }
+
+                        let _ = is_command; // 类别差异仅靠行尾文本表达
                     }
                 }
             }
@@ -2048,9 +1846,6 @@ impl Widget for LauncherPanel {
     }
 }
 
-fn v4a(v: Vec4) -> [f32; 4] {
-    [v.x, v.y, v.z, v.w]
-}
 
 #[derive(Script, ScriptHook)]
 pub struct App {
