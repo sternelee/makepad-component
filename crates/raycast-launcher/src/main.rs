@@ -90,19 +90,18 @@ script_mod! {
 
     mod.widgets.LauncherPanelBase = #(LauncherPanel::register_widget(vm))
     mod.widgets.LauncherPanel = set_type_default() do mod.widgets.LauncherPanelBase{
-        width: Fill
-        height: Fill
-        flow: Down
-        spacing: 12
-        padding: Inset{left: 16 right: 16 top: 14 bottom: 14}
+        width: 750
+        height: 475
+        flow: Overlay
         show_bg: true
         draw_bg +: {
             surface_col: uniform(mod.tc.surface)
+            hairline_col: uniform(mod.tc.hairline)
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 13.0)
-                sdf.fill(#x181a1f)
-                sdf.stroke(#x2f343d 1.0)
+                sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 26.0)
+                sdf.fill(self.surface_col)
+                sdf.stroke(self.hairline_col 1.0)
                 return sdf.result
             }
         }
@@ -721,23 +720,31 @@ script_mod! {
     startup() do #(App::script_component(vm)){
         ui: Root{
             main_window := Window{
-                window.inner_size: vec2(900 700)
+                window.inner_size: vec2(900 620)
                 window.title: "Raycast Launcher"
-                pass +: { clear_color: #x0f1115 }
+                pass +: { clear_color: #xff08080a }
                 body +: {
                     bg_view := View{
                         width: Fill
                         height: Fill
+                        flow: Down
+                        align: Center
                         show_bg: true
                         draw_bg +: {
+                            // Simulate macOS desktop wallpaper: diagonal light-dark stripes (referencing the tinycast screenshot)
                             pixel: fn() {
-                                let center = vec2(0.5 0.5)
-                                let d = distance(self.pos center)
-                                let t = clamp(d * 1.35 0.0 1.0)
-                                return mix(#x0f1115 #x20242b t)
+                                let p = self.pos
+                                let d = p.x * 0.72 + p.y * 0.68
+                                let w1 = sin(d * 10.7 + sin(p.y * 4.0) * 0.6) * 0.5 + 0.5
+                                let w2 = sin(d * 5.7 + 2.1) * 0.5 + 0.5
+                                let v = smoothstep(0.35 0.65 w1) * 0.55 + smoothstep(0.4 0.7 w2) * 0.35
+                                let g = v * v
+                                return mix(#xff08080a #xffc9c9ce g)
                             }
                         }
-                        launcher := mod.widgets.LauncherPanel{}
+                        launcher := mod.widgets.LauncherPanel{
+                            margin: Inset{bottom: 30}   // Slightly above vertical center ≈8%
+                        }
                     }
                 }
             }
