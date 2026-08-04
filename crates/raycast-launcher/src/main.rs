@@ -206,7 +206,7 @@ script_mod! {
         launcher_view := View{
             width: Fill
             height: Fill
-            flow: Down
+            flow: Overlay
             spacing: 10
 
             View{
@@ -259,20 +259,11 @@ script_mod! {
             empty_state := View{
                 visible: false
                 width: Fill
-                height: Fit
+                height: Fill
                 flow: Down
+                align: Center
                 spacing: 6
                 padding: Inset{left: 14 right: 14 top: 14 bottom: 14}
-                show_bg: true
-                draw_bg +: {
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 9.0)
-                        sdf.fill(#x1b2028)
-                        sdf.stroke(#x303745 1.0)
-                        return sdf.result
-                    }
-                }
                 empty_title := Label{
                     text: "No Results"
                     draw_text +: {
@@ -386,6 +377,37 @@ script_mod! {
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            dissolve_top := View{
+                width: Fill
+                height: 76
+                show_bg: true
+                draw_bg +: {
+                    surface_col: uniform(mod.tc.surface)
+                    pixel: fn() {
+                        // 预乘 alpha：顶部不透明 → 底部透明
+                        let a = 1.0 - self.pos.y
+                        let c = self.surface_col
+                        return vec4(c.x * a c.y * a c.z * a a)
+                    }
+                }
+            }
+
+            dissolve_bottom := View{
+                width: Fill
+                height: Fill
+                show_bg: true
+                draw_bg +: {
+                    surface_col: uniform(mod.tc.surface)
+                    pixel: fn() {
+                        // 预乘 alpha：仅底部 80pt 参与渐变，向上透明
+                        let py = self.pos.y * self.rect_size.y
+                        let a = clamp((py - (self.rect_size.y - 80.0)) / 80.0 0.0 1.0)
+                        let c = self.surface_col
+                        return vec4(c.x * a c.y * a c.z * a a)
                     }
                 }
             }
