@@ -139,231 +139,12 @@ script_mod! {
             }
         }
 
-        mode_input_row := View{
-            width: Fill
-            height: 44
-            flow: Right
-            align: VCenter
-            spacing: 8
-            padding: Inset{left: 16 right: 16}
 
-            mode_back_wrap := View{
-                visible: false
-                width: Fit
-                height: Fit
-                mode_back_btn := Button{
-                    width: 24
-                    height: 24
-                    text: ""
-                    draw_bg +: {
-                        glyph_col: uniform(mod.tc.text_secondary)
-                        pixel: fn() {
-                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            // 返回 chevron ‹
-                            sdf.move_to(14.0 5.0)
-                            sdf.line_to(8.0 12.0)
-                            sdf.line_to(14.0 19.0)
-                            sdf.stroke(self.glyph_col 1.6)
-                            return sdf.result
-                        }
-                    }
-                }
-            }
-
-            search_glyph := View{
-                width: 20
-                height: 24
-                show_bg: true
-                draw_bg +: {
-                    glyph_col: uniform(mod.tc.text_secondary)
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        // 放大镜
-                        sdf.circle(8.5 9.5 5.5)
-                        sdf.stroke(self.glyph_col 1.6)
-                        sdf.move_to(12.8 13.8)
-                        sdf.line_to(17.0 18.0)
-                        sdf.stroke(self.glyph_col 1.6)
-                        return sdf.result
-                    }
-                }
-            }
-
-            mode_input := TextInput{
-                width: Fill
-                height: Fit
-                empty_text: "Search for apps and commands..."
-                draw_bg +: {
-                    pixel: fn() {
-                        return #x00000000
-                    }
-                }
-                draw_text +: {
-                    text_style: theme.font_regular {font_size: 20}
-                    color: mod.tc.text_primary
-                }
-                draw_select +: {
-                    color: mod.tc.selection
-                }
-            }
-
-            mode_action_wrap := View{
-                visible: false
-                width: Fit
-                height: Fit
-                mode_action_btn := Button{
-                    text: "Send"
-                    padding: Inset{left: 12 right: 12 top: 6 bottom: 6}
-                    draw_bg +: {
-                        top_col: uniform(mod.tc.glass_top)
-                        bot_col: uniform(mod.tc.glass_bottom)
-                        stroke_col: uniform(mod.tc.glass_stroke)
-                        pixel: fn() {
-                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            let r = self.rect_size.y * 0.5
-                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y r)
-                            let g = mix(self.top_col self.bot_col self.pos.y)
-                            sdf.fill(g)
-                            sdf.stroke(self.stroke_col 1.0)
-                            return sdf.result
-                        }
-                    }
-                    draw_text +: {
-                        text_style: theme.font_bold {font_size: 12}
-                        color: mod.tc.text_primary
-                    }
-                }
-            }
-        }
-
-        bottom_bar := View{
-            width: Fill
-            height: 52
-            flow: Right
-            align: VCenter
-            spacing: 10
-            padding: Inset{left: 12 right: 12}
-            margin: Inset{top: 423}   // 475 - 52，Overlay 钉底
-
-            menu_circle := View{
-                width: 36
-                height: 36
-                flow: Overlay
-                align: Center
-                show_bg: true
-                draw_bg +: {
-                    top_col: uniform(mod.tc.glass_top)
-                    bot_col: uniform(mod.tc.glass_bottom)
-                    stroke_col: uniform(mod.tc.glass_stroke)
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.circle(self.rect_size.x * 0.5 self.rect_size.y * 0.5 18.0)
-                        let g = mix(self.top_col self.bot_col self.pos.y)
-                        sdf.fill(g)
-                        sdf.stroke(self.stroke_col 1.0)
-                        return sdf.result
-                    }
-                }
-                Label{
-                    text: "···"
-                    draw_text +: {
-                        text_style: theme.font_bold {font_size: 12}
-                        color: mod.tc.text_secondary
-                    }
-                }
-            }
-
-            status_label := Label{
-                width: Fill
-                text: ""
-                draw_text +: {
-                    text_style: theme.font_regular {font_size: 11}
-                    color: mod.tc.text_tertiary
-                }
-            }
-
-            action_capsule := View{
-                width: Fit
-                height: 34
-                flow: Right
-                align: VCenter
-                spacing: 8
-                padding: Inset{left: 14 right: 10}
-                show_bg: true
-                draw_bg +: {
-                    top_col: uniform(mod.tc.glass_top)
-                    bot_col: uniform(mod.tc.glass_bottom)
-                    stroke_col: uniform(mod.tc.glass_stroke)
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        let r = self.rect_size.y * 0.5
-                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y r)
-                        let g = mix(self.top_col self.bot_col self.pos.y)
-                        // 顶部内侧高光
-                        let hl = pow(1.0 - self.pos.y 3.0) * 0.12
-                        let g = g + vec4(hl hl hl hl)
-                        sdf.fill(g)
-                        sdf.stroke(self.stroke_col 1.0)
-                        return sdf.result
-                    }
-                }
-
-                primary_action_label := Label{
-                    text: "Open Application"
-                    draw_text +: {
-                        text_style: theme.font_bold {font_size: 12}
-                        color: mod.tc.text_primary
-                    }
-                }
-
-                mod.widgets.KeyCap{ caption := Label{ text: "↵" } }
-
-                View{
-                    width: 1
-                    height: 16
-                    show_bg: true
-                    draw_bg +: { color: mod.tc.separator }
-                }
-
-                Label{
-                    text: "Actions"
-                    draw_text +: {
-                        text_style: theme.font_regular {font_size: 12}
-                        color: mod.tc.text_secondary
-                    }
-                }
-
-                mod.widgets.KeyCapOutline{ caption := Label{ text: "⌘" } }
-                mod.widgets.KeyCapOutline{ caption := Label{ text: "K" } }
-            }
-        }
 
         launcher_view := View{
             width: Fill
             height: Fill
             flow: Overlay
-            spacing: 10
-
-            View{
-                width: Fill
-                height: Fit
-                flow: Down
-                spacing: 2
-                Label{
-                    text: "Launcher"
-                    draw_text +: {
-                        text_style: theme.font_bold {font_size: 17}
-                        color: mod.tc.text_primary
-                    }
-                }
-                Label{
-                    text: "Quickly open apps and run commands"
-                    draw_text +: {
-                        text_style: theme.font_regular {font_size: 10}
-                        color: #x8f9caf
-                    }
-                }
-            }
 
             empty_state := View{
                 visible: false
@@ -372,19 +153,19 @@ script_mod! {
                 flow: Down
                 align: Center
                 spacing: 6
-                padding: Inset{left: 14 right: 14 top: 14 bottom: 14}
+
                 empty_title := Label{
                     text: "No Results"
                     draw_text +: {
                         text_style: theme.font_bold {font_size: 13}
-                        color: #xe6ebf5
+                        color: mod.tc.text_secondary
                     }
                 }
                 empty_desc := Label{
                     text: "Try another keyword, or use /todo and /chat"
                     draw_text +: {
                         text_style: theme.font_regular {font_size: 11}
-                        color: #x8f9caf
+                        color: mod.tc.text_tertiary
                     }
                 }
             }
@@ -780,6 +561,203 @@ script_mod! {
                 }
             }
 
+        }
+        mode_input_row := View{
+            width: Fill
+            height: 44
+            flow: Right
+            align: VCenter
+            spacing: 8
+            padding: Inset{left: 16 right: 16}
+
+            mode_back_wrap := View{
+                visible: false
+                width: Fit
+                height: Fit
+                mode_back_btn := Button{
+                    width: 24
+                    height: 24
+                    text: ""
+                    draw_bg +: {
+                        glyph_col: uniform(mod.tc.text_secondary)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            // 返回 chevron ‹
+                            sdf.move_to(14.0 5.0)
+                            sdf.line_to(8.0 12.0)
+                            sdf.line_to(14.0 19.0)
+                            sdf.stroke(self.glyph_col 1.6)
+                            return sdf.result
+                        }
+                    }
+                }
+            }
+
+            search_glyph := View{
+                width: 20
+                height: 24
+                show_bg: true
+                draw_bg +: {
+                    glyph_col: uniform(mod.tc.text_secondary)
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        // 放大镜
+                        sdf.circle(8.5 9.5 5.5)
+                        sdf.stroke(self.glyph_col 1.6)
+                        sdf.move_to(12.8 13.8)
+                        sdf.line_to(17.0 18.0)
+                        sdf.stroke(self.glyph_col 1.6)
+                        return sdf.result
+                    }
+                }
+            }
+
+            mode_input := TextInput{
+                width: Fill
+                height: Fit
+                empty_text: "Search for apps and commands..."
+                draw_bg +: {
+                    pixel: fn() {
+                        return #x00000000
+                    }
+                }
+                draw_text +: {
+                    text_style: theme.font_regular {font_size: 20}
+                    color: mod.tc.text_primary
+                }
+                draw_select +: {
+                    color: mod.tc.selection
+                }
+            }
+
+            mode_action_wrap := View{
+                visible: false
+                width: Fit
+                height: Fit
+                mode_action_btn := Button{
+                    text: "Send"
+                    padding: Inset{left: 12 right: 12 top: 6 bottom: 6}
+                    draw_bg +: {
+                        top_col: uniform(mod.tc.glass_top)
+                        bot_col: uniform(mod.tc.glass_bottom)
+                        stroke_col: uniform(mod.tc.glass_stroke)
+                        pixel: fn() {
+                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            let r = self.rect_size.y * 0.5
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y r)
+                            let g = mix(self.top_col self.bot_col self.pos.y)
+                            sdf.fill(g)
+                            sdf.stroke(self.stroke_col 1.0)
+                            return sdf.result
+                        }
+                    }
+                    draw_text +: {
+                        text_style: theme.font_bold {font_size: 12}
+                        color: mod.tc.text_primary
+                    }
+                }
+            }
+        }
+        bottom_bar := View{
+            width: Fill
+            height: 52
+            flow: Right
+            align: VCenter
+            spacing: 10
+            padding: Inset{left: 12 right: 12}
+            margin: Inset{top: 423}   // 475 - 52，Overlay 钉底
+
+            menu_circle := View{
+                width: 36
+                height: 36
+                flow: Overlay
+                align: Center
+                show_bg: true
+                draw_bg +: {
+                    top_col: uniform(mod.tc.glass_top)
+                    bot_col: uniform(mod.tc.glass_bottom)
+                    stroke_col: uniform(mod.tc.glass_stroke)
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.circle(self.rect_size.x * 0.5 self.rect_size.y * 0.5 18.0)
+                        let g = mix(self.top_col self.bot_col self.pos.y)
+                        sdf.fill(g)
+                        sdf.stroke(self.stroke_col 1.0)
+                        return sdf.result
+                    }
+                }
+                Label{
+                    text: "···"
+                    draw_text +: {
+                        text_style: theme.font_bold {font_size: 12}
+                        color: mod.tc.text_secondary
+                    }
+                }
+            }
+
+            status_label := Label{
+                width: Fill
+                text: ""
+                draw_text +: {
+                    text_style: theme.font_regular {font_size: 11}
+                    color: mod.tc.text_tertiary
+                }
+            }
+
+            action_capsule := View{
+                width: Fit
+                height: 34
+                flow: Right
+                align: VCenter
+                spacing: 8
+                padding: Inset{left: 14 right: 10}
+                show_bg: true
+                draw_bg +: {
+                    top_col: uniform(mod.tc.glass_top)
+                    bot_col: uniform(mod.tc.glass_bottom)
+                    stroke_col: uniform(mod.tc.glass_stroke)
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        let r = self.rect_size.y * 0.5
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y r)
+                        let g = mix(self.top_col self.bot_col self.pos.y)
+                        // 顶部内侧高光
+                        let hl = pow(1.0 - self.pos.y 3.0) * 0.12
+                        let g = g + vec4(hl hl hl hl)
+                        sdf.fill(g)
+                        sdf.stroke(self.stroke_col 1.0)
+                        return sdf.result
+                    }
+                }
+
+                primary_action_label := Label{
+                    text: "Open Application"
+                    draw_text +: {
+                        text_style: theme.font_bold {font_size: 12}
+                        color: mod.tc.text_primary
+                    }
+                }
+
+                mod.widgets.KeyCap{ caption := Label{ text: "↵" } }
+
+                View{
+                    width: 1
+                    height: 16
+                    show_bg: true
+                    draw_bg +: { color: mod.tc.separator }
+                }
+
+                Label{
+                    text: "Actions"
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 12}
+                        color: mod.tc.text_secondary
+                    }
+                }
+
+                mod.widgets.KeyCapOutline{ caption := Label{ text: "⌘" } }
+                mod.widgets.KeyCapOutline{ caption := Label{ text: "K" } }
+            }
         }
     }
 
@@ -1423,7 +1401,9 @@ impl LauncherPanel {
                     .label(cx, ids!(empty_desc))
                     .set_text(cx, "Type app or command name. Try: todo, chat, terminal");
             } else {
-                self.view.label(cx, ids!(empty_title)).set_text(cx, "No Results");
+                self.view
+                    .label(cx, ids!(empty_title))
+                    .set_text(cx, "No Results");
                 self.view
                     .label(cx, ids!(empty_desc))
                     .set_text(cx, &format!("No match for \"{}\". Try /todo or /chat", q));
@@ -1860,15 +1840,21 @@ impl Widget for LauncherPanel {
                         } else {
                             false
                         };
-                        row.widget(cx, ids!(group_label)).set_visible(cx, show_group);
+                        row.widget(cx, ids!(group_label))
+                            .set_visible(cx, show_group);
                         row.label(cx, ids!(group_label)).set_text(cx, group_name);
                         if let Some(mut v) = row.view(cx, ids!(row_bg)).borrow_mut() {
-                            v.walk.margin.top = if show_group && item_id != 0 { 12.0 } else { 0.0 };
+                            v.walk.margin.top = if show_group && item_id != 0 {
+                                12.0
+                            } else {
+                                0.0
+                            };
                         }
 
                         row.label(cx, ids!(app_name)).set_text(cx, &app_name);
                         row.label(cx, ids!(app_meta)).set_text(cx, &category);
-                        row.label(cx, ids!(app_icon_fallback)).set_text(cx, &fallback);
+                        row.label(cx, ids!(app_icon_fallback))
+                            .set_text(cx, &fallback);
 
                         if let Some(path) = icon_path {
                             let loaded = row
@@ -1876,21 +1862,35 @@ impl Widget for LauncherPanel {
                                 .load_image_file_by_path(cx, Path::new(&path))
                                 .is_ok();
                             row.widget(cx, ids!(app_icon)).set_visible(cx, loaded);
-                            row.widget(cx, ids!(app_icon_fallback)).set_visible(cx, !loaded);
+                            row.widget(cx, ids!(app_icon_fallback))
+                                .set_visible(cx, !loaded);
                         } else {
                             row.widget(cx, ids!(app_icon)).set_visible(cx, false);
-                            row.widget(cx, ids!(app_icon_fallback)).set_visible(cx, true);
+                            row.widget(cx, ids!(app_icon_fallback))
+                                .set_visible(cx, true);
                         }
 
-                        let selected = if item_id == self.selected_index { 1.0 } else { 0.0 };
-                        let hovered = if Some(item_id) == self.hovered_index { 1.0 } else { 0.0 };
+                        let selected = if item_id == self.selected_index {
+                            1.0
+                        } else {
+                            0.0
+                        };
+                        let hovered = if Some(item_id) == self.hovered_index {
+                            1.0
+                        } else {
+                            0.0
+                        };
                         if let Some(mut view) = row.view(cx, ids!(row_bg)).borrow_mut() {
-                            view.draw_bg
-                                .draw_vars
-                                .set_dyn_instance(cx, live_id!(selected), &[selected]);
-                            view.draw_bg
-                                .draw_vars
-                                .set_dyn_instance(cx, live_id!(hovered), &[hovered]);
+                            view.draw_bg.draw_vars.set_dyn_instance(
+                                cx,
+                                live_id!(selected),
+                                &[selected],
+                            );
+                            view.draw_bg.draw_vars.set_dyn_instance(
+                                cx,
+                                live_id!(hovered),
+                                &[hovered],
+                            );
                         }
                         row.draw_all(cx, &mut Scope::empty());
                         if let Some(area) = row
@@ -1909,7 +1909,6 @@ impl Widget for LauncherPanel {
         DrawStep::done()
     }
 }
-
 
 #[derive(Script, ScriptHook)]
 pub struct App {
