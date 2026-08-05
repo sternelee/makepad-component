@@ -4,6 +4,8 @@
 范围：`crates/raycast-launcher` 主面板（launcher 模式）视觉重做，对齐 tinycast 设计系统。
 方案：方案 A —— 深邃暗色浮动面板，全部用 Makepad SDF 着色器模拟，不依赖 OS 级透明/模糊。
 
+> 修订（2026-08-05，commit 9d974fb）：前提“Makepad 不支持 OS 级透明”被推翻——锁定 makepad 提交的 `ScriptWindowHandle` 支持 `window.transparent: true` + `MacosWindowConfig{chrome: MacosWindowChrome.Borderless}`。最终实现改为真透明无边框窗口（窗口即面板 750×475，真实桌面透出，只剩一层圆角），模拟壁纸 bg_view 已删除。SDF 模拟仅保留面板表面/溶解/玻璃控件。
+
 参考实现：`/Users/sternelee/www/github/tinycast`（`docs/ui.md`、`Core/Theme.swift`）。
 
 ---
