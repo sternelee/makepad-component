@@ -45,14 +45,21 @@ script_mod! {
             fill_col: uniform(mod.tc.control_surface)
             stroke_col: uniform(mod.tc.border)
             pixel: fn() {
-                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 6.0)
+                // 解析圆角矩形 SDF（不用 Sdf2d.box，其半径行为不可靠）
+                let p = self.pos * self.rect_size
+                let r = 6.0
+                let qx = max(abs(p.x - self.rect_size.x * 0.5) - (self.rect_size.x * 0.5 - r), 0.0)
+                let qy = max(abs(p.y - self.rect_size.y * 0.5) - (self.rect_size.y * 0.5 - r), 0.0)
+                let d = length(vec2(qx qy)) - r
+                let fill_a = clamp(-d, 0.0, 1.0)
+                let band = min(clamp((d + 1.0) * 2.0, 0.0, 1.0), clamp(-d * 2.0, 0.0, 1.0))
                 if self.filled > 0.5 {
-                    sdf.fill(self.fill_col)
+                    let a = self.fill_col.w * fill_a
+                    return vec4(self.fill_col.xyz * a, a)
                 } else {
-                    sdf.stroke(self.stroke_col 1.0)
+                    let a = self.stroke_col.w * band
+                    return vec4(self.stroke_col.xyz * a, a)
                 }
-                return sdf.result
             }
         }
         caption := Label{
@@ -736,16 +743,22 @@ script_mod! {
                     bot_col: uniform(mod.tc.glass_bottom)
                     stroke_col: uniform(mod.tc.glass_stroke)
                     pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        // 解析体育场形 SDF（不用 Sdf2d.box，其半径行为不可靠）
+                        let p = self.pos * self.rect_size
                         let r = self.rect_size.y * 0.5
-                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y r)
+                        let cx = min(max(p.x, r), self.rect_size.x - r)
+                        let d = length(vec2(p.x - cx, p.y - r)) - r
+                        let fill_a = clamp(-d, 0.0, 1.0)
+                        let band = min(clamp((d + 1.0) * 2.0, 0.0, 1.0), clamp(-d * 2.0, 0.0, 1.0))
                         let g = mix(self.top_col self.bot_col self.pos.y)
                         // 顶部内侧高光
                         let hl = pow(1.0 - self.pos.y 3.0) * 0.12
                         let g = g + vec4(hl hl hl hl)
-                        sdf.fill(g)
-                        sdf.stroke(self.stroke_col 1.0)
-                        return sdf.result
+                        let a1 = g.w * fill_a
+                        let a2 = self.stroke_col.w * band
+                        let a = a1 + a2 * (1.0 - a1)
+                        let rgb = (g.xyz * a1 + self.stroke_col.xyz * a2 * (1.0 - a1)) / max(a, 0.0001)
+                        return vec4(rgb * a, a)
                     }
                 }
 
