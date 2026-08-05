@@ -35,10 +35,10 @@ script_mod! {
     }
 
     mod.widgets.KeyCap = View{
-        width: Fit
-        height: 18
+        width: 22
+        height: 20
         align: Center
-        padding: Inset{left: 6 right: 6}
+        padding: Inset{left: 7 right: 7}
         show_bg: true
         draw_bg +: {
             filled: uniform(1.0)
@@ -729,7 +729,7 @@ script_mod! {
                 flow: Right
                 align: VCenter
                 spacing: 8
-                padding: Inset{left: 14 right: 10}
+                padding: Inset{left: 14 right: 14}
                 show_bg: true
                 draw_bg +: {
                     top_col: uniform(mod.tc.glass_top)
