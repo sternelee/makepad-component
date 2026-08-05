@@ -10,7 +10,13 @@ pub fn format_timestamp(timestamp: f64) -> String {
     let total_seconds = timestamp as u64;
     let hours = (total_seconds % 86400) / 3600;
     let minutes = (total_seconds % 3600) / 60;
-    let hour_12 = if hours == 0 { 12 } else if hours > 12 { hours - 12 } else { hours };
+    let hour_12 = if hours == 0 {
+        12
+    } else if hours > 12 {
+        hours - 12
+    } else {
+        hours
+    };
     let am_pm = if hours >= 12 { "PM" } else { "AM" };
     format!(
         "{:02}/{:02}/{:02} {:02}:{:02}{}",

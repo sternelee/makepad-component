@@ -414,7 +414,7 @@ impl DrawPlotLine {
         p2: DVec2,
         width: f64,
         style: LineStyle,
-        dash_offset: f64
+        dash_offset: f64,
     ) {
         let dx = p2.x - p1.x;
         let dy = p2.y - p1.y;
@@ -429,7 +429,7 @@ impl DrawPlotLine {
             pos: dvec2(p1.x.min(p2.x) - padding, p1.y.min(p2.y) - padding),
             size: dvec2(
                 (p2.x - p1.x).abs() + padding * 2.0,
-                (p2.y - p1.y).abs() + padding * 2.0
+                (p2.y - p1.y).abs() + padding * 2.0,
             ),
         };
 
@@ -500,7 +500,7 @@ impl DrawPlotBar {
         cx: &mut Cx2d,
         rect: Rect,
         bottom_color: Vec4,
-        top_color: Vec4
+        top_color: Vec4,
     ) {
         self.gradient_enabled = 1.0;
         self.gradient_bottom_color = bottom_color;
@@ -544,7 +544,7 @@ impl DrawPlotFill {
         y1: f64,
         y2: f64,
         bottom_color: Vec4,
-        top_color: Vec4
+        top_color: Vec4,
     ) {
         self.gradient_enabled = 1.0;
         self.gradient_bottom_color = bottom_color;
@@ -585,7 +585,7 @@ impl DrawPieSlice {
         center: DVec2,
         radius: f64,
         start_angle: f64,
-        end_angle: f64
+        end_angle: f64,
     ) {
         self.gradient_enabled = 0.0;
         self.start_angle = start_angle as f32;
@@ -606,7 +606,7 @@ impl DrawPieSlice {
         start_angle: f64,
         end_angle: f64,
         center_color: Vec4,
-        outer_color: Vec4
+        outer_color: Vec4,
     ) {
         self.gradient_enabled = 1.0;
         self.gradient_center_color = center_color;
@@ -654,7 +654,7 @@ impl DrawArc {
         outer_radius: f64,
         inner_radius_ratio: f64,
         start_angle: f64,
-        end_angle: f64
+        end_angle: f64,
     ) {
         self.gradient_enabled = 0.0;
         self.start_angle = start_angle as f32;
@@ -678,7 +678,7 @@ impl DrawArc {
         end_angle: f64,
         inner_color: Vec4,
         outer_color: Vec4,
-        gradient_type: i32
+        gradient_type: i32,
     ) {
         self.gradient_enabled = 1.0;
         self.gradient_type = gradient_type as f32;
@@ -728,7 +728,7 @@ impl DrawPlotPointGradient {
         center: DVec2,
         radius: f64,
         center_color: Vec4,
-        outer_color: Vec4
+        outer_color: Vec4,
     ) {
         self.gradient_enabled = 1.0;
         self.gradient_center_color = center_color;
@@ -808,7 +808,7 @@ impl DrawTriangle {
         p1: DVec2,
         p2: DVec2,
         center_color: Vec4,
-        outer_color: Vec4
+        outer_color: Vec4,
     ) {
         let min_x = p0.x.min(p1.x).min(p2.x);
         let min_y = p0.y.min(p1.y).min(p2.y);

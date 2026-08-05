@@ -180,11 +180,7 @@ impl Storage {
         Ok(())
     }
 
-    pub fn get_memories_by_month(
-        &self,
-        year: i32,
-        month: u32,
-    ) -> Result<Vec<MemorySummary>> {
+    pub fn get_memories_by_month(&self, year: i32, month: u32) -> Result<Vec<MemorySummary>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, title, summary, timestamp, date, mood FROM memories 
              WHERE date LIKE ?1 ORDER BY timestamp DESC",

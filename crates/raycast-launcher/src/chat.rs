@@ -522,9 +522,10 @@ impl LauncherPanel {
                     self.all_items = crate::load_launcher_items();
                     self.rebuild_filter();
                     self.last_saved_app_path = Some(path.clone());
-                    self.view
-                        .label(cx, ids!(chat_status_label))
-                        .set_text(cx, &format!("Saved '{}' — search in launcher to open", name));
+                    self.view.label(cx, ids!(chat_status_label)).set_text(
+                        cx,
+                        &format!("Saved '{}' — search in launcher to open", name),
+                    );
                     self.sync_chat_ui(cx);
                     self.redraw(cx);
                 }

@@ -1,10 +1,10 @@
 //! A2uiSurface widget definition and core implementation
 
-use makepad_plot::*;
 #[allow(unused_imports)]
 use makepad_plot::plot::area::AreaChart;
 #[allow(unused_imports)]
 use makepad_plot::plot::financial::CandlestickChart;
+use makepad_plot::*;
 use makepad_widgets::*;
 
 use crate::a2ui::{
@@ -404,7 +404,6 @@ pub struct A2uiSurface {
     #[live]
     #[live]
     #[live]
-
     // ============================================================================
     // Widget pools
     // ============================================================================

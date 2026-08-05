@@ -1,6 +1,6 @@
-pub use makepad_widgets;
 #[cfg(feature = "plot")]
 pub use makepad_plot;
+pub use makepad_widgets;
 
 pub mod a2ui;
 pub mod theme;

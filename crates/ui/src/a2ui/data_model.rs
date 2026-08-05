@@ -225,9 +225,7 @@ impl DataModel {
             return vec![];
         }
 
-        path.trim_start_matches('/')
-            .split('/')
-            .collect()
+        path.trim_start_matches('/').split('/').collect()
     }
 
     /// Get a value by JSON Pointer path
@@ -402,9 +400,7 @@ impl SurfaceDataModels {
 
     /// Get or create a data model for a surface
     pub fn get_or_create(&mut self, surface_id: &str) -> &mut DataModel {
-        self.models
-            .entry(surface_id.to_string())
-            .or_default()
+        self.models.entry(surface_id.to_string()).or_default()
     }
 
     /// Get a data model for a surface

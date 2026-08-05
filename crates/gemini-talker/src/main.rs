@@ -15,11 +15,11 @@ mod storage;
 use audio_input::MicCapture;
 use audio_output::AudioPlayer;
 
+use background::{ParticleBackground, CANVAS_H, CANVAS_W};
 use gemini_live::{GeminiEvent, GeminiLiveClient, ModelTurn, Part, ServerContent};
-use background::{ParticleBackground, CANVAS_W, CANVAS_H};
+use memory::format_timestamp;
 use memory::MemorySummary;
 use storage::{Message, Storage};
-use memory::format_timestamp;
 
 #[derive(Debug, Clone)]
 enum SceneContent {
@@ -470,7 +470,7 @@ impl MatchEvent for App {
                             std::time::SystemTime::now()
                                 .duration_since(std::time::UNIX_EPOCH)
                                 .unwrap()
-                                .as_secs_f64()
+                                .as_secs_f64(),
                         );
                         self.ui
                             .label(cx, ids!(status_label))
@@ -492,9 +492,13 @@ impl MatchEvent for App {
                         self.pending_response.push_str(text);
                         let txt = self.pending_response.clone();
                         self.set_speech_text(cx, &txt);
-                        self.ui.label(cx, ids!(status_label)).set_text(cx, "\u{25cf} Speaking");
+                        self.ui
+                            .label(cx, ids!(status_label))
+                            .set_text(cx, "\u{25cf} Speaking");
                         self.ui.button(cx, ids!(replay_btn)).set_visible(cx, true);
-                        self.ui.button(cx, ids!(translate_btn)).set_visible(cx, true);
+                        self.ui
+                            .button(cx, ids!(translate_btn))
+                            .set_visible(cx, true);
                     }
                     GeminiAction::OutputTranscript(text) => {
                         // Clear overlay at start of new turn
@@ -506,9 +510,13 @@ impl MatchEvent for App {
                         self.pending_response.push_str(&text);
                         let txt = self.pending_response.clone();
                         self.set_speech_text(cx, &txt);
-                        self.ui.label(cx, ids!(status_label)).set_text(cx, "\u{25cf} Speaking");
+                        self.ui
+                            .label(cx, ids!(status_label))
+                            .set_text(cx, "\u{25cf} Speaking");
                         self.ui.button(cx, ids!(replay_btn)).set_visible(cx, true);
-                        self.ui.button(cx, ids!(translate_btn)).set_visible(cx, true);
+                        self.ui
+                            .button(cx, ids!(translate_btn))
+                            .set_visible(cx, true);
                         // Add to conversation for Memory saving
                         self.conversation.push(Message {
                             role: "assistant".to_string(),
@@ -543,8 +551,13 @@ impl MatchEvent for App {
                         // Only push if pending_response has content that wasn't pushed via transcript.
                         if !self.pending_response.is_empty() {
                             // Check if last conversation entry already has this content
-                            let already_saved = self.conversation.last()
-                                .map(|m| m.role == "assistant" && self.pending_response.contains(&m.content))
+                            let already_saved = self
+                                .conversation
+                                .last()
+                                .map(|m| {
+                                    m.role == "assistant"
+                                        && self.pending_response.contains(&m.content)
+                                })
                                 .unwrap_or(false);
                             if !already_saved {
                                 self.conversation.push(Message {
@@ -573,7 +586,9 @@ impl MatchEvent for App {
                     }
                     GeminiAction::AudioReceived(pcm_data) => {
                         self.session_state = "speaking".to_string();
-                        self.ui.label(cx, ids!(status_label)).set_text(cx, "\u{25cf} Speaking");
+                        self.ui
+                            .label(cx, ids!(status_label))
+                            .set_text(cx, "\u{25cf} Speaking");
                         // Accumulate for replay
                         self.current_audio_buf.extend_from_slice(&pcm_data);
                         if let Some(ref mut player) = self.audio_player {
@@ -594,7 +609,9 @@ impl MatchEvent for App {
                             player.stop();
                         }
                         self.session_start_time = None;
-                        self.ui.label(cx, ids!(duration_label)).set_text(cx, "00:00");
+                        self.ui
+                            .label(cx, ids!(duration_label))
+                            .set_text(cx, "00:00");
                         let short = format!("Error: {}", e);
                         eprintln!("{}", short);
                         self.set_speech_text(cx, &short);
@@ -623,7 +640,9 @@ impl MatchEvent for App {
                         if let Some(ref mut player) = self.audio_player {
                             player.stop();
                         }
-                        self.ui.label(cx, ids!(duration_label)).set_text(cx, "00:00");
+                        self.ui
+                            .label(cx, ids!(duration_label))
+                            .set_text(cx, "00:00");
                         let status = self.ui.label(cx, ids!(status_label)).text();
                         if !status.starts_with("Error:") {
                             self.ui
@@ -670,10 +689,16 @@ impl MatchEvent for App {
             } // guard dropped here
             self.pending_response.clear();
             self.set_speech_text(cx, "");
-            self.ui.label(cx, ids!(status_label)).set_text(cx, "Disconnected");
-            self.ui.label(cx, ids!(conn_status)).set_text(cx, "Disconnected");
+            self.ui
+                .label(cx, ids!(status_label))
+                .set_text(cx, "Disconnected");
+            self.ui
+                .label(cx, ids!(conn_status))
+                .set_text(cx, "Disconnected");
             self.ui.button(cx, ids!(connect_btn)).set_visible(cx, true);
-            self.ui.button(cx, ids!(disconnect_btn)).set_visible(cx, false);
+            self.ui
+                .button(cx, ids!(disconnect_btn))
+                .set_visible(cx, false);
         }
 
         if self.ui.button(cx, ids!(connect_btn)).clicked(actions) {
@@ -743,9 +768,7 @@ impl MatchEvent for App {
                                         // Signal Gemini to stop; local playback stopped by UI
                                         client_sender.signal_start().await
                                     }
-                                    UiToGemini::SignalEnd => {
-                                        client_sender.signal_end().await
-                                    }
+                                    UiToGemini::SignalEnd => client_sender.signal_end().await,
                                     UiToGemini::Disconnect => break,
                                 };
                                 if let Err(e) = result {
@@ -912,7 +935,9 @@ impl MatchEvent for App {
                 }
                 self.session_state = "thinking".to_string();
                 self.ui.button(cx, ids!(mic_btn)).set_text(cx, "🎤 Mic");
-                self.ui.label(cx, ids!(status_label)).set_text(cx, "⏳ Processing...");
+                self.ui
+                    .label(cx, ids!(status_label))
+                    .set_text(cx, "⏳ Processing...");
                 self.ui
                     .label(cx, ids!(conn_status))
                     .set_text(cx, "Connected");
@@ -929,13 +954,18 @@ impl MatchEvent for App {
                 .pick_file()
             {
                 if let Ok(bytes) = std::fs::read(&path) {
-                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("png").to_lowercase();
+                    let ext = path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .unwrap_or("png")
+                        .to_lowercase();
                     let mime_type = match ext.as_str() {
                         "jpg" | "jpeg" => "image/jpeg",
-                        "gif"  => "image/gif",
+                        "gif" => "image/gif",
                         "webp" => "image/webp",
-                        _      => "image/png",
-                    }.to_string();
+                        _ => "image/png",
+                    }
+                    .to_string();
 
                     use ::image::ImageReader;
                     use std::io::Cursor;
@@ -947,25 +977,33 @@ impl MatchEvent for App {
                     if let Some(img) = decoded {
                         // Store original bytes (base64) for Gemini image context
                         let b64 = base64::Engine::encode(
-                            &base64::engine::general_purpose::STANDARD, &bytes,
+                            &base64::engine::general_purpose::STANDARD,
+                            &bytes,
                         );
                         self.current_image = Some((mime_type, b64));
 
                         // Build particle system
                         let now = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap().as_secs_f64();
+                            .unwrap()
+                            .as_secs_f64();
                         let bg = ParticleBackground::from_image(&img);
                         // First render + upload immediately
                         let first_png = bg.render_png(now);
-                        let _ = self.ui.image(cx, ids!(scene_background))
+                        let _ = self
+                            .ui
+                            .image(cx, ids!(scene_background))
                             .load_png_from_data(cx, &first_png);
-                        self.ui.image(cx, ids!(scene_background)).set_visible(cx, true);
+                        self.ui
+                            .image(cx, ids!(scene_background))
+                            .set_visible(cx, true);
                         self.particle_bg = Some(bg);
                         self.particle_time = now;
 
-                        self.ui.label(cx, ids!(status_label))
-                            .set_text(cx, "\u{2728} Particle canvas ready — hover & click to interact");
+                        self.ui.label(cx, ids!(status_label)).set_text(
+                            cx,
+                            "\u{2728} Particle canvas ready — hover & click to interact",
+                        );
                     }
                 }
             }
@@ -997,7 +1035,9 @@ impl MatchEvent for App {
             self.current_dithered_image = None;
             self.particle_bg = None;
             self.scene_content = None;
-            self.ui.image(cx, ids!(scene_background)).set_visible(cx, false);
+            self.ui
+                .image(cx, ids!(scene_background))
+                .set_visible(cx, false);
             self.set_speech_text(cx, "");
             self.ui
                 .view(cx, ids!(scene_background))
@@ -1180,7 +1220,9 @@ impl App {
         let storage = match Storage::new(data_dir) {
             Ok(s) => s,
             Err(e) => {
-                self.ui.label(cx, ids!(status_label)).set_text(cx, &format!("Save error: {}", e));
+                self.ui
+                    .label(cx, ids!(status_label))
+                    .set_text(cx, &format!("Save error: {}", e));
                 return;
             }
         };
@@ -1207,7 +1249,8 @@ impl App {
             deduped
         };
         let (title, summary, mood) = if !api_key.is_empty() {
-            storage.summarize_with_ai(&messages, &api_key)
+            storage
+                .summarize_with_ai(&messages, &api_key)
                 .unwrap_or_else(|_| self.fallback_summary(&messages))
         } else {
             self.fallback_summary(&messages)
@@ -1225,23 +1268,35 @@ impl App {
         match storage.save_memory(&mem) {
             Ok(()) => {
                 self.conversation.clear();
-                self.ui.label(cx, ids!(status_label)).set_text(cx, "\u{2713} Memory saved");
+                self.ui
+                    .label(cx, ids!(status_label))
+                    .set_text(cx, "\u{2713} Memory saved");
                 self.refresh_memory_list(cx);
             }
             Err(e) => {
-                self.ui.label(cx, ids!(status_label)).set_text(cx, &format!("Save failed: {}", e));
+                self.ui
+                    .label(cx, ids!(status_label))
+                    .set_text(cx, &format!("Save failed: {}", e));
             }
         }
     }
 
     fn fallback_summary(&self, messages: &[storage::Message]) -> (String, String, Option<String>) {
-        let title = messages.iter().find(|m| m.role == "user")
+        let title = messages
+            .iter()
+            .find(|m| m.role == "user")
             .map(|m| {
                 let t = m.content.chars().take(30).collect::<String>();
-                if m.content.len() > 30 { format!("{}\u{2026}", t) } else { t }
+                if m.content.len() > 30 {
+                    format!("{}\u{2026}", t)
+                } else {
+                    t
+                }
             })
             .unwrap_or_else(|| "Conversation".to_string());
-        let summary = messages.iter().take(4)
+        let summary = messages
+            .iter()
+            .take(4)
             .map(|m| m.content.chars().take(50).collect::<String>())
             .collect::<Vec<_>>()
             .join(" \u{2022} ");
@@ -1268,25 +1323,31 @@ impl App {
     /// Show speech overlay with text; hide when text is empty.
     fn set_speech_text(&mut self, cx: &mut Cx, text: &str) {
         let visible = !text.is_empty();
-        self.ui.view(cx, ids!(speech_overlay)).set_visible(cx, visible);
+        self.ui
+            .view(cx, ids!(speech_overlay))
+            .set_visible(cx, visible);
         self.ui.label(cx, ids!(speech_label)).set_text(cx, text);
         if !visible {
             self.ui.button(cx, ids!(replay_btn)).set_visible(cx, false);
-            self.ui.button(cx, ids!(translate_btn)).set_visible(cx, false);
+            self.ui
+                .button(cx, ids!(translate_btn))
+                .set_visible(cx, false);
         }
     }
 
     fn update_orb_animation(&mut self, cx: &mut Cx) {
         // Animation frames for each state (cycle through chars)
         let (orb_chars, period): (&[&str], u64) = match self.session_state.as_str() {
-            "listening" => (&["\u{25CF}", "\u{25C9}", "\u{25CE}", "\u{25C9}"], 8),  // ● ◉ ◎ cycling
-            "thinking"  => (&["\u{25D4}", "\u{25D1}", "\u{25D5}", "\u{25D3}"], 12), // quarter-circle spin
-            "speaking"  => (&["\u{266A}", "\u{25CF}", "\u{266B}", "\u{25CF}"], 6),  // ♪ ● ♫ pulse
-            "error"     => (&["\u{26A0}", "\u{2715}"], 20),                         // ⚠ ✕
-            _            => (&["\u{25EF}", "\u{25CE}"], 40),                         // ◯ ◎ idle breathe
+            "listening" => (&["\u{25CF}", "\u{25C9}", "\u{25CE}", "\u{25C9}"], 8), // ● ◉ ◎ cycling
+            "thinking" => (&["\u{25D4}", "\u{25D1}", "\u{25D5}", "\u{25D3}"], 12), // quarter-circle spin
+            "speaking" => (&["\u{266A}", "\u{25CF}", "\u{266B}", "\u{25CF}"], 6),  // ♪ ● ♫ pulse
+            "error" => (&["\u{26A0}", "\u{2715}"], 20),                            // ⚠ ✕
+            _ => (&["\u{25EF}", "\u{25CE}"], 40), // ◯ ◎ idle breathe
         };
         let idx = ((self.anim_tick / (period.max(1))) as usize) % orb_chars.len();
-        self.ui.label(cx, ids!(orb_label)).set_text(cx, orb_chars[idx]);
+        self.ui
+            .label(cx, ids!(orb_label))
+            .set_text(cx, orb_chars[idx]);
     }
 
     fn send_current_input(&mut self, cx: &mut Cx) {
@@ -1818,14 +1879,17 @@ impl AppMain for App {
             // Particle background physics + render
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap().as_secs_f64();
+                .unwrap()
+                .as_secs_f64();
             self.particle_time = now;
             if let Some(bg) = &mut self.particle_bg {
                 // Run physics every frame; render every other frame (~30fps) to save CPU
                 let needs_redraw = bg.update(now);
                 if needs_redraw && self.anim_tick % 2 == 0 {
                     let png = bg.render_png(now);
-                    let _ = self.ui.image(cx, ids!(scene_background))
+                    let _ = self
+                        .ui
+                        .image(cx, ids!(scene_background))
                         .load_png_from_data(cx, &png);
                 }
             }
@@ -1941,7 +2005,8 @@ impl AppMain for App {
         // ── Mouse tracking for particle background ──────────────────────
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap().as_secs_f64();
+            .unwrap()
+            .as_secs_f64();
 
         if let Event::MouseMove(me) = event {
             if self.particle_bg.is_some() {
@@ -1952,7 +2017,8 @@ impl AppMain for App {
                     let rel_y = me.abs.y as f32 - rect.pos.y as f32;
                     let cx_pos = rel_x / rect.size.x as f32 * CANVAS_W as f32;
                     let cy_pos = rel_y / rect.size.y as f32 * CANVAS_H as f32;
-                    let inside = rel_x >= 0.0 && rel_y >= 0.0
+                    let inside = rel_x >= 0.0
+                        && rel_y >= 0.0
                         && rel_x < rect.size.x as f32
                         && rel_y < rect.size.y as f32;
                     if let Some(bg) = &mut self.particle_bg {
@@ -1970,7 +2036,8 @@ impl AppMain for App {
                     if rect.size.x > 1.0 {
                         let rel_x = me.abs.x as f32 - rect.pos.x as f32;
                         let rel_y = me.abs.y as f32 - rect.pos.y as f32;
-                        let inside = rel_x >= 0.0 && rel_y >= 0.0
+                        let inside = rel_x >= 0.0
+                            && rel_y >= 0.0
                             && rel_x < rect.size.x as f32
                             && rel_y < rect.size.y as f32;
                         if inside {

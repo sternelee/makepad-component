@@ -106,8 +106,7 @@ impl AudioPlayer {
 
     /// Whether the player has data queued.
     pub fn is_playing(&self) -> bool {
-        *self.is_playing.lock().unwrap()
-            && !self.audio_buffer.lock().unwrap().is_empty()
+        *self.is_playing.lock().unwrap() && !self.audio_buffer.lock().unwrap().is_empty()
     }
 }
 

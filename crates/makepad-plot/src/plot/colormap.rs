@@ -1,8 +1,7 @@
 use makepad_widgets::*;
 
 /// Colormap for heatmap and other visualizations
-#[derive(Clone, Debug, PartialEq)]
-#[derive(Default)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub enum Colormap {
     // Perceptually uniform sequential
     #[default]
@@ -28,7 +27,6 @@ pub enum Colormap {
     Turbo,                    // Improved rainbow
     Custom(Vec<(f64, Vec4)>), // User-defined color stops
 }
-
 
 impl Colormap {
     /// Sample a color from the colormap at position t (0.0 to 1.0)

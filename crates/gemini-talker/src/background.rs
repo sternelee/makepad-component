@@ -50,29 +50,36 @@ const COMET_TOTAL_S: f64 = 0.30;
 
 // ── Data types ────────────────────────────────────────────────────────────────
 pub struct Particle {
-    pub bx: f32, pub by: f32,  // base position
-    pub dx: f32, pub dy: f32,  // displacement
-    pub r: u8, pub g: u8, pub b: u8,  // original image color
+    pub bx: f32,
+    pub by: f32, // base position
+    pub dx: f32,
+    pub dy: f32, // displacement
+    pub r: u8,
+    pub g: u8,
+    pub b: u8, // original image color
 }
 
 pub struct Ripple {
-    pub cx: f32, pub cy: f32,
+    pub cx: f32,
+    pub cy: f32,
     pub start: f64,
 }
 
 pub struct CometPt {
-    pub x: f32, pub y: f32,
+    pub x: f32,
+    pub y: f32,
     pub t: f64,
 }
 
 // ── Main struct ───────────────────────────────────────────────────────────────
 pub struct ParticleBackground {
     pub particles: Vec<Particle>,
-    pub ripples:   Vec<Ripple>,
-    pub comet:     VecDeque<CometPt>,
-    pub width:     u32,
-    pub height:    u32,
-    pub mx: f32, pub my: f32,
+    pub ripples: Vec<Ripple>,
+    pub comet: VecDeque<CometPt>,
+    pub width: u32,
+    pub height: u32,
+    pub mx: f32,
+    pub my: f32,
     pub mouse_in: bool,
 }
 
@@ -91,54 +98,72 @@ impl ParticleBackground {
 
         // Resize to canvas-fitted dimensions
         let resized = img.resize_exact(fw, fh, image::imageops::FilterType::Lanczos3);
-        let rgba    = resized.to_rgba8();
+        let rgba = resized.to_rgba8();
 
         let mut particles = Vec::new();
         for sy in (0..fh as usize).step_by(DOT_STEP) {
             for sx in (0..fw as usize).step_by(DOT_STEP) {
                 let p = rgba.get_pixel(sx as u32, sy as u32);
-                if p[3] < ALPHA_THRESHOLD { continue; }
+                if p[3] < ALPHA_THRESHOLD {
+                    continue;
+                }
                 particles.push(Particle {
                     bx: (ox as usize + sx) as f32,
                     by: (oy as usize + sy) as f32,
-                    dx: 0.0, dy: 0.0,
-                    r: p[0], g: p[1], b: p[2],
+                    dx: 0.0,
+                    dy: 0.0,
+                    r: p[0],
+                    g: p[1],
+                    b: p[2],
                 });
             }
         }
 
         log::info!(
             "ParticleBackground: {} colored particles from {}×{} source",
-            particles.len(), iw, ih
+            particles.len(),
+            iw,
+            ih
         );
 
         Self {
             particles,
             ripples: Vec::new(),
-            comet:   VecDeque::new(),
-            width:   CANVAS_W,
-            height:  CANVAS_H,
-            mx: 0.0, my: 0.0,
+            comet: VecDeque::new(),
+            width: CANVAS_W,
+            height: CANVAS_H,
+            mx: 0.0,
+            my: 0.0,
             mouse_in: false,
         }
     }
 
     pub fn set_mouse(&mut self, x: f32, y: f32, inside: bool) {
-        self.mx = x; self.my = y; self.mouse_in = inside;
+        self.mx = x;
+        self.my = y;
+        self.mouse_in = inside;
     }
 
     pub fn push_comet(&mut self, x: f32, y: f32, now: f64) {
         if let Some(last) = self.comet.back() {
             let dx = x - last.x;
             let dy = y - last.y;
-            if dx * dx + dy * dy < 4.0 { return; }
+            if dx * dx + dy * dy < 4.0 {
+                return;
+            }
         }
         self.comet.push_back(CometPt { x, y, t: now });
-        while self.comet.len() > COMET_MAX { self.comet.pop_front(); }
+        while self.comet.len() > COMET_MAX {
+            self.comet.pop_front();
+        }
     }
 
     pub fn add_ripple(&mut self, x: f32, y: f32, now: f64) {
-        self.ripples.push(Ripple { cx: x, cy: y, start: now });
+        self.ripples.push(Ripple {
+            cx: x,
+            cy: y,
+            start: now,
+        });
     }
 
     /// Physics step. Returns true when redraw is needed.
@@ -167,11 +192,11 @@ impl ParticleBackground {
 
             for r in &self.ripples {
                 let elapsed = (now - r.start) as f32;
-                let radius  = elapsed * SHOCK_SPEED;
-                let life    = 1.0 - elapsed as f64 / SHOCK_DURATION;
+                let radius = elapsed * SHOCK_SPEED;
+                let life = 1.0 - elapsed as f64 / SHOCK_DURATION;
                 let sx = p.bx - r.cx;
                 let sy = p.by - r.cy;
-                let d  = (sx * sx + sy * sy).sqrt();
+                let d = (sx * sx + sy * sy).sqrt();
                 if d > 0.1 {
                     let band = (d - radius).abs();
                     if band < SHOCK_WIDTH {
@@ -184,9 +209,15 @@ impl ParticleBackground {
 
             p.dx += (fx - p.dx) * EASING;
             p.dy += (fy - p.dy) * EASING;
-            if p.dx.abs() < SNAP { p.dx = 0.0; }
-            if p.dy.abs() < SNAP { p.dy = 0.0; }
-            if p.dx != 0.0 || p.dy != 0.0 { any = true; }
+            if p.dx.abs() < SNAP {
+                p.dx = 0.0;
+            }
+            if p.dy.abs() < SNAP {
+                p.dy = 0.0;
+            }
+            if p.dx != 0.0 || p.dy != 0.0 {
+                any = true;
+            }
         }
         any
     }
@@ -198,7 +229,7 @@ impl ParticleBackground {
 
         // Background
         for i in 0..w * h {
-            px[i * 4]     = BG[0];
+            px[i * 4] = BG[0];
             px[i * 4 + 1] = BG[1];
             px[i * 4 + 2] = BG[2];
             px[i * 4 + 3] = 255;
@@ -209,8 +240,8 @@ impl ParticleBackground {
             let x = p.bx + p.dx;
             let y = p.by + p.dy;
 
-            let disp  = (p.dx * p.dx + p.dy * p.dy).sqrt();
-            let t     = (disp / 18.0).min(1.0); // 0 = resting, 1 = fully displaced
+            let disp = (p.dx * p.dx + p.dy * p.dy).sqrt();
+            let t = (disp / 18.0).min(1.0); // 0 = resting, 1 = fully displaced
 
             // Resting color: original image RGB with a very subtle cold tint
             // (+8 on B channel to hint holographic without washing color out)
@@ -228,7 +259,11 @@ impl ParticleBackground {
             let b = lerp_u8(base_b, glow_b, t * HOLO_GLOW_STRENGTH);
 
             // Scanline: every 3rd row is slightly dimmer for holographic feel
-            let scanline = if (y as usize) % 3 == 0 { 1.0 - SCANLINE_FACTOR } else { 1.0 };
+            let scanline = if (y as usize) % 3 == 0 {
+                1.0 - SCANLINE_FACTOR
+            } else {
+                1.0
+            };
             let r = (r as f32 * scanline) as u8;
             let g = (g as f32 * scanline) as u8;
             let b = (b as f32 * scanline) as u8;
@@ -247,12 +282,34 @@ impl ParticleBackground {
         // ── Ripple rings ─────────────────────────────────────────────────
         for r in &self.ripples {
             let elapsed = now - r.start;
-            if elapsed >= SHOCK_DURATION { continue; }
-            let life   = (1.0 - elapsed / SHOCK_DURATION) as f32;
+            if elapsed >= SHOCK_DURATION {
+                continue;
+            }
+            let life = (1.0 - elapsed / SHOCK_DURATION) as f32;
             let radius = elapsed as f32 * SHOCK_SPEED;
-            draw_ring(&mut px, w, h, r.cx, r.cy, radius, 2.5, RIPPLE_COL, life * life * 0.80);
+            draw_ring(
+                &mut px,
+                w,
+                h,
+                r.cx,
+                r.cy,
+                radius,
+                2.5,
+                RIPPLE_COL,
+                life * life * 0.80,
+            );
             if radius > 20.0 {
-                draw_ring(&mut px, w, h, r.cx, r.cy, radius * 0.55, 1.5, RIPPLE_COL, life * 0.32);
+                draw_ring(
+                    &mut px,
+                    w,
+                    h,
+                    r.cx,
+                    r.cy,
+                    radius * 0.55,
+                    1.5,
+                    RIPPLE_COL,
+                    life * 0.32,
+                );
             }
         }
 
@@ -275,10 +332,12 @@ fn lerp_u8(a: u8, b: u8, t: f32) -> u8 {
 
 fn blend(buf: &mut [u8], w: usize, x: i32, y: i32, r: u8, g: u8, b: u8, a: f32) {
     let h = buf.len() / (w * 4);
-    if x < 0 || y < 0 || x >= w as i32 || y >= h as i32 { return; }
+    if x < 0 || y < 0 || x >= w as i32 || y >= h as i32 {
+        return;
+    }
     let i = (y as usize * w + x as usize) * 4;
     let a = a.clamp(0.0, 1.0);
-    buf[i]     = lerp_u8(buf[i],     r, a);
+    buf[i] = lerp_u8(buf[i], r, a);
     buf[i + 1] = lerp_u8(buf[i + 1], g, a);
     buf[i + 2] = lerp_u8(buf[i + 2], b, a);
 }
@@ -290,15 +349,33 @@ fn draw_dot(buf: &mut [u8], w: usize, h: usize, x: f32, y: f32, c: [u8; 3], a: f
 }
 
 /// Soft radial glow (comet head / displaced halo).
-fn draw_soft_circle(buf: &mut [u8], w: usize, h: usize, cx: f32, cy: f32, r: f32, c: [u8; 3], a: f32) {
+fn draw_soft_circle(
+    buf: &mut [u8],
+    w: usize,
+    h: usize,
+    cx: f32,
+    cy: f32,
+    r: f32,
+    c: [u8; 3],
+    a: f32,
+) {
     let _ = h;
     let margin = (r + 2.0) as i32;
     for dy in -margin..=margin {
         for dx in -margin..=margin {
             let dist = (dx as f32).hypot(dy as f32);
-            let cov  = ((r + 1.5 - dist) / 1.5).clamp(0.0, 1.0);
+            let cov = ((r + 1.5 - dist) / 1.5).clamp(0.0, 1.0);
             if cov > 0.01 {
-                blend(buf, w, cx as i32 + dx, cy as i32 + dy, c[0], c[1], c[2], a * cov);
+                blend(
+                    buf,
+                    w,
+                    cx as i32 + dx,
+                    cy as i32 + dy,
+                    c[0],
+                    c[1],
+                    c[2],
+                    a * cov,
+                );
             }
         }
     }
@@ -306,45 +383,71 @@ fn draw_soft_circle(buf: &mut [u8], w: usize, h: usize, cx: f32, cy: f32, r: f32
 
 /// Anti-aliased thick line (perpendicular-slice stepping).
 fn draw_line(
-    buf: &mut [u8], w: usize, h: usize,
-    x0: f32, y0: f32, x1: f32, y1: f32,
-    width: f32, c: [u8; 3], a: f32,
+    buf: &mut [u8],
+    w: usize,
+    h: usize,
+    x0: f32,
+    y0: f32,
+    x1: f32,
+    y1: f32,
+    width: f32,
+    c: [u8; 3],
+    a: f32,
 ) {
     let _ = h;
-    let dx  = x1 - x0;
-    let dy  = y1 - y0;
+    let dx = x1 - x0;
+    let dy = y1 - y0;
     let len = (dx * dx + dy * dy).sqrt();
-    if len < 0.5 { return; }
+    if len < 0.5 {
+        return;
+    }
     let nx = -dy / len;
-    let ny =  dx / len;
+    let ny = dx / len;
     let hw = width * 0.5;
     let steps = (len * 1.5) as usize + 1;
     for i in 0..=steps {
-        let t  = i as f32 / steps as f32;
+        let t = i as f32 / steps as f32;
         let mx = x0 + dx * t;
         let my = y0 + dy * t;
         for j in -3_i32..=3 {
             let off = j as f32 * hw / 3.0;
             let cov = ((hw - off.abs() + 0.5) / 1.0).clamp(0.0, 1.0);
-            blend(buf, w, (mx + nx * off) as i32, (my + ny * off) as i32,
-                  c[0], c[1], c[2], a * cov);
+            blend(
+                buf,
+                w,
+                (mx + nx * off) as i32,
+                (my + ny * off) as i32,
+                c[0],
+                c[1],
+                c[2],
+                a * cov,
+            );
         }
     }
 }
 
 /// Anti-aliased ring.
 fn draw_ring(
-    buf: &mut [u8], w: usize, h: usize,
-    cx: f32, cy: f32, radius: f32, width: f32, c: [u8; 3], a: f32,
+    buf: &mut [u8],
+    w: usize,
+    h: usize,
+    cx: f32,
+    cy: f32,
+    radius: f32,
+    width: f32,
+    c: [u8; 3],
+    a: f32,
 ) {
     let _ = h;
-    if radius <= 0.0 || a <= 0.01 { return; }
+    if radius <= 0.0 || a <= 0.01 {
+        return;
+    }
     let margin = (radius + width + 2.0) as i32;
     let cxi = cx as i32;
     let cyi = cy as i32;
     for dy in -margin..=margin {
         for dx in -margin..=margin {
-            let d    = (dx as f32).hypot(dy as f32);
+            let d = (dx as f32).hypot(dy as f32);
             let band = (d - radius).abs();
             if band < width + 1.5 {
                 let cov = ((width + 1.0 - band) / 1.5).clamp(0.0, 1.0);

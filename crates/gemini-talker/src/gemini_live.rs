@@ -4,10 +4,9 @@
 //! Provides real-time communication with Gemini Live via the `gemini-live` crate.
 
 use ::gemini_live::prelude::{
-    connect, recv_event, Content as LiveContent,
-    GeminiModel as LiveGeminiModel, Part as LivePart,
-    Role as LiveRole, SessionConfig, SessionEvent, SessionHandle, SessionPhase, TransportConfig,
-    ActivityHandling,
+    connect, recv_event, ActivityHandling, Content as LiveContent, GeminiModel as LiveGeminiModel,
+    Part as LivePart, Role as LiveRole, SessionConfig, SessionEvent, SessionHandle, SessionPhase,
+    TransportConfig,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use serde::{Deserialize, Serialize};
@@ -310,12 +309,8 @@ impl GeminiLiveClient {
                         }
                     },
                     OutgoingMessage::AudioRaw(bytes) => session_for_send.send_audio(bytes).await,
-                    OutgoingMessage::SignalStart => {
-                        session_for_send.signal_activity_start().await
-                    }
-                    OutgoingMessage::SignalEnd => {
-                        session_for_send.signal_activity_end().await
-                    }
+                    OutgoingMessage::SignalStart => session_for_send.signal_activity_start().await,
+                    OutgoingMessage::SignalEnd => session_for_send.signal_activity_end().await,
                     OutgoingMessage::Disconnect => {
                         let _ = session_for_send.disconnect().await;
                         break;

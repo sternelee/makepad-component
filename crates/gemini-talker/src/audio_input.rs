@@ -74,7 +74,11 @@ impl MicCapture {
         *send_buf.lock().unwrap() = Vec::new();
 
         /// Append bytes to send_buf; flush when MIN_SEND_BYTES reached.
-        fn flush_if_ready(buf: &Arc<Mutex<Vec<u8>>>, new_bytes: Vec<u8>, sender: &mpsc::Sender<Vec<u8>>) {
+        fn flush_if_ready(
+            buf: &Arc<Mutex<Vec<u8>>>,
+            new_bytes: Vec<u8>,
+            sender: &mpsc::Sender<Vec<u8>>,
+        ) {
             let mut guard = buf.lock().unwrap();
             guard.extend_from_slice(&new_bytes);
             if guard.len() >= MIN_SEND_BYTES {
@@ -91,9 +95,12 @@ impl MicCapture {
                 device.build_input_stream(
                     &config.into(),
                     move |data: &[i16], _| {
-                        if !*is_rec.lock().unwrap() { return; }
+                        if !*is_rec.lock().unwrap() {
+                            return;
+                        }
                         let mono: Vec<f32> = to_mono_f32_i16(data, native_channels);
-                        let resampled = resample(&mono, native_sample_rate, GEMINI_INPUT_SAMPLE_RATE, &rpos);
+                        let resampled =
+                            resample(&mono, native_sample_rate, GEMINI_INPUT_SAMPLE_RATE, &rpos);
                         let bytes = f32_to_pcm16_le(&resampled);
                         flush_if_ready(&buf, bytes, &sender);
                     },
@@ -108,9 +115,12 @@ impl MicCapture {
                 device.build_input_stream(
                     &config.into(),
                     move |data: &[f32], _| {
-                        if !*is_rec.lock().unwrap() { return; }
+                        if !*is_rec.lock().unwrap() {
+                            return;
+                        }
                         let mono: Vec<f32> = to_mono_f32_f32(data, native_channels);
-                        let resampled = resample(&mono, native_sample_rate, GEMINI_INPUT_SAMPLE_RATE, &rpos);
+                        let resampled =
+                            resample(&mono, native_sample_rate, GEMINI_INPUT_SAMPLE_RATE, &rpos);
                         let bytes = f32_to_pcm16_le(&resampled);
                         flush_if_ready(&buf, bytes, &sender);
                     },
@@ -125,12 +135,16 @@ impl MicCapture {
                 device.build_input_stream(
                     &config.into(),
                     move |data: &[u8], _| {
-                        if !*is_rec.lock().unwrap() { return; }
-                        let mono: Vec<f32> = data.iter()
+                        if !*is_rec.lock().unwrap() {
+                            return;
+                        }
+                        let mono: Vec<f32> = data
+                            .iter()
                             .step_by(native_channels.max(1))
                             .map(|&s| (s as f32 / 128.0) - 1.0)
                             .collect();
-                        let resampled = resample(&mono, native_sample_rate, GEMINI_INPUT_SAMPLE_RATE, &rpos);
+                        let resampled =
+                            resample(&mono, native_sample_rate, GEMINI_INPUT_SAMPLE_RATE, &rpos);
                         let bytes = f32_to_pcm16_le(&resampled);
                         flush_if_ready(&buf, bytes, &sender);
                     },
@@ -149,7 +163,9 @@ impl MicCapture {
 
         log::info!(
             "Mic capture started: native={}Hz {}ch -> {}Hz mono",
-            native_sample_rate, native_channels, GEMINI_INPUT_SAMPLE_RATE
+            native_sample_rate,
+            native_channels,
+            GEMINI_INPUT_SAMPLE_RATE
         );
         Ok(())
     }

@@ -219,7 +219,6 @@ script_mod! {
 
 app_main!(App);
 
-
 #[derive(Script, ScriptHook)]
 pub struct App {
     #[live]
@@ -290,21 +289,36 @@ impl App {
         cx.with_vm(|vm| {
             let m = vm.module(id!(a2ui_theme));
             let t = NoTrap;
-            vm.bx
-                .heap
-                .set_value(m, id!(bg_primary).into(), ScriptValue::from_color(pack(colors.bg_primary)), t);
-            vm.bx
-                .heap
-                .set_value(m, id!(bg_surface).into(), ScriptValue::from_color(pack(colors.bg_surface)), t);
-            vm.bx
-                .heap
-                .set_value(m, id!(text_primary).into(), ScriptValue::from_color(pack(colors.text_primary)), t);
-            vm.bx
-                .heap
-                .set_value(m, id!(text_secondary).into(), ScriptValue::from_color(pack(colors.text_secondary)), t);
-            vm.bx
-                .heap
-                .set_value(m, id!(status_color).into(), ScriptValue::from_color(pack(colors.status_color)), t);
+            vm.bx.heap.set_value(
+                m,
+                id!(bg_primary).into(),
+                ScriptValue::from_color(pack(colors.bg_primary)),
+                t,
+            );
+            vm.bx.heap.set_value(
+                m,
+                id!(bg_surface).into(),
+                ScriptValue::from_color(pack(colors.bg_surface)),
+                t,
+            );
+            vm.bx.heap.set_value(
+                m,
+                id!(text_primary).into(),
+                ScriptValue::from_color(pack(colors.text_primary)),
+                t,
+            );
+            vm.bx.heap.set_value(
+                m,
+                id!(text_secondary).into(),
+                ScriptValue::from_color(pack(colors.text_secondary)),
+                t,
+            );
+            vm.bx.heap.set_value(
+                m,
+                id!(status_color).into(),
+                ScriptValue::from_color(pack(colors.status_color)),
+                t,
+            );
         });
 
         // Re-apply the themed colors to each element
@@ -338,7 +352,11 @@ impl App {
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
         // Handle theme dropdown selection
-        if let Some(index) = self.ui.drop_down(cx, ids!(theme_dropdown)).selected(actions) {
+        if let Some(index) = self
+            .ui
+            .drop_down(cx, ids!(theme_dropdown))
+            .selected(actions)
+        {
             let new_theme = Theme::from_index(index);
             if new_theme != self.current_theme {
                 self.current_theme = new_theme;
@@ -608,7 +626,9 @@ impl App {
                             } else {
                                 format!("⏳ Downloading: {}", title)
                             };
-                            self.ui.label(cx, ids!(status_label)).set_text(cx, &status_msg);
+                            self.ui
+                                .label(cx, ids!(status_label))
+                                .set_text(cx, &status_msg);
 
                             if !self.audio_output_registered {
                                 start_audio_output(

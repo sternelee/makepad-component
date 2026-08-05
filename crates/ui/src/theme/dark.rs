@@ -111,6 +111,8 @@ impl MpThemeState {
         };
         cx.widget_action(self.widget_uid(), MpThemeAction::Toggle);
         cx.widget_action(self.widget_uid(), action);
+        // Re-apply all widget colors to match new theme
+        Self::apply_theme_to_all_widgets(cx, self.dark_mode);
         self.redraw(cx);
     }
 
@@ -124,8 +126,27 @@ impl MpThemeState {
                 MpThemeAction::SetLight
             };
             cx.widget_action(self.widget_uid(), action);
+            // Re-apply all widget colors to match new theme
+            Self::apply_theme_to_all_widgets(cx, self.dark_mode);
             self.redraw(cx);
         }
+    }
+
+    /// Apply theme colors by pushing new instance values to all widgets.
+    /// Walks the widget tree and uses script_apply_eval to swap
+    /// bg_color, color, border_color etc. between light and dark palettes.
+    fn apply_theme_to_all_widgets(cx: &mut Cx, dark: bool) {
+        // We trigger a full script re-apply so all widgets re-evaluate
+        // their instance() values against the active theme module.
+        // The theme_mode global is set for shader-based widgets to read.
+        let vm_id = cx.script_vm_id();
+        cx.with_script_vm_id(vm_id, |vm| {
+            let key = id!(theme_mode);
+            let val: ScriptValue = if dark { 1.0.into() } else { 0.0.into() };
+            vm.bx.heap.set_global(key, val);
+        });
+        // Request a script re-apply so all widgets recompile with new theme
+        cx.request_script_reapply();
     }
 
     pub fn is_dark(&self) -> bool {

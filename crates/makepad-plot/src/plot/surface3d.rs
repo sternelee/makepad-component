@@ -68,7 +68,6 @@ impl View3D {
         let y1 = x * az.sin() + y * az.cos();
         let z1 = z;
 
-        
         y1 * el.cos() - z1 * el.sin()
     }
 }
@@ -290,10 +289,7 @@ impl Surface3D {
     /// Get or create a per-chart instance by ID. Preserves interactive state
     /// (view angles, zoom) across redraws while allowing data updates.
     pub fn get_chart_mut(&mut self, chart_id: &str) -> &mut Surface3DChart {
-        self.charts
-            .map
-            .entry(chart_id.to_string())
-            .or_default()
+        self.charts.map.entry(chart_id.to_string()).or_default()
     }
 
     /// Draw a specific chart instance using its per-chart state.
