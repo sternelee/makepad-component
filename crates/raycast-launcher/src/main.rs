@@ -13,6 +13,8 @@ mod chat;
 mod chat_list;
 script_mod! {
     use mod.prelude.widgets.*
+    use mod.draw.MacosWindowChrome
+    use mod.draw.MacosWindowConfig
 
     // ── tinycast Theme 移植令牌（单一来源；着色器内用 uniform(mod.tc.*) 引用）──
     mod.tc = {
@@ -781,32 +783,14 @@ script_mod! {
     startup() do #(App::script_component(vm)){
         ui: Root{
             main_window := Window{
-                window.inner_size: vec2(900 620)
+                // 真透明无边框窗口：窗口即面板，真实桌面透出，只剩一层圆角
+                window.inner_size: vec2(750 475)
                 window.title: "Raycast Launcher"
-                pass +: { clear_color: #x08080aff }
+                window.transparent: true
+                window.macos: MacosWindowConfig{chrome: MacosWindowChrome.Borderless}
+                pass +: { clear_color: #x00000000 }
                 body +: {
-                    bg_view := View{
-                        width: Fill
-                        height: Fill
-                        flow: Down
-                        align: Center
-                        show_bg: true
-                        draw_bg +: {
-                            // Simulate macOS desktop wallpaper: diagonal light-dark stripes (referencing the tinycast screenshot)
-                            pixel: fn() {
-                                let p = self.pos
-                                let d = p.x * 0.72 + p.y * 0.68
-                                let w1 = sin(d * 10.7 + sin(p.y * 4.0) * 0.6) * 0.5 + 0.5
-                                let w2 = sin(d * 5.7 + 2.1) * 0.5 + 0.5
-                                let v = smoothstep(0.35 0.65 w1) * 0.55 + smoothstep(0.4 0.7 w2) * 0.35
-                                let g = v * v
-                                return mix(#x08080aff #x2e3238ff g)
-                            }
-                        }
-                        launcher := mod.widgets.LauncherPanel{
-                            margin: Inset{bottom: 30}   // Slightly above vertical center ≈8%
-                        }
-                    }
+                    launcher := mod.widgets.LauncherPanel{}
                 }
             }
         }
