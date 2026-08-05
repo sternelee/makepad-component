@@ -1011,7 +1011,6 @@ fn scan_macos_applications() -> Vec<LauncherItem> {
         PathBuf::from("/System/Applications/Utilities"),
     ];
 
-    let mut seen_paths = HashSet::new();
     let mut app_paths = Vec::new();
 
     for root in roots {
@@ -1030,9 +1029,7 @@ fn scan_macos_applications() -> Vec<LauncherItem> {
                 if path.is_dir() {
                     if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
                         if name.ends_with(".app") {
-                            if seen_paths.insert(path.clone()) {
-                                app_paths.push(path);
-                            }
+                            app_paths.push(path);
                             continue;
                         }
                     }
@@ -1044,7 +1041,18 @@ fn scan_macos_applications() -> Vec<LauncherItem> {
         }
     }
 
-    app_paths.sort();
+    // 最浅路径优先，保证去重时保留 /Applications/X.app 而非嵌套副本
+    app_paths.sort_by_key(|p| (p.components().count(), p.clone()));
+
+    // 机器上可能存在 /Applications/Applications/Applications 这类真实嵌套目录，
+    // 同一 app 会以不同字面路径被扫到多次；按 bundle 名去重，保留最浅路径。
+    let mut seen_names = HashSet::new();
+    app_paths.retain(|p| {
+        p.file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| seen_names.insert(n.to_string()))
+            .unwrap_or(false)
+    });
 
     app_paths
         .into_iter()
