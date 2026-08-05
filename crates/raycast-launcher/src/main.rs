@@ -16,20 +16,20 @@ script_mod! {
 
     // ── tinycast Theme 移植令牌（单一来源；着色器内用 uniform(mod.tc.*) 引用）──
     mod.tc = {
-        surface: #xff101013          // 面板表面（black 0.40 叠极暗底）
-        hairline: #x14ffffff         // white 0.08 面板外边框
-        selection: #x1affffff        // white 0.10 选中行
-        row_hover: #x0dffffff        // white 0.05 悬停行
-        control_surface: #x1affffff  // white 0.10 填充 keycap
-        border: #x33ffffff           // white 0.20 描边 keycap
-        text_primary: #xf2ffffff     // white 0.95
-        text_secondary: #x99ffffff   // white 0.60
-        text_tertiary: #x66ffffff    // white 0.40
-        glass_top: #x24ffffff        // white 0.14
-        glass_bottom: #x10ffffff     // white 0.06
-        glass_stroke: #x38ffffff     // white 0.22
-        separator: #x1affffff        // white 0.10
-        scrollbar: #x4dffffff        // white 0.30
+        surface: #x101013ff          // 面板表面（black 0.40 叠极暗底）#xRRGGBBAA
+        hairline: #xffffff14         // white 0.08 面板外边框
+        selection: #xffffff1a        // white 0.10 选中行
+        row_hover: #xffffff0d        // white 0.05 悬停行
+        control_surface: #xffffff1a  // white 0.10 填充 keycap
+        border: #xffffff33           // white 0.20 描边 keycap
+        text_primary: #xfffffff2     // white 0.95
+        text_secondary: #xffffff99   // white 0.60
+        text_tertiary: #xffffff66    // white 0.40
+        glass_top: #xffffff24        // white 0.14
+        glass_bottom: #xffffff10     // white 0.06
+        glass_stroke: #xffffff38     // white 0.22
+        separator: #xffffff1a        // white 0.10
+        scrollbar: #xffffff4d        // white 0.30
     }
 
     mod.widgets.KeyCap = View{
@@ -175,14 +175,15 @@ script_mod! {
                 height: Fill
                 flow: Down
                 spacing: 0
+                margin: Inset{top: 44 bottom: 34}
 
                 scroll_bar := ScrollBar{
                     draw_bg +: {
                         size: uniform(2.0)
                         border_radius: uniform(1.0)
                         color: uniform(mod.tc.scrollbar)
-                        color_hover: uniform(#x6bffffff)   // white 0.42
-                        color_drag: uniform(#x80ffffff)   // white 0.50
+                        color_hover: uniform(#xffffff6b)   // white 0.42
+                        color_drag: uniform(#xffffff80)   // white 0.50
                     }
                 }
 
@@ -281,7 +282,15 @@ script_mod! {
                         // 预乘 alpha：顶部不透明 → 底部透明
                         let a = 1.0 - self.pos.y
                         let c = self.surface_col
-                        return vec4(c.x * a c.y * a c.z * a a)
+                        // 圆角遮罩：面板顶部两角 radius 26，避免直角盖住圆角
+                        let p = self.pos * self.rect_size
+                        let r = 26.0
+                        let e = max(max(r - p.x, p.x - (self.rect_size.x - r)), 0.0)
+                        let f = max(r - p.y, 0.0)
+                        let d = length(vec2(e f)) - r
+                        let m = clamp(-d, 0.0, 1.0)
+                        let aa = a * m
+                        return vec4(c.x * aa c.y * aa c.z * aa aa)
                     }
                 }
             }
@@ -297,7 +306,15 @@ script_mod! {
                         let py = self.pos.y * self.rect_size.y
                         let a = clamp((py - (self.rect_size.y - 80.0)) / 80.0 0.0 1.0)
                         let c = self.surface_col
-                        return vec4(c.x * a c.y * a c.z * a a)
+                        // 圆角遮罩：面板底部两角 radius 26
+                        let p = self.pos * self.rect_size
+                        let r = 26.0
+                        let e = max(max(r - p.x, p.x - (self.rect_size.x - r)), 0.0)
+                        let f = max(p.y - (self.rect_size.y - r), 0.0)
+                        let d = length(vec2(e f)) - r
+                        let m = clamp(-d, 0.0, 1.0)
+                        let aa = a * m
+                        return vec4(c.x * aa c.y * aa c.z * aa aa)
                     }
                 }
             }
@@ -766,7 +783,7 @@ script_mod! {
             main_window := Window{
                 window.inner_size: vec2(900 620)
                 window.title: "Raycast Launcher"
-                pass +: { clear_color: #xff08080a }
+                pass +: { clear_color: #x08080aff }
                 body +: {
                     bg_view := View{
                         width: Fill
@@ -783,7 +800,7 @@ script_mod! {
                                 let w2 = sin(d * 5.7 + 2.1) * 0.5 + 0.5
                                 let v = smoothstep(0.35 0.65 w1) * 0.55 + smoothstep(0.4 0.7 w2) * 0.35
                                 let g = v * v
-                                return mix(#xff08080a #xffc9c9ce g)
+                                return mix(#x08080aff #x2e3238ff g)
                             }
                         }
                         launcher := mod.widgets.LauncherPanel{
