@@ -96,8 +96,14 @@ script_mod! {
                 flow: Overlay
                 show_bg: true
                 draw_bg +: {
-                    color: #x3a5a8a
-                    radius: 8.0
+                    // 脚本 View 的 draw_bg 是 DrawQuad，默认 pixel 透明且无 color/radius
+                    // 属性——必须显式 pixel: fn() 自绘圆角矩形（与 launcher 行/状态条一致）
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 10.0)
+                        sdf.fill(#x3a5a8a)
+                        return sdf.result
+                    }
                 }
 
                 selectable := Markdown{
@@ -116,8 +122,14 @@ script_mod! {
                 flow: Overlay
                 show_bg: true
                 draw_bg +: {
-                    color: #x2a2a3a
-                    radius: 8.0
+                    // 脚本 View 的 draw_bg 是 DrawQuad，默认 pixel 透明且无 color/radius
+                    // 属性——必须显式 pixel: fn() 自绘圆角矩形（与 launcher 行/状态条一致）
+                    pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 10.0)
+                        sdf.fill(#x2a2a3a)
+                        return sdf.result
+                    }
                 }
 
                 selectable := Markdown{
@@ -140,11 +152,19 @@ script_mod! {
             surface_col: uniform(mod.tc.surface)
             hairline_col: uniform(mod.tc.hairline)
             pixel: fn() {
-                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 26.0)
-                sdf.fill(self.surface_col)
-                sdf.stroke(self.hairline_col 1.0)
-                return sdf.result
+                // Do not use Sdf2d.box here: its corner-radius behavior does
+                // not match the manual 26pt masks used by launcher_view.
+                // This analytic rounded rectangle is shared by every mode.
+                let p = self.pos * self.rect_size
+                let r = 26.0
+                let dx = max(max(r - p.x, p.x - (self.rect_size.x - r)), 0.0)
+                let dy = max(max(r - p.y, p.y - (self.rect_size.y - r)), 0.0)
+                let d = length(vec2(dx dy)) - r
+                let coverage = clamp(0.5 - d, 0.0, 1.0)
+                let interior = clamp(-d, 0.0, 1.0)
+                let c = mix(self.hairline_col self.surface_col interior)
+                // Window compositing expects premultiplied alpha.
+                return vec4(c.xyz * c.w * coverage c.w * coverage)
             }
         }
 
@@ -403,7 +423,10 @@ script_mod! {
             height: Fill
             flow: Down
             spacing: 10
-            padding: Inset{left: 2 right: 2 top: 2 bottom: 2}
+            // 顶部统一输入行仍用于 Chat 提示输入，因此让开它的 44pt 高度。
+            // Chat 模式隐藏 launcher 底栏，底部只保留 Chat 自己的状态栏。
+            // 左右和底部各留 26pt，避免实色控件侵入面板圆角区。
+            padding: Inset{left: 26 right: 26 top: 46 bottom: 26}
 
             View{
                 width: Fill
@@ -423,6 +446,30 @@ script_mod! {
                 chat_reset_btn := Button{
                     text: "Clear"
                     padding: Inset{left: 10 right: 10 top: 7 bottom: 7}
+                    draw_bg +: {
+                        top_col: uniform(mod.tc.glass_top)
+                        bot_col: uniform(mod.tc.glass_bottom)
+                        stroke_col: uniform(mod.tc.glass_stroke)
+                        pixel: fn() {
+                            // 全圆角 stadium SDF（与底部动作胶囊一致，不用 Sdf2d.box）
+                            let p = self.pos * self.rect_size
+                            let r = self.rect_size.y * 0.5
+                            let cx = min(max(p.x, r), self.rect_size.x - r)
+                            let d = length(vec2(p.x - cx, p.y - r)) - r
+                            let fill_a = clamp(-d, 0.0, 1.0)
+                            let band = min(clamp((d + 1.0) * 2.0, 0.0, 1.0), clamp(-d * 2.0, 0.0, 1.0))
+                            let g = mix(self.top_col self.bot_col self.pos.y)
+                            let a1 = g.w * fill_a
+                            let a2 = self.stroke_col.w * band
+                            let a = a1 + a2 * (1.0 - a1)
+                            let rgb = (g.xyz * a1 + self.stroke_col.xyz * a2 * (1.0 - a1)) / max(a, 0.0001)
+                            return vec4(rgb * a, a)
+                        }
+                    }
+                    draw_text +: {
+                        text_style: theme.font_regular {font_size: 12}
+                        color: mod.tc.text_primary
+                    }
                 }
             }
 
@@ -445,7 +492,7 @@ script_mod! {
                 draw_bg +: {
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 10.0)
                         sdf.fill(#x1b2028)
                         sdf.stroke(#x303745 1.0)
                         return sdf.result
@@ -467,7 +514,7 @@ script_mod! {
                         border_color: instance(#x3e4653)
                         pixel: fn() {
                             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 10.0)
                             sdf.fill(#x1f2329)
                             sdf.stroke(self.border_color 1.0)
                             return sdf.result
@@ -487,7 +534,7 @@ script_mod! {
                         border_color: instance(#x3e4653)
                         pixel: fn() {
                             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 10.0)
                             sdf.fill(#x1f2329)
                             sdf.stroke(self.border_color 1.0)
                             return sdf.result
@@ -514,7 +561,7 @@ script_mod! {
                 draw_bg +: {
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 7.0)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 10.0)
                         sdf.fill(#x1b2028)
                         sdf.stroke(#x303745 1.0)
                         return sdf.result
@@ -550,7 +597,7 @@ script_mod! {
                 draw_bg +: {
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 7.0)
+                        sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 10.0)
                         sdf.fill(#x131a24)
                         sdf.stroke(#x1d4ed8 1.0)
                         return sdf.result
@@ -570,7 +617,19 @@ script_mod! {
                     save_app_btn := Button{
                         text: "Save as App"
                         padding: Inset{left: 10 right: 10 top: 5 bottom: 5}
-                        draw_bg +: { color: #x1d4ed8 radius: 5.0 }
+                        draw_bg +: {
+                            fill_col: uniform(#x1d4ed8)
+                            pixel: fn() {
+                                // 全圆角 stadium SDF（与底部动作胶囊一致，不用 Sdf2d.box）
+                                let p = self.pos * self.rect_size
+                                let r = self.rect_size.y * 0.5
+                                let cx = min(max(p.x, r), self.rect_size.x - r)
+                                let d = length(vec2(p.x - cx, p.y - r)) - r
+                                let fill_a = clamp(-d, 0.0, 1.0)
+                                let a = self.fill_col.w * fill_a
+                                return vec4(self.fill_col.xyz * a, a)
+                            }
+                        }
                         draw_text +: { color: #xffffff }
                     }
                 }
@@ -581,7 +640,19 @@ script_mod! {
                     open_app_btn := Button{
                         text: "Open App"
                         padding: Inset{left: 10 right: 10 top: 5 bottom: 5}
-                        draw_bg +: { color: #x22c55e radius: 5.0 }
+                        draw_bg +: {
+                            fill_col: uniform(#x22c55e)
+                            pixel: fn() {
+                                // 全圆角 stadium SDF（与底部动作胶囊一致，不用 Sdf2d.box）
+                                let p = self.pos * self.rect_size
+                                let r = self.rect_size.y * 0.5
+                                let cx = min(max(p.x, r), self.rect_size.x - r)
+                                let d = length(vec2(p.x - cx, p.y - r)) - r
+                                let fill_a = clamp(-d, 0.0, 1.0)
+                                let a = self.fill_col.w * fill_a
+                                return vec4(self.fill_col.xyz * a, a)
+                            }
+                        }
                         draw_text +: { color: #xffffff }
                     }
                 }
@@ -668,13 +739,20 @@ script_mod! {
                         bot_col: uniform(mod.tc.glass_bottom)
                         stroke_col: uniform(mod.tc.glass_stroke)
                         pixel: fn() {
-                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                            // Analytic stadium, matching Clear and the launcher action capsule.
+                            // Sdf2d.box does not produce a reliable full-round radius here.
+                            let p = self.pos * self.rect_size
                             let r = self.rect_size.y * 0.5
-                            sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y r)
+                            let cx = min(max(p.x, r), self.rect_size.x - r)
+                            let d = length(vec2(p.x - cx, p.y - r)) - r
+                            let fill_a = clamp(-d, 0.0, 1.0)
+                            let band = min(clamp((d + 1.0) * 2.0, 0.0, 1.0), clamp(-d * 2.0, 0.0, 1.0))
                             let g = mix(self.top_col self.bot_col self.pos.y)
-                            sdf.fill(g)
-                            sdf.stroke(self.stroke_col 1.0)
-                            return sdf.result
+                            let a1 = g.w * fill_a
+                            let a2 = self.stroke_col.w * band
+                            let a = a1 + a2 * (1.0 - a1)
+                            let rgb = (g.xyz * a1 + self.stroke_col.xyz * a2 * (1.0 - a1)) / max(a, 0.0001)
+                            return vec4(rgb * a, a)
                         }
                     }
                     draw_text +: {

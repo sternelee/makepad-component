@@ -173,6 +173,11 @@ impl LauncherPanel {
             .set_visible(cx, !show);
         self.view.view(cx, ids!(todo_view)).set_visible(cx, false);
         self.view.view(cx, ids!(chat_view)).set_visible(cx, show);
+        // The chat view owns its bottom status bar. Keeping the launcher's
+        // result/action bar visible here overlaps the Chat surface.
+        self.view
+            .view(cx, ids!(bottom_bar))
+            .set_visible(cx, !show);
         self.sync_mode_input(cx);
         if show {
             self.sync_chat_ui(cx);
