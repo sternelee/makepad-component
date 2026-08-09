@@ -32,6 +32,9 @@ script_mod! {
         glass_stroke: #xffffff38     // white 0.22
         separator: #xffffff1a        // white 0.10
         scrollbar: #xffffff4d        // white 0.30
+        destructive: #xff3b30ff      // macOS 系统红（Quit/危险行）
+        menu_surface: #x16161cff     // 弹出菜单面板表面（比面板表面略亮）RRGGBBAA
+        menu_stroke: #xffffff3d      // white 0.24 菜单描边（浮动面板更亮）
     }
 
     mod.widgets.KeyCap = View{
@@ -72,6 +75,109 @@ script_mod! {
     }
     mod.widgets.KeyCapOutline = mod.widgets.KeyCap{
         draw_bg +: { filled: uniform(0.0) }
+    }
+
+    // ── 弹出菜单行（tinycast PopoverMenuRow 移植：glyph + 标题 + 尾随快捷键）──
+    mod.widgets.MenuRow = View{
+        width: Fill
+        height: 30
+        margin: Inset{left: 6 right: 6 top: 1 bottom: 1}
+        flow: Right
+        align: VCenter
+        spacing: 10
+        padding: Inset{left: 8 right: 8}
+        show_bg: true
+        draw_bg +: {
+            sel: instance(0.0)
+            hov: instance(0.0)
+            sel_col: uniform(mod.tc.selection)
+            hov_col: uniform(mod.tc.row_hover)
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.0 0.0 self.rect_size.x self.rect_size.y 8.0)
+                let c = mix(#x00000000 self.hov_col self.hov)
+                let c = mix(c self.sel_col self.sel)
+                sdf.fill(c)
+                return sdf.result
+            }
+        }
+        row_icon := Label{
+            text: ""
+            width: 20
+            height: 20
+            align: Center
+            draw_text +: {
+                text_style: theme.font_regular {font_size: 12}
+                color: mod.tc.text_secondary
+            }
+        }
+        row_title := Label{
+            width: Fill
+            text: ""
+            draw_text +: {
+                text_style: theme.font_regular {font_size: 12}
+                color: mod.tc.text_primary
+                danger: instance(0.0)
+                danger_col: uniform(mod.tc.destructive)
+                get_color: fn() {
+                    return mix(self.color self.danger_col self.danger)
+                }
+            }
+        }
+        row_shortcut := Label{
+            text: ""
+            draw_text +: {
+                text_style: theme.font_regular {font_size: 11}
+                color: mod.tc.text_tertiary
+            }
+        }
+    }
+
+    // ── 弹出菜单面板（tinycast PopoverMenu 移植：圆角16 + 头部 + 分隔线）──
+    mod.widgets.MenuPanel = View{
+        width: 276
+        height: Fit
+        flow: Down
+        padding: Inset{top: 6 bottom: 6}
+        show_bg: true
+        draw_bg +: {
+            surface_col: uniform(mod.tc.menu_surface)
+            stroke_col: uniform(mod.tc.menu_stroke)
+            pixel: fn() {
+                let p = self.pos * self.rect_size
+                let r = 16.0
+                let dx = max(max(r - p.x, p.x - (self.rect_size.x - r)), 0.0)
+                let dy = max(max(r - p.y, p.y - (self.rect_size.y - r)), 0.0)
+                let d = length(vec2(dx dy)) - r
+                let a1 = clamp(-d, 0.0, 1.0)
+                let band = min(clamp((d + 1.0) * 2.0, 0.0, 1.0), clamp(-d * 2.0, 0.0, 1.0))
+                let a2 = self.stroke_col.w * band
+                let aa = a1 + a2 * (1.0 - a1)
+                let rgb = (self.surface_col.xyz * a1 + self.stroke_col.xyz * a2 * (1.0 - a1)) / max(aa, 0.0001)
+                return vec4(rgb * aa, aa)
+            }
+        }
+        menu_header := Label{
+            text: ""
+            margin: Inset{left: 14 right: 14 top: 8 bottom: 8}
+            draw_text +: {
+                text_style: theme.font_bold {font_size: 12}
+                color: mod.tc.text_primary
+            }
+        }
+        menu_divider := View{
+            width: Fill
+            height: 1
+            margin: Inset{left: 12 right: 12 bottom: 4}
+            show_bg: true
+            draw_bg +: { color: mod.tc.separator }
+        }
+        menu_row_0 := mod.widgets.MenuRow{}
+        menu_row_1 := mod.widgets.MenuRow{}
+        menu_row_2 := mod.widgets.MenuRow{}
+        menu_row_3 := mod.widgets.MenuRow{}
+        menu_row_4 := mod.widgets.MenuRow{}
+        menu_row_5 := mod.widgets.MenuRow{}
     }
 
     mod.widgets.ChatListBase = #(chat_list::ChatList::register_widget(vm))
@@ -781,10 +887,14 @@ script_mod! {
                     top_col: uniform(mod.tc.glass_top)
                     bot_col: uniform(mod.tc.glass_bottom)
                     stroke_col: uniform(mod.tc.glass_stroke)
+                    hov: instance(0.0)
+                    hov_col: uniform(mod.tc.row_hover)
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                         sdf.circle(self.rect_size.x * 0.5 self.rect_size.y * 0.5 18.0)
                         let g = mix(self.top_col self.bot_col self.pos.y)
+                        // 悬停：row_hover 叠在 glass 之上（tinycast MenuCircleButton）
+                        let g = mix(g self.hov_col self.hov)
                         sdf.fill(g)
                         sdf.stroke(self.stroke_col 1.0)
                         return sdf.result
@@ -813,8 +923,8 @@ script_mod! {
                 height: 34
                 flow: Right
                 align: VCenter
-                spacing: 8
-                padding: Inset{left: 14 right: 14}
+                spacing: 2
+                padding: Inset{left: 4 right: 4}
                 show_bg: true
                 draw_bg +: {
                     top_col: uniform(mod.tc.glass_top)
@@ -840,15 +950,38 @@ script_mod! {
                     }
                 }
 
-                primary_action_label := Label{
-                    text: "Open Application"
-                    draw_text +: {
-                        text_style: theme.font_bold {font_size: 12}
-                        color: mod.tc.text_primary
+                // ── 主动作 pill：点击 = 启动选中项（tinycast BarButton）──
+                pill_zone := View{
+                    width: Fit
+                    height: 28
+                    flow: Right
+                    align: VCenter
+                    spacing: 8
+                    padding: Inset{left: 10 right: 10}
+                    show_bg: true
+                    draw_bg +: {
+                        hov: instance(0.0)
+                        hov_col: uniform(mod.tc.row_hover)
+                        pixel: fn() {
+                            // 全圆角 stadium 悬停填充（预乘 alpha）
+                            let p = self.pos * self.rect_size
+                            let r = self.rect_size.y * 0.5
+                            let cx = min(max(p.x, r), self.rect_size.x - r)
+                            let d = length(vec2(p.x - cx, p.y - r)) - r
+                            let a = clamp(-d, 0.0, 1.0) * self.hov
+                            let c = self.hov_col
+                            return vec4(c.xyz * c.w * a c.w * a)
+                        }
                     }
+                    primary_action_label := Label{
+                        text: "Open Application"
+                        draw_text +: {
+                            text_style: theme.font_bold {font_size: 12}
+                            color: mod.tc.text_primary
+                        }
+                    }
+                    mod.widgets.KeyCap{ caption := Label{ text: "↵" } }
                 }
-
-                mod.widgets.KeyCap{ caption := Label{ text: "↵" } }
 
                 View{
                     width: 1
@@ -857,16 +990,62 @@ script_mod! {
                     draw_bg +: { color: mod.tc.separator }
                 }
 
-                Label{
-                    text: "Actions"
-                    draw_text +: {
-                        text_style: theme.font_regular {font_size: 12}
-                        color: mod.tc.text_secondary
+                // ── Actions 开关：点击/⌘K = 打开选中项动作菜单（tinycast BarButton）──
+                actions_zone := View{
+                    width: Fit
+                    height: 28
+                    flow: Right
+                    align: VCenter
+                    spacing: 6
+                    padding: Inset{left: 10 right: 10}
+                    show_bg: true
+                    draw_bg +: {
+                        hov: instance(0.0)
+                        hov_col: uniform(mod.tc.row_hover)
+                        pixel: fn() {
+                            let p = self.pos * self.rect_size
+                            let r = self.rect_size.y * 0.5
+                            let cx = min(max(p.x, r), self.rect_size.x - r)
+                            let d = length(vec2(p.x - cx, p.y - r)) - r
+                            let a = clamp(-d, 0.0, 1.0) * self.hov
+                            let c = self.hov_col
+                            return vec4(c.xyz * c.w * a c.w * a)
+                        }
                     }
+                    Label{
+                        text: "Actions"
+                        draw_text +: {
+                            text_style: theme.font_regular {font_size: 12}
+                            color: mod.tc.text_secondary
+                        }
+                    }
+                    mod.widgets.KeyCapOutline{ caption := Label{ text: "⌘" } }
+                    mod.widgets.KeyCapOutline{ caption := Label{ text: "K" } }
                 }
+            }
+        }
 
-                mod.widgets.KeyCapOutline{ caption := Label{ text: "⌘" } }
-                mod.widgets.KeyCapOutline{ caption := Label{ text: "K" } }
+        // ── 弹出菜单层：透明容器钉在底部，菜单悬浮于列表之上（tinycast in-window overlay）──
+        menu_layer := View{
+            width: Fill
+            height: Fill
+            flow: Right
+            align: Align{x: 0.0 y: 1.0}
+
+            // 初始可见用于首帧预热 draw_bg（visible:false 子树不渲染的 makepad 限制）
+            app_menu := mod.widgets.MenuPanel{
+                margin: Inset{left: 8 bottom: 60}   // 52 底栏 + 8 间距
+            }
+            menu_spacer := View{
+                width: Fill
+                height: Fit
+            }
+            actions_menu := mod.widgets.MenuPanel{
+                margin: Inset{bottom: 60}
+            }
+            menu_edge := View{
+                width: 8
+                height: Fit
             }
         }
     }
@@ -960,6 +1139,35 @@ pub struct LauncherPanel {
     stream_msg_index: usize,
     #[rust]
     last_saved_app_path: Option<String>,
+    // ── 弹出菜单状态（tinycast PopoverMenu 移植）──
+    #[rust]
+    show_actions: bool,
+    #[rust]
+    show_app_menu: bool,
+    #[rust]
+    menu_selection: usize,
+    #[rust]
+    menu_hover: Option<usize>,
+    #[rust]
+    menu_query_restore: String,
+    #[rust]
+    actions_items: Vec<MenuEntry>,
+    #[rust]
+    app_items: Vec<MenuEntry>,
+    #[rust]
+    favorites: HashSet<String>,
+    #[rust]
+    menu_hit_rects: Vec<(usize, Rect)>,
+    #[rust]
+    bar_rects: (Rect, Rect, Rect),
+    #[rust]
+    bar_hover: (bool, bool, bool),
+    /// 首帧预热标记：菜单初始可见以建立 draw_bg shader 实例，首帧绘制后立即隐藏
+    #[rust]
+    __menu_prewarmed: bool,
+    /// 第二帧绘制前隐藏菜单（预热完成标记）
+    #[rust]
+    __menu_prewarm_hide: bool,
 }
 
 impl ScriptHook for LauncherPanel {
@@ -982,6 +1190,19 @@ impl ScriptHook for LauncherPanel {
             self.chat_messages = chat::default_or_history();
             self.chat_loading = false;
             self.last_saved_app_path = None;
+            self.show_actions = false;
+            self.show_app_menu = false;
+            self.menu_selection = 0;
+            self.menu_hover = None;
+            self.menu_query_restore.clear();
+            self.actions_items.clear();
+            self.app_items = Self::app_menu_items();
+            self.favorites = Self::load_favorites();
+            self.menu_hit_rects.clear();
+            self.bar_rects = (Rect::default(), Rect::default(), Rect::default());
+            self.bar_hover = (false, false, false);
+            self.__menu_prewarmed = false;
+            self.__menu_prewarm_hide = true;
             self.chat_server_url = std::env::var("LLM_API_URL")
                 .unwrap_or_else(|_| "https://openrouter.ai/api/v1/chat/completions".to_string());
             self.chat_model =
@@ -1520,6 +1741,11 @@ impl LauncherPanel {
             Some(_) => "Open Application",
             None => "Open Application",
         };
+        // 无结果时隐藏动作胶囊（tinycast：showActionGroup = 有可选结果）
+        self.view
+            .widget(cx, ids!(action_capsule))
+            .set_visible(cx, has_results);
+
         self.view
             .label(cx, ids!(primary_action_label))
             .set_text(cx, action_text);
@@ -1674,6 +1900,7 @@ impl LauncherPanel {
 
     pub(crate) fn set_todo_mode(&mut self, cx: &mut Cx, show: bool) {
         if show {
+            self.close_menus(cx);
             let path = Self::default_todo_app_path();
             self.open_splash_app(cx, &path);
         } else {
@@ -1702,6 +1929,473 @@ impl LauncherPanel {
             self.redraw(cx);
             return true;
         }
+        false
+    }
+}
+
+// ═══════════ 弹出菜单系统（tinycast PopoverMenu 移植）══════════════════
+
+const MENU_ROW_SLOTS: usize = 6;
+
+#[derive(Clone)]
+enum MenuAction {
+    /// 打开/运行选中项（↵）
+    Launch,
+    /// 收藏 / 取消收藏
+    ToggleFavorite,
+    /// 在 Finder 中显示（⌘↵）
+    RevealInFinder,
+    /// 退出应用（⌃⇧Q）
+    QuitApp,
+    /// 关于
+    About,
+    /// 退出启动器
+    QuitLauncher,
+}
+
+#[derive(Clone)]
+struct MenuEntry {
+    title: String,
+    shortcut: String,
+    /// 行首图标字符（文字渲染，不用自绘 SDF）
+    icon: &'static str,
+    danger: bool,
+    action: MenuAction,
+}
+
+impl LauncherPanel {
+    /// 选中项的稳定唯一键（用于收藏持久化）
+    fn item_key(item: &LauncherItem) -> String {
+        match &item.launch {
+            LaunchTarget::OpenPath(p) => p.clone(),
+            LaunchTarget::OpenSplashApp(p) => format!("splash:{}", p),
+            LaunchTarget::OpenChat => "builtin:chat".into(),
+            LaunchTarget::Command { program, args } => {
+                format!("cmd:{} {}", program, args.join(" "))
+            }
+        }
+    }
+
+    fn favorites_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".favorites.json")
+    }
+
+    fn load_favorites() -> HashSet<String> {
+        let Ok(txt) = fs::read_to_string(Self::favorites_path()) else {
+            return HashSet::new();
+        };
+        serde_json::from_str::<Vec<String>>(&txt)
+            .map(|v| v.into_iter().collect())
+            .unwrap_or_default()
+    }
+
+    fn save_favorites(&self) {
+        let mut v: Vec<String> = self.favorites.iter().cloned().collect();
+        v.sort();
+        if let Ok(json) = serde_json::to_string_pretty(&v) {
+            let _ = fs::write(Self::favorites_path(), json);
+        }
+    }
+
+    /// 菜单圆点（左下）的应用菜单：About / Quit
+    fn app_menu_items() -> Vec<MenuEntry> {
+        vec![
+            MenuEntry {
+                title: "About Raycast Launcher".into(),
+                shortcut: String::new(),
+                icon: "ⓘ",
+                danger: false,
+                action: MenuAction::About,
+            },
+            MenuEntry {
+                title: "Quit Launcher".into(),
+                shortcut: String::new(),
+                icon: "✕",
+                danger: false,
+                action: MenuAction::QuitLauncher,
+            },
+        ]
+    }
+
+    /// 打开时采样一次动作列表（tinycast openActions：冻结 Quit 行可见性）
+    fn build_actions_menu(&self) -> Vec<MenuEntry> {
+        let Some(item) = self.selected_item() else {
+            return vec![];
+        };
+        let mut items = vec![];
+        let primary = if item.category == "Command" {
+            "Run Command"
+        } else {
+            "Open Application"
+        };
+        items.push(MenuEntry {
+            title: primary.into(),
+            shortcut: "↵".into(),
+            icon: "▶",
+            danger: false,
+            action: MenuAction::Launch,
+        });
+        let key = Self::item_key(item);
+        let is_fav = self.favorites.contains(&key);
+        items.push(MenuEntry {
+            title: if is_fav {
+                "Remove from Favorites".into()
+            } else {
+                "Add to Favorites".into()
+            },
+            shortcut: String::new(),
+            icon: if is_fav { "★" } else { "☆" },
+            danger: false,
+            action: MenuAction::ToggleFavorite,
+        });
+        // 有文件系统位置的项目才提供 Reveal in Finder（tinycast canRevealInFinder）
+        if matches!(
+            item.launch,
+            LaunchTarget::OpenPath(_) | LaunchTarget::OpenSplashApp(_)
+        ) {
+            items.push(MenuEntry {
+                title: "Show in Finder".into(),
+                shortcut: "⌘↵".into(),
+                icon: "↗",
+                danger: false,
+                action: MenuAction::RevealInFinder,
+            });
+        }
+        // 仅运行中的应用显示 Quit 行
+        if let LaunchTarget::OpenPath(ref path) = item.launch {
+            if Self::is_app_running(path) {
+                items.push(MenuEntry {
+                    title: "Quit Application".into(),
+                    shortcut: "⌃⇧Q".into(),
+                    icon: "⏻",
+                    danger: true,
+                    action: MenuAction::QuitApp,
+                });
+            }
+        }
+        items
+    }
+
+    fn active_menu_items(&self) -> &[MenuEntry] {
+        if self.show_actions {
+            &self.actions_items
+        } else {
+            &self.app_items
+        }
+    }
+
+    pub(crate) fn open_actions(&mut self, cx: &mut Cx) {
+        if self.filtered_indices.is_empty() {
+            return;
+        }
+        self.actions_items = self.build_actions_menu();
+        if self.actions_items.is_empty() {
+            return;
+        }
+        self.menu_query_restore = self.query.clone();
+        self.show_actions = true;
+        self.show_app_menu = false;
+        self.menu_selection = 0;
+        self.menu_hover = None;
+        self.sync_menu(cx);
+    }
+
+    pub(crate) fn toggle_actions(&mut self, cx: &mut Cx) {
+        if self.show_actions {
+            self.close_menus(cx);
+        } else {
+            self.open_actions(cx);
+        }
+    }
+
+    pub(crate) fn toggle_app_menu(&mut self, cx: &mut Cx) {
+        if self.show_app_menu {
+            self.close_menus(cx);
+        } else {
+            self.menu_query_restore = self.query.clone();
+            self.show_app_menu = true;
+            self.show_actions = false;
+            self.menu_selection = 0;
+            self.menu_hover = None;
+            self.sync_menu(cx);
+        }
+    }
+
+    /// 关闭菜单并恢复被冻结的搜索词（tinycast 输入冻结语义）
+    pub(crate) fn close_menus(&mut self, cx: &mut Cx) {
+        let was_open = self.show_actions || self.show_app_menu;
+        self.show_actions = false;
+        self.show_app_menu = false;
+        self.menu_hover = None;
+        if was_open {
+            self.view
+                .text_input(cx, ids!(mode_input))
+                .set_text(cx, &self.menu_query_restore);
+        }
+        self.menu_query_restore.clear();
+        self.sync_menu(cx);
+        self.redraw(cx);
+    }
+
+    fn sync_menu(&mut self, cx: &mut Cx) {
+        self.view
+            .widget(cx, ids!(actions_menu))
+            .set_visible(cx, self.show_actions);
+        self.view
+            .widget(cx, ids!(app_menu))
+            .set_visible(cx, self.show_app_menu);
+        if self.show_actions {
+            let header = self
+                .selected_item()
+                .map(|it| it.app_name.clone())
+                .unwrap_or_default();
+            let items = self.actions_items.clone();
+            Self::sync_menu_panel(cx, self, live_id!(actions_menu), &items, &header);
+        } else if self.show_app_menu {
+            let items = self.app_items.clone();
+            Self::sync_menu_panel(
+                cx,
+                self,
+                live_id!(app_menu),
+                &items,
+                "Raycast Launcher",
+            );
+        }
+        self.redraw(cx);
+    }
+
+    /// 填充一个菜单面板：头部 + 各行动态文本/可见性
+    fn sync_menu_panel(
+        cx: &mut Cx,
+        panel: &LauncherPanel,
+        menu: LiveId,
+        items: &[MenuEntry],
+        header: &str,
+    ) {
+        let header_path = vec![menu, LiveId::from_str_with_lut("menu_header").unwrap()];
+        panel.view.widget(cx, &header_path).set_text(cx, header);
+        for i in 0..MENU_ROW_SLOTS {
+            let row_path = vec![
+                menu,
+                LiveId::from_str_with_lut(&format!("menu_row_{}", i)).unwrap(),
+            ];
+            let row_widget = panel.view.widget(cx, &row_path);
+            let visible = i < items.len();
+            row_widget.set_visible(cx, visible);
+            if !visible {
+                continue;
+            }
+            let entry = &items[i];
+            let mut title_path = row_path.clone();
+            title_path.push(LiveId::from_str_with_lut("row_title").unwrap());
+            panel
+                .view
+                .widget(cx, &title_path)
+                .set_text(cx, &entry.title);
+            let mut shortcut_path = row_path.clone();
+            shortcut_path.push(LiveId::from_str_with_lut("row_shortcut").unwrap());
+            panel
+                .view
+                .widget(cx, &shortcut_path)
+                .set_text(cx, &entry.shortcut);
+            let mut icon_path = row_path.clone();
+            icon_path.push(LiveId::from_str_with_lut("row_icon").unwrap());
+            panel
+                .view
+                .widget(cx, &icon_path)
+                .set_text(cx, entry.icon);
+        }
+    }
+
+    fn activate_menu_selection(&mut self, cx: &mut Cx) {
+        let items = self.active_menu_items().to_vec();
+        let Some(entry) = items.get(self.menu_selection).cloned() else {
+            self.close_menus(cx);
+            return;
+        };
+        self.close_menus(cx);
+        match entry.action {
+            MenuAction::Launch => self.launch_selected(cx),
+            MenuAction::ToggleFavorite => {
+                if let Some(item) = self.selected_item().cloned() {
+                    let key = Self::item_key(&item);
+                    if self.favorites.contains(&key) {
+                        self.favorites.remove(&key);
+                        self.view.label(cx, ids!(status_label)).set_text(
+                            cx,
+                            &format!("Removed from Favorites: {}", item.app_name),
+                        );
+                    } else {
+                        self.favorites.insert(key);
+                        self.view.label(cx, ids!(status_label)).set_text(
+                            cx,
+                            &format!("Added to Favorites: {}", item.app_name),
+                        );
+                    }
+                    self.save_favorites();
+                    self.redraw(cx);
+                }
+            }
+            MenuAction::RevealInFinder => self.reveal_selected_in_finder(cx),
+            MenuAction::QuitApp => self.quit_selected_app(cx),
+            MenuAction::About => {
+                self.view.label(cx, ids!(status_label)).set_text(
+                    cx,
+                    "raycast-launcher 0.1.0 · Makepad 2.0 script_mod · tinycast 风格",
+                );
+                self.redraw(cx);
+            }
+            MenuAction::QuitLauncher => {
+                cx.quit();
+            }
+        }
+    }
+
+    /// ⌘↵ 或菜单 "Show in Finder"：open -R 在 Finder 中显示
+    fn reveal_selected_in_finder(&mut self, cx: &mut Cx) {
+        let Some(item) = self.selected_item().cloned() else {
+            return;
+        };
+        match item.launch {
+            LaunchTarget::OpenPath(path) | LaunchTarget::OpenSplashApp(path) => {
+                #[cfg(target_os = "macos")]
+                {
+                    let _ = Command::new("open").args(["-R", &path]).status();
+                    self.view.label(cx, ids!(status_label)).set_text(
+                        cx,
+                        &format!("Revealed in Finder: {}", item.app_name),
+                    );
+                    self.redraw(cx);
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    let _ = (cx, &path);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// ⌃⇧Q 或菜单 "Quit Application"：SIGTERM 优雅退出（无权限弹窗）
+    fn quit_selected_app(&mut self, cx: &mut Cx) {
+        let Some(item) = self.selected_item().cloned() else {
+            return;
+        };
+        if let LaunchTarget::OpenPath(path) = item.launch {
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(exe) = Self::executable_name(&path) {
+                    let _ = Command::new("pkill").args(["-x", &exe]).status();
+                    self.view.label(cx, ids!(status_label)).set_text(
+                        cx,
+                        &format!("Quit: {}", item.app_name),
+                    );
+                    self.redraw(cx);
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = (cx, &path);
+            }
+        }
+    }
+
+    /// 菜单打开时的独立事件处理：输入冻结，键盘/鼠标只服务菜单
+    fn handle_menu_events(&mut self, cx: &mut Cx, event: &Event) {
+        if let Event::KeyDown(key) = event {
+            let count = self.active_menu_items().len();
+            match key.key_code {
+                KeyCode::ArrowDown => {
+                    if count > 0 {
+                        self.menu_selection = (self.menu_selection + 1).min(count - 1);
+                    }
+                    self.redraw(cx);
+                }
+                KeyCode::ArrowUp => {
+                    self.menu_selection = self.menu_selection.saturating_sub(1);
+                    self.redraw(cx);
+                }
+                KeyCode::ReturnKey => {
+                    self.activate_menu_selection(cx);
+                }
+                KeyCode::Escape => {
+                    self.close_menus(cx);
+                }
+                KeyCode::KeyK if key.modifiers.logo => {
+                    self.close_menus(cx);
+                }
+                _ => {}
+            }
+            return;
+        }
+        if let Event::MouseDown(me) = event {
+            if me.button.is_primary() {
+                if let Some((idx, _)) = self
+                    .menu_hit_rects
+                    .iter()
+                    .find(|(_, rect)| rect.contains(me.abs))
+                {
+                    self.menu_selection = *idx;
+                    self.activate_menu_selection(cx);
+                } else {
+                    // 菜单外点击 → 关闭（tinycast 全屏遮罩语义）
+                    self.close_menus(cx);
+                }
+            }
+            return;
+        }
+        if let Event::MouseMove(me) = event {
+            let next_hover = self
+                .menu_hit_rects
+                .iter()
+                .find(|(_, rect)| rect.contains(me.abs))
+                .map(|(idx, _)| *idx);
+            if next_hover != self.menu_hover {
+                self.menu_hover = next_hover;
+                self.redraw(cx);
+            }
+        }
+    }
+
+    fn set_zone_hover(&self, cx: &mut Cx, id: LiveId, on: bool) {
+        if let Some(mut v) = self.view.view(cx, &[id]).borrow_mut() {
+            v.draw_bg.draw_vars
+                .set_dyn_instance(cx, live_id!(hov), &[if on { 1.0 } else { 0.0 }]);
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    fn plist_string(xml: &str, key: &str) -> Option<String> {
+        let pat = format!("<key>{}</key>", key);
+        let i = xml.find(&pat)?;
+        let rest = &xml[i + pat.len()..];
+        let s = rest.find("<string>")?;
+        let rest2 = &rest[s + 8..];
+        let e = rest2.find("</string>")?;
+        Some(rest2[..e].to_string())
+    }
+
+    #[cfg(target_os = "macos")]
+    fn executable_name(bundle_path: &str) -> Option<String> {
+        let plist_path = format!("{}/Contents/Info.plist", bundle_path);
+        let xml = fs::read_to_string(plist_path).ok()?;
+        Self::plist_string(&xml, "CFBundleExecutable")
+    }
+
+    #[cfg(target_os = "macos")]
+    fn is_app_running(bundle_path: &str) -> bool {
+        let Some(exe) = Self::executable_name(bundle_path) else {
+            return false;
+        };
+        Command::new("pgrep")
+            .args(["-x", &exe])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn is_app_running(_bundle_path: &str) -> bool {
         false
     }
 }
@@ -1811,8 +2505,27 @@ impl Widget for LauncherPanel {
             return;
         }
 
+        // ── 弹出菜单打开时：输入冻结，事件全部交给菜单（tinycast menu-open freeze）──
+        if self.show_actions || self.show_app_menu {
+            self.handle_menu_events(cx, event);
+            return;
+        }
+
         if let Event::MouseDown(me) = event {
             if me.button.is_primary() {
+                // 操作栏（优先于行命中）：菜单圆点 / 主动作 pill / Actions 开关
+                if self.bar_rects.2.contains(me.abs) {
+                    self.toggle_app_menu(cx);
+                    return;
+                }
+                if self.bar_rects.0.contains(me.abs) {
+                    self.launch_selected(cx);
+                    return;
+                }
+                if self.bar_rects.1.contains(me.abs) {
+                    self.toggle_actions(cx);
+                    return;
+                }
                 let hit_item = self
                     .row_hit_rects
                     .iter()
@@ -1841,6 +2554,16 @@ impl Widget for LauncherPanel {
                 .iter()
                 .find(|(_, rect)| rect.contains(me.abs))
                 .map(|(item_id, _)| *item_id);
+            // 操作栏悬停（tinycast BarButton 悬停反馈）
+            let next_bar = (
+                self.bar_rects.0.contains(me.abs),
+                self.bar_rects.1.contains(me.abs),
+                self.bar_rects.2.contains(me.abs),
+            );
+            if next_bar != self.bar_hover {
+                self.bar_hover = next_bar;
+                self.redraw(cx);
+            }
             if next_hover != self.hovered_index {
                 self.hovered_index = next_hover;
                 self.redraw(cx);
@@ -1848,33 +2571,40 @@ impl Widget for LauncherPanel {
         }
 
         if let Event::MouseLeave(_) = event {
-            if self.hovered_index.is_some() {
+            if self.hovered_index.is_some() || self.bar_hover != (false, false, false) {
                 self.hovered_index = None;
+                self.bar_hover = (false, false, false);
                 self.redraw(cx);
             }
         }
 
         let mut handled_enter = false;
-        if let Some((text, _mods)) = self
+        if let Some((text, mods)) = self
             .view
             .text_input(cx, ids!(mode_input))
             .returned(&actions)
         {
-            handled_enter = true;
-            self.query = text;
-            let q = self.query.trim().to_lowercase();
-            if q == "todo" || q == "/todo" {
-                self.set_todo_mode(cx, true);
-                self.redraw(cx);
-                return;
+            // ⌘↵ = 在 Finder 中显示（tinycast secondary action）
+            if mods.logo {
+                handled_enter = true;
+                self.reveal_selected_in_finder(cx);
+            } else {
+                handled_enter = true;
+                self.query = text;
+                let q = self.query.trim().to_lowercase();
+                if q == "todo" || q == "/todo" {
+                    self.set_todo_mode(cx, true);
+                    self.redraw(cx);
+                    return;
+                }
+                if q == "chat" || q == "/chat" {
+                    self.set_chat_mode(cx, true);
+                    self.redraw(cx);
+                    return;
+                }
+                self.rebuild_filter();
+                self.launch_selected(cx);
             }
-            if q == "chat" || q == "/chat" {
-                self.set_chat_mode(cx, true);
-                self.redraw(cx);
-                return;
-            }
-            self.rebuild_filter();
-            self.launch_selected(cx);
         }
 
         if let Event::KeyDown(key) = event {
@@ -1891,8 +2621,18 @@ impl Widget for LauncherPanel {
                     self.update_labels(cx, "Selected");
                     self.redraw(cx);
                 }
+                // ⌘K：打开/关闭选中项动作菜单
+                KeyCode::KeyK if key.modifiers.logo => {
+                    self.toggle_actions(cx);
+                }
+                // ⌃⇧Q：退出选中的应用（仅运行中）
+                KeyCode::KeyQ if key.modifiers.control && key.modifiers.shift => {
+                    self.quit_selected_app(cx);
+                }
                 KeyCode::ReturnKey => {
-                    if !handled_enter {
+                    if key.modifiers.logo {
+                        self.reveal_selected_in_finder(cx);
+                    } else if !handled_enter {
                         self.launch_selected(cx);
                     }
                 }
@@ -1910,7 +2650,7 @@ impl Widget for LauncherPanel {
                 while let Some(item_id) = list.next_visible_item(cx) {
                     if let Some(source_idx) = self.filtered_indices.get(item_id) {
                         let source_idx = *source_idx;
-                        let (app_name, category, fallback, is_command, group_name) =
+                        let (app_name, category, fallback, is_command, group_name, is_fav) =
                             if let Some(entry) = self.all_items.get(source_idx) {
                                 (
                                     entry.app_name.clone(),
@@ -1918,6 +2658,7 @@ impl Widget for LauncherPanel {
                                     entry.icon_fallback.clone(),
                                     entry.category == "Command",
                                     Self::group_name_for(entry),
+                                    self.favorites.contains(&Self::item_key(entry)),
                                 )
                             } else {
                                 continue;
@@ -1952,7 +2693,12 @@ impl Widget for LauncherPanel {
                         }
 
                         row.label(cx, ids!(app_name)).set_text(cx, &app_name);
-                        row.label(cx, ids!(app_meta)).set_text(cx, &category);
+                        let meta_text = if is_fav {
+                            format!("★ {}", category)
+                        } else {
+                            category.clone()
+                        };
+                        row.label(cx, ids!(app_meta)).set_text(cx, &meta_text);
                         row.label(cx, ids!(app_icon_fallback))
                             .set_text(cx, &fallback);
 
@@ -2005,6 +2751,94 @@ impl Widget for LauncherPanel {
                     }
                 }
             }
+        }
+
+        // ── 操作栏 hit 区域 + 悬停实例（每帧跟随布局）──
+        self.bar_rects = (
+            self.view
+                .view(cx, ids!(pill_zone))
+                .borrow()
+                .map(|v| v.draw_bg.draw_vars.area)
+                .map(|a| if a.is_valid(cx) { a.rect(cx) } else { Rect::default() })
+                .unwrap_or_default(),
+            self.view
+                .view(cx, ids!(actions_zone))
+                .borrow()
+                .map(|v| v.draw_bg.draw_vars.area)
+                .map(|a| if a.is_valid(cx) { a.rect(cx) } else { Rect::default() })
+                .unwrap_or_default(),
+            self.view
+                .view(cx, ids!(menu_circle))
+                .borrow()
+                .map(|v| v.draw_bg.draw_vars.area)
+                .map(|a| if a.is_valid(cx) { a.rect(cx) } else { Rect::default() })
+                .unwrap_or_default(),
+        );
+        self.set_zone_hover(cx, live_id!(pill_zone), self.bar_hover.0);
+        self.set_zone_hover(cx, live_id!(actions_zone), self.bar_hover.1);
+        self.set_zone_hover(cx, live_id!(menu_circle), self.bar_hover.2);
+
+        // ── 弹出菜单行：hit 区域 + 选中/悬停/图标/danger 实例 ──
+        self.menu_hit_rects.clear();
+        if self.show_actions || self.show_app_menu {
+            let menu = if self.show_actions {
+                live_id!(actions_menu)
+            } else {
+                live_id!(app_menu)
+            };
+            let items: &[MenuEntry] = if self.show_actions {
+                &self.actions_items
+            } else {
+                &self.app_items
+            };
+            for (i, entry) in items.iter().enumerate() {
+                let row_path = vec![
+                    menu,
+                    LiveId::from_str_with_lut(&format!("menu_row_{}", i)).unwrap(),
+                ];
+                let row_widget = self.view.widget(cx, &row_path);
+                if let Some(v) = row_widget.borrow::<View>() {
+                    let area = v.draw_bg.draw_vars.area;
+                    if area.is_valid(cx) {
+                        self.menu_hit_rects.push((i, area.rect(cx)));
+                    }
+                }
+                if let Some(mut v) = row_widget.borrow_mut::<View>() {
+                    v.draw_bg.draw_vars.set_dyn_instance(
+                        cx,
+                        live_id!(sel),
+                        &[if i == self.menu_selection { 1.0 } else { 0.0 }],
+                    );
+                    v.draw_bg.draw_vars.set_dyn_instance(
+                        cx,
+                        live_id!(hov),
+                        &[if Some(i) == self.menu_hover { 1.0 } else { 0.0 }],
+                    );
+                }
+                let mut title_path = row_path.clone();
+                title_path.push(LiveId::from_str_with_lut("row_title").unwrap());
+                if let Some(mut l) = self.view.widget(cx, &title_path).borrow_mut::<Label>() {
+                    l.draw_text.draw_vars.set_dyn_instance(
+                        cx,
+                        live_id!(danger),
+                        &[if entry.danger { 1.0 } else { 0.0 }],
+                    );
+                }
+            }
+        }
+        // ── 首帧预热：第一帧渲染菜单建立 draw_bg shader；下一帧绘制前隐藏（不在绘制中切可见性）──
+        if !self.__menu_prewarmed {
+            self.__menu_prewarmed = true;
+            self.redraw(cx);
+        } else if self.__menu_prewarm_hide {
+            // 第二帧开始前才隐藏，避免 draw 状态机被 set_visible 破坏
+            self.__menu_prewarm_hide = false;
+            self.view
+                .widget(cx, ids!(actions_menu))
+                .set_visible(cx, false);
+            self.view
+                .widget(cx, ids!(app_menu))
+                .set_visible(cx, false);
         }
         DrawStep::done()
     }

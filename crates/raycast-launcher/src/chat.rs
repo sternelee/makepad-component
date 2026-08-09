@@ -163,6 +163,7 @@ impl LauncherPanel {
         self.show_chat = show;
         if show {
             self.show_todo = false;
+            self.close_menus(cx);
         } else {
             // Stop any active stream when leaving chat
             self.stream_timer = None;
