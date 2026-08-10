@@ -926,7 +926,7 @@ impl A2uiSurface {
         data_model: &DataModel,
         grid: &GridComponent,
     ) {
-        let columns = grid.columns.unwrap_or(3);
+        let _columns = grid.columns.unwrap_or(3);
 
         let walk = Walk::fill_fit();
         let layout = Layout {
@@ -1101,8 +1101,8 @@ impl A2uiSurface {
     fn render_dropdown(
         &mut self,
         cx: &mut Cx2d,
-        scope: &mut Scope,
-        surface: &crate::a2ui::processor::Surface,
+        _scope: &mut Scope,
+        _surface: &crate::a2ui::processor::Surface,
         data_model: &DataModel,
         dd: &DropdownComponent,
     ) {
@@ -1157,8 +1157,8 @@ impl A2uiSurface {
     fn render_tag_picker(
         &mut self,
         cx: &mut Cx2d,
-        scope: &mut Scope,
-        surface: &crate::a2ui::processor::Surface,
+        _scope: &mut Scope,
+        _surface: &crate::a2ui::processor::Surface,
         data_model: &DataModel,
         tp: &TagPickerComponent,
     ) {

@@ -806,15 +806,15 @@ pub struct DrawA2uiChartLine {
     draw_super: DrawQuad,
     #[live]
     pub color: Vec4,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub x1: f32,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub y1: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub x2: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub y2: f32,
-    #[live(0.05)]
+    #[live(0.05_f32)]
     pub line_width: f32,
 }
 
@@ -829,11 +829,11 @@ pub struct DrawA2uiArc {
     draw_super: DrawQuad,
     #[live]
     pub color: Vec4,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub start_angle: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub end_angle: f32,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub inner_radius: f32,
 }
 
@@ -849,24 +849,24 @@ pub struct DrawA2uiQuad {
     draw_super: DrawQuad,
     #[live]
     pub color: Vec4,
-    #[live(0.3)]
+    #[live(0.3_f32)]
     pub opacity: f32,
     // Corner positions in pixel coords relative to the draw quad origin
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub p0x: f32,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub p0y: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub p1x: f32,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub p1y: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub p2x: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub p2y: f32,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub p3x: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub p3y: f32,
 }
 
@@ -875,9 +875,9 @@ pub struct DrawA2uiQuad {
 pub struct DrawAudioBars {
     #[deref]
     draw_super: DrawQuad,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub is_playing: f32,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub amplitude: f32,
 }
 
@@ -890,15 +890,15 @@ pub struct DrawAudioBars {
 pub struct DrawAurora {
     #[deref]
     draw_super: DrawQuad,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub amplitude: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub speed: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub zoom: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub glow: f32,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub color_shift: f32,
 }
 
@@ -907,15 +907,15 @@ pub struct DrawAurora {
 pub struct DrawReef {
     #[deref]
     draw_super: DrawQuad,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub amplitude: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub speed: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub zoom: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub glow: f32,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub color_shift: f32,
 }
 
@@ -924,15 +924,15 @@ pub struct DrawReef {
 pub struct DrawFractalRainbow {
     #[deref]
     draw_super: DrawQuad,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub amplitude: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub speed: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub zoom: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub glow: f32,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub color_shift: f32,
 }
 
@@ -941,15 +941,15 @@ pub struct DrawFractalRainbow {
 pub struct DrawGlowingLattice {
     #[deref]
     draw_super: DrawQuad,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub amplitude: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub speed: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub zoom: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub glow: f32,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub color_shift: f32,
 }
 
@@ -958,15 +958,15 @@ pub struct DrawGlowingLattice {
 pub struct DrawJellyfish {
     #[deref]
     draw_super: DrawQuad,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub amplitude: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub speed: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub zoom: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub glow: f32,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub color_shift: f32,
 }
 
@@ -975,15 +975,15 @@ pub struct DrawJellyfish {
 pub struct DrawTurbulenceFire {
     #[deref]
     draw_super: DrawQuad,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub amplitude: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub speed: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub zoom: f32,
-    #[live(1.0)]
+    #[live(1.0_f32)]
     pub glow: f32,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub color_shift: f32,
 }
 
@@ -992,6 +992,6 @@ pub struct DrawTurbulenceFire {
 pub struct DrawTaiji {
     #[deref]
     draw_super: DrawQuad,
-    #[live(0.0)]
+    #[live(0.0_f32)]
     pub anim: f32,
 }

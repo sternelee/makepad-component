@@ -174,15 +174,14 @@ impl Widget for MpRadio {
                 cx.set_cursor(MouseCursor::Default);
                 self.animator_play(cx, ids!(hover.off));
             }
-            Hit::FingerUp(fe) => {
-                if fe.is_over && !self.checked {
+            Hit::FingerUp(fe)
+                if fe.is_over && !self.checked => {
                     // Radio can only be checked, not unchecked by clicking
                     self.checked = true;
                     self.animator_play(cx, ids!(checked.on));
                     cx.widget_action(uid, MpRadioAction::Changed(true));
                     self.redraw(cx);
                 }
-            }
             _ => {}
         }
     }

@@ -289,15 +289,14 @@ impl Widget for MpTooltip {
                         self.redraw(cx);
                     }
                 }
-                Event::MouseLeave(_) => {
-                    if self.hovering {
+                Event::MouseLeave(_)
+                    if self.hovering => {
                         self.hovering = false;
                         self.popup_opened = false;
                         self.delay_timer = Timer::default();
                         self.draw_list.as_mut().unwrap().redraw(cx);
                         self.redraw(cx);
                     }
-                }
                 _ => {}
             }
         }

@@ -138,12 +138,13 @@ impl MpThemeState {
     fn apply_theme_to_all_widgets(cx: &mut Cx, dark: bool) {
         // We trigger a full script re-apply so all widgets re-evaluate
         // their instance() values against the active theme module.
-        // The theme_mode global is set for shader-based widgets to read.
-        let vm_id = cx.script_vm_id();
-        cx.with_script_vm_id(vm_id, |vm| {
+        // The theme_mode value is set on the shared widgets module heap so
+        // shader-based widgets can read it on their next apply.
+        cx.with_vm(|vm| {
             let key = id!(theme_mode);
             let val: ScriptValue = if dark { 1.0.into() } else { 0.0.into() };
-            vm.bx.heap.set_global(key, val);
+            let widgets_mod = vm.bx.heap.module(id!(widgets));
+            vm.bx.heap.set_value(widgets_mod, key.into(), val, NoTrap);
         });
         // Request a script re-apply so all widgets recompile with new theme
         cx.request_script_reapply();

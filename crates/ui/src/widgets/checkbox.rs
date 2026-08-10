@@ -181,8 +181,8 @@ impl Widget for MpCheckbox {
             Hit::FingerDown(_) => {
                 // Finger down - no action yet, wait for FingerUp
             }
-            Hit::FingerUp(fe) => {
-                if fe.is_over {
+            Hit::FingerUp(fe)
+                if fe.is_over => {
                     self.checked = !self.checked;
                     self.animator_toggle(
                         cx,
@@ -194,7 +194,6 @@ impl Widget for MpCheckbox {
                     cx.widget_action(uid, MpCheckboxAction::Changed(self.checked));
                     self.redraw(cx);
                 }
-            }
             _ => {}
         }
     }

@@ -112,7 +112,7 @@ impl A2aClient {
         source_component_id: &str,
         context: HashMap<String, Value>,
     ) -> Result<(), String> {
-        let Some(task_id) = &self.task_id else {
+        let Some(_task_id) = &self.task_id else {
             return Err("No active task to send action to".to_string());
         };
 

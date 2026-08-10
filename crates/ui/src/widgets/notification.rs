@@ -533,13 +533,12 @@ impl Widget for MpNotificationWidget {
             Hit::FingerHoverOut(_) => {
                 close_btn.animator_play(cx, ids!(hover.off));
             }
-            Hit::FingerUp(fe) => {
-                if fe.is_over {
+            Hit::FingerUp(fe)
+                if fe.is_over => {
                     self.visible = false;
                     self.redraw(cx);
                     cx.widget_action(uid, MpNotificationAction::Closed);
                 }
-            }
             _ => {}
         }
     }

@@ -857,11 +857,10 @@ impl Widget for MpPopoverMenuItemWidget {
             Hit::FingerHoverOut(_) => {
                 self.view.animator_play(cx, ids!(hover.off));
             }
-            Hit::FingerUp(fe) => {
-                if fe.is_over {
+            Hit::FingerUp(fe)
+                if fe.is_over => {
                     cx.widget_action(uid, MpPopoverMenuItemAction::Clicked);
                 }
-            }
             _ => {}
         }
     }

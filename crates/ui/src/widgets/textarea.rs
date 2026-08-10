@@ -135,7 +135,7 @@ pub enum MpTextAreaAction {
 
 impl Widget for MpTextArea {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
-        let uid = self.widget_uid();
+        let _uid = self.widget_uid();
 
         if self.animator_handle_event(cx, event).must_redraw() {
             self.redraw(cx);

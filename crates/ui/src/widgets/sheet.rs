@@ -164,11 +164,10 @@ impl Widget for MpSheetTrigger {
             Hit::FingerHoverIn(_) => {
                 cx.set_cursor(MouseCursor::Hand);
             }
-            Hit::FingerUp(fe) => {
-                if fe.is_over {
+            Hit::FingerUp(fe)
+                if fe.is_over => {
                     cx.widget_action(self.widget_uid(), MpSheetAction::Open);
                 }
-            }
             _ => {}
         }
     }

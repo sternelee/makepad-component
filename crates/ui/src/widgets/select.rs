@@ -264,14 +264,13 @@ impl Widget for MpSelectOption {
             Hit::FingerHoverOut(_) => {
                 self.animator_play(cx, ids!(hover.off));
             }
-            Hit::FingerUp(fe) => {
-                if fe.is_over {
+            Hit::FingerUp(fe)
+                if fe.is_over => {
                     cx.widget_action(
                         uid,
                         MpSelectAction::Selected(self.value.as_ref().to_string()),
                     );
                 }
-            }
             _ => {}
         }
     }

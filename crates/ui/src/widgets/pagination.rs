@@ -244,11 +244,10 @@ impl Widget for MpPaginationItem {
             Hit::FingerHoverOut(_) => {
                 self.animator_play(cx, ids!(hover.off));
             }
-            Hit::FingerUp(fe) => {
-                if fe.is_over {
+            Hit::FingerUp(fe)
+                if fe.is_over => {
                     cx.widget_action(uid, MpPaginationAction::PageSelected(self.page_num));
                 }
-            }
             _ => {}
         }
     }
@@ -331,11 +330,10 @@ impl Widget for MpPaginationPrev {
             Hit::FingerHoverOut(_) => {
                 self.animator_play(cx, ids!(hover.off));
             }
-            Hit::FingerUp(fe) => {
-                if fe.is_over {
+            Hit::FingerUp(fe)
+                if fe.is_over => {
                     cx.widget_action(uid, MpPaginationAction::Prev);
                 }
-            }
             _ => {}
         }
     }

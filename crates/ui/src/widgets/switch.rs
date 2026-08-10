@@ -139,14 +139,13 @@ impl Widget for MpSwitch {
                 cx.set_cursor(MouseCursor::Default);
                 self.animator_play(cx, ids!(hover.off));
             }
-            Hit::FingerUp(fe) => {
-                if fe.is_over {
+            Hit::FingerUp(fe)
+                if fe.is_over => {
                     self.on = !self.on;
                     self.animator_toggle(cx, self.on, Animate::Yes, ids!(on.on), ids!(on.off));
                     cx.widget_action(uid, MpSwitchAction::Changed(self.on));
                     self.redraw(cx);
                 }
-            }
             _ => {}
         }
     }

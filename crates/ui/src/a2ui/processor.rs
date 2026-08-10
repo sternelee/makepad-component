@@ -193,7 +193,7 @@ impl A2uiMessageProcessor {
         let mut result = Vec::new();
         for (surface_id, surface) in &self.surfaces {
             let dm = self.data_models.get(surface_id).unwrap_or(&empty_dm);
-            for (_id, comp) in surface.components.iter() {
+            for comp in surface.components.values() {
                 if let ComponentType::AudioPlayer(player) = &comp.component {
                     let url = resolve_string_value(&player.url, dm);
                     if url.is_empty() {

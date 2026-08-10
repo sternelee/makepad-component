@@ -426,11 +426,10 @@ impl Widget for MpModalWidget {
             Hit::FingerHoverOut(_) => {
                 close_btn.animator_play(cx, ids!(hover.off));
             }
-            Hit::FingerUp(fe) => {
-                if fe.is_over {
+            Hit::FingerUp(fe)
+                if fe.is_over => {
                     cx.widget_action(uid, MpModalAction::CloseRequested);
                 }
-            }
             _ => {}
         }
     }

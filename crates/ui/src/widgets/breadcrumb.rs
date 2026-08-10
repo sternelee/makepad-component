@@ -127,11 +127,10 @@ impl Widget for MpBreadcrumbItem {
             Hit::FingerHoverOut(_) => {
                 self.animator_play(cx, ids!(hover.off));
             }
-            Hit::FingerUp(fe) => {
-                if fe.is_over {
+            Hit::FingerUp(fe)
+                if fe.is_over => {
                     cx.widget_action(uid, MpBreadcrumbAction::Clicked);
                 }
-            }
             _ => {}
         }
     }
