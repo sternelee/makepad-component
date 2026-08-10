@@ -5132,9 +5132,12 @@ impl Widget for ShaderCanvas {
         if !self.animator_in_state(cx, ids!(anim.on)) {
             self.animator_play(cx, ids!(anim.on));
         }
-        if self.next_frame.is_none() {
-            self.next_frame = Some(cx.new_next_frame());
-        }
+        // Always re-arm the next-frame loop on every draw (matches the
+        // A2uiSurface shader-stage pattern). Guarding on is_none() could leave
+        // a stale token behind when NextFrame events stop while the window is
+        // occluded/minimized/suspended, so the loop would never restart after
+        // the window becomes visible again (frozen canvas).
+        self.next_frame = Some(cx.new_next_frame());
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
@@ -5206,9 +5209,12 @@ impl Widget for ShaderArtCanvas {
         if !self.animator_in_state(cx, ids!(anim.on)) {
             self.animator_play(cx, ids!(anim.on));
         }
-        if self.next_frame.is_none() {
-            self.next_frame = Some(cx.new_next_frame());
-        }
+        // Always re-arm the next-frame loop on every draw (matches the
+        // A2uiSurface shader-stage pattern). Guarding on is_none() could leave
+        // a stale token behind when NextFrame events stop while the window is
+        // occluded/minimized/suspended, so the loop would never restart after
+        // the window becomes visible again (frozen canvas).
+        self.next_frame = Some(cx.new_next_frame());
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
@@ -5280,9 +5286,12 @@ impl Widget for ShaderArt2Canvas {
         if !self.animator_in_state(cx, ids!(anim.on)) {
             self.animator_play(cx, ids!(anim.on));
         }
-        if self.next_frame.is_none() {
-            self.next_frame = Some(cx.new_next_frame());
-        }
+        // Always re-arm the next-frame loop on every draw (matches the
+        // A2uiSurface shader-stage pattern). Guarding on is_none() could leave
+        // a stale token behind when NextFrame events stop while the window is
+        // occluded/minimized/suspended, so the loop would never restart after
+        // the window becomes visible again (frozen canvas).
+        self.next_frame = Some(cx.new_next_frame());
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
@@ -5354,9 +5363,12 @@ impl Widget for ShaderMathCanvas {
         if !self.animator_in_state(cx, ids!(anim.on)) {
             self.animator_play(cx, ids!(anim.on));
         }
-        if self.next_frame.is_none() {
-            self.next_frame = Some(cx.new_next_frame());
-        }
+        // Always re-arm the next-frame loop on every draw (matches the
+        // A2uiSurface shader-stage pattern). Guarding on is_none() could leave
+        // a stale token behind when NextFrame events stop while the window is
+        // occluded/minimized/suspended, so the loop would never restart after
+        // the window becomes visible again (frozen canvas).
+        self.next_frame = Some(cx.new_next_frame());
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
@@ -6033,7 +6045,7 @@ impl Widget for JsonRenderDemo {
                                     .set_text(cx, label);
                                 item_widget.draw_all(cx, &mut Scope::empty());
                             }
-                            FlatWidget::Input { label, placeholder } => {
+                            FlatWidget::Input { label, placeholder: _ } => {
                                 let item_widget = list.item(cx, item_id, live_id!(JsonInput));
                                 item_widget
                                     .label(cx, ids!(json_input_label))
