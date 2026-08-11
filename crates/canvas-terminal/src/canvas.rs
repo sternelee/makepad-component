@@ -29,7 +29,7 @@ const BTN_CLOSE_HOVER: [f32; 4] = [0.65, 0.25, 0.25, 1.0];
 /// Bottom dock (screen-fixed minimize tray).
 const DOCK_H: f64 = 34.0;
 const DOCK_BOTTOM: f64 = 76.0;
-const DOCK_BG: [f32; 4] = [0.10, 0.11, 0.15, 0.92];
+const DOCK_BG: [f32; 4] = [0.10, 0.11, 0.15, 1.0];
 const CHIP_BG: [f32; 4] = [0.16, 0.18, 0.24, 1.0];
 const CHIP_BG_HOVER: [f32; 4] = [0.22, 0.26, 0.34, 1.0];
 const CHIP_BORDER: [f32; 4] = [0.28, 0.32, 0.42, 1.0];
@@ -82,6 +82,16 @@ pub struct CanvasPanel {
     last_mouse: Vec2d,
     #[rust]
     hovered: Option<u64>,
+    /// The title-bar control button currently hovered, if any.
+    #[rust]
+    hovered_btn: Option<(u64, BtnKind)>,
+    /// The dock chip currently hovered, if any.
+    #[rust]
+    hovered_chip: Option<u64>,
+    /// Minimized items: (id, kind, world rect, title, extra string).
+    /// For Terminal, extra = command; for Browser, extra = url.
+    #[rust]
+    minimized: Vec<(u64, ItemKind, Rect, String, String)>,
     #[rust]
     focused_terminal: Option<u64>,
     /// Set when the reader thread reported new output for a session.
@@ -251,6 +261,161 @@ impl CanvasPanel {
             .rev()
             .find(|i| self.item_screen_rect(i).contains(screen))
             .map(|i| i.id())
+    }
+
+
+    /// Compute the minimize/close button rects for an item's screen rect.
+    /// Buttons live at the top-right of the item title bar.
+    fn control_button_rects(r: Rect) -> (Rect, Rect) {
+        let bx = r.pos.x + r.size.x - 2.0 * BTN_W - 8.0;
+        let by = r.pos.y + 4.0;
+        let min_rect = Rect {
+            pos: Vec2d { x: bx, y: by },
+            size: Vec2d { x: BTN_W, y: BTN_H },
+        };
+        let close_rect = Rect {
+            pos: Vec2d {
+                x: bx + BTN_W + 4.0,
+                y: by,
+            },
+            size: Vec2d { x: BTN_W, y: BTN_H },
+        };
+        (min_rect, close_rect)
+    }
+
+    /// Topmost item whose title-bar control button is under `screen`.
+    fn control_button_under(&self, screen: Vec2d) -> Option<(u64, BtnKind)> {
+        self.items
+            .iter()
+            .rev()
+            .find_map(|i| {
+                let r = self.item_screen_rect(i);
+                let (min_r, close_r) = Self::control_button_rects(r);
+                if min_r.contains(screen) {
+                    Some((i.id(), BtnKind::Minimize))
+                } else if close_r.contains(screen) {
+                    Some((i.id(), BtnKind::Close))
+                } else {
+                    None
+                }
+            })
+    }
+
+    /// The minimized-item chip under `screen` in the bottom dock (if any).
+    fn dock_chip_under(&self, screen: Vec2d, viewport: Vec2d) -> Option<u64> {
+        if self.minimized.is_empty() {
+            return None;
+        }
+        let tray_y = viewport.y - DOCK_BOTTOM;
+        let chip_w = 140.0;
+        let chip_h = DOCK_H - 8.0;
+        let x0 = 10.0;
+        for (i, m) in self.minimized.iter().enumerate() {
+            let rect = Rect {
+                pos: Vec2d {
+                    x: x0 + i as f64 * (chip_w + 8.0),
+                    y: tray_y + 4.0,
+                },
+                size: Vec2d { x: chip_w, y: chip_h },
+            };
+            if rect.contains(screen) {
+                return Some(m.0);
+            }
+        }
+        None
+    }
+
+    /// Minimize `id`: remove it from the canvas, add it to the bottom dock.
+    fn minimize_item(&mut self, cx: &mut Cx, id: u64) {
+        if self.minimized.iter().any(|m| m.0 == id) {
+            return;
+        }
+        let Some(pos) = self.items.iter().position(|i| i.id() == id) else {
+            return;
+        };
+        let item = self.items.remove(pos);
+        let meta = match &item {
+            CanvasItem::Terminal { world, title, session, .. } => (
+                id,
+                ItemKind::Terminal,
+                *world,
+                title.clone(),
+                session.as_ref().map(|s| s.command.clone()).unwrap_or_default(),
+            ),
+            CanvasItem::Browser { world, title, url, .. } => (
+                id,
+                ItemKind::Browser,
+                *world,
+                title.clone(),
+                url.clone(),
+            ),
+            CanvasItem::Note { world, title, .. } => (
+                id,
+                ItemKind::Note,
+                *world,
+                title.clone(),
+                String::new(),
+            ),
+        };
+        self.minimized.push(meta);
+        self.selected = None;
+        self.focused_terminal = None;
+        self.redraw(cx);
+    }
+
+    /// Restore `id` from the dock back onto the canvas.
+    fn restore_item(&mut self, cx: &mut Cx, id: u64) {
+        let Some(pos) = self.minimized.iter().position(|m| m.0 == id) else {
+            return;
+        };
+        let (id, kind, world, title, extra) = self.minimized.remove(pos);
+        match kind {
+            ItemKind::Terminal => {
+                // Re-spawn the PTY session with the stored command.
+                let (cols, rows) = {
+                    let w = world.size.x;
+                    let h = world.size.y;
+                    (
+                        ((w - 12.0) / TERM_CELL_W).floor().max(10.0) as usize,
+                        ((h - 34.0) / TERM_CELL_H).floor().max(3.0) as usize,
+                    )
+                };
+                if let Ok(session) = crate::terminal::TerminalSession::spawn(&title, &extra, cols, rows) {
+                    self.items.push(CanvasItem::Terminal {
+                        id,
+                        world,
+                        title,
+                        session: Some(Box::new(session)),
+                    });
+                }
+            }
+            ItemKind::Browser => {
+                self.items.push(CanvasItem::Browser {
+                    id,
+                    world,
+                    title,
+                    url: extra,
+                });
+            }
+            ItemKind::Note => {
+                self.items.push(CanvasItem::Note { id, world, title });
+            }
+        }
+        self.selected = Some(id);
+        self.redraw(cx);
+    }
+
+    /// Close `id`: fully remove it from the canvas and the dock.
+    fn close_item(&mut self, cx: &mut Cx, id: u64) {
+        self.minimized.retain(|m| m.0 != id);
+        self.items.retain(|i| i.id() != id);
+        if self.selected == Some(id) {
+            self.selected = None;
+        }
+        if self.focused_terminal == Some(id) {
+            self.focused_terminal = None;
+        }
+        self.redraw(cx);
     }
 
     /// Topmost item whose bottom-right resize handle is under `screen`.
@@ -569,6 +734,95 @@ impl CanvasPanel {
         self.draw_cursor.draw_abs(cx, grip2);
     }
 
+
+    /// Draw the minimize/close control buttons in the item's title bar.
+    fn draw_control_buttons(&mut self, cx: &mut Cx2d, id: u64, screen: Rect) {
+        let (min_r, close_r) = Self::control_button_rects(screen);
+        let min_hov = self.hovered_btn == Some((id, BtnKind::Minimize));
+        let close_hov = self.hovered_btn == Some((id, BtnKind::Close));
+        // Minimize button (—)
+        self.draw_item_bg_rect(
+            cx,
+            min_r,
+            if min_hov { BTN_HOVER } else { BTN_BG },
+        );
+        self.draw_border_rect(cx, min_r, BTN_BORDER);
+        self.draw_cursor.color = Vec4f { x: 0.7, y: 0.75, z: 0.85, w: 1.0 };
+        let dash = Rect {
+            pos: min_r.pos + Vec2d { x: 6.0, y: 8.0 },
+            size: Vec2d { x: min_r.size.x - 12.0, y: 2.0 },
+        };
+        self.draw_cursor.draw_abs(cx, dash);
+        // Close button (×)
+        self.draw_item_bg_rect(
+            cx,
+            close_r,
+            if close_hov { BTN_CLOSE_HOVER } else { BTN_BG },
+        );
+        self.draw_border_rect(cx, close_r, BTN_BORDER);
+        self.draw_cursor.color = Vec4f { x: 0.9, y: 0.85, z: 0.85, w: 1.0 };
+        let x1 = Rect {
+            pos: close_r.pos + Vec2d { x: 6.0, y: 5.0 },
+            size: Vec2d { x: close_r.size.x - 12.0, y: 2.0 },
+        };
+        self.draw_cursor.draw_abs(cx, x1);
+        let x2 = Rect {
+            pos: close_r.pos + Vec2d { x: 6.0, y: 11.0 },
+            size: Vec2d { x: close_r.size.x - 12.0, y: 2.0 },
+        };
+        self.draw_cursor.draw_abs(cx, x2);
+    }
+
+    /// Draw the bottom dock tray with minimized-item chips.
+    fn draw_dock(&mut self, cx: &mut Cx2d, viewport: Vec2d) {
+        if self.minimized.is_empty() {
+            return;
+        }
+        let tray_y = viewport.y - DOCK_BOTTOM;
+        let tray_rect = Rect {
+            pos: Vec2d { x: 0.0, y: tray_y },
+            size: Vec2d { x: viewport.x, y: DOCK_H },
+        };
+        self.draw_item_bg_rect(cx, tray_rect, DOCK_BG);
+        self.draw_border_rect(cx, tray_rect, CHIP_BORDER);
+
+        let chip_w = 140.0;
+        let chip_h = DOCK_H - 8.0;
+        let x0 = 10.0;
+        let minimized: Vec<(u64, ItemKind, String)> = self
+            .minimized
+            .iter()
+            .map(|m| (m.0, m.1, m.3.clone()))
+            .collect();
+        let hovered_chip = self.hovered_chip;
+        for (i, (id, kind, title)) in minimized.iter().enumerate() {
+            let rect = Rect {
+                pos: Vec2d {
+                    x: x0 + i as f64 * (chip_w + 8.0),
+                    y: tray_y + 4.0,
+                },
+                size: Vec2d { x: chip_w, y: chip_h },
+            };
+            let hov = hovered_chip == Some(*id);
+            self.draw_item_bg_rect(cx, rect, if hov { CHIP_BG_HOVER } else { CHIP_BG });
+            self.draw_border_rect(cx, rect, CHIP_BORDER);
+            let kind_label = match kind {
+                ItemKind::Terminal => ">_",
+                ItemKind::Browser => "◎",
+                ItemKind::Note => "📝",
+            };
+            let label = format!("{kind_label} {title}");
+            self.draw_cell_text
+                .draw_vars
+                .set_uniform(cx.cx, live_id!(color), &TITLE_TEXT);
+            self.draw_cell_text.draw_abs(
+                cx,
+                rect.pos + Vec2d { x: 8.0, y: 6.0 },
+                &label,
+            );
+        }
+    }
+
     fn draw_terminal_at(
         &mut self,
         cx: &mut Cx2d,
@@ -819,6 +1073,19 @@ impl Widget for CanvasPanel {
         if let Event::MouseDown(me) = event {
             if me.button.contains(MouseButton::PRIMARY) {
                 self.last_mouse = me.abs;
+                // Title-bar control buttons take priority.
+                if let Some((id, kind)) = self.control_button_under(me.abs) {
+                    match kind {
+                        BtnKind::Minimize => self.minimize_item(cx, id),
+                        BtnKind::Close => self.close_item(cx, id),
+                    }
+                    return;
+                }
+                // Dock chip: restore a minimized item.
+                if let Some(id) = self.dock_chip_under(me.abs, self.viewport) {
+                    self.restore_item(cx, id);
+                    return;
+                }
                 // Resize handle hit-test first: bottom-right corner of the
                 // topmost item under the cursor.
                 let resize_target = self.resize_handle_under(me.abs);
@@ -888,8 +1155,15 @@ impl Widget for CanvasPanel {
                 self.redraw(cx);
             } else {
                 let hov = self.hit_test(me.abs);
-                if hov != self.hovered {
+                let hov_btn = self.control_button_under(me.abs);
+                let hov_chip = self.dock_chip_under(me.abs, self.viewport);
+                if hov != self.hovered
+                    || hov_btn != self.hovered_btn
+                    || hov_chip != self.hovered_chip
+                {
                     self.hovered = hov;
+                    self.hovered_btn = hov_btn;
+                    self.hovered_chip = hov_chip;
                     self.redraw(cx);
                 }
             }
@@ -1097,6 +1371,7 @@ impl Widget for CanvasPanel {
                     if let Some(state) = state {
                         self.draw_terminal_at(cx, item_screen, &title, &command, &state);
                     }
+                    self.draw_control_buttons(cx, item_id, item_screen);
                     if is_sel {
                         self.draw_resize_handle(cx, item_screen);
                     }
@@ -1108,18 +1383,23 @@ impl Widget for CanvasPanel {
                         if is_sel { SEL_BORDER } else { NOTE_BORDER },
                     );
                     self.draw_note_title(cx, &title, item_screen);
+                    self.draw_control_buttons(cx, item_id, item_screen);
                     if is_sel {
                         self.draw_resize_handle(cx, item_screen);
                     }
                 }
                 ItemKind::Browser => {
                     self.draw_browser_at(cx, item_id, item_screen, is_sel, &url);
+                    self.draw_control_buttons(cx, item_id, item_screen);
                     if is_sel {
                         self.draw_resize_handle(cx, item_screen);
                     }
                 }
             }
         }
+
+        // Bottom dock (minimized items tray).
+        self.draw_dock(cx, rect.size);
 
         // Children (command bar, status label) draw on top.
         while self.view.draw_walk(cx, scope, walk).step().is_some() {}
