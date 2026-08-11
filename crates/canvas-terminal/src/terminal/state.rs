@@ -180,7 +180,11 @@ impl TerminalState {
                 continue;
             };
             let start = if r == ra { ca } else { 0 };
-            let end = if r == rb { cb } else { line.len().saturating_sub(1) };
+            let end = if r == rb {
+                cb
+            } else {
+                line.len().saturating_sub(1)
+            };
             for cell in line.iter().take(end + 1).skip(start) {
                 if cell.ch != '\0' {
                     out.push(cell.ch);
@@ -387,7 +391,9 @@ impl Perform for TerminalState {
                                 self.cur_fg = ANSI_COLORS[(v - 30) as usize];
                             }
                             38 => {
-                                if i + 1 < values.len() && values[i + 1] == 5 && i + 2 < values.len()
+                                if i + 1 < values.len()
+                                    && values[i + 1] == 5
+                                    && i + 2 < values.len()
                                 {
                                     self.cur_fg = index_color(values[i + 2] as usize);
                                     i += 2;
@@ -408,7 +414,9 @@ impl Perform for TerminalState {
                                 self.cur_bg = ANSI_COLORS[(v - 40) as usize];
                             }
                             48 => {
-                                if i + 1 < values.len() && values[i + 1] == 5 && i + 2 < values.len()
+                                if i + 1 < values.len()
+                                    && values[i + 1] == 5
+                                    && i + 2 < values.len()
                                 {
                                     self.cur_bg = index_color(values[i + 2] as usize);
                                     i += 2;

@@ -434,14 +434,12 @@ impl CanvasPanel {
         }
         let r = self.camera.world_rect_to_screen(item.world(), viewport);
         let origin = r.pos + Vec2d { x: 6.0, y: 30.0 };
-        let content_w = (r.size.x - 12.0).max(1.0);
-        let content_h = (r.size.y - 34.0).max(1.0);
         let state = item.session()?.state.clone();
         let grid = state.lock().ok()?;
         let cols = grid.cols.max(1);
         let rows = grid.rows.max(1);
-        let char_w = content_w / cols as f64;
-        let line_h = content_h / rows as f64;
+        let char_w = TERM_CELL_W * self.camera.zoom as f64;
+        let line_h = TERM_CELL_H * self.camera.zoom as f64;
         let dx = screen.x - origin.x;
         let dy = screen.y - origin.y;
         if dx < 0.0 || dy < 0.0 {
@@ -985,11 +983,13 @@ impl CanvasPanel {
         let content_w = (screen.size.x - 12.0).max(1.0);
         let content_h = (screen.size.y - 34.0).max(1.0);
 
-        // Cell size tiles the content rect exactly (grid dims include zoom).
+        // Fixed cell size: characters keep a constant width/height; dragging
+        // the resize handle only changes how many cols/rows fit (the PTY is
+        // resized by draw_walk), never stretching glyphs.
         let cols = grid.cols.max(1);
         let rows = grid.rows.max(1);
-        let char_w = content_w / cols as f64;
-        let line_h = content_h / rows as f64;
+        let char_w = TERM_CELL_W * self.camera.zoom as f64;
+        let line_h = TERM_CELL_H * self.camera.zoom as f64;
 
         // Tail view: show the LAST `rows` lines (the on-screen viewport).
         let total = grid.lines.len();
