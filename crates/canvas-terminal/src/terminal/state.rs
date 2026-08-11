@@ -342,9 +342,7 @@ impl Perform for TerminalState {
                                 } else {
                                     self.cols
                                 };
-                                for c in 0..end.min(self.cols) {
-                                    line[c] = Cell::default();
-                                }
+                                line[..end.min(self.cols)].fill(Cell::default());
                             }
                         }
                     }
@@ -361,11 +359,7 @@ impl Perform for TerminalState {
                 if let Some(line) = self.lines.get_mut(self.cursor_row) {
                     match mode {
                         0 => line[self.cursor_col..].fill(Cell::default()),
-                        1 => {
-                            for c in 0..=self.cursor_col {
-                                line[c] = Cell::default();
-                            }
-                        }
+                        1 => line[..=self.cursor_col.min(self.cols - 1)].fill(Cell::default()),
                         2 => line.fill(Cell::default()),
                         _ => {}
                     }

@@ -877,6 +877,7 @@ impl CanvasPanel {
     }
 
     /// Render one terminal grid row as color runs.
+    #[allow(clippy::too_many_arguments)]
     fn draw_terminal_row(
         &mut self,
         cx: &mut Cx2d,
@@ -1032,11 +1033,13 @@ impl CanvasPanel {
                 char_w,
                 line_h,
                 true,
-                |c0, c1| sel.map_or(false, |(r0, c0s, r1, c1s)| {
-                    let (ra, rb) = (r0.min(r1), r0.max(r1));
-                    let (ca, cb) = (c0s.min(c1s), c0s.max(c1s));
-                    (ra..=rb).contains(&disp_r) && (ca..=cb).contains(&c0) || (ca..=cb).contains(&c1)
-                }),
+                |c0, _c1| {
+                    sel.is_some_and(|(r0, c0s, r1, c1s)| {
+                        let (ra, rb) = (r0.min(r1), r0.max(r1));
+                        let (ca, cb) = (c0s.min(c1s), c0s.max(c1s));
+                        (ra..=rb).contains(&disp_r) && (ca..=cb).contains(&c0)
+                    })
+                },
             );
             disp_r += 1;
         }
@@ -1055,11 +1058,13 @@ impl CanvasPanel {
                 char_w,
                 line_h,
                 dim,
-                |c0, c1| sel.map_or(false, |(r0, c0s, r1, c1s)| {
-                    let (ra, rb) = (r0.min(r1), r0.max(r1));
-                    let (ca, cb) = (c0s.min(c1s), c0s.max(c1s));
-                    (ra..=rb).contains(&disp_row) && (ca..=cb).contains(&c0) || (ca..=cb).contains(&c1)
-                }),
+                |c0, _c1| {
+                    sel.is_some_and(|(r0, c0s, r1, c1s)| {
+                        let (ra, rb) = (r0.min(r1), r0.max(r1));
+                        let (ca, cb) = (c0s.min(c1s), c0s.max(c1s));
+                        (ra..=rb).contains(&disp_row) && (ca..=cb).contains(&c0)
+                    })
+                },
             );
             disp_r += 1;
         }

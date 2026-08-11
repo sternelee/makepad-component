@@ -66,7 +66,17 @@ script_mod! {
             color: #xff0000ff
         }
         draw_cell_text +: {
-            text_style: theme.font_bold{font_size: 12.5}
+            text_style: TextStyle{
+                font_family: FontFamily{
+                    // Menlo is monospace AND covers Dingbats (➜✗⌘);
+                    // CJK + emoji fall back to the bundled fonts.
+                    latin := FontMember{res: crate_resource("makepad_widgets:resources/Menlo-Regular.ttf") asc: 0.0 desc: 0.0}
+                    chinese := FontMember{res: crate_resource("makepad_widgets:resources/LXGWWenKaiRegular.ttf") asc: 0.0 desc: 0.0}
+                    emoji := FontMember{res: crate_resource("makepad_widgets:resources/NotoColorEmoji.ttf") asc: 0.0 desc: 0.0}
+                }
+                font_size: 12.5
+                line_spacing: 1.2
+            }
             color: #xe2e6efff
         }
         draw_cursor +: {
