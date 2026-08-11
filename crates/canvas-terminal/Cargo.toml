@@ -1,0 +1,26 @@
+[package]
+name = "canvas-terminal"
+version.workspace = true
+edition.workspace = true
+description = "Infinite Canvas Terminal Workspace - AI terminal canvas (CNVS-style) on Makepad"
+
+[[bin]]
+name = "canvas-terminal"
+path = "src/main.rs"
+
+[dependencies]
+makepad-widgets = { workspace = true, features = ["cef"] }
+makepad-script = { workspace = true }
+makepad-cef = { git = "https://github.com/makepad/makepad", rev = "4f9ce7a8bb3fd19e5c61dcf13edd2e6d4a04cefc" }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+rmux-sdk = "0.10.0"
+tokio = { version = "1", features = [
+  "macros",
+  "rt-multi-thread",
+  "time",
+  "sync",
+] }
+vte = "0.14"
