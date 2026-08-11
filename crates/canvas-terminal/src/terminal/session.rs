@@ -206,8 +206,11 @@ impl TerminalSession {
                 Err(e) => log!("rmux: window resize FAILED {cols}x{rows}: {e}"),
             }
         });
-        // TerminalState is updated from the next snapshot, so we don't
-        // resize it here — the snapshot poll will bring the correct dims.
+        // Reflow the local grid (wrap/truncate per alacritty semantics).
+        if let Ok(mut st) = self.state.lock() {
+            st.resize(cols, rows);
+        }
+        let _ = self.notify.send(true);
     }
 
     /// Fully terminate the rmux session (kills the underlying PTY process).

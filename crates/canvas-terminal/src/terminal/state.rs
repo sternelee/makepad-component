@@ -140,22 +140,50 @@ impl TerminalState {
         if new_cols == self.cols && new_rows == self.rows {
             return;
         }
-        // Shrink rows: push dropped top lines into scrollback.
-        if new_rows < self.rows && self.lines.len() > new_rows {
-            let drop = self.lines.len() - new_rows;
-            let mut dropped: Vec<Vec<Cell>> = self.lines.drain(..drop).collect();
-            self.scrollback.append(&mut dropped);
-            let overflow = self.scrollback.len().saturating_sub(self.max_scrollback);
-            if overflow > 0 {
-                self.scrollback.drain(..overflow);
+        // Column shrink: reflow each line — trailing content wraps to the
+        // next line (alacritty semantics) instead of being truncated.
+        // Column grow: lines keep their content, new columns stay blank.
+        let mut new_lines: Vec<Vec<Cell>> = Vec::new();
+        for line in self.lines.drain(..) {
+            if new_cols >= self.cols {
+                // Grow: keep content, pad to new width.
+                let mut nl = line;
+                nl.resize(new_cols, Cell::default());
+                new_lines.push(nl);
+            } else {
+                // Shrink: wrap overflow into following lines.
+                let mut chunk = line;
+                while !chunk.is_empty() {
+                    let (head, tail) = if chunk.len() > new_cols {
+                        (chunk[..new_cols].to_vec(), chunk[new_cols..].to_vec())
+                    } else {
+                        (chunk, Vec::new())
+                    };
+                    let mut nl = head;
+                    nl.resize(new_cols, Cell::default());
+                    new_lines.push(nl);
+                    chunk = tail;
+                }
             }
         }
+        // Row shrink: move dropped top lines into scrollback.
+        let overflow_rows = new_lines.len().saturating_sub(new_rows);
+        if overflow_rows > 0 {
+            let mut dropped: Vec<Vec<Cell>> = new_lines.drain(..overflow_rows).collect();
+            self.scrollback.append(&mut dropped);
+            let sb_overflow = self.scrollback.len().saturating_sub(self.max_scrollback);
+            if sb_overflow > 0 {
+                self.scrollback.drain(..sb_overflow);
+            }
+        }
+        // Row grow: pad with blank rows at the bottom.
+        while new_lines.len() < new_rows {
+            new_lines.push(vec![Cell::default(); new_cols]);
+        }
+        self.lines = new_lines;
         self.cols = new_cols;
         self.rows = new_rows;
         self.ensure_rows();
-        for line in self.lines.iter_mut() {
-            line.resize(self.cols, Cell::default());
-        }
         self.cursor_row = self.cursor_row.min(self.rows - 1);
         self.cursor_col = self.cursor_col.min(self.cols - 1);
         // Clamp scroll offset to available history.
