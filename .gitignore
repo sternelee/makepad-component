@@ -28,3 +28,4 @@ crates/a2ui-demo/resources/audio_*.mp3
 hello
 .pi
 .pi-subagents
+.codegraph
