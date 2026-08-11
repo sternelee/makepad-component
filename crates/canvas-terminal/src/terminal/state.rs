@@ -51,6 +51,10 @@ pub struct TerminalState {
     pub cursor_row: usize,
     pub cursor_col: usize,
     pub cursor_visible: bool,
+    /// Cursor style from the PTY: 0=block, 1=beam(bar), 2=underline.
+    pub cursor_style: u8,
+    /// Text selection in cell coords: (start_row, start_col, end_row, end_col).
+    pub selection: Option<(usize, usize, usize, usize)>,
 }
 
 impl TerminalState {
@@ -62,6 +66,8 @@ impl TerminalState {
             cursor_row: 0,
             cursor_col: 0,
             cursor_visible: true,
+            cursor_style: 0,
+            selection: None,
         }
     }
 
@@ -109,10 +115,64 @@ impl TerminalState {
         self.cursor_row = snap.cursor.row as usize;
         self.cursor_col = snap.cursor.col as usize;
         self.cursor_visible = snap.cursor.visible;
+        // style: rmux PaneCursor.style raw value (0 block, 1 bar, 2 underline).
+        self.cursor_style = (snap.cursor.style & 0xff) as u8;
+        // Selection persists across snapshots (user-driven).
     }
 
     pub fn cursor_visible(&self) -> bool {
         self.cursor_visible
+    }
+
+    /// Whether the cell at (row, col) is inside the current selection.
+    pub fn in_selection(&self, row: usize, col: usize) -> bool {
+        let Some((r0, c0, r1, c1)) = self.selection else {
+            return false;
+        };
+        let (ra, rb) = (r0.min(r1), r0.max(r1));
+        let (ca, cb) = (c0.min(c1), c0.max(c1));
+        if row < ra || row > rb {
+            return false;
+        }
+        if row == ra && row == rb {
+            return col >= ca && col <= cb;
+        }
+        if row == ra {
+            return col >= ca;
+        }
+        if row == rb {
+            return col <= cb;
+        }
+        true
+    }
+
+    /// Extract the selected text as a plain string.
+    pub fn selected_text(&self) -> String {
+        let Some((r0, c0, r1, c1)) = self.selection else {
+            return String::new();
+        };
+        let (ra, rb) = (r0.min(r1), r0.max(r1));
+        let (ca, cb) = (c0.min(c1), c0.max(c1));
+        let mut out = String::new();
+        for r in ra..=rb.min(self.rows - 1) {
+            if r > ra {
+                out.push('\n');
+            }
+            let line = &self.lines[r];
+            let start = if r == ra { ca } else { 0 };
+            let end = if r == rb { cb } else { line.len().saturating_sub(1) };
+            let end = end.min(line.len().saturating_sub(1));
+            for cell in line.iter().take(end + 1).skip(start) {
+                if cell.ch != '\0' {
+                    out.push(cell.ch);
+                }
+            }
+            // Trim trailing spaces per line (terminal-style copy).
+            while out.ends_with(' ') {
+                out.pop();
+            }
+        }
+        out
     }
 }
 

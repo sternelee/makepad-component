@@ -107,6 +107,9 @@ pub struct CanvasPanel {
     minimized: Vec<MinimizedItem>,
     #[rust]
     focused_terminal: Option<u64>,
+    /// Active terminal text selection: (item_id, start_row, start_col).
+    #[rust]
+    selecting: Option<(u64, usize, usize)>,
     /// Set when the reader thread reported new output for a session.
     #[rust]
     redraw_pending: bool,
@@ -426,6 +429,39 @@ impl CanvasPanel {
     }
 
     /// Topmost item whose bottom-right resize handle is under `screen`.
+    /// Screen→cell coordinate conversion for a terminal item's content area.
+    fn screen_to_cell(
+        &self,
+        item: &CanvasItem,
+        screen: Vec2d,
+        viewport: Vec2d,
+    ) -> Option<(usize, usize)> {
+        if item.kind() != ItemKind::Terminal {
+            return None;
+        }
+        let r = self.camera.world_rect_to_screen(item.world(), viewport);
+        let origin = r.pos + Vec2d { x: 6.0, y: 30.0 };
+        let content_w = (r.size.x - 12.0).max(1.0);
+        let content_h = (r.size.y - 34.0).max(1.0);
+        let state = item.session()?.state.clone();
+        let grid = state.lock().ok()?;
+        let cols = grid.cols.max(1);
+        let rows = grid.rows.max(1);
+        let char_w = content_w / cols as f64;
+        let line_h = content_h / rows as f64;
+        let dx = screen.x - origin.x;
+        let dy = screen.y - origin.y;
+        if dx < 0.0 || dy < 0.0 {
+            return None;
+        }
+        let col = (dx / char_w) as usize;
+        let row = (dy / line_h) as usize;
+        if col >= cols || row >= rows {
+            return None;
+        }
+        Some((row, col))
+    }
+
     fn resize_handle_under(&self, screen: Vec2d) -> Option<u64> {
         const HANDLE: f64 = 18.0;
         self.items
@@ -902,8 +938,10 @@ impl CanvasPanel {
         cx.push_clip_rect(content_rect);
 
         // Draw rows: background cells then text runs.
+        let sel = grid.selection;
         for r in 0..draw_rows {
             let row = &grid.lines[start + r];
+            let abs_r = start + r;
             let y = origin.y + r as f64 * line_h;
 
             let mut i = 0;
@@ -912,10 +950,15 @@ impl CanvasPanel {
                 let fg = cell.fg;
                 let bg = cell.bg;
                 let bold = cell.bold;
+                let in_sel = grid.in_selection(abs_r, i);
                 let mut j = i;
                 while j < row.len() && j < cols {
                     let c = &row[j];
-                    if c.fg != fg || c.bg != bg || c.bold != bold {
+                    if c.fg != fg
+                        || c.bg != bg
+                        || c.bold != bold
+                        || grid.in_selection(abs_r, j) != in_sel
+                    {
                         break;
                     }
                     j += 1;
@@ -932,12 +975,18 @@ impl CanvasPanel {
                         y: line_h,
                     },
                 };
-                if bg != DEFAULT_BG {
+                let eff_bg = if in_sel {
+                    // Selection highlight (semi-transparent blue).
+                    [0.20, 0.45, 0.90, 0.55]
+                } else {
+                    [bg[0], bg[1], bg[2], 1.0]
+                };
+                if in_sel || bg != DEFAULT_BG {
                     self.draw_cell_bg.color = Vec4f {
-                        x: bg[0],
-                        y: bg[1],
-                        z: bg[2],
-                        w: 1.0,
+                        x: eff_bg[0],
+                        y: eff_bg[1],
+                        z: eff_bg[2],
+                        w: eff_bg[3],
                     };
                     self.draw_cell_bg.draw_abs(cx, run_rect);
                 }
@@ -950,8 +999,9 @@ impl CanvasPanel {
                 i = j;
             }
         }
+        let _ = sel;
 
-        // Cursor
+        // Cursor (block / beam / underline per PTY style)
         if grid.cursor_visible() {
             let c = grid.cursor_col.min(cols - 1);
             let r = grid
@@ -969,16 +1019,46 @@ impl CanvasPanel {
                 z: 0.98,
                 w: 1.0,
             };
-            self.draw_cursor.draw_abs(
-                cx,
-                Rect {
-                    pos,
-                    size: Vec2d {
-                        x: char_w,
-                        y: line_h,
-                    },
-                },
-            );
+            match grid.cursor_style {
+                1 => {
+                    // Beam (vertical bar): thin column at the left edge.
+                    let w = (char_w * 0.12).max(2.0);
+                    self.draw_cursor.draw_abs(
+                        cx,
+                        Rect {
+                            pos,
+                            size: Vec2d { x: w, y: line_h },
+                        },
+                    );
+                }
+                2 => {
+                    // Underline: thin bar at the bottom.
+                    let h = (line_h * 0.15).max(2.0);
+                    self.draw_cursor.draw_abs(
+                        cx,
+                        Rect {
+                            pos: Vec2d {
+                                x: pos.x,
+                                y: pos.y + line_h - h,
+                            },
+                            size: Vec2d { x: char_w, y: h },
+                        },
+                    );
+                }
+                _ => {
+                    // Block (default)
+                    self.draw_cursor.draw_abs(
+                        cx,
+                        Rect {
+                            pos,
+                            size: Vec2d {
+                                x: char_w,
+                                y: line_h,
+                            },
+                        },
+                    );
+                }
+            }
         }
 
         cx.pop_clip_rect();
@@ -1129,15 +1209,41 @@ impl Widget for CanvasPanel {
                     self.selected = Some(id);
                     if let Some(item) = self.items.iter().find(|i| i.id() == id) {
                         let is_terminal = item.kind() == ItemKind::Terminal;
-                        self.drag = Some(DragState {
-                            item_id: id,
-                            grab_world: self.camera.screen_to_world(me.abs, self.world_viewport()),
-                            item_origin_world: item.world().pos,
-                            item_origin_size: item.world().size,
-                            mode: DragMode::Move,
-                        });
-                        if is_terminal {
-                            self.focus_terminal(cx, Some(id));
+                        // In the terminal CONTENT area (below title bar),
+                        // drag starts a text selection like alacritty/wezterm;
+                        // the title bar still drags/moves the item.
+                        let in_content = if is_terminal {
+                            let r = self
+                                .camera
+                                .world_rect_to_screen(item.world(), self.world_viewport());
+                            me.abs.y > r.pos.y + 26.0
+                        } else {
+                            false
+                        };
+                        if is_terminal && in_content {
+                            if let Some((row, col)) =
+                                self.screen_to_cell(item, me.abs, self.world_viewport())
+                            {
+                                self.selecting = Some((id, row, col));
+                                if let Some(session) = item.session() {
+                                    if let Ok(mut st) = session.state.lock() {
+                                        st.selection = Some((row, col, row, col));
+                                    }
+                                }
+                            }
+                        } else {
+                            self.drag = Some(DragState {
+                                item_id: id,
+                                grab_world: self
+                                    .camera
+                                    .screen_to_world(me.abs, self.world_viewport()),
+                                item_origin_world: item.world().pos,
+                                item_origin_size: item.world().size,
+                                mode: DragMode::Move,
+                            });
+                            if is_terminal {
+                                self.focus_terminal(cx, Some(id));
+                            }
                         }
                     }
                 } else {
@@ -1151,7 +1257,18 @@ impl Widget for CanvasPanel {
 
         if let Event::MouseMove(me) = event {
             self.last_mouse = me.abs;
-            if let Some(drag) = &self.drag {
+            if let Some((sel_id, sr, sc)) = self.selecting {
+                if let Some(item) = self.items.iter().find(|i| i.id() == sel_id) {
+                    if let Some((er, ec)) = self.screen_to_cell(item, me.abs, self.world_viewport()) {
+                        if let Some(session) = item.session() {
+                            if let Ok(mut st) = session.state.lock() {
+                                st.selection = Some((sr, sc, er, ec));
+                            }
+                        }
+                        self.redraw(cx);
+                    }
+                }
+            } else if let Some(drag) = &self.drag {
                 let world = self.camera.screen_to_world(me.abs, self.world_viewport());
                 let delta = world - drag.grab_world;
                 let item_id = drag.item_id;
@@ -1197,6 +1314,22 @@ impl Widget for CanvasPanel {
             if me.button.contains(MouseButton::PRIMARY) {
                 self.drag = None;
                 self.panning = false;
+                if let Some((sel_id, _, _)) = self.selecting {
+                    self.selecting = None;
+                    if let Some(item) = self.items.iter().find(|i| i.id() == sel_id) {
+                        if let Some(session) = item.session() {
+                            let text = if let Ok(st) = session.state.lock() {
+                                st.selected_text()
+                            } else {
+                                String::new()
+                            };
+                            if !text.is_empty() {
+                                cx.copy_to_clipboard(&text);
+                                self.status(cx, &format!("Copied {} chars", text.chars().count()));
+                            }
+                        }
+                    }
+                }
             }
         }
 
