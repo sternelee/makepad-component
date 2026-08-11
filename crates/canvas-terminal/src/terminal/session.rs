@@ -45,6 +45,12 @@ pub struct TerminalSession {
     /// Shared terminal grid state (written by the snapshot poll task).
     pub state: Arc<Mutex<TerminalState>>,
     pane: rmux_sdk::Pane,
+    /// Session handle kept so we can fully terminate the session on close.
+    #[allow(dead_code)]
+    session: rmux_sdk::Session,
+    /// Set when `kill()` was called; the poll task checks this to exit.
+    #[allow(dead_code)]
+    killed: Arc<std::sync::atomic::AtomicBool>,
     /// Set when the snapshot poll task reported new data.
     rx: std::sync::mpsc::Receiver<bool>,
     /// Keep the poll task alive.
@@ -80,11 +86,16 @@ impl TerminalSession {
         // TerminalState. This replaces the output-stream + vte approach: the
         // snapshot is the complete, rendered screen — colors, glyphs, cursor
         // — exactly what the user sees in the rmux pane.
+        let killed = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (tx, rx) = std::sync::mpsc::channel::<bool>();
         let state_poll = state.clone();
         let pane_poll = pane.clone();
+        let killed_poll = killed.clone();
         let poll_task = runtime().spawn(async move {
             loop {
+                if killed_poll.load(std::sync::atomic::Ordering::SeqCst) {
+                    break;
+                }
                 match pane_poll.snapshot().await {
                     Ok(snapshot) => {
                         if let Ok(mut st) = state_poll.lock() {
@@ -105,6 +116,8 @@ impl TerminalSession {
             command: command.to_string(),
             state,
             pane,
+            session,
+            killed,
             rx,
             _poll: Arc::new(poll_task),
             last_size: std::sync::Mutex::new((cols, rows)),
@@ -169,6 +182,13 @@ impl TerminalSession {
         });
         // TerminalState is updated from the next snapshot, so we don't
         // resize it here — the snapshot poll will bring the correct dims.
+    }
+
+    /// Fully terminate the rmux session (kills the underlying PTY process).
+    #[allow(dead_code)]
+    pub fn kill(&self) {
+        self.killed.store(true, std::sync::atomic::Ordering::SeqCst);
+        let _ = runtime().block_on(self.session.kill());
     }
 }
 

@@ -18,6 +18,22 @@ const TERM_BORDER: [f32; 4] = [0.20, 0.24, 0.32, 1.0];
 const SEL_BORDER: [f32; 4] = [0.30, 0.62, 0.98, 1.0];
 const TITLE_TEXT: [f32; 4] = [0.85, 0.88, 0.94, 1.0];
 
+/// Title-bar control buttons (minimize / close).
+const BTN_W: f64 = 22.0;
+const BTN_H: f64 = 18.0;
+const BTN_BG: [f32; 4] = [0.16, 0.19, 0.26, 1.0];
+const BTN_BORDER: [f32; 4] = [0.28, 0.32, 0.42, 1.0];
+const BTN_HOVER: [f32; 4] = [0.22, 0.28, 0.40, 1.0];
+const BTN_CLOSE_HOVER: [f32; 4] = [0.65, 0.25, 0.25, 1.0];
+
+/// Bottom dock (screen-fixed minimize tray).
+const DOCK_H: f64 = 34.0;
+const DOCK_BOTTOM: f64 = 76.0;
+const DOCK_BG: [f32; 4] = [0.10, 0.11, 0.15, 0.92];
+const CHIP_BG: [f32; 4] = [0.16, 0.18, 0.24, 1.0];
+const CHIP_BG_HOVER: [f32; 4] = [0.22, 0.26, 0.34, 1.0];
+const CHIP_BORDER: [f32; 4] = [0.28, 0.32, 0.42, 1.0];
+
 /// Drag state while moving or resizing an item.
 struct DragState {
     item_id: u64,
@@ -33,6 +49,13 @@ struct DragState {
 enum DragMode {
     Move,
     Resize,
+}
+
+/// Title-bar control button kind.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum BtnKind {
+    Minimize,
+    Close,
 }
 
 #[derive(Script, ScriptHook, Widget)]

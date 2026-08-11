@@ -128,7 +128,7 @@ fn pane_color_to_rgb(color: &PaneColor, is_fg: bool) -> [f32; 3] {
         }
         PaneColor::None => DEFAULT_BG,
         PaneColor::Ansi { index } => ANSI_COLORS[(*index as usize).min(15)],
-        PaneColor::BrightAnsi { index } => ANSI_COLORS[((*index - 90 + 8) as usize).min(15)],
+        PaneColor::BrightAnsi { index } => ANSI_COLORS[((*index as i32 - 90 + 8).clamp(0, 15)) as usize],
         PaneColor::Indexed { index } => index_color(*index as usize),
         PaneColor::Rgb { red, green, blue } => [
             *red as f32 / 255.0,
