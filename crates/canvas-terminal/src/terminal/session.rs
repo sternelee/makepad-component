@@ -85,9 +85,9 @@ impl TerminalSession {
         let state = Arc::new(Mutex::new(TerminalState::new(cols, rows)));
 
         // Poll pane.snapshot() at ~30fps and push the result into the shared
-        // TerminalState. This replaces the output-stream + vte approach: the
-        // snapshot is the complete, rendered screen — colors, glyphs, cursor
-        // — exactly what the user sees in the rmux pane.
+        // TerminalState. The rmux daemon owns the PTY; we parse its raw
+        // output stream locally with vte into the grid (like alacritty), so
+        // colors, wide chars, scrollback, cursor are all maintained here.
         let killed = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (tx, rx) = std::sync::mpsc::channel::<bool>();
         let notify = tx.clone();
@@ -95,23 +95,45 @@ impl TerminalSession {
         let pane_poll = pane.clone();
         let killed_poll = killed.clone();
         let poll_task = runtime().spawn(async move {
+            // Subscribe to the raw pane output stream (oldest => replay).
+            let stream = match pane_poll
+                .output_stream_starting_at(rmux_sdk::PaneOutputStart::Oldest)
+                .await
+            {
+                Ok(s) => s,
+                Err(e) => {
+                    log!("rmux: output stream failed: {e}");
+                    return;
+                }
+            };
+            let mut stream = stream;
             loop {
                 if killed_poll.load(std::sync::atomic::Ordering::SeqCst) {
                     break;
                 }
-                match pane_poll.snapshot().await {
-                    Ok(snapshot) => {
-                        if let Ok(mut st) = state_poll.lock() {
-                            st.apply_snapshot(&snapshot);
+                let next = tokio::time::timeout(
+                    Duration::from_secs(30),
+                    stream.next(),
+                )
+                .await;
+                match next {
+                    Ok(Ok(Some(chunk))) => {
+                        if let rmux_sdk::PaneOutputChunk::Bytes { bytes, .. } = chunk {
+                            if let Ok(mut st) = state_poll.lock() {
+                                st.feed(&bytes);
+                            }
+                            let _ = tx.send(true);
                         }
-                        let _ = tx.send(true);
                     }
-                    Err(e) => {
-                        log!("rmux: snapshot error: {e}");
-                        tokio::time::sleep(Duration::from_secs(1)).await;
+                    Ok(Err(e)) => {
+                        log!("rmux: stream error: {e}");
+                        break;
                     }
+                    Ok(Ok(None)) => break,
+                    // Timeout with no output is normal for an idle pane:
+                    // keep the stream alive.
+                    Err(_) => continue,
                 }
-                tokio::time::sleep(Duration::from_millis(33)).await;
             }
         });
 
@@ -195,36 +217,12 @@ impl TerminalSession {
         let _ = runtime().block_on(self.session.kill());
     }
 
-    /// Fetch `offset` lines of scrollback history (plus the current screen)
-    /// from the rmux daemon and store them in `TerminalState.history`.
-    pub fn fetch_history(&self, offset: usize) {
-        let pane = self.pane.clone();
-        let state = self.state.clone();
-        let notify = self.notify.clone();
-        runtime().spawn(async move {
-            match pane.capture_pane().start(-(offset as i64)).await {
-                Ok(capture) => {
-                    let text = String::from_utf8_lossy(&capture.stdout);
-                    let lines: Vec<String> = text.lines().map(|l| l.to_string()).collect();
-                    if let Ok(mut st) = state.lock() {
-                        st.history = lines;
-                        st.scroll_offset = offset;
-                    }
-                    let _ = notify.send(true);
-                }
-                Err(e) => {
-                    log!("rmux: capture history failed: {e}");
-                }
-            }
-        });
-    }
-
-    /// Reset scrollback (scroll back to the live tail).
-    pub fn reset_history(&self) {
+    /// Scroll the local scrollback viewport by `delta` lines (positive = up).
+    pub fn scroll_display(&self, delta: i32) {
         if let Ok(mut st) = self.state.lock() {
-            st.history.clear();
-            st.scroll_offset = 0;
+            st.scroll_display(delta);
         }
+        let _ = self.notify.send(true);
     }
 }
 

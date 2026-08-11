@@ -3,7 +3,7 @@ use makepad_widgets::*;
 use crate::camera::Camera;
 use crate::command::{self, Command};
 use crate::items::{CanvasItem, ItemKind};
-use crate::terminal::state::DEFAULT_BG;
+use crate::terminal::state::{Cell, DEFAULT_BG};
 
 /// Grid spacing in world units.
 const GRID_SIZE: f64 = 24.0;
@@ -360,14 +360,7 @@ impl CanvasPanel {
                     .as_ref()
                     .map(|s| s.command.clone())
                     .unwrap_or_default();
-                (
-                    id,
-                    ItemKind::Terminal,
-                    world,
-                    title,
-                    command,
-                    session,
-                )
+                (id, ItemKind::Terminal, world, title, command, session)
             }
             CanvasItem::Browser {
                 world, title, url, ..
@@ -736,7 +729,7 @@ impl CanvasPanel {
         self.draw_item_bg_rect(cx, screen, NOTE_COLOR);
         self.draw_title
             .draw_vars
-            .set_uniform(cx.cx, live_id!(color), &TITLE_TEXT);
+            .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
         self.draw_title
             .draw_abs(cx, screen.pos + Vec2d { x: 10.0, y: 8.0 }, title);
     }
@@ -877,9 +870,85 @@ impl CanvasPanel {
             let label = format!("{kind_label} {title}");
             self.draw_cell_text
                 .draw_vars
-                .set_uniform(cx.cx, live_id!(color), &TITLE_TEXT);
+                .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
             self.draw_cell_text
                 .draw_abs(cx, rect.pos + Vec2d { x: 8.0, y: 6.0 }, &label);
+        }
+    }
+
+    /// Render one terminal grid row as color runs.
+    fn draw_terminal_row(
+        &mut self,
+        cx: &mut Cx2d,
+        row: &[Cell],
+        x0: f64,
+        y: f64,
+        char_w: f64,
+        line_h: f64,
+        dim: bool,
+        in_sel: impl Fn(usize, usize) -> bool,
+    ) {
+        let mut i = 0;
+        while i < row.len() {
+            let cell = &row[i];
+            let fg = cell.fg;
+            let bg = cell.bg;
+            let bold = cell.bold;
+            let mut j = i;
+            while j < row.len() {
+                let c = &row[j];
+                if c.fg != fg || c.bg != bg || c.bold != bold {
+                    break;
+                }
+                j += 1;
+            }
+            let mut text = String::new();
+            for cell in row.iter().take(j).skip(i) {
+                if !cell.wide_padding {
+                    text.push(cell.ch);
+                }
+            }
+            let x = x0 + i as f64 * char_w;
+            let run_rect = Rect {
+                pos: Vec2d { x, y },
+                size: Vec2d {
+                    x: (j - i) as f64 * char_w,
+                    y: line_h,
+                },
+            };
+            let selected = in_sel(i, j);
+            let eff_bg = if selected {
+                // Selection highlight (semi-transparent blue).
+                [0.20, 0.45, 0.90, 0.55]
+            } else if bg != DEFAULT_BG {
+                [bg[0], bg[1], bg[2], 1.0]
+            } else {
+                [0.0, 0.0, 0.0, 0.0]
+            };
+            if selected || bg != DEFAULT_BG {
+                let a = eff_bg[3];
+                let c = if dim {
+                    [
+                        eff_bg[0] * 0.6,
+                        eff_bg[1] * 0.6,
+                        eff_bg[2] * 0.6,
+                        a,
+                    ]
+                } else {
+                    eff_bg
+                };
+                self.draw_cell_bg.color = Vec4f { x: c[0], y: c[1], z: c[2], w: c[3] };
+                self.draw_cell_bg.draw_abs(cx, run_rect);
+            }
+            let mut col = [fg[0], fg[1], fg[2], 1.0];
+            if dim {
+                col[0] *= 0.6;
+                col[1] *= 0.6;
+                col[2] *= 0.6;
+            }
+            self.draw_cell_text.color = Vec4f { x: col[0], y: col[1], z: col[2], w: col[3] };
+            self.draw_cell_text.draw_abs(cx, Vec2d { x, y }, &text);
+            i = j;
         }
     }
 
@@ -898,7 +967,7 @@ impl CanvasPanel {
         // Title text (DrawText) - drawn after bg/border but before content
         self.draw_title
             .draw_vars
-            .set_uniform(cx.cx, live_id!(color), &TITLE_TEXT);
+            .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
         self.draw_title.draw_abs(
             cx,
             screen.pos + Vec2d { x: 8.0, y: 6.0 },
@@ -926,14 +995,15 @@ impl CanvasPanel {
         let start = total.saturating_sub(rows);
         let draw_rows = (total - start).min(rows);
 
-        // Scrollback: render captured history lines ABOVE the live snapshot.
-        // History is plain text (no per-cell colors); snapshot draws below.
-        let hist_offset = grid.scroll_offset.min(grid.history.len());
-        let hist_lines: Vec<String> = grid
-            .history
-            .iter()
-            .take(hist_offset).cloned()
-            .collect();
+        // Scrollback: when scrolled, show the tail of `grid.scrollback`
+        // above the main grid (both rendered as cell runs with colors).
+        let hist_offset = grid.scroll_offset.min(grid.scrollback.len());
+        let hist_start = grid.scrollback.len().saturating_sub(hist_offset);
+        let hist_rows: Vec<&Vec<Cell>> =
+            grid.scrollback.iter().skip(hist_start).collect();
+        // Live rows below the history, limited by remaining space.
+        let live_rows = rows.saturating_sub(hist_offset);
+        let live_rows = live_rows.min(draw_rows);
 
         // Clip glyph/background drawing to the content rect so no text can
         // overflow outside the terminal item (e.g. long unwrapped lines).
@@ -946,81 +1016,54 @@ impl CanvasPanel {
         };
         cx.push_clip_rect(content_rect);
 
-        // Draw scrollback history lines (plain text, above the viewport).
-        for (hr, hist) in hist_lines.iter().enumerate() {
-            let y = origin.y + hr as f64 * line_h;
-            self.draw_cell_text
-                .draw_vars
-                .set_uniform(cx.cx, live_id!(color), &[0.75, 0.78, 0.85, 1.0]);
-            self.draw_cell_text
-                .draw_abs(cx, Vec2d { x: origin.x, y }, hist);
-        }
-
         // Draw rows: background cells then text runs.
-        // When scrolled, the snapshot viewport shifts down by hist_offset.
-        let hist_offset = grid.scroll_offset.min(grid.history.len());
-        let live_rows = draw_rows.saturating_sub(hist_offset);
+        // History rows first (dimmed), then live grid rows.
         let sel = grid.selection;
+        let mut disp_r = 0usize;
+        // History rows (scrollback tail).
+        for row in hist_rows.iter() {
+            let y = origin.y + disp_r as f64 * line_h;
+            let row_sel: Vec<Cell> = (*row).clone();
+            self.draw_terminal_row(
+                cx,
+                &row_sel,
+                origin.x,
+                y,
+                char_w,
+                line_h,
+                true,
+                |c0, c1| sel.map_or(false, |(r0, c0s, r1, c1s)| {
+                    let (ra, rb) = (r0.min(r1), r0.max(r1));
+                    let (ca, cb) = (c0s.min(c1s), c0s.max(c1s));
+                    (ra..=rb).contains(&disp_r) && (ca..=cb).contains(&c0) || (ca..=cb).contains(&c1)
+                }),
+            );
+            disp_r += 1;
+        }
+        // Live grid rows (dimmed if scrolled).
         for r in 0..live_rows {
             let row = &grid.lines[start + r];
-            let abs_r = start + r;
-            let y = origin.y + (hist_offset + r) as f64 * line_h;
-
-            let mut i = 0;
-            while i < row.len() && i < cols {
-                let cell = &row[i];
-                let fg = cell.fg;
-                let bg = cell.bg;
-                let bold = cell.bold;
-                let in_sel = grid.in_selection(abs_r, i);
-                let mut j = i;
-                while j < row.len() && j < cols {
-                    let c = &row[j];
-                    if c.fg != fg
-                        || c.bg != bg
-                        || c.bold != bold
-                        || grid.in_selection(abs_r, j) != in_sel
-                    {
-                        break;
-                    }
-                    j += 1;
-                }
-                let mut text = String::new();
-                for cell in row.iter().take(j).skip(i) {
-                    text.push(cell.ch);
-                }
-                let x = origin.x + i as f64 * char_w;
-                let run_rect = Rect {
-                    pos: Vec2d { x, y },
-                    size: Vec2d {
-                        x: (j - i) as f64 * char_w,
-                        y: line_h,
-                    },
-                };
-                let eff_bg = if in_sel {
-                    // Selection highlight (semi-transparent blue).
-                    [0.20, 0.45, 0.90, 0.55]
-                } else {
-                    [bg[0], bg[1], bg[2], 1.0]
-                };
-                if in_sel || bg != DEFAULT_BG {
-                    self.draw_cell_bg.color = Vec4f {
-                        x: eff_bg[0],
-                        y: eff_bg[1],
-                        z: eff_bg[2],
-                        w: eff_bg[3],
-                    };
-                    self.draw_cell_bg.draw_abs(cx, run_rect);
-                }
-                self.draw_cell_text.draw_vars.set_uniform(
-                    cx.cx,
-                    live_id!(color),
-                    &[fg[0], fg[1], fg[2], 1.0],
-                );
-                self.draw_cell_text.draw_abs(cx, Vec2d { x, y }, &text);
-                i = j;
-            }
+            let y = origin.y + disp_r as f64 * line_h;
+            let dim = hist_offset > 0;
+            let disp_row = disp_r;
+            let row_sel = row.clone();
+            self.draw_terminal_row(
+                cx,
+                &row_sel,
+                origin.x,
+                y,
+                char_w,
+                line_h,
+                dim,
+                |c0, c1| sel.map_or(false, |(r0, c0s, r1, c1s)| {
+                    let (ra, rb) = (r0.min(r1), r0.max(r1));
+                    let (ca, cb) = (c0s.min(c1s), c0s.max(c1s));
+                    (ra..=rb).contains(&disp_row) && (ca..=cb).contains(&c0) || (ca..=cb).contains(&c1)
+                }),
+            );
+            disp_r += 1;
         }
+
         let _ = sel;
 
         // Cursor (block / beam / underline per PTY style)
@@ -1108,7 +1151,7 @@ impl CanvasPanel {
         self.draw_item_bg_rect(cx, bar_rect, [0.14, 0.16, 0.22, 1.0]);
         self.draw_title
             .draw_vars
-            .set_uniform(cx.cx, live_id!(color), &TITLE_TEXT);
+            .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
         self.draw_title.draw_abs(
             cx,
             bar_rect.pos + Vec2d { x: 10.0, y: 7.0 },
@@ -1281,7 +1324,8 @@ impl Widget for CanvasPanel {
             self.last_mouse = me.abs;
             if let Some((sel_id, sr, sc)) = self.selecting {
                 if let Some(item) = self.items.iter().find(|i| i.id() == sel_id) {
-                    if let Some((er, ec)) = self.screen_to_cell(item, me.abs, self.world_viewport()) {
+                    if let Some((er, ec)) = self.screen_to_cell(item, me.abs, self.world_viewport())
+                    {
                         if let Some(session) = item.session() {
                             if let Ok(mut st) = session.state.lock() {
                                 st.selection = Some((sr, sc, er, ec));
@@ -1366,20 +1410,10 @@ impl Widget for CanvasPanel {
             });
             if let Some(item) = term_under {
                 if let Some(session) = item.session() {
-                    let delta = (se.scroll.y / 20.0).round() as i64;
+                    // Wheel up (negative scroll.y) shows history: offset+.
+                    let delta = (se.scroll.y / 20.0).round() as i32;
                     if delta != 0 {
-                        let new_offset = {
-                            let st = session.state.lock();
-                            match st {
-                                Ok(st) => (st.scroll_offset as i64 - delta).max(0),
-                                Err(_) => 0,
-                            }
-                        } as usize;
-                        if new_offset == 0 {
-                            session.reset_history();
-                        } else {
-                            session.fetch_history(new_offset);
-                        }
+                        session.scroll_display(-delta);
                         self.redraw(cx);
                     }
                     return;
