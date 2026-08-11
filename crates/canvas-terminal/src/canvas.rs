@@ -554,22 +554,11 @@ impl CanvasPanel {
         command: &str,
         state: &std::sync::Arc<std::sync::Mutex<crate::terminal::state::TerminalState>>,
     ) {
-        // Background
+        // Background first (DrawColor)
         self.draw_item_bg_rect(cx, screen, TERM_BG);
-
-        // Border (plain quads; the custom pixel-fn shader corrupted
-        // subsequent DrawText rendering, so we draw the frame manually).
+        // Border (DrawColor)
         self.draw_border_rect(cx, screen, TERM_BORDER);
-
-        // Title bar (no bg block; text only - a bg rect corrupts content)
-        let title_rect = Rect {
-            pos: screen.pos,
-            size: Vec2d {
-                x: screen.size.x,
-                y: 26.0,
-            },
-        };
-        let _ = title_rect;
+        // Title text (DrawText) - drawn after bg/border but before content
         self.draw_title
             .draw_vars
             .set_uniform(cx.cx, live_id!(color), &TITLE_TEXT);
@@ -965,10 +954,21 @@ impl Widget for CanvasPanel {
             .button(cx, ids!(menu_new_browser))
             .clicked(&actions)
         {
-            self.spawn_browser(cx, "https://github.com");
             self.view
                 .view(cx, ids!(new_item_menu))
                 .set_visible(cx, false);
+            let ti = self.view.text_input(cx, ids!(command_input));
+            let prefix = "/new browser ";
+            ti.set_text(cx, prefix);
+            ti.set_key_focus(cx);
+            ti.set_cursor(
+                cx,
+                makepad_widgets::makepad_draw::text::selection::Cursor {
+                    index: prefix.len(),
+                    prefer_next_row: false,
+                },
+                true,
+            );
             self.redraw(cx);
         }
         if self.view.button(cx, ids!(menu_new_note)).clicked(&actions) {
