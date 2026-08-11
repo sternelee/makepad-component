@@ -58,6 +58,17 @@ enum BtnKind {
     Close,
 }
 
+/// A minimized item's stored data.
+/// For Terminal, `extra` = command and `session` keeps the live PTY alive.
+type MinimizedItem = (
+    u64,
+    ItemKind,
+    Rect,
+    String,
+    String,
+    Option<Box<crate::terminal::session::TerminalSession>>,
+);
+
 #[derive(Script, ScriptHook, Widget)]
 pub struct CanvasPanel {
     #[deref]
@@ -88,10 +99,12 @@ pub struct CanvasPanel {
     /// The dock chip currently hovered, if any.
     #[rust]
     hovered_chip: Option<u64>,
-    /// Minimized items: (id, kind, world rect, title, extra string).
-    /// For Terminal, extra = command; for Browser, extra = url.
+    /// Minimized items: (id, kind, world rect, title, extra, session).
+    /// For Terminal, extra = command and session keeps the live PTY alive
+    /// so restore can reuse it without re-spawning (which would collide on
+    /// the create_only rmux session name). For Browser, extra = url.
     #[rust]
-    minimized: Vec<(u64, ItemKind, Rect, String, String)>,
+    minimized: Vec<MinimizedItem>,
     #[rust]
     focused_terminal: Option<u64>,
     /// Set when the reader thread reported new output for a session.
@@ -333,27 +346,31 @@ impl CanvasPanel {
             return;
         };
         let item = self.items.remove(pos);
-        let meta = match &item {
+        let meta = match item {
             CanvasItem::Terminal {
                 world,
                 title,
                 session,
                 ..
-            } => (
-                id,
-                ItemKind::Terminal,
-                *world,
-                title.clone(),
-                session
+            } => {
+                let command = session
                     .as_ref()
                     .map(|s| s.command.clone())
-                    .unwrap_or_default(),
-            ),
+                    .unwrap_or_default();
+                (
+                    id,
+                    ItemKind::Terminal,
+                    world,
+                    title,
+                    command,
+                    session,
+                )
+            }
             CanvasItem::Browser {
                 world, title, url, ..
-            } => (id, ItemKind::Browser, *world, title.clone(), url.clone()),
+            } => (id, ItemKind::Browser, world, title, url, None),
             CanvasItem::Note { world, title, .. } => {
-                (id, ItemKind::Note, *world, title.clone(), String::new())
+                (id, ItemKind::Note, world, title, String::new(), None)
             }
         };
         self.minimized.push(meta);
@@ -367,28 +384,17 @@ impl CanvasPanel {
         let Some(pos) = self.minimized.iter().position(|m| m.0 == id) else {
             return;
         };
-        let (id, kind, world, title, extra) = self.minimized.remove(pos);
+        let (id, kind, world, title, extra, session) = self.minimized.remove(pos);
         match kind {
             ItemKind::Terminal => {
-                // Re-spawn the PTY session with the stored command.
-                let (cols, rows) = {
-                    let w = world.size.x;
-                    let h = world.size.y;
-                    (
-                        ((w - 12.0) / TERM_CELL_W).floor().max(10.0) as usize,
-                        ((h - 34.0) / TERM_CELL_H).floor().max(3.0) as usize,
-                    )
-                };
-                if let Ok(session) =
-                    crate::terminal::TerminalSession::spawn(&title, &extra, cols, rows)
-                {
-                    self.items.push(CanvasItem::Terminal {
-                        id,
-                        world,
-                        title,
-                        session: Some(Box::new(session)),
-                    });
-                }
+                // Reuse the live session saved at minimize time; re-spawning
+                // would collide on the create_only rmux session name.
+                self.items.push(CanvasItem::Terminal {
+                    id,
+                    world,
+                    title,
+                    session,
+                });
             }
             ItemKind::Browser => {
                 self.items.push(CanvasItem::Browser {
