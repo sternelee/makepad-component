@@ -28,7 +28,7 @@ const BTN_CLOSE_HOVER: [f32; 4] = [0.65, 0.25, 0.25, 1.0];
 
 /// Bottom dock (screen-fixed minimize tray).
 const DOCK_H: f64 = 34.0;
-const DOCK_BOTTOM: f64 = 76.0;
+const DOCK_BOTTOM: f64 = 108.0;
 const DOCK_BG: [f32; 4] = [0.10, 0.11, 0.15, 1.0];
 const CHIP_BG: [f32; 4] = [0.16, 0.18, 0.24, 1.0];
 const CHIP_BG_HOVER: [f32; 4] = [0.22, 0.26, 0.34, 1.0];
@@ -263,7 +263,6 @@ impl CanvasPanel {
             .map(|i| i.id())
     }
 
-
     /// Compute the minimize/close button rects for an item's screen rect.
     /// Buttons live at the top-right of the item title bar.
     fn control_button_rects(r: Rect) -> (Rect, Rect) {
@@ -285,20 +284,17 @@ impl CanvasPanel {
 
     /// Topmost item whose title-bar control button is under `screen`.
     fn control_button_under(&self, screen: Vec2d) -> Option<(u64, BtnKind)> {
-        self.items
-            .iter()
-            .rev()
-            .find_map(|i| {
-                let r = self.item_screen_rect(i);
-                let (min_r, close_r) = Self::control_button_rects(r);
-                if min_r.contains(screen) {
-                    Some((i.id(), BtnKind::Minimize))
-                } else if close_r.contains(screen) {
-                    Some((i.id(), BtnKind::Close))
-                } else {
-                    None
-                }
-            })
+        self.items.iter().rev().find_map(|i| {
+            let r = self.item_screen_rect(i);
+            let (min_r, close_r) = Self::control_button_rects(r);
+            if min_r.contains(screen) {
+                Some((i.id(), BtnKind::Minimize))
+            } else if close_r.contains(screen) {
+                Some((i.id(), BtnKind::Close))
+            } else {
+                None
+            }
+        })
     }
 
     /// The minimized-item chip under `screen` in the bottom dock (if any).
@@ -316,7 +312,10 @@ impl CanvasPanel {
                     x: x0 + i as f64 * (chip_w + 8.0),
                     y: tray_y + 4.0,
                 },
-                size: Vec2d { x: chip_w, y: chip_h },
+                size: Vec2d {
+                    x: chip_w,
+                    y: chip_h,
+                },
             };
             if rect.contains(screen) {
                 return Some(m.0);
@@ -335,27 +334,27 @@ impl CanvasPanel {
         };
         let item = self.items.remove(pos);
         let meta = match &item {
-            CanvasItem::Terminal { world, title, session, .. } => (
+            CanvasItem::Terminal {
+                world,
+                title,
+                session,
+                ..
+            } => (
                 id,
                 ItemKind::Terminal,
                 *world,
                 title.clone(),
-                session.as_ref().map(|s| s.command.clone()).unwrap_or_default(),
+                session
+                    .as_ref()
+                    .map(|s| s.command.clone())
+                    .unwrap_or_default(),
             ),
-            CanvasItem::Browser { world, title, url, .. } => (
-                id,
-                ItemKind::Browser,
-                *world,
-                title.clone(),
-                url.clone(),
-            ),
-            CanvasItem::Note { world, title, .. } => (
-                id,
-                ItemKind::Note,
-                *world,
-                title.clone(),
-                String::new(),
-            ),
+            CanvasItem::Browser {
+                world, title, url, ..
+            } => (id, ItemKind::Browser, *world, title.clone(), url.clone()),
+            CanvasItem::Note { world, title, .. } => {
+                (id, ItemKind::Note, *world, title.clone(), String::new())
+            }
         };
         self.minimized.push(meta);
         self.selected = None;
@@ -380,7 +379,9 @@ impl CanvasPanel {
                         ((h - 34.0) / TERM_CELL_H).floor().max(3.0) as usize,
                     )
                 };
-                if let Ok(session) = crate::terminal::TerminalSession::spawn(&title, &extra, cols, rows) {
+                if let Ok(session) =
+                    crate::terminal::TerminalSession::spawn(&title, &extra, cols, rows)
+                {
                     self.items.push(CanvasItem::Terminal {
                         id,
                         world,
@@ -734,23 +735,26 @@ impl CanvasPanel {
         self.draw_cursor.draw_abs(cx, grip2);
     }
 
-
     /// Draw the minimize/close control buttons in the item's title bar.
     fn draw_control_buttons(&mut self, cx: &mut Cx2d, id: u64, screen: Rect) {
         let (min_r, close_r) = Self::control_button_rects(screen);
         let min_hov = self.hovered_btn == Some((id, BtnKind::Minimize));
         let close_hov = self.hovered_btn == Some((id, BtnKind::Close));
         // Minimize button (—)
-        self.draw_item_bg_rect(
-            cx,
-            min_r,
-            if min_hov { BTN_HOVER } else { BTN_BG },
-        );
+        self.draw_item_bg_rect(cx, min_r, if min_hov { BTN_HOVER } else { BTN_BG });
         self.draw_border_rect(cx, min_r, BTN_BORDER);
-        self.draw_cursor.color = Vec4f { x: 0.7, y: 0.75, z: 0.85, w: 1.0 };
+        self.draw_cursor.color = Vec4f {
+            x: 0.7,
+            y: 0.75,
+            z: 0.85,
+            w: 1.0,
+        };
         let dash = Rect {
             pos: min_r.pos + Vec2d { x: 6.0, y: 8.0 },
-            size: Vec2d { x: min_r.size.x - 12.0, y: 2.0 },
+            size: Vec2d {
+                x: min_r.size.x - 12.0,
+                y: 2.0,
+            },
         };
         self.draw_cursor.draw_abs(cx, dash);
         // Close button (×)
@@ -760,15 +764,26 @@ impl CanvasPanel {
             if close_hov { BTN_CLOSE_HOVER } else { BTN_BG },
         );
         self.draw_border_rect(cx, close_r, BTN_BORDER);
-        self.draw_cursor.color = Vec4f { x: 0.9, y: 0.85, z: 0.85, w: 1.0 };
+        self.draw_cursor.color = Vec4f {
+            x: 0.9,
+            y: 0.85,
+            z: 0.85,
+            w: 1.0,
+        };
         let x1 = Rect {
             pos: close_r.pos + Vec2d { x: 6.0, y: 5.0 },
-            size: Vec2d { x: close_r.size.x - 12.0, y: 2.0 },
+            size: Vec2d {
+                x: close_r.size.x - 12.0,
+                y: 2.0,
+            },
         };
         self.draw_cursor.draw_abs(cx, x1);
         let x2 = Rect {
             pos: close_r.pos + Vec2d { x: 6.0, y: 11.0 },
-            size: Vec2d { x: close_r.size.x - 12.0, y: 2.0 },
+            size: Vec2d {
+                x: close_r.size.x - 12.0,
+                y: 2.0,
+            },
         };
         self.draw_cursor.draw_abs(cx, x2);
     }
@@ -781,7 +796,10 @@ impl CanvasPanel {
         let tray_y = viewport.y - DOCK_BOTTOM;
         let tray_rect = Rect {
             pos: Vec2d { x: 0.0, y: tray_y },
-            size: Vec2d { x: viewport.x, y: DOCK_H },
+            size: Vec2d {
+                x: viewport.x,
+                y: DOCK_H,
+            },
         };
         self.draw_item_bg_rect(cx, tray_rect, DOCK_BG);
         self.draw_border_rect(cx, tray_rect, CHIP_BORDER);
@@ -801,7 +819,10 @@ impl CanvasPanel {
                     x: x0 + i as f64 * (chip_w + 8.0),
                     y: tray_y + 4.0,
                 },
-                size: Vec2d { x: chip_w, y: chip_h },
+                size: Vec2d {
+                    x: chip_w,
+                    y: chip_h,
+                },
             };
             let hov = hovered_chip == Some(*id);
             self.draw_item_bg_rect(cx, rect, if hov { CHIP_BG_HOVER } else { CHIP_BG });
@@ -815,11 +836,8 @@ impl CanvasPanel {
             self.draw_cell_text
                 .draw_vars
                 .set_uniform(cx.cx, live_id!(color), &TITLE_TEXT);
-            self.draw_cell_text.draw_abs(
-                cx,
-                rect.pos + Vec2d { x: 8.0, y: 6.0 },
-                &label,
-            );
+            self.draw_cell_text
+                .draw_abs(cx, rect.pos + Vec2d { x: 8.0, y: 6.0 }, &label);
         }
     }
 
@@ -1398,11 +1416,12 @@ impl Widget for CanvasPanel {
             }
         }
 
-        // Bottom dock (minimized items tray).
-        self.draw_dock(cx, rect.size);
-
-        // Children (command bar, status label) draw on top.
+        // Children (command bar, status label) draw first.
         while self.view.draw_walk(cx, scope, walk).step().is_some() {}
+
+        // Bottom dock (minimized items tray) draws ON TOP of the command
+        // bar, so minimized items stay visible above the input box.
+        self.draw_dock(cx, rect.size);
 
         DrawStep::done()
     }
