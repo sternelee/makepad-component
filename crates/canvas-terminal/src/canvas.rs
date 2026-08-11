@@ -18,12 +18,21 @@ const TERM_BORDER: [f32; 4] = [0.20, 0.24, 0.32, 1.0];
 const SEL_BORDER: [f32; 4] = [0.30, 0.62, 0.98, 1.0];
 const TITLE_TEXT: [f32; 4] = [0.85, 0.88, 0.94, 1.0];
 
-/// Drag state while moving an item.
+/// Drag state while moving or resizing an item.
 struct DragState {
     item_id: u64,
     /// World position of the cursor at drag start.
     grab_world: Vec2d,
     item_origin_world: Vec2d,
+    /// Starting world size (for resize mode).
+    item_origin_size: Vec2d,
+    mode: DragMode,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum DragMode {
+    Move,
+    Resize,
 }
 
 #[derive(Script, ScriptHook, Widget)]
@@ -61,8 +70,6 @@ pub struct CanvasPanel {
     draw_grid: DrawQuad,
     #[live]
     draw_item_bg: DrawColor,
-    #[live]
-    draw_item_border: DrawQuad,
     #[live]
     draw_title: DrawText,
     #[live]
@@ -220,6 +227,29 @@ impl CanvasPanel {
             .iter()
             .rev()
             .find(|i| self.item_screen_rect(i).contains(screen))
+            .map(|i| i.id())
+    }
+
+    /// Topmost item whose bottom-right resize handle is under `screen`.
+    fn resize_handle_under(&self, screen: Vec2d) -> Option<u64> {
+        const HANDLE: f64 = 18.0;
+        self.items
+            .iter()
+            .rev()
+            .find(|i| {
+                let r = self.item_screen_rect(i);
+                let handle = Rect {
+                    pos: Vec2d {
+                        x: r.pos.x + r.size.x - HANDLE,
+                        y: r.pos.y + r.size.y - HANDLE,
+                    },
+                    size: Vec2d {
+                        x: HANDLE,
+                        y: HANDLE,
+                    },
+                };
+                handle.contains(screen)
+            })
             .map(|i| i.id())
     }
 
@@ -410,6 +440,67 @@ impl CanvasPanel {
         self.draw_item_bg.draw_abs(cx, rect);
     }
 
+    /// Draw a 4-edge border using plain DrawColor quads (avoids the custom
+    /// DrawQuad pixel-fn shader, whose draw corrupts subsequent DrawText
+    /// rendering in the same frame).
+    fn draw_border_rect(&mut self, cx: &mut Cx2d, rect: Rect, color: [f32; 4]) {
+        const T: f64 = 1.5;
+        // top
+        self.draw_item_bg_rect(
+            cx,
+            Rect {
+                pos: rect.pos,
+                size: Vec2d {
+                    x: rect.size.x,
+                    y: T,
+                },
+            },
+            color,
+        );
+        // bottom
+        self.draw_item_bg_rect(
+            cx,
+            Rect {
+                pos: Vec2d {
+                    x: rect.pos.x,
+                    y: rect.pos.y + rect.size.y - T,
+                },
+                size: Vec2d {
+                    x: rect.size.x,
+                    y: T,
+                },
+            },
+            color,
+        );
+        // left
+        self.draw_item_bg_rect(
+            cx,
+            Rect {
+                pos: rect.pos,
+                size: Vec2d {
+                    x: T,
+                    y: rect.size.y,
+                },
+            },
+            color,
+        );
+        // right
+        self.draw_item_bg_rect(
+            cx,
+            Rect {
+                pos: Vec2d {
+                    x: rect.pos.x + rect.size.x - T,
+                    y: rect.pos.y,
+                },
+                size: Vec2d {
+                    x: T,
+                    y: rect.size.y,
+                },
+            },
+            color,
+        );
+    }
+
     fn draw_note_title(&mut self, cx: &mut Cx2d, title: &str, screen: Rect) {
         self.draw_item_bg_rect(cx, screen, NOTE_COLOR);
         self.draw_title
@@ -417,6 +508,42 @@ impl CanvasPanel {
             .set_uniform(cx.cx, live_id!(color), &TITLE_TEXT);
         self.draw_title
             .draw_abs(cx, screen.pos + Vec2d { x: 10.0, y: 8.0 }, title);
+    }
+
+    /// Draw the bottom-right resize handle of a selected item.
+    fn draw_resize_handle(&mut self, cx: &mut Cx2d, screen: Rect) {
+        const HANDLE: f64 = 18.0;
+        let handle_rect = Rect {
+            pos: Vec2d {
+                x: screen.pos.x + screen.size.x - HANDLE,
+                y: screen.pos.y + screen.size.y - HANDLE,
+            },
+            size: Vec2d {
+                x: HANDLE,
+                y: HANDLE,
+            },
+        };
+        // Handle background.
+        self.draw_item_bg_rect(cx, handle_rect, [0.16, 0.20, 0.30, 1.0]);
+        // Handle border.
+        self.draw_border_rect(cx, handle_rect, SEL_BORDER);
+        // Diagonal grip line.
+        self.draw_cursor.color = Vec4f {
+            x: 0.62,
+            y: 0.78,
+            z: 0.98,
+            w: 1.0,
+        };
+        let grip = Rect {
+            pos: handle_rect.pos + Vec2d { x: 5.0, y: 5.0 },
+            size: Vec2d { x: 8.0, y: 2.0 },
+        };
+        self.draw_cursor.draw_abs(cx, grip);
+        let grip2 = Rect {
+            pos: handle_rect.pos + Vec2d { x: 9.0, y: 11.0 },
+            size: Vec2d { x: 4.0, y: 2.0 },
+        };
+        self.draw_cursor.draw_abs(cx, grip2);
     }
 
     fn draw_terminal_at(
@@ -430,7 +557,11 @@ impl CanvasPanel {
         // Background
         self.draw_item_bg_rect(cx, screen, TERM_BG);
 
-        // Title bar
+        // Border (plain quads; the custom pixel-fn shader corrupted
+        // subsequent DrawText rendering, so we draw the frame manually).
+        self.draw_border_rect(cx, screen, TERM_BORDER);
+
+        // Title bar (no bg block; text only - a bg rect corrupts content)
         let title_rect = Rect {
             pos: screen.pos,
             size: Vec2d {
@@ -438,10 +569,7 @@ impl CanvasPanel {
                 y: 26.0,
             },
         };
-        self.draw_item_border
-            .draw_vars
-            .set_uniform(cx.cx, live_id!(color), &TERM_BORDER);
-        self.draw_item_border.draw_abs(cx, title_rect);
+        let _ = title_rect;
         self.draw_title
             .draw_vars
             .set_uniform(cx.cx, live_id!(color), &TITLE_TEXT);
@@ -456,35 +584,52 @@ impl CanvasPanel {
             Err(_) => return,
         };
 
+        // Content area (below the title bar, inside the item border).
         let origin = screen.pos + Vec2d { x: 6.0, y: 30.0 };
-        let char_w = TERM_CELL_W * self.camera.zoom as f64;
-        let line_h = TERM_CELL_H * self.camera.zoom as f64;
+        let content_w = (screen.size.x - 12.0).max(1.0);
+        let content_h = (screen.size.y - 34.0).max(1.0);
 
-        // Only draw rows within the item viewport.
-        let max_rows = ((screen.size.y - 34.0) / line_h).floor() as usize;
-        let start_row = grid.cursor_row.saturating_sub(max_rows.saturating_sub(1));
+        // Cell size tiles the content rect exactly (grid dims include zoom).
+        let cols = grid.cols.max(1);
+        let rows = grid.rows.max(1);
+        let char_w = content_w / cols as f64;
+        let line_h = content_h / rows as f64;
 
-        for r in start_row..(start_row + max_rows).min(grid.lines.len()) {
-            let row = &grid.lines[r];
-            let y = origin.y + (r - start_row) as f64 * line_h;
+        // Tail view: show the LAST `rows` lines (the on-screen viewport).
+        let total = grid.lines.len();
+        let start = total.saturating_sub(rows);
+        let draw_rows = (total - start).min(rows);
 
-            // Group the row into color runs.
+        // Clip glyph/background drawing to the content rect so no text can
+        // overflow outside the terminal item (e.g. long unwrapped lines).
+        let content_rect = Rect {
+            pos: origin,
+            size: Vec2d {
+                x: content_w,
+                y: content_h,
+            },
+        };
+        cx.push_clip_rect(content_rect);
+
+        // Draw rows: background cells then text runs.
+        for r in 0..draw_rows {
+            let row = &grid.lines[start + r];
+            let y = origin.y + r as f64 * line_h;
+
             let mut i = 0;
-            while i < row.len() {
+            while i < row.len() && i < cols {
                 let cell = &row[i];
                 let fg = cell.fg;
                 let bg = cell.bg;
                 let bold = cell.bold;
-                // Find the extent of the run.
                 let mut j = i;
-                while j < row.len() {
+                while j < row.len() && j < cols {
                     let c = &row[j];
                     if c.fg != fg || c.bg != bg || c.bold != bold {
                         break;
                     }
                     j += 1;
                 }
-                // Text of the run.
                 let mut text = String::new();
                 for cell in row.iter().take(j).skip(i) {
                     text.push(cell.ch);
@@ -497,7 +642,6 @@ impl CanvasPanel {
                         y: line_h,
                     },
                 };
-                // Background for non-default bg.
                 if bg != DEFAULT_BG {
                     self.draw_cell_bg.color = Vec4f {
                         x: bg[0],
@@ -507,7 +651,6 @@ impl CanvasPanel {
                     };
                     self.draw_cell_bg.draw_abs(cx, run_rect);
                 }
-                // Text
                 self.draw_cell_text.draw_vars.set_uniform(
                     cx.cx,
                     live_id!(color),
@@ -520,32 +663,35 @@ impl CanvasPanel {
 
         // Cursor
         if grid.cursor_visible() {
-            let c = grid.cursor_col;
-            let r = grid.cursor_row;
-            if r >= start_row && r < start_row + max_rows {
-                let pos = origin
-                    + Vec2d {
-                        x: c as f64 * char_w,
-                        y: (r - start_row) as f64 * line_h,
-                    };
-                self.draw_cursor.color = Vec4f {
-                    x: 0.30,
-                    y: 0.62,
-                    z: 0.98,
-                    w: 1.0,
+            let c = grid.cursor_col.min(cols - 1);
+            let r = grid
+                .cursor_row
+                .saturating_sub(start)
+                .min(draw_rows.saturating_sub(1));
+            let pos = origin
+                + Vec2d {
+                    x: c as f64 * char_w,
+                    y: r as f64 * line_h,
                 };
-                self.draw_cursor.draw_abs(
-                    cx,
-                    Rect {
-                        pos,
-                        size: Vec2d {
-                            x: char_w,
-                            y: line_h,
-                        },
+            self.draw_cursor.color = Vec4f {
+                x: 0.30,
+                y: 0.62,
+                z: 0.98,
+                w: 1.0,
+            };
+            self.draw_cursor.draw_abs(
+                cx,
+                Rect {
+                    pos,
+                    size: Vec2d {
+                        x: char_w,
+                        y: line_h,
                     },
-                );
-            }
+                },
+            );
         }
+
+        cx.pop_clip_rect();
     }
 
     /// Draw a browser card and drive the embedded CEF browser slot.
@@ -558,12 +704,7 @@ impl CanvasPanel {
     fn draw_browser_at(&mut self, cx: &mut Cx2d, id: u64, screen: Rect, is_sel: bool, url: &str) {
         // Card background + border + title chrome.
         self.draw_item_bg_rect(cx, screen, TERM_BG);
-        self.draw_item_border.draw_vars.set_uniform(
-            cx.cx,
-            live_id!(color),
-            &(if is_sel { SEL_BORDER } else { TERM_BORDER }),
-        );
-        self.draw_item_border.draw_abs(cx, screen);
+        self.draw_border_rect(cx, screen, if is_sel { SEL_BORDER } else { TERM_BORDER });
 
         let bar_rect = Rect {
             pos: screen.pos,
@@ -666,7 +807,22 @@ impl Widget for CanvasPanel {
         if let Event::MouseDown(me) = event {
             if me.button.contains(MouseButton::PRIMARY) {
                 self.last_mouse = me.abs;
-                if let Some(id) = self.hit_test(me.abs) {
+                // Resize handle hit-test first: bottom-right corner of the
+                // topmost item under the cursor.
+                let resize_target = self.resize_handle_under(me.abs);
+                if let Some(id) = resize_target {
+                    self.selected = Some(id);
+                    if let Some(item) = self.items.iter().find(|i| i.id() == id) {
+                        self.drag = Some(DragState {
+                            item_id: id,
+                            grab_world: self.camera.screen_to_world(me.abs, self.world_viewport()),
+                            item_origin_world: item.world().pos,
+                            item_origin_size: item.world().size,
+                            mode: DragMode::Resize,
+                        });
+                    }
+                    self.redraw(cx);
+                } else if let Some(id) = self.hit_test(me.abs) {
                     self.selected = Some(id);
                     if let Some(item) = self.items.iter().find(|i| i.id() == id) {
                         let is_terminal = item.kind() == ItemKind::Terminal;
@@ -674,6 +830,8 @@ impl Widget for CanvasPanel {
                             item_id: id,
                             grab_world: self.camera.screen_to_world(me.abs, self.world_viewport()),
                             item_origin_world: item.world().pos,
+                            item_origin_size: item.world().size,
+                            mode: DragMode::Move,
                         });
                         if is_terminal {
                             self.focus_terminal(cx, Some(id));
@@ -694,20 +852,20 @@ impl Widget for CanvasPanel {
                 let world = self.camera.screen_to_world(me.abs, self.world_viewport());
                 let delta = world - drag.grab_world;
                 let item_id = drag.item_id;
-                let item_origin_world = drag.item_origin_world;
-                if let Some(item) = self.items.iter_mut().find(|i| i.id() == item_id) {
-                    item.world_mut().pos = item_origin_world + delta;
-                    // Live-resize the terminal pty grid on move.
-                    if item.kind() == ItemKind::Terminal {
-                        let w = item.world().size.x;
-                        let h = item.world().size.y;
-                        let (cols, rows) = {
-                            let cols = ((w - 12.0) / TERM_CELL_W).floor().max(10.0) as usize;
-                            let rows = ((h - 34.0) / TERM_CELL_H).floor().max(3.0) as usize;
-                            (cols, rows)
-                        };
-                        if let Some(session) = item.session_mut() {
-                            session.resize(cols, rows);
+                match drag.mode {
+                    DragMode::Move => {
+                        let item_origin_world = drag.item_origin_world;
+                        if let Some(item) = self.items.iter_mut().find(|i| i.id() == item_id) {
+                            item.world_mut().pos = item_origin_world + delta;
+                        }
+                    }
+                    DragMode::Resize => {
+                        let item_origin_size = drag.item_origin_size;
+                        if let Some(item) = self.items.iter_mut().find(|i| i.id() == item_id) {
+                            // Clamp to a sensible minimum world size.
+                            let new_w = (item_origin_size.x + delta.x).max(200.0);
+                            let new_h = (item_origin_size.y + delta.y).max(140.0);
+                            item.world_mut().size = Vec2d { x: new_w, y: new_h };
                         }
                     }
                 }
@@ -780,6 +938,47 @@ impl Widget for CanvasPanel {
             }
         }
 
+        // ── New-item menu ──
+        let menu_btn = self.view.button(cx, ids!(menu_button));
+        if menu_btn.clicked(&actions) {
+            log!("canvas: menu_button clicked");
+            let menu = self.view.view(cx, ids!(new_item_menu));
+            let menu_visible = menu.visible();
+            log!("canvas: menu visible was {menu_visible}");
+            menu.set_visible(cx, !menu_visible);
+            self.redraw(cx);
+        }
+        if self
+            .view
+            .button(cx, ids!(menu_new_terminal))
+            .clicked(&actions)
+        {
+            let cmd = std::env::var("SHELL").unwrap_or_else(|_| "zsh".to_string());
+            self.spawn_terminal(cx, "term", &cmd);
+            self.view
+                .view(cx, ids!(new_item_menu))
+                .set_visible(cx, false);
+            self.redraw(cx);
+        }
+        if self
+            .view
+            .button(cx, ids!(menu_new_browser))
+            .clicked(&actions)
+        {
+            self.spawn_browser(cx, "https://github.com");
+            self.view
+                .view(cx, ids!(new_item_menu))
+                .set_visible(cx, false);
+            self.redraw(cx);
+        }
+        if self.view.button(cx, ids!(menu_new_note)).clicked(&actions) {
+            self.spawn_note(cx);
+            self.view
+                .view(cx, ids!(new_item_menu))
+                .set_visible(cx, false);
+            self.redraw(cx);
+        }
+
         // Unified command input.
         if let Some((text, _mods)) = self
             .view
@@ -848,6 +1047,37 @@ impl Widget for CanvasPanel {
 
         for (item_id, kind, item_screen, is_sel, title, command, url, state) in draw_queue {
             match kind {
+                ItemKind::Terminal => {
+                    self.draw_border_rect(
+                        cx,
+                        item_screen,
+                        if is_sel { SEL_BORDER } else { TERM_BORDER },
+                    );
+                    // Keep the PTY grid in sync with the on-screen content
+                    // area every frame (handles zoom and item resizes).
+                    if let Some(session) = self
+                        .items
+                        .iter()
+                        .find(|i| i.id() == item_id)
+                        .and_then(|i| i.session())
+                    {
+                        let content_w = (item_screen.size.x - 12.0).max(1.0);
+                        let content_h = (item_screen.size.y - 34.0).max(1.0);
+                        let cols = (content_w / (TERM_CELL_W * self.camera.zoom as f64))
+                            .floor()
+                            .max(10.0) as usize;
+                        let rows = (content_h / (TERM_CELL_H * self.camera.zoom as f64))
+                            .floor()
+                            .max(3.0) as usize;
+                        session.resize(cols, rows);
+                    }
+                    if let Some(state) = state {
+                        self.draw_terminal_at(cx, item_screen, &title, &command, &state);
+                    }
+                    if is_sel {
+                        self.draw_resize_handle(cx, item_screen);
+                    }
+                }
                 ItemKind::Note => {
                     self.draw_item_bg_rect(
                         cx,
@@ -855,19 +1085,15 @@ impl Widget for CanvasPanel {
                         if is_sel { SEL_BORDER } else { NOTE_BORDER },
                     );
                     self.draw_note_title(cx, &title, item_screen);
-                }
-                ItemKind::Terminal => {
-                    self.draw_item_border.draw_vars.set_uniform(
-                        cx.cx,
-                        live_id!(color),
-                        &(if is_sel { SEL_BORDER } else { TERM_BORDER }),
-                    );
-                    if let Some(state) = state {
-                        self.draw_terminal_at(cx, item_screen, &title, &command, &state);
+                    if is_sel {
+                        self.draw_resize_handle(cx, item_screen);
                     }
                 }
                 ItemKind::Browser => {
                     self.draw_browser_at(cx, item_id, item_screen, is_sel, &url);
+                    if is_sel {
+                        self.draw_resize_handle(cx, item_screen);
+                    }
                 }
             }
         }

@@ -104,8 +104,28 @@ impl TerminalState {
     }
 
     pub fn resize(&mut self, cols: usize, rows: usize) {
-        self.cols = cols.max(1);
-        self.rows = rows.max(1);
+        let new_cols = cols.max(1);
+        let new_rows = rows.max(1);
+        if new_cols == self.cols && new_rows == self.rows {
+            return;
+        }
+        // Only drain top lines when the row count actually shrinks; a pure
+        // column change must never drop history (spawn-vs-draw cols differ by
+        // one cell and draining on that would throw away the prompt).
+        if new_rows < self.rows && self.lines.len() > new_rows {
+            let drop = self.lines.len() - new_rows;
+            let mut dropped: Vec<Vec<Cell>> = self.lines.drain(..drop).collect();
+            self.scrollback_lines.append(&mut dropped);
+            let overflow = self
+                .scrollback_lines
+                .len()
+                .saturating_sub(self.max_scrollback);
+            if overflow > 0 {
+                self.scrollback_lines.drain(..overflow);
+            }
+        }
+        self.cols = new_cols;
+        self.rows = new_rows;
         self.ensure_rows();
         for line in self.lines.iter_mut() {
             line.resize(self.cols, Cell::default());

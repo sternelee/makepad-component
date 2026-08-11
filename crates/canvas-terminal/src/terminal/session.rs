@@ -50,6 +50,8 @@ pub struct TerminalSession {
     rx: std::sync::mpsc::Receiver<Vec<u8>>,
     /// Keep the stream task alive.
     _stream: Arc<tokio::task::JoinHandle<()>>,
+    /// Last requested grid size (to short-circuit redundant resizes).
+    last_cols: std::sync::Mutex<(usize, usize)>,
 }
 
 impl TerminalSession {
@@ -100,6 +102,7 @@ impl TerminalSession {
             pane,
             rx,
             _stream: Arc::new(stream_task),
+            last_cols: std::sync::Mutex::new((cols, rows)),
         })
     }
 
@@ -130,8 +133,21 @@ impl TerminalSession {
         });
     }
 
-    /// Resize the pane grid.
+    /// Resize the pane grid. Short-circuits when the size is unchanged so
+    /// the per-frame draw sync does not spam the rmux daemon with SIGWINCH
+    /// resizes (which would reflow the shell and look broken).
     pub fn resize(&self, cols: usize, rows: usize) {
+        {
+            let mut last = match self.last_cols.lock() {
+                Ok(l) => l,
+                Err(_) => return,
+            };
+            if *last == (cols, rows) {
+                return;
+            }
+            *last = (cols, rows);
+        }
+        log!("rmux: resize to {cols}x{rows}");
         let pane = self.pane.clone();
         runtime().spawn(async move {
             let _ = pane
@@ -161,18 +177,24 @@ async fn consume_stream(
     loop {
         let next = tokio::time::timeout(Duration::from_secs(30), stream.next()).await;
         match next {
-            Ok(Ok(Some(chunk))) => if let rmux_sdk::PaneOutputChunk::Bytes { bytes, .. } = chunk {
-                if let Ok(mut st) = state.lock() {
-                    st.feed(&bytes);
+            Ok(Ok(Some(chunk))) => {
+                if let rmux_sdk::PaneOutputChunk::Bytes { bytes, .. } = chunk {
+                    if let Ok(mut st) = state.lock() {
+                        st.feed(&bytes);
+                    }
+                    let _ = tx.send(bytes);
+                } else {
+                    log!("rmux: stream chunk (non-bytes)");
                 }
-                let _ = tx.send(bytes);
-            },
+            }
             Ok(Err(e)) => {
                 log!("rmux: stream error: {e}");
                 break;
             }
             Ok(Ok(None)) => break,
-            Err(_) => break,
+            // Timeout with no new output is normal for an idle pane:
+            // keep the stream alive so later output still arrives.
+            Err(_) => continue,
         }
     }
 }

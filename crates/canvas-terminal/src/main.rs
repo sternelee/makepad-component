@@ -58,15 +58,6 @@ script_mod! {
         draw_item_bg +: {
             color: #x1a1c24ff
         }
-        draw_item_border +: {
-            color: #x262a35ff
-            pixel: fn() {
-                let p = self.pos * self.rect_size
-                let d = min(min(p.x, self.rect_size.x - p.x), min(p.y, self.rect_size.y - p.y))
-                let a = 1.0 - smoothstep(0.0, 1.0, d)
-                return vec4(self.color.x, self.color.y, self.color.z, self.color.w * a)
-            }
-        }
         draw_title +: {
             text_style: theme.font_bold{font_size: 13.0}
             color: #xe2e6efff
@@ -75,7 +66,7 @@ script_mod! {
             color: #xff0000ff
         }
         draw_cell_text +: {
-            text_style: theme.font_code{font_size: 12.5}
+            text_style: theme.font_bold{font_size: 12.5}
             color: #xe2e6efff
         }
         draw_cursor +: {
@@ -132,8 +123,64 @@ script_mod! {
                 show_bg: true
                 draw_bg +: {
                     color: #x15161cff
+                    pixel: fn() {
+                        let p = self.pos * self.rect_size
+                        let d = self.rect_size.y - p.y
+                        let a = clamp(d / 1.0, 0.0, 1.0)
+                        return vec4(self.color.x, self.color.y, self.color.z, self.color.w * a)
+                    }
                 }
                 padding: Inset{left: 16 right: 16 top: 8 bottom: 10}
+
+            // ── "New item" popup menu (hidden by default; shown above the
+            // input row when menu_button is clicked) ──
+            new_item_menu := View{
+                width: 190
+                height: Fit
+                flow: Down
+                spacing: 2
+                visible: false
+                margin: Inset{bottom: 8}
+                show_bg: true
+                draw_bg +: {
+                    color: #x1c1f28ff
+                    pixel: fn() {
+                        let p = self.pos * self.rect_size
+                        let d = min(min(p.x, self.rect_size.x - p.x), min(p.y, self.rect_size.y - p.y))
+                        let a = 1.0 - smoothstep(0.0, 1.0, d)
+                        return vec4(self.color.x, self.color.y, self.color.z, self.color.w * a)
+                    }
+                }
+                padding: Inset{top: 4 bottom: 4 left: 4 right: 4}
+
+                menu_new_terminal := Button{
+                    text: "Terminal"
+                    width: Fill
+                    height: 30
+                    draw_text +: {
+                        text_style: theme.font_regular{font_size: 13}
+                        color: mod.tc.text_primary
+                    }
+                }
+                menu_new_browser := Button{
+                    text: "Browser"
+                    width: Fill
+                    height: 30
+                    draw_text +: {
+                        text_style: theme.font_regular{font_size: 13}
+                        color: mod.tc.text_primary
+                    }
+                }
+                menu_new_note := Button{
+                    text: "Note"
+                    width: Fill
+                    height: 30
+                    draw_text +: {
+                        text_style: theme.font_regular{font_size: 13}
+                        color: mod.tc.text_primary
+                    }
+                }
+            }
 
             input_row := View{
                 width: Fill
@@ -141,6 +188,17 @@ script_mod! {
                 flow: Right
                 spacing: 10
                 align: Align{y: 0.5}
+
+                // ── "New item" menu button ──
+                menu_button := Button{
+                    text: "＋"
+                    width: 32
+                    height: 32
+                    draw_text +: {
+                        text_style: theme.font_regular{font_size: 16}
+                        color: mod.tc.text_primary
+                    }
+                }
 
                 prompt_label := Label{
                     text: "⌘"
