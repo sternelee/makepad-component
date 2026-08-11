@@ -53,6 +53,8 @@ pub struct TerminalSession {
     killed: Arc<std::sync::atomic::AtomicBool>,
     /// Set when the snapshot poll task reported new data.
     rx: std::sync::mpsc::Receiver<bool>,
+    /// Notify the UI (fetch_history etc.) to redraw.
+    notify: std::sync::mpsc::Sender<bool>,
     /// Keep the poll task alive.
     _poll: Arc<tokio::task::JoinHandle<()>>,
     /// Last requested grid size (to short-circuit redundant resizes).
@@ -88,6 +90,7 @@ impl TerminalSession {
         // — exactly what the user sees in the rmux pane.
         let killed = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (tx, rx) = std::sync::mpsc::channel::<bool>();
+        let notify = tx.clone();
         let state_poll = state.clone();
         let pane_poll = pane.clone();
         let killed_poll = killed.clone();
@@ -119,6 +122,7 @@ impl TerminalSession {
             session,
             killed,
             rx,
+            notify,
             _poll: Arc::new(poll_task),
             last_size: std::sync::Mutex::new((cols, rows)),
             window,
@@ -189,6 +193,38 @@ impl TerminalSession {
     pub fn kill(&self) {
         self.killed.store(true, std::sync::atomic::Ordering::SeqCst);
         let _ = runtime().block_on(self.session.kill());
+    }
+
+    /// Fetch `offset` lines of scrollback history (plus the current screen)
+    /// from the rmux daemon and store them in `TerminalState.history`.
+    pub fn fetch_history(&self, offset: usize) {
+        let pane = self.pane.clone();
+        let state = self.state.clone();
+        let notify = self.notify.clone();
+        runtime().spawn(async move {
+            match pane.capture_pane().start(-(offset as i64)).await {
+                Ok(capture) => {
+                    let text = String::from_utf8_lossy(&capture.stdout);
+                    let lines: Vec<String> = text.lines().map(|l| l.to_string()).collect();
+                    if let Ok(mut st) = state.lock() {
+                        st.history = lines;
+                        st.scroll_offset = offset;
+                    }
+                    let _ = notify.send(true);
+                }
+                Err(e) => {
+                    log!("rmux: capture history failed: {e}");
+                }
+            }
+        });
+    }
+
+    /// Reset scrollback (scroll back to the live tail).
+    pub fn reset_history(&self) {
+        if let Ok(mut st) = self.state.lock() {
+            st.history.clear();
+            st.scroll_offset = 0;
+        }
     }
 }
 

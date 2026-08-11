@@ -926,6 +926,15 @@ impl CanvasPanel {
         let start = total.saturating_sub(rows);
         let draw_rows = (total - start).min(rows);
 
+        // Scrollback: render captured history lines ABOVE the live snapshot.
+        // History is plain text (no per-cell colors); snapshot draws below.
+        let hist_offset = grid.scroll_offset.min(grid.history.len());
+        let hist_lines: Vec<String> = grid
+            .history
+            .iter()
+            .take(hist_offset).cloned()
+            .collect();
+
         // Clip glyph/background drawing to the content rect so no text can
         // overflow outside the terminal item (e.g. long unwrapped lines).
         let content_rect = Rect {
@@ -937,12 +946,25 @@ impl CanvasPanel {
         };
         cx.push_clip_rect(content_rect);
 
+        // Draw scrollback history lines (plain text, above the viewport).
+        for (hr, hist) in hist_lines.iter().enumerate() {
+            let y = origin.y + hr as f64 * line_h;
+            self.draw_cell_text
+                .draw_vars
+                .set_uniform(cx.cx, live_id!(color), &[0.75, 0.78, 0.85, 1.0]);
+            self.draw_cell_text
+                .draw_abs(cx, Vec2d { x: origin.x, y }, hist);
+        }
+
         // Draw rows: background cells then text runs.
+        // When scrolled, the snapshot viewport shifts down by hist_offset.
+        let hist_offset = grid.scroll_offset.min(grid.history.len());
+        let live_rows = draw_rows.saturating_sub(hist_offset);
         let sel = grid.selection;
-        for r in 0..draw_rows {
+        for r in 0..live_rows {
             let row = &grid.lines[start + r];
             let abs_r = start + r;
-            let y = origin.y + r as f64 * line_h;
+            let y = origin.y + (hist_offset + r) as f64 * line_h;
 
             let mut i = 0;
             while i < row.len() && i < cols {
@@ -1011,7 +1033,7 @@ impl CanvasPanel {
             let pos = origin
                 + Vec2d {
                     x: c as f64 * char_w,
-                    y: r as f64 * line_h,
+                    y: (hist_offset + r) as f64 * line_h,
                 };
             self.draw_cursor.color = Vec4f {
                 x: 0.30,
@@ -1334,8 +1356,36 @@ impl Widget for CanvasPanel {
         }
 
         if let Event::Scroll(se) = event {
-            // Zoom with pinch-like scroll; two-finger scroll on trackpads zooms
-            // when the pointer is over empty canvas.
+            // Scrollback: if the cursor is over a terminal's content area,
+            // scroll the terminal history instead of panning/zooming the
+            // canvas (like alacritty/wezterm).
+            let term_under = self.items.iter().rev().find(|i| {
+                i.kind() == ItemKind::Terminal
+                    && self.item_screen_rect(i).contains(se.abs)
+                    && se.abs.y > self.item_screen_rect(i).pos.y + 26.0
+            });
+            if let Some(item) = term_under {
+                if let Some(session) = item.session() {
+                    let delta = (se.scroll.y / 20.0).round() as i64;
+                    if delta != 0 {
+                        let new_offset = {
+                            let st = session.state.lock();
+                            match st {
+                                Ok(st) => (st.scroll_offset as i64 - delta).max(0),
+                                Err(_) => 0,
+                            }
+                        } as usize;
+                        if new_offset == 0 {
+                            session.reset_history();
+                        } else {
+                            session.fetch_history(new_offset);
+                        }
+                        self.redraw(cx);
+                    }
+                    return;
+                }
+            }
+            // Not over a terminal: zoom/pan the canvas as before.
             if se.is_mouse {
                 // Wheel: zoom out/in based on delta.y
                 let factor = (-se.scroll.y as f32 * 0.001 + 1.0).clamp(0.5, 2.0);

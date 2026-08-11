@@ -55,6 +55,11 @@ pub struct TerminalState {
     pub cursor_style: u8,
     /// Text selection in cell coords: (start_row, start_col, end_row, end_col).
     pub selection: Option<(usize, usize, usize, usize)>,
+    /// Lines scrolled above the viewport (scrollback), captured from the
+    /// rmux daemon. Index 0 is the oldest visible history line.
+    pub history: Vec<String>,
+    /// How many history lines are shown above the current screen (0 = tail).
+    pub scroll_offset: usize,
 }
 
 impl TerminalState {
@@ -68,6 +73,8 @@ impl TerminalState {
             cursor_visible: true,
             cursor_style: 0,
             selection: None,
+            history: Vec::new(),
+            scroll_offset: 0,
         }
     }
 
