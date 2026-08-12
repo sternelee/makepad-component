@@ -1310,6 +1310,11 @@ impl Widget for CanvasPanel {
                                     }
                                 }
                             }
+                            // Clicking the content area focuses the terminal too
+                            // (otherwise keyboard input stays routed to the
+                            // command bar after focus left the terminal).
+                            // `item` borrow ends here; focus_terminal needs &mut self.
+                            self.focus_terminal(cx, Some(id));
                         } else {
                             self.drag = Some(DragState {
                                 item_id: id,
