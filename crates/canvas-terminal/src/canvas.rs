@@ -901,15 +901,8 @@ impl CanvasPanel {
                 }
                 j += 1;
             }
-            let mut text = String::new();
-            for cell in row.iter().take(j).skip(i) {
-                if !cell.wide_padding {
-                    text.push(cell.ch);
-                }
-            }
-            let x = x0 + i as f64 * char_w;
             let run_rect = Rect {
-                pos: Vec2d { x, y },
+                pos: Vec2d { x: x0 + i as f64 * char_w, y },
                 size: Vec2d {
                     x: (j - i) as f64 * char_w,
                     y: line_h,
@@ -946,7 +939,19 @@ impl CanvasPanel {
                 col[2] *= 0.6;
             }
             self.draw_cell_text.color = Vec4f { x: col[0], y: col[1], z: col[2], w: col[3] };
-            self.draw_cell_text.draw_abs(cx, Vec2d { x, y }, &text);
+            // Per-character slot drawing: each glyph at its cell's fixed
+            // x (char_w grid), so no advance-vs-cell-width drift overlaps.
+            for (k, cell) in row.iter().take(j).skip(i).enumerate() {
+                if cell.wide_padding {
+                    continue;
+                }
+                if cell.ch == ' ' {
+                    continue;
+                }
+                let cx_pos = x0 + (i + k) as f64 * char_w;
+                let cs = cell.ch.to_string();
+                self.draw_cell_text.draw_abs(cx, Vec2d { x: cx_pos, y }, &cs);
+            }
             i = j;
         }
     }
