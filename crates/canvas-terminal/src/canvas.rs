@@ -1679,6 +1679,15 @@ impl Widget for CanvasPanel {
         // bar, so minimized items stay visible above the input box.
         self.draw_dock(cx, rect.size);
 
+        // The new-item menu must stay above the dock. It was already drawn
+        // as part of the command bar pass; re-draw it here (after the dock)
+        // when visible so the dock cannot cover the popup.
+        if self.view.view(cx, ids!(new_item_menu)).visible() {
+            let menu = self.view.view(cx, ids!(new_item_menu));
+            let menu_walk = menu.walk(cx.cx);
+            while menu.draw_walk(cx, &mut Scope::empty(), menu_walk).step().is_some() {}
+        }
+
         DrawStep::done()
     }
 }
