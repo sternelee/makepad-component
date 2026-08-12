@@ -8,7 +8,7 @@ use crate::terminal::state::{Cell, DEFAULT_BG};
 /// Grid spacing in world units.
 const GRID_SIZE: f64 = 24.0;
 /// Terminal font metrics.
-const TERM_CELL_W: f64 = 7.6;
+const TERM_CELL_W: f64 = 8.0;
 const TERM_CELL_H: f64 = 17.3;
 
 const NOTE_COLOR: [f32; 4] = [0.20, 0.24, 0.34, 1.0];
@@ -990,6 +990,10 @@ impl CanvasPanel {
         let rows = grid.rows.max(1);
         let char_w = TERM_CELL_W * self.camera.zoom as f64;
         let line_h = TERM_CELL_H * self.camera.zoom as f64;
+        // Scale the font with zoom so glyph width matches char_w (prevents
+        // horizontal overlap when zooming out; glyphs would otherwise stay at
+        // fixed size and collide).
+        self.draw_cell_text.font_scale = self.camera.zoom;
 
         // Tail view: show the LAST `rows` lines (the on-screen viewport).
         let total = grid.lines.len();
