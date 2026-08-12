@@ -1687,10 +1687,16 @@ impl Widget for CanvasPanel {
         // the popup always sits above the dock tray (overlay draw lists are
         // painted last regardless of widget z-order).
         if self.view.view(cx, ids!(new_item_menu)).visible() {
+            let menu = self.view.view(cx, ids!(new_item_menu));
+            let menu_pos = menu.area().rect(cx.cx).pos;
+            let menu_walk = menu.walk(cx.cx).with_abs_pos(menu_pos);
             let draw_list = &mut self.draw_list;
             draw_list.begin_overlay_last(cx);
-            let menu = self.view.view(cx, ids!(new_item_menu));
-            menu.draw_all(cx, scope);
+            while menu
+                .draw_walk(cx, &mut Scope::empty(), menu_walk)
+                .step()
+                .is_some()
+            {}
             draw_list.end(cx);
         }
 
