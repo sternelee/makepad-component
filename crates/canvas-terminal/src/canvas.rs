@@ -135,6 +135,10 @@ pub struct CanvasPanel {
     /// item_id → browser slot index (0..=3) for CEF embedded browsers.
     #[rust]
     browser_slots: Vec<(u64, usize)>,
+    /// Overlay draw list for the new-item menu — rendered after the dock so
+    /// the popup can never be occluded by the dock tray.
+    #[live]
+    draw_list: DrawList2d,
 }
 
 impl CanvasPanel {
@@ -1679,13 +1683,15 @@ impl Widget for CanvasPanel {
         // bar, so minimized items stay visible above the input box.
         self.draw_dock(cx, rect.size);
 
-        // The new-item menu must stay above the dock. It was already drawn
-        // as part of the command bar pass; re-draw it here (after the dock)
-        // when visible so the dock cannot cover the popup.
+        // New-item menu: re-render in an overlay draw list AFTER the dock so
+        // the popup always sits above the dock tray (overlay draw lists are
+        // painted last regardless of widget z-order).
         if self.view.view(cx, ids!(new_item_menu)).visible() {
+            let draw_list = &mut self.draw_list;
+            draw_list.begin_overlay_last(cx);
             let menu = self.view.view(cx, ids!(new_item_menu));
-            let menu_walk = menu.walk(cx.cx);
-            while menu.draw_walk(cx, &mut Scope::empty(), menu_walk).step().is_some() {}
+            menu.draw_all(cx, scope);
+            draw_list.end(cx);
         }
 
         DrawStep::done()
