@@ -9,7 +9,7 @@ use crate::terminal::state::{Cell, DEFAULT_BG};
 const GRID_SIZE: f64 = 24.0;
 /// Terminal font metrics.
 const TERM_CELL_W: f64 = 7.6;
-const TERM_CELL_H: f64 = 16.0;
+const TERM_CELL_H: f64 = 17.3;
 
 const NOTE_COLOR: [f32; 4] = [0.20, 0.24, 0.34, 1.0];
 const NOTE_BORDER: [f32; 4] = [0.36, 0.43, 0.60, 1.0];
