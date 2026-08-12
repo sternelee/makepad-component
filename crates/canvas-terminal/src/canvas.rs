@@ -165,8 +165,10 @@ impl CanvasPanel {
         self.redraw(cx);
     }
 
-    /// Spawn a terminal item running `command` (default shell).
-    pub fn spawn_terminal(&mut self, cx: &mut Cx, name: &str, command: &str) {
+    /// Spawn a terminal item running `command` (default shell) with the
+    /// given `name`; `cwd` sets the PTY working directory (None = current
+    /// directory).
+    pub fn spawn_terminal(&mut self, cx: &mut Cx, name: &str, cwd: Option<&str>, command: &str) {
         let world_pos = self
             .camera
             .screen_to_world(self.viewport * 0.5, self.world_viewport());
@@ -183,7 +185,7 @@ impl CanvasPanel {
             session: None,
         };
         let (cols, rows) = self.term_grid_size(&item);
-        match crate::terminal::TerminalSession::spawn(name, command, cols, rows) {
+        match crate::terminal::TerminalSession::spawn(name, command, cwd, cols, rows) {
             Ok(session) => {
                 let mut item = item;
                 // Store the session into the Terminal variant's slot.
@@ -505,10 +507,10 @@ impl CanvasPanel {
                 self.spawn_note(cx);
                 self.status(cx, "Created note");
             }
-            Command::NewTerminal { name } => {
+            Command::NewTerminal { name, cwd } => {
                 // Default shell command for a new terminal.
                 let cmd = std::env::var("SHELL").unwrap_or_else(|_| "zsh".to_string());
-                self.spawn_terminal(cx, &name, &cmd);
+                self.spawn_terminal(cx, &name, cwd.as_deref(), &cmd);
             }
             Command::NewBrowser { url } => {
                 self.spawn_browser(cx, &url);
@@ -519,6 +521,19 @@ impl CanvasPanel {
                     self.focus_terminal(cx, Some(item.id()));
                 } else {
                     self.status(cx, &format!("No terminal named '{name}'"));
+                }
+            }
+            Command::Rename { old, new } => {
+                if let Some(item) = self
+                    .items
+                    .iter_mut()
+                    .find(|i| i.kind() == ItemKind::Terminal && i.title() == old)
+                {
+                    *item.title_mut() = new.clone();
+                    self.redraw(cx);
+                    self.status(cx, &format!("Renamed '{old}' → '{new}'"));
+                } else {
+                    self.status(cx, &format!("No terminal named '{old}'"));
                 }
             }
             Command::Zoom { factor } => {
@@ -902,7 +917,10 @@ impl CanvasPanel {
                 j += 1;
             }
             let run_rect = Rect {
-                pos: Vec2d { x: x0 + i as f64 * char_w, y },
+                pos: Vec2d {
+                    x: x0 + i as f64 * char_w,
+                    y,
+                },
                 size: Vec2d {
                     x: (j - i) as f64 * char_w,
                     y: line_h,
@@ -920,16 +938,16 @@ impl CanvasPanel {
             if selected || bg != DEFAULT_BG {
                 let a = eff_bg[3];
                 let c = if dim {
-                    [
-                        eff_bg[0] * 0.6,
-                        eff_bg[1] * 0.6,
-                        eff_bg[2] * 0.6,
-                        a,
-                    ]
+                    [eff_bg[0] * 0.6, eff_bg[1] * 0.6, eff_bg[2] * 0.6, a]
                 } else {
                     eff_bg
                 };
-                self.draw_cell_bg.color = Vec4f { x: c[0], y: c[1], z: c[2], w: c[3] };
+                self.draw_cell_bg.color = Vec4f {
+                    x: c[0],
+                    y: c[1],
+                    z: c[2],
+                    w: c[3],
+                };
                 self.draw_cell_bg.draw_abs(cx, run_rect);
             }
             let mut col = [fg[0], fg[1], fg[2], 1.0];
@@ -938,7 +956,12 @@ impl CanvasPanel {
                 col[1] *= 0.6;
                 col[2] *= 0.6;
             }
-            self.draw_cell_text.color = Vec4f { x: col[0], y: col[1], z: col[2], w: col[3] };
+            self.draw_cell_text.color = Vec4f {
+                x: col[0],
+                y: col[1],
+                z: col[2],
+                w: col[3],
+            };
             // Per-character slot drawing: each glyph at its cell's fixed
             // x (char_w grid), so no advance-vs-cell-width drift overlaps.
             for (k, cell) in row.iter().take(j).skip(i).enumerate() {
@@ -950,7 +973,8 @@ impl CanvasPanel {
                 }
                 let cx_pos = x0 + (i + k) as f64 * char_w;
                 let cs = cell.ch.to_string();
-                self.draw_cell_text.draw_abs(cx, Vec2d { x: cx_pos, y }, &cs);
+                self.draw_cell_text
+                    .draw_abs(cx, Vec2d { x: cx_pos, y }, &cs);
             }
             i = j;
         }
@@ -1009,8 +1033,7 @@ impl CanvasPanel {
         // above the main grid (both rendered as cell runs with colors).
         let hist_offset = grid.scroll_offset.min(grid.scrollback.len());
         let hist_start = grid.scrollback.len().saturating_sub(hist_offset);
-        let hist_rows: Vec<&Vec<Cell>> =
-            grid.scrollback.iter().skip(hist_start).collect();
+        let hist_rows: Vec<&Vec<Cell>> = grid.scrollback.iter().skip(hist_start).collect();
         // Live rows below the history, limited by remaining space.
         let live_rows = rows.saturating_sub(hist_offset);
         let live_rows = live_rows.min(draw_rows);
@@ -1059,22 +1082,13 @@ impl CanvasPanel {
             let dim = hist_offset > 0;
             let disp_row = disp_r;
             let row_sel = row.clone();
-            self.draw_terminal_row(
-                cx,
-                &row_sel,
-                origin.x,
-                y,
-                char_w,
-                line_h,
-                dim,
-                |c0, _c1| {
-                    sel.is_some_and(|(r0, c0s, r1, c1s)| {
-                        let (ra, rb) = (r0.min(r1), r0.max(r1));
-                        let (ca, cb) = (c0s.min(c1s), c0s.max(c1s));
-                        (ra..=rb).contains(&disp_row) && (ca..=cb).contains(&c0)
-                    })
-                },
-            );
+            self.draw_terminal_row(cx, &row_sel, origin.x, y, char_w, line_h, dim, |c0, _c1| {
+                sel.is_some_and(|(r0, c0s, r1, c1s)| {
+                    let (ra, rb) = (r0.min(r1), r0.max(r1));
+                    let (ca, cb) = (c0s.min(c1s), c0s.max(c1s));
+                    (ra..=rb).contains(&disp_row) && (ca..=cb).contains(&c0)
+                })
+            });
             disp_r += 1;
         }
 
@@ -1500,7 +1514,7 @@ impl Widget for CanvasPanel {
             .clicked(&actions)
         {
             let cmd = std::env::var("SHELL").unwrap_or_else(|_| "zsh".to_string());
-            self.spawn_terminal(cx, "term", &cmd);
+            self.spawn_terminal(cx, "term", None, &cmd);
             self.view
                 .view(cx, ids!(new_item_menu))
                 .set_visible(cx, false);

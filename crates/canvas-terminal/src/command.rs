@@ -3,9 +3,10 @@
 /// Supported forms:
 /// - `@name message...`   → send raw text to the terminal named `name`
 /// - `/new note`          → create a note item
-/// - `/new terminal NAME` → create a terminal item
+/// - `/new terminal NAME[:CWD]` → create a terminal item (optional working dir)
 /// - `/new browser URL`   → create a browser item
 /// - `/focus NAME`        → focus the terminal named `NAME`
+/// - `/rename OLD NEW`    → rename a terminal
 /// - `/zoom 1.5`          → set zoom
 /// - `/help`              → show usage
 /// - anything else        → sent to the active terminal
@@ -19,12 +20,18 @@ pub enum Command {
     NewNote,
     NewTerminal {
         name: String,
+        /// Working directory for the new terminal's PTY (None = current dir).
+        cwd: Option<String>,
     },
     NewBrowser {
         url: String,
     },
     Focus {
         name: String,
+    },
+    Rename {
+        old: String,
+        new: String,
     },
     Zoom {
         factor: f32,
@@ -61,8 +68,19 @@ pub fn parse(line: &str) -> Command {
             Some("new") => match parts.next() {
                 Some("note") => return Command::NewNote,
                 Some("terminal") => {
-                    let name = parts.next().unwrap_or("term").to_string();
-                    return Command::NewTerminal { name };
+                    let spec = parts.next().unwrap_or("term").to_string();
+                    // NAME[:CWD] — split on the FIRST ':' so CWDs containing
+                    // ':' (e.g. `C:/...` on Windows) still work.
+                    let (name, cwd) = match spec.split_once(':') {
+                        Some((n, c)) => (n.to_string(), Some(c.to_string())),
+                        None => (spec, None),
+                    };
+                    let name = if name.is_empty() {
+                        "term".to_string()
+                    } else {
+                        name
+                    };
+                    return Command::NewTerminal { name, cwd };
                 }
                 Some("browser") => {
                     let url = parts.next().unwrap_or("https://github.com").to_string();
@@ -80,6 +98,13 @@ pub fn parse(line: &str) -> Command {
             Some("zoom") => {
                 if let Some(f) = parts.next().and_then(|s| s.parse::<f32>().ok()) {
                     return Command::Zoom { factor: f };
+                }
+            }
+            Some("rename") => {
+                let old = parts.next().unwrap_or("").to_string();
+                let new = parts.next().unwrap_or("").to_string();
+                if !old.is_empty() && !new.is_empty() {
+                    return Command::Rename { old, new };
                 }
             }
             Some("help") => return Command::Help,
@@ -123,7 +148,15 @@ mod tests {
         assert_eq!(
             parse("/new terminal claude"),
             Command::NewTerminal {
-                name: "claude".into()
+                name: "claude".into(),
+                cwd: None
+            }
+        );
+        assert_eq!(
+            parse("/new terminal myshell:~/projects/foo"),
+            Command::NewTerminal {
+                name: "myshell".into(),
+                cwd: Some("~/projects/foo".into())
             }
         );
         assert_eq!(

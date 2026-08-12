@@ -277,7 +277,7 @@ impl AppMain for App {
                 .text_input(cx, ids!(main_window.body.canvas.command_wrap.command_bar.command_input))
                 .set_key_focus(cx);
             if let Some(mut panel) = self.ui.widget(cx, ids!(main_window.body.canvas)).borrow_mut::<CanvasPanel>() {
-                panel.spawn_terminal(cx, "claude", "zsh");
+                panel.spawn_terminal(cx, "claude", None, "zsh");
             }
         }
         self.ui.handle_event(cx, event, &mut Scope::empty());
