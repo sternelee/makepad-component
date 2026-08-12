@@ -1209,8 +1209,8 @@ impl CanvasPanel {
 
         // Drive the slot: set url once, make it visible, draw it at the
         // item rect, then hide it again for the overlay flow pass.
-        let slot_path = LiveId::from_str_num("browser_slot_", slot as u64);
-        let slot_widget = self.view.widget(cx.cx, &[slot_path]);
+        let slot_id = LiveId::from_str(&format!("browser_slot_{}", slot));
+        let slot_widget = self.view.widget(cx.cx, &[slot_id]);
         let slot_browser = slot_widget.as_browser();
         if !self.browser_spawned.contains(&id) {
             self.browser_spawned.push(id);
