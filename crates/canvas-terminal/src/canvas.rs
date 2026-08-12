@@ -135,10 +135,6 @@ pub struct CanvasPanel {
     /// item_id → browser slot index (0..=3) for CEF embedded browsers.
     #[rust]
     browser_slots: Vec<(u64, usize)>,
-    /// Overlay draw list for the new-item menu — rendered after the dock so
-    /// the popup can never be occluded by the dock tray.
-    #[live]
-    draw_list: DrawList2d,
 }
 
 impl CanvasPanel {
@@ -1676,29 +1672,16 @@ impl Widget for CanvasPanel {
             }
         }
 
-        // Children (command bar, status label) draw first.
-        while self.view.draw_walk(cx, scope, walk).step().is_some() {}
-
-        // Bottom dock (minimized items tray) draws ON TOP of the command
-        // bar, so minimized items stay visible above the input box.
+        // Bottom dock (minimized items tray) draws FIRST — it sits in the
+        // gap between the command bar and the bottom edge (y-108..y-74), and
+        // drawing it before the command-bar pass lets the new-item menu
+        // (which pops up above the input row into the dock's band) render on
+        // top of the dock instead of being occluded by it.
         self.draw_dock(cx, rect.size);
 
-        // New-item menu: re-render in an overlay draw list AFTER the dock so
-        // the popup always sits above the dock tray (overlay draw lists are
-        // painted last regardless of widget z-order).
-        if self.view.view(cx, ids!(new_item_menu)).visible() {
-            let menu = self.view.view(cx, ids!(new_item_menu));
-            let menu_pos = menu.area().rect(cx.cx).pos;
-            let menu_walk = menu.walk(cx.cx).with_abs_pos(menu_pos);
-            let draw_list = &mut self.draw_list;
-            draw_list.begin_overlay_last(cx);
-            while menu
-                .draw_walk(cx, &mut Scope::empty(), menu_walk)
-                .step()
-                .is_some()
-            {}
-            draw_list.end(cx);
-        }
+        // Children (command bar, status label, popup menu) draw AFTER the
+        // dock, so the menu always covers the dock tray.
+        while self.view.draw_walk(cx, scope, walk).step().is_some() {}
 
         DrawStep::done()
     }
