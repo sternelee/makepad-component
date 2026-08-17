@@ -467,16 +467,31 @@ impl CanvasPanel {
         Some((row, col))
     }
 
-    /// Note palette/canvas layout geometry on screen.
+    /// Geometry for the global left tool palette. The palette stays fixed
+    /// in screen space and is vertically centered in the canvas viewport.
+    fn tool_palette_rect(&self) -> Rect {
+        const PALETTE_W: f64 = 40.0;
+        const BTN: f64 = 28.0;
+        const GAP: f64 = 4.0;
+        const PADDING: f64 = 4.0;
+        let height = 8.0 * (BTN + GAP) + PADDING * 2.0;
+        Rect {
+            pos: Vec2d {
+                x: 2.0,
+                y: ((self.viewport.y - height) * 0.5).max(2.0),
+            },
+            size: Vec2d {
+                x: PALETTE_W,
+                y: height,
+            },
+        }
+    }
+
     /// Tool button index (0..7) under `screen` for the global palette, or None.
     fn tool_under(&self, screen: Vec2d) -> Option<usize> {
         const BTN: f64 = 28.0;
         const GAP: f64 = 4.0;
-        const TITLE_H: f64 = 26.0;
-        let palette = Rect {
-            pos: Vec2d { x: 2.0, y: TITLE_H },
-            size: Vec2d { x: 40.0, y: 8.0 * (BTN + GAP) + 4.0 },
-        };
+        let palette = self.tool_palette_rect();
         for i in 0..8 {
             let r = Rect {
                 pos: palette.pos
@@ -835,14 +850,8 @@ impl CanvasPanel {
         }
     }
 
-    /// Draw one completed or in-progress shape in note-local world coords.
-    fn draw_note_shape(
-        &mut self,
-        cx: &mut Cx2d,
-        shape: &NoteShape,
-        zoom: f64,
-        color: [f32; 4],
-    ) {
+    /// Draw one completed or in-progress global whiteboard shape in world coords.
+    fn draw_note_shape(&mut self, cx: &mut Cx2d, shape: &NoteShape, zoom: f64, color: [f32; 4]) {
         let viewport = self.world_viewport();
         let pan = self.camera.pan;
         let zoom_f = self.camera.zoom as f64;
@@ -946,16 +955,9 @@ impl CanvasPanel {
     /// of the canvas (screen-fixed, like the dock), always available.
     fn draw_tool_palette(&mut self, cx: &mut Cx2d) {
         const PALETTE_W: f64 = 40.0;
-        const TITLE_H: f64 = 26.0;
         const BTN: f64 = 28.0;
         const GAP: f64 = 4.0;
-        let palette_rect = Rect {
-            pos: Vec2d { x: 2.0, y: TITLE_H },
-            size: Vec2d {
-                x: PALETTE_W,
-                y: 8.0 * (BTN + GAP) + 4.0 + 4.0,
-            },
-        };
+        let palette_rect = self.tool_palette_rect();
         self.draw_item_bg_rect(cx, palette_rect, [0.12, 0.14, 0.20, 0.94]);
 
         for (i, t) in Self::note_tools().iter().enumerate() {
@@ -965,10 +967,7 @@ impl CanvasPanel {
                         x: (PALETTE_W - BTN) * 0.5,
                         y: 4.0 + i as f64 * (BTN + GAP),
                     },
-                size: Vec2d {
-                    x: BTN,
-                    y: BTN,
-                },
+                size: Vec2d { x: BTN, y: BTN },
             };
             let active = *t == self.tool;
             self.draw_item_bg_rect(
@@ -1637,8 +1636,12 @@ impl Widget for CanvasPanel {
                     self.note_draw = Some(world);
                     if self.tool != NoteTool::Eraser {
                         self.pending = Some(match self.tool {
-                            NoteTool::Pen => NoteShape::Pen { points: vec![world] },
-                            NoteTool::Polyline => NoteShape::Polyline { points: vec![world] },
+                            NoteTool::Pen => NoteShape::Pen {
+                                points: vec![world],
+                            },
+                            NoteTool::Polyline => NoteShape::Polyline {
+                                points: vec![world],
+                            },
                             NoteTool::Arrow => NoteShape::Arrow { a: world, b: world },
                             NoteTool::Rect => NoteShape::Rect { a: world, b: world },
                             NoteTool::Circle => NoteShape::Circle {
@@ -1688,8 +1691,7 @@ impl Widget for CanvasPanel {
                         *pending = Some(NoteShape::Rect { a: start, b: local });
                     }
                     NoteTool::Circle => {
-                        let r = ((local.x - start.x).powi(2) + (local.y - start.y).powi(2))
-                            .sqrt();
+                        let r = ((local.x - start.x).powi(2) + (local.y - start.y).powi(2)).sqrt();
                         *pending = Some(NoteShape::Circle { center: start, r });
                     }
                     NoteTool::Text | NoteTool::Eraser => {}
