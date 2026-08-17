@@ -508,6 +508,18 @@ impl CanvasPanel {
         None
     }
 
+    /// Return whether a screen point belongs to the fixed UI overlays rather
+    /// than the drawable canvas. The bottom band contains the command bar and
+    /// dock; an open new-item menu is also UI and must remain clickable.
+    fn is_canvas_ui_hit(&self, cx: &Cx, screen: Vec2d) -> bool {
+        const BOTTOM_UI_H: f64 = 112.0;
+        if screen.y >= self.viewport.y - BOTTOM_UI_H {
+            return true;
+        }
+        let menu = self.view.view(cx, ids!(new_item_menu));
+        menu.visible() && menu.area().is_valid(cx) && menu.area().rect(cx).contains(screen)
+    }
+
     /// Tool list in palette order (must match draw order).
     fn note_tools() -> [NoteTool; 8] {
         [
@@ -1632,9 +1644,12 @@ impl Widget for CanvasPanel {
                     self.selected = None;
                     self.focused_terminal = None;
                     self.panning = false;
+                    let ui_hit = self.is_canvas_ui_hit(cx, me.abs);
                     let world = self.camera.screen_to_world(me.abs, self.world_viewport());
-                    self.note_draw = Some(world);
-                    if self.tool != NoteTool::Eraser {
+                    if !ui_hit {
+                        self.note_draw = Some(world);
+                    }
+                    if !ui_hit && self.tool != NoteTool::Eraser {
                         self.pending = Some(match self.tool {
                             NoteTool::Pen => NoteShape::Pen {
                                 points: vec![world],
@@ -1768,7 +1783,6 @@ impl Widget for CanvasPanel {
                         self.shapes.push(shape);
                     }
                     self.redraw(cx);
-                    return;
                 }
                 if let Some((sel_id, _, _)) = self.selecting {
                     self.selecting = None;
