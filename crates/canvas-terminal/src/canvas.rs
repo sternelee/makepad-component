@@ -147,6 +147,9 @@ pub struct CanvasPanel {
     /// Global whiteboard: drawing session start point in world coords.
     #[rust]
     note_draw: Option<makepad_widgets::Vec2d>,
+    /// True while the Text tool is editing an in-progress text shape.
+    #[rust]
+    text_editing: bool,
 }
 
 impl CanvasPanel {
@@ -956,7 +959,13 @@ impl CanvasPanel {
                     live_id!(color),
                     &[1.0, 1.0, 1.0, 1.0],
                 );
-                self.draw_title.draw_abs(cx, p, text);
+                // Show a blinking caret while the in-progress text shape is
+                // being edited (empty text still shows the caret).
+                if self.text_editing {
+                    self.draw_title.draw_abs(cx, p, &format!("{text}▏"));
+                } else {
+                    self.draw_title.draw_abs(cx, p, text);
+                }
             }
         }
     }
@@ -1647,29 +1656,37 @@ impl Widget for CanvasPanel {
                     let ui_hit = self.is_canvas_ui_hit(cx, me.abs);
                     let world = self.camera.screen_to_world(me.abs, self.world_viewport());
                     if !ui_hit {
-                        self.note_draw = Some(world);
-                    }
-                    if !ui_hit && self.tool != NoteTool::Eraser {
-                        self.pending = Some(match self.tool {
-                            NoteTool::Pen => NoteShape::Pen {
-                                points: vec![world],
-                            },
-                            NoteTool::Polyline => NoteShape::Polyline {
-                                points: vec![world],
-                            },
-                            NoteTool::Arrow => NoteShape::Arrow { a: world, b: world },
-                            NoteTool::Rect => NoteShape::Rect { a: world, b: world },
-                            NoteTool::Circle => NoteShape::Circle {
-                                center: world,
-                                r: 0.0,
-                            },
-                            NoteTool::Line => NoteShape::Line { a: world, b: world },
-                            NoteTool::Text => NoteShape::Text {
+                        if self.tool == NoteTool::Text {
+                            // Text tool: click places an empty, editable text
+                            // shape; typing appends until Return/Escape. No
+                            // note_draw session, so MouseUp won't commit it.
+                            self.text_editing = true;
+                            self.pending = Some(NoteShape::Text {
                                 pos: world,
-                                text: "Text".to_string(),
-                            },
-                            NoteTool::Eraser => unreachable!(),
-                        });
+                                text: String::new(),
+                            });
+                        } else {
+                            self.note_draw = Some(world);
+                            if self.tool != NoteTool::Eraser {
+                                self.pending = Some(match self.tool {
+                                    NoteTool::Pen => NoteShape::Pen {
+                                        points: vec![world],
+                                    },
+                                    NoteTool::Polyline => NoteShape::Polyline {
+                                        points: vec![world],
+                                    },
+                                    NoteTool::Arrow => NoteShape::Arrow { a: world, b: world },
+                                    NoteTool::Rect => NoteShape::Rect { a: world, b: world },
+                                    NoteTool::Circle => NoteShape::Circle {
+                                        center: world,
+                                        r: 0.0,
+                                    },
+                                    NoteTool::Line => NoteShape::Line { a: world, b: world },
+                                    NoteTool::Text => unreachable!(),
+                                    NoteTool::Eraser => unreachable!(),
+                                });
+                            }
+                        }
                     }
                 }
                 self.redraw(cx);
@@ -1842,7 +1859,43 @@ impl Widget for CanvasPanel {
         }
 
         if let Event::KeyDown(key) = event {
-            if let Some(id) = self.focused_terminal {
+            // Whiteboard text editing takes priority over terminal input.
+            if self.text_editing {
+                let commit = |pending: &mut Option<NoteShape>,
+                             shapes: &mut Vec<NoteShape>|
+                -> bool {
+                    match pending.take() {
+                        Some(NoteShape::Text { .. }) => true,
+                        other => {
+                            if let Some(s) = other {
+                                shapes.push(s);
+                            }
+                            false
+                        }
+                    }
+                };
+                match key.key_code {
+                    KeyCode::Backspace => {
+                        if let Some(NoteShape::Text { text, .. }) = &mut self.pending {
+                            text.pop();
+                        }
+                        self.redraw(cx);
+                    }
+                    KeyCode::ReturnKey => {
+                        let was_text = commit(&mut self.pending, &mut self.shapes);
+                        self.text_editing = false;
+                        if was_text {
+                            self.redraw(cx);
+                        }
+                    }
+                    KeyCode::Escape => {
+                        self.pending = None;
+                        self.text_editing = false;
+                        self.redraw(cx);
+                    }
+                    _ => {}
+                }
+            } else if let Some(id) = self.focused_terminal {
                 if let Some(item) = self.items.iter().find(|i| i.id() == id) {
                     if let Some(session) = item.session() {
                         if let Some(bytes) = self.key_to_bytes(key) {
@@ -1860,7 +1913,12 @@ impl Widget for CanvasPanel {
         }
 
         if let Event::TextInput(te) = event {
-            if let Some(id) = self.focused_terminal {
+            if self.text_editing {
+                if let Some(NoteShape::Text { text, .. }) = &mut self.pending {
+                    text.push_str(&te.input);
+                }
+                self.redraw(cx);
+            } else if let Some(id) = self.focused_terminal {
                 if let Some(item) = self.items.iter().find(|i| i.id() == id) {
                     if let Some(session) = item.session() {
                         session.write_bytes(te.input.as_bytes());
