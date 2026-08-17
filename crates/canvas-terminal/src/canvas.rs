@@ -135,10 +135,18 @@ pub struct CanvasPanel {
     /// item_id → browser slot index (0..=3) for CEF embedded browsers.
     #[rust]
     browser_slots: Vec<(u64, usize)>,
-    /// Active note-whiteboard drawing session: (item_id, start point in
-    /// note-local world coords). None when not drawing.
+    /// Global whiteboard: active tool (cnvs-style palette).
     #[rust]
-    note_draw: Option<(u64, makepad_widgets::Vec2d)>,
+    tool: NoteTool,
+    /// Global whiteboard: completed shapes in world coords.
+    #[rust]
+    shapes: Vec<NoteShape>,
+    /// Global whiteboard: shape being drawn (mouse-down → move → up).
+    #[rust]
+    pending: Option<NoteShape>,
+    /// Global whiteboard: drawing session start point in world coords.
+    #[rust]
+    note_draw: Option<makepad_widgets::Vec2d>,
 }
 
 impl CanvasPanel {
@@ -163,9 +171,6 @@ impl CanvasPanel {
                 size: Vec2d { x: 240.0, y: 120.0 },
             },
             title: format!("Note {}", self.next_item_id),
-            tool: NoteTool::Arrow,
-            shapes: Vec::new(),
-            pending: None,
         };
         self.next_item_id += 1;
         self.items.push(item);
@@ -410,14 +415,7 @@ impl CanvasPanel {
                 });
             }
             ItemKind::Note => {
-                self.items.push(CanvasItem::Note {
-                    id,
-                    world,
-                    title,
-                    tool: NoteTool::Arrow,
-                    shapes: Vec::new(),
-                    pending: None,
-                });
+                self.items.push(CanvasItem::Note { id, world, title });
             }
         }
         self.selected = Some(id);
@@ -470,38 +468,15 @@ impl CanvasPanel {
     }
 
     /// Note palette/canvas layout geometry on screen.
-    fn note_layout(&self, item: &CanvasItem, viewport: Vec2d) -> Option<(Rect, Rect)> {
-        if item.kind() != ItemKind::Note {
-            return None;
-        }
-        let r = self.camera.world_rect_to_screen(item.world(), viewport);
-        const PALETTE_W: f64 = 40.0;
-        const TITLE_H: f64 = 26.0;
-        let palette = Rect {
-            pos: r.pos + Vec2d { x: 2.0, y: TITLE_H },
-            size: Vec2d {
-                x: PALETTE_W,
-                y: (r.size.y - TITLE_H - 4.0).max(1.0),
-            },
-        };
-        let canvas = Rect {
-            pos: r.pos + Vec2d {
-                x: 2.0 + PALETTE_W,
-                y: TITLE_H,
-            },
-            size: Vec2d {
-                x: (r.size.x - PALETTE_W - 4.0).max(1.0),
-                y: (r.size.y - TITLE_H - 4.0).max(1.0),
-            },
-        };
-        Some((palette, canvas))
-    }
-
-    /// Tool button index (0..7) under `screen` for a note's palette, or None.
-    fn note_tool_under(&self, item: &CanvasItem, screen: Vec2d, viewport: Vec2d) -> Option<usize> {
-        let (palette, _) = self.note_layout(item, viewport)?;
+    /// Tool button index (0..7) under `screen` for the global palette, or None.
+    fn tool_under(&self, screen: Vec2d) -> Option<usize> {
         const BTN: f64 = 28.0;
         const GAP: f64 = 4.0;
+        const TITLE_H: f64 = 26.0;
+        let palette = Rect {
+            pos: Vec2d { x: 2.0, y: TITLE_H },
+            size: Vec2d { x: 40.0, y: 8.0 * (BTN + GAP) + 4.0 },
+        };
         for i in 0..8 {
             let r = Rect {
                 pos: palette.pos
@@ -518,22 +493,7 @@ impl CanvasPanel {
         None
     }
 
-    /// Convert a screen point to note-local world coords (0,0 = canvas top-left).
-    fn screen_to_note_local(
-        &self,
-        item: &CanvasItem,
-        screen: Vec2d,
-        viewport: Vec2d,
-    ) -> Option<makepad_widgets::Vec2d> {
-        let (_, canvas) = self.note_layout(item, viewport)?;
-        let zoom = self.camera.zoom as f64;
-        Some(makepad_widgets::Vec2d {
-            x: (screen.x - canvas.pos.x) / zoom,
-            y: (screen.y - canvas.pos.y) / zoom,
-        })
-    }
-
-    /// Tool list in palette order (must match draw_note_at).
+    /// Tool list in palette order (must match draw order).
     fn note_tools() -> [NoteTool; 8] {
         [
             NoteTool::Arrow,
@@ -830,6 +790,15 @@ impl CanvasPanel {
         );
     }
 
+    fn draw_note_title(&mut self, cx: &mut Cx2d, title: &str, screen: Rect) {
+        self.draw_item_bg_rect(cx, screen, NOTE_COLOR);
+        self.draw_title
+            .draw_vars
+            .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
+        self.draw_title
+            .draw_abs(cx, screen.pos + Vec2d { x: 10.0, y: 8.0 }, title);
+    }
+
     /// Draw a straight stroke from `a` to `b` as overlapping unit squares
     /// (DrawColor is axis-aligned only; sampling the segment keeps any
     /// angle crisp enough for a whiteboard).
@@ -847,11 +816,7 @@ impl CanvasPanel {
         let step = (width * 0.5).max(1.0);
         let n = (dist / step).ceil().max(1.0) as usize;
         for i in 0..=n {
-            let t = if n == 0 {
-                0.0
-            } else {
-                i as f64 / n as f64
-            };
+            let t = if n == 0 { 0.0 } else { i as f64 / n as f64 };
             let p = makepad_widgets::Vec2d {
                 x: a.x + dx * t,
                 y: a.y + dy * t,
@@ -874,16 +839,15 @@ impl CanvasPanel {
     fn draw_note_shape(
         &mut self,
         cx: &mut Cx2d,
-        origin: makepad_widgets::Vec2d,
         shape: &NoteShape,
         zoom: f64,
         color: [f32; 4],
     ) {
-        let to_screen = |p: makepad_widgets::Vec2d| -> makepad_widgets::Vec2d {
-            makepad_widgets::Vec2d {
-                x: origin.x + p.x * zoom,
-                y: origin.y + p.y * zoom,
-            }
+        let viewport = self.world_viewport();
+        let pan = self.camera.pan;
+        let zoom_f = self.camera.zoom as f64;
+        let to_screen = move |p: makepad_widgets::Vec2d| -> makepad_widgets::Vec2d {
+            (p - pan) * zoom_f + viewport * 0.5
         };
         let w = (2.0 * zoom).max(1.5);
         match shape {
@@ -966,9 +930,11 @@ impl CanvasPanel {
             }
             NoteShape::Text { pos, text } => {
                 let p = to_screen(*pos);
-                self.draw_title
-                    .draw_vars
-                    .set_dyn_instance(cx.cx, live_id!(color), &[1.0, 1.0, 1.0, 1.0]);
+                self.draw_title.draw_vars.set_dyn_instance(
+                    cx.cx,
+                    live_id!(color),
+                    &[1.0, 1.0, 1.0, 1.0],
+                );
                 self.draw_title.draw_abs(cx, p, text);
             }
         }
@@ -976,61 +942,35 @@ impl CanvasPanel {
 
     /// Draw a note whiteboard: title bar, left vertical tool palette, and
     /// the drawing canvas with all shapes (cnvs-style).
-    fn draw_note_at(
-        &mut self,
-        cx: &mut Cx2d,
-        title: &str,
-        screen: Rect,
-        tool: NoteTool,
-        shapes: &[NoteShape],
-        pending: Option<&NoteShape>,
-    ) {
-        // Card background + border.
-        self.draw_item_bg_rect(cx, screen, NOTE_COLOR);
-
-        // Title bar (drawn by caller via draw_note_title when needed? No —
-        // keep it here so the palette starts below the title).
-        self.draw_title
-            .draw_vars
-            .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
-        self.draw_title
-            .draw_abs(cx, screen.pos + Vec2d { x: 10.0, y: 6.0 }, title);
-
-        // Left vertical tool palette.
+    /// Global whiteboard palette: a fixed vertical tool bar on the LEFT edge
+    /// of the canvas (screen-fixed, like the dock), always available.
+    fn draw_tool_palette(&mut self, cx: &mut Cx2d) {
         const PALETTE_W: f64 = 40.0;
         const TITLE_H: f64 = 26.0;
+        const BTN: f64 = 28.0;
+        const GAP: f64 = 4.0;
         let palette_rect = Rect {
-            pos: screen.pos + Vec2d { x: 2.0, y: TITLE_H },
+            pos: Vec2d { x: 2.0, y: TITLE_H },
             size: Vec2d {
                 x: PALETTE_W,
-                y: screen.size.y - TITLE_H - 4.0,
+                y: 8.0 * (BTN + GAP) + 4.0 + 4.0,
             },
         };
-        self.draw_item_bg_rect(cx, palette_rect, [0.13, 0.15, 0.21, 1.0]);
+        self.draw_item_bg_rect(cx, palette_rect, [0.12, 0.14, 0.20, 0.94]);
 
-        let tools = [
-            NoteTool::Arrow,
-            NoteTool::Pen,
-            NoteTool::Rect,
-            NoteTool::Circle,
-            NoteTool::Line,
-            NoteTool::Polyline,
-            NoteTool::Text,
-            NoteTool::Eraser,
-        ];
-        let btn_size = 28.0;
-        for (i, t) in tools.iter().enumerate() {
+        for (i, t) in Self::note_tools().iter().enumerate() {
             let r = Rect {
-                pos: palette_rect.pos + Vec2d {
-                    x: (PALETTE_W - btn_size) * 0.5,
-                    y: 4.0 + i as f64 * (btn_size + 4.0),
-                },
+                pos: palette_rect.pos
+                    + Vec2d {
+                        x: (PALETTE_W - BTN) * 0.5,
+                        y: 4.0 + i as f64 * (BTN + GAP),
+                    },
                 size: Vec2d {
-                    x: btn_size,
-                    y: btn_size,
+                    x: BTN,
+                    y: BTN,
                 },
             };
-            let active = *t == tool;
+            let active = *t == self.tool;
             self.draw_item_bg_rect(
                 cx,
                 r,
@@ -1043,45 +983,40 @@ impl CanvasPanel {
             if active {
                 self.draw_border_rect(cx, r, [0.45, 0.72, 1.0, 1.0]);
             }
-            self.draw_title
-                .draw_vars
-                .set_dyn_instance(
-                    cx.cx,
-                    live_id!(color),
-                    &if active {
-                        [1.0, 1.0, 1.0, 1.0]
-                    } else {
-                        [0.72, 0.78, 0.90, 1.0]
-                    },
-                );
-            self.draw_title.draw_abs(
-                cx,
-                r.pos + Vec2d { x: 6.0, y: 4.0 },
-                t.label(),
+            self.draw_title.draw_vars.set_dyn_instance(
+                cx.cx,
+                live_id!(color),
+                &if active {
+                    [1.0, 1.0, 1.0, 1.0]
+                } else {
+                    [0.72, 0.78, 0.90, 1.0]
+                },
             );
+            self.draw_title
+                .draw_abs(cx, r.pos + Vec2d { x: 6.0, y: 4.0 }, t.label());
         }
+    }
 
-        // Drawing canvas (right of the palette).
-        let canvas_rect = Rect {
-            pos: screen.pos + Vec2d {
-                x: 2.0 + PALETTE_W,
-                y: TITLE_H,
-            },
-            size: Vec2d {
-                x: screen.size.x - PALETTE_W - 4.0,
-                y: screen.size.y - TITLE_H - 4.0,
-            },
-        };
-        self.draw_item_bg_rect(cx, canvas_rect, [0.10, 0.12, 0.17, 1.0]);
-        let origin = canvas_rect.pos;
+    /// Draw all global whiteboard shapes (world coords) plus the in-progress
+    /// stroke, clipped to the whole canvas viewport.
+    fn draw_canvas_shapes(
+        &mut self,
+        cx: &mut Cx2d,
+        viewport: Vec2d,
+        shapes: &[NoteShape],
+        pending: Option<&NoteShape>,
+    ) {
         let zoom = self.camera.zoom as f64;
-        let ink: [f32; 4] = [0.90, 0.93, 1.0, 1.0];
-        cx.push_clip_rect(canvas_rect);
+        let ink: [f32; 4] = [0.92, 0.95, 1.0, 1.0];
+        cx.push_clip_rect(Rect {
+            pos: Vec2d { x: 0.0, y: 0.0 },
+            size: viewport,
+        });
         for shape in shapes {
-            self.draw_note_shape(cx, origin, shape, zoom, ink);
+            self.draw_note_shape(cx, shape, zoom, ink);
         }
         if let Some(p) = pending {
-            self.draw_note_shape(cx, origin, p, zoom, ink);
+            self.draw_note_shape(cx, p, zoom, ink);
         }
         cx.pop_clip_rect();
     }
@@ -1624,6 +1559,12 @@ impl Widget for CanvasPanel {
                     self.restore_item(cx, id);
                     return;
                 }
+                // Global whiteboard palette: clicking a tool switches it.
+                if let Some(tool_idx) = self.tool_under(me.abs) {
+                    self.tool = Self::note_tools()[tool_idx];
+                    self.redraw(cx);
+                    return;
+                }
                 // Resize handle hit-test first: bottom-right corner of the
                 // topmost item under the cursor.
                 let resize_target = self.resize_handle_under(me.abs);
@@ -1643,71 +1584,6 @@ impl Widget for CanvasPanel {
                     self.selected = Some(id);
                     if let Some(item) = self.items.iter().find(|i| i.id() == id) {
                         let is_terminal = item.kind() == ItemKind::Terminal;
-                        let is_note = item.kind() == ItemKind::Note;
-                        // Note: palette tool click switches the active tool;
-                        // canvas click starts drawing; title bar drags/moves.
-                        if is_note {
-                            if let Some(tool_idx) = self.note_tool_under(item, me.abs, self.world_viewport()) {
-                                if let Some(note) = self
-                                    .items
-                                    .iter_mut()
-                                    .find(|i| i.id() == id && i.kind() == ItemKind::Note)
-                                {
-                                    if let CanvasItem::Note { tool, .. } = note {
-                                        *tool = Self::note_tools()[tool_idx];
-                                    }
-                                }
-                                self.redraw(cx);
-                                return;
-                            }
-                            if let Some((_, canvas)) =
-                                self.note_layout(item, self.world_viewport())
-                            {
-                                if canvas.contains(me.abs) {
-                                    // Begin drawing with the active tool.
-                                    let local = self
-                                        .screen_to_note_local(item, me.abs, self.world_viewport())
-                                        .unwrap_or(makepad_widgets::Vec2d { x: 0.0, y: 0.0 });
-                                    self.note_draw = Some((id, local));
-                                    if let Some(note) = self
-                                        .items
-                                        .iter_mut()
-                                        .find(|i| i.id() == id && i.kind() == ItemKind::Note)
-                                    {
-                                        if let CanvasItem::Note {
-                                            pending, tool: t, ..
-                                        } = note
-                                        {
-                                            // Eraser erases on MouseUp; other
-                                            // tools start a pending shape now.
-                                            if *t != NoteTool::Eraser {
-                                                *pending = Some(match *t {
-                                                    NoteTool::Pen => {
-                                                        NoteShape::Pen { points: vec![local] }
-                                                    }
-                                                    NoteTool::Polyline => {
-                                                        NoteShape::Polyline { points: vec![local] }
-                                                    }
-                                                    NoteTool::Arrow => NoteShape::Arrow { a: local, b: local },
-                                                    NoteTool::Rect => NoteShape::Rect { a: local, b: local },
-                                                    NoteTool::Circle => {
-                                                        NoteShape::Circle { center: local, r: 0.0 }
-                                                    }
-                                                    NoteTool::Line => NoteShape::Line { a: local, b: local },
-                                                    NoteTool::Text => NoteShape::Text {
-                                                        pos: local,
-                                                        text: "Text".to_string(),
-                                                    },
-                                                    NoteTool::Eraser => unreachable!(),
-                                                });
-                                            }
-                                        }
-                                    }
-                                    self.redraw(cx);
-                                    return;
-                                }
-                            }
-                        }
                         // In the terminal CONTENT area (below title bar),
                         // drag starts a text selection like alacritty/wezterm;
                         // the title bar still drags/moves the item.
@@ -1751,9 +1627,32 @@ impl Widget for CanvasPanel {
                         }
                     }
                 } else {
+                    // Empty canvas press: start a global whiteboard stroke
+                    // with the active tool. Canvas panning stays on the
+                    // trackpad scroll (or middle-drag) like other whiteboards.
                     self.selected = None;
                     self.focused_terminal = None;
-                    self.panning = true;
+                    self.panning = false;
+                    let world = self.camera.screen_to_world(me.abs, self.world_viewport());
+                    self.note_draw = Some(world);
+                    if self.tool != NoteTool::Eraser {
+                        self.pending = Some(match self.tool {
+                            NoteTool::Pen => NoteShape::Pen { points: vec![world] },
+                            NoteTool::Polyline => NoteShape::Polyline { points: vec![world] },
+                            NoteTool::Arrow => NoteShape::Arrow { a: world, b: world },
+                            NoteTool::Rect => NoteShape::Rect { a: world, b: world },
+                            NoteTool::Circle => NoteShape::Circle {
+                                center: world,
+                                r: 0.0,
+                            },
+                            NoteTool::Line => NoteShape::Line { a: world, b: world },
+                            NoteTool::Text => NoteShape::Text {
+                                pos: world,
+                                text: "Text".to_string(),
+                            },
+                            NoteTool::Eraser => unreachable!(),
+                        });
+                    }
                 }
                 self.redraw(cx);
             }
@@ -1761,55 +1660,42 @@ impl Widget for CanvasPanel {
 
         if let Event::MouseMove(me) = event {
             self.last_mouse = me.abs;
-            if let Some((nid, start)) = self.note_draw {
-                if let Some(item) = self.items.iter().find(|i| i.id() == nid) {
-                    if let Some(local) =
-                        self.screen_to_note_local(item, me.abs, self.world_viewport())
-                    {
-                        if let Some(note) = self
-                            .items
-                            .iter_mut()
-                            .find(|i| i.id() == nid && i.kind() == ItemKind::Note)
+            if let Some(start) = self.note_draw {
+                let local = self.camera.screen_to_world(me.abs, self.world_viewport());
+                let pending = &mut self.pending;
+                let tool = self.tool;
+                match tool {
+                    NoteTool::Pen | NoteTool::Polyline => {
+                        if let Some(NoteShape::Pen { points })
+                        | Some(NoteShape::Polyline { points }) = pending
                         {
-                            if let CanvasItem::Note { pending, tool, .. } = note {
-                                match *tool {
-                                    NoteTool::Pen | NoteTool::Polyline => {
-                                        if let Some(NoteShape::Pen { points })
-                                        | Some(NoteShape::Polyline { points }) = pending
-                                        {
-                                            let last = points.last().copied().unwrap_or(start);
-                                            if (local.x - last.x).hypot(local.y - last.y) > 2.0 {
-                                                points.push(local);
-                                            }
-                                        }
-                                    }
-                                    NoteTool::Arrow => {
-                                        if let Some(NoteShape::Arrow { a, .. }) = pending {
-                                            *a = start;
-                                        }
-                                        *pending = Some(NoteShape::Arrow { a: start, b: local });
-                                    }
-                                    NoteTool::Line => {
-                                        *pending = Some(NoteShape::Line { a: start, b: local });
-                                    }
-                                    NoteTool::Rect => {
-                                        *pending = Some(NoteShape::Rect { a: start, b: local });
-                                    }
-                                    NoteTool::Circle => {
-                                        let r = ((local.x - start.x).powi(2)
-                                            + (local.y - start.y).powi(2))
-                                            .sqrt();
-                                        *pending =
-                                            Some(NoteShape::Circle { center: start, r });
-                                    }
-                                    NoteTool::Text | NoteTool::Eraser => {}
-                                }
+                            let last = points.last().copied().unwrap_or(start);
+                            if (local.x - last.x).hypot(local.y - last.y) > 2.0 {
+                                points.push(local);
                             }
                         }
-                        self.redraw(cx);
-                        return;
                     }
+                    NoteTool::Arrow => {
+                        if let Some(NoteShape::Arrow { a, .. }) = pending {
+                            *a = start;
+                        }
+                        *pending = Some(NoteShape::Arrow { a: start, b: local });
+                    }
+                    NoteTool::Line => {
+                        *pending = Some(NoteShape::Line { a: start, b: local });
+                    }
+                    NoteTool::Rect => {
+                        *pending = Some(NoteShape::Rect { a: start, b: local });
+                    }
+                    NoteTool::Circle => {
+                        let r = ((local.x - start.x).powi(2) + (local.y - start.y).powi(2))
+                            .sqrt();
+                        *pending = Some(NoteShape::Circle { center: start, r });
+                    }
+                    NoteTool::Text | NoteTool::Eraser => {}
                 }
+                self.redraw(cx);
+                return;
             }
             if let Some((sel_id, sr, sc)) = self.selecting {
                 if let Some(item) = self.items.iter().find(|i| i.id() == sel_id) {
@@ -1869,43 +1755,15 @@ impl Widget for CanvasPanel {
             if me.button.contains(MouseButton::PRIMARY) {
                 self.drag = None;
                 self.panning = false;
-                // Commit a note drawing session (draw shape / erase).
-                if let Some((nid, _start)) = self.note_draw.take() {
-                    if let Some(item) = self.items.iter().find(|i| i.id() == nid) {
-                        let tool = match item {
-                            CanvasItem::Note { tool, .. } => *tool,
-                            _ => NoteTool::Arrow,
-                        };
-                        if tool == NoteTool::Eraser {
-                            // Erase shapes under the release point.
-                            if let Some(local) =
-                                self.screen_to_note_local(item, me.abs, self.world_viewport())
-                            {
-                                if let Some(note) = self
-                                    .items
-                                    .iter_mut()
-                                    .find(|i| i.id() == nid && i.kind() == ItemKind::Note)
-                                {
-                                    if let CanvasItem::Note { shapes, .. } = note {
-                                        let tol = 8.0 / (self.camera.zoom as f64).max(0.1);
-                                        shapes.retain(|sh| !sh.hit(local, tol));
-                                    }
-                                }
-                            }
-                        } else if let Some(note) = self
-                            .items
-                            .iter_mut()
-                            .find(|i| i.id() == nid && i.kind() == ItemKind::Note)
-                        {
-                            if let CanvasItem::Note {
-                                shapes, pending, ..
-                            } = note
-                            {
-                                if let Some(shape) = pending.take() {
-                                    shapes.push(shape);
-                                }
-                            }
-                        }
+                // Commit a global whiteboard drawing session (draw shape / erase).
+                if let Some(_start) = self.note_draw.take() {
+                    if self.tool == NoteTool::Eraser {
+                        // Erase shapes under the release point.
+                        let local = self.camera.screen_to_world(me.abs, self.world_viewport());
+                        let tol = 8.0 / (self.camera.zoom as f64).max(0.1);
+                        self.shapes.retain(|sh| !sh.hit(local, tol));
+                    } else if let Some(shape) = self.pending.take() {
+                        self.shapes.push(shape);
                     }
                     self.redraw(cx);
                     return;
@@ -2153,22 +2011,7 @@ impl Widget for CanvasPanel {
                         item_screen,
                         if is_sel { SEL_BORDER } else { NOTE_BORDER },
                     );
-                    if let Some(note) = self
-                        .items
-                        .iter()
-                        .find(|i| i.id() == item_id && i.kind() == ItemKind::Note)
-                    {
-                        let (tool, shapes, pending) = match note {
-                            CanvasItem::Note {
-                                tool,
-                                shapes,
-                                pending,
-                                ..
-                            } => (*tool, shapes.clone(), pending.clone()),
-                            _ => (NoteTool::Arrow, Vec::new(), None),
-                        };
-                        self.draw_note_at(cx, &title, item_screen, tool, &shapes, pending.as_ref());
-                    }
+                    self.draw_note_title(cx, &title, item_screen);
                     self.draw_control_buttons(cx, item_id, item_screen);
                     if is_sel {
                         self.draw_resize_handle(cx, item_screen);
@@ -2184,6 +2027,12 @@ impl Widget for CanvasPanel {
             }
         }
 
+        // Global whiteboard shapes (world coords) draw ON TOP of items so
+        // annotations/flowcharts can mark terminals and browsers.
+        let shapes = self.shapes.clone();
+        let pending = self.pending.clone();
+        self.draw_canvas_shapes(cx, rect.size, &shapes, pending.as_ref());
+
         // Bottom dock (minimized items tray) draws FIRST — it sits in the
         // gap between the command bar and the bottom edge (y-108..y-74), and
         // drawing it before the command-bar pass lets the new-item menu
@@ -2194,6 +2043,9 @@ impl Widget for CanvasPanel {
         // Children (command bar, status label, popup menu) draw AFTER the
         // dock, so the menu always covers the dock tray.
         while self.view.draw_walk(cx, scope, walk).step().is_some() {}
+
+        // Global tool palette: fixed to the left edge, always on top.
+        self.draw_tool_palette(cx);
 
         DrawStep::done()
     }

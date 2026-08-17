@@ -38,7 +38,6 @@ impl NoteTool {
             NoteTool::Eraser => "▤",
         }
     }
-
 }
 
 /// A completed (or in-progress) drawing on a note whiteboard.
@@ -50,9 +49,7 @@ pub enum NoteShape {
         b: makepad_widgets::Vec2d,
     },
     /// Freehand stroke.
-    Pen {
-        points: Vec<makepad_widgets::Vec2d>,
-    },
+    Pen { points: Vec<makepad_widgets::Vec2d> },
     /// Axis-aligned rectangle from corner `a` to `b`.
     Rect {
         a: makepad_widgets::Vec2d,
@@ -69,9 +66,7 @@ pub enum NoteShape {
         b: makepad_widgets::Vec2d,
     },
     /// Multi-segment polyline.
-    Polyline {
-        points: Vec<makepad_widgets::Vec2d>,
-    },
+    Polyline { points: Vec<makepad_widgets::Vec2d> },
     /// Text note at `pos`.
     Text {
         pos: makepad_widgets::Vec2d,
@@ -108,10 +103,22 @@ impl NoteShape {
                 let x1 = a.x.max(b.x);
                 let y1 = a.y.max(b.y);
                 let segs = [
-                    (makepad_widgets::Vec2d { x: x0, y: y0 }, makepad_widgets::Vec2d { x: x1, y: y0 }),
-                    (makepad_widgets::Vec2d { x: x1, y: y0 }, makepad_widgets::Vec2d { x: x1, y: y1 }),
-                    (makepad_widgets::Vec2d { x: x1, y: y1 }, makepad_widgets::Vec2d { x: x0, y: y1 }),
-                    (makepad_widgets::Vec2d { x: x0, y: y1 }, makepad_widgets::Vec2d { x: x0, y: y0 }),
+                    (
+                        makepad_widgets::Vec2d { x: x0, y: y0 },
+                        makepad_widgets::Vec2d { x: x1, y: y0 },
+                    ),
+                    (
+                        makepad_widgets::Vec2d { x: x1, y: y0 },
+                        makepad_widgets::Vec2d { x: x1, y: y1 },
+                    ),
+                    (
+                        makepad_widgets::Vec2d { x: x1, y: y1 },
+                        makepad_widgets::Vec2d { x: x0, y: y1 },
+                    ),
+                    (
+                        makepad_widgets::Vec2d { x: x0, y: y1 },
+                        makepad_widgets::Vec2d { x: x0, y: y0 },
+                    ),
                 ];
                 segs.iter().any(|(a, b)| near(*a, *b) <= tol)
             }
@@ -134,12 +141,6 @@ pub enum CanvasItem {
         id: u64,
         world: Rect,
         title: String,
-        /// Active whiteboard tool (cnvs-style palette).
-        tool: NoteTool,
-        /// Completed shapes on the whiteboard.
-        shapes: Vec<NoteShape>,
-        /// Shape currently being drawn (mouse-down → move → up).
-        pending: Option<NoteShape>,
     },
     Terminal {
         id: u64,
