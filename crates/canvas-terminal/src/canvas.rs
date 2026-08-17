@@ -623,7 +623,7 @@ impl CanvasPanel {
             Command::Help => {
                 self.status(
                     cx,
-                    "Commands: @name text · /new note · /new terminal NAME · /focus NAME · /zoom N · /help",
+                    "Commands: @name text · /new terminal NAME · /new browser URL · /focus NAME · /zoom N · /help",
                 );
             }
             Command::Forward { text } => {
@@ -1913,14 +1913,6 @@ impl Widget for CanvasPanel {
             );
             self.redraw(cx);
         }
-        if self.view.button(cx, ids!(menu_new_note)).clicked(&actions) {
-            self.spawn_note(cx);
-            self.view
-                .view(cx, ids!(new_item_menu))
-                .set_visible(cx, false);
-            self.redraw(cx);
-        }
-
         // Unified command input.
         if let Some((text, _mods)) = self
             .view

@@ -181,15 +181,6 @@ script_mod! {
                         color: mod.tc.text_primary
                     }
                 }
-                menu_new_note := Button{
-                    text: "Note"
-                    width: Fill
-                    height: 30
-                    draw_text +: {
-                        text_style: theme.font_regular{font_size: 13}
-                        color: mod.tc.text_primary
-                    }
-                }
             }
 
             input_row := View{
@@ -223,7 +214,7 @@ script_mod! {
                 command_input := TextInput{
                     width: Fill
                     height: 32
-                    empty_text: "@name text · /new terminal NAME · /new browser URL · /new note · /help"
+                    empty_text: "@name text · /new terminal NAME · /new browser URL · /help"
                     draw_text +: {
                         text_style: theme.font_regular{font_size: 13}
                         color: mod.tc.text_primary
