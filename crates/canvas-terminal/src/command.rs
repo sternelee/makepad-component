@@ -8,6 +8,7 @@
 /// - `/focus NAME`        → focus the terminal named `NAME`
 /// - `/rename OLD NEW`    → rename a terminal
 /// - `/zoom 1.5`          → set zoom
+/// - `/clear`             → clear all whiteboard shapes
 /// - `/help`              → show usage
 /// - anything else        → sent to the active terminal
 #[derive(Clone, Debug, PartialEq)]
@@ -37,6 +38,8 @@ pub enum Command {
         factor: f32,
     },
     Help,
+    /// Clear all whiteboard shapes.
+    Clear,
     /// No recognized prefix: forward to the active terminal.
     Forward {
         text: String,
@@ -108,6 +111,7 @@ pub fn parse(line: &str) -> Command {
                 }
             }
             Some("help") => return Command::Help,
+            Some("clear") => return Command::Clear,
             _ => {}
         }
     }
@@ -177,6 +181,11 @@ mod tests {
             }
         );
         assert_eq!(parse("/help"), Command::Help);
+    }
+
+    #[test]
+    fn parses_clear() {
+        assert_eq!(parse("/clear"), Command::Clear);
     }
 
     #[test]

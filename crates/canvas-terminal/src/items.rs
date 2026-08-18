@@ -14,11 +14,13 @@ pub enum ItemKind {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum NoteTool {
     #[default]
+    Move,
     Arrow,
     Pen,
+    Line,
     Rect,
     Circle,
-    Line,
+    Ellipse,
     Polyline,
     Text,
     Eraser,
@@ -28,11 +30,13 @@ impl NoteTool {
     /// Short label / glyph for the vertical tool palette.
     pub fn label(self) -> &'static str {
         match self {
+            NoteTool::Move => "✥",
             NoteTool::Arrow => "↗",
             NoteTool::Pen => "✏",
+            NoteTool::Line => "╱",
             NoteTool::Rect => "▭",
             NoteTool::Circle => "○",
-            NoteTool::Line => "╱",
+            NoteTool::Ellipse => "◯",
             NoteTool::Polyline => "⌁",
             NoteTool::Text => "T",
             NoteTool::Eraser => "▤",
@@ -59,6 +63,12 @@ pub enum NoteShape {
     Circle {
         center: makepad_widgets::Vec2d,
         r: f64,
+    },
+    /// Axis-aligned ellipse inscribed in the bounding box from corner `a`
+    /// to corner `b` (world coords).
+    Ellipse {
+        a: makepad_widgets::Vec2d,
+        b: makepad_widgets::Vec2d,
     },
     /// Straight segment `a` → `b`.
     Line {
@@ -126,6 +136,31 @@ impl NoteShape {
                 let d = ((p.x - center.x).powi(2) + (p.y - center.y).powi(2)).sqrt();
                 (d - r).abs() <= tol
             }
+            NoteShape::Ellipse { a, b } => {
+                // Ellipse inscribed in the bounding box [a, b]. Hit test by
+                // sampling the perimeter (same approach as the draw code).
+                let cx = (a.x + b.x) * 0.5;
+                let cy = (a.y + b.y) * 0.5;
+                let rx = ((b.x - a.x).abs() * 0.5).max(0.5);
+                let ry = ((b.y - a.y).abs() * 0.5).max(0.5);
+                let n = 48;
+                let mut prev = makepad_widgets::Vec2d {
+                    x: cx + rx,
+                    y: cy,
+                };
+                for i in 1..=n {
+                    let ang = (i as f64 / n as f64) * std::f64::consts::TAU;
+                    let cur = makepad_widgets::Vec2d {
+                        x: cx + rx * ang.cos(),
+                        y: cy + ry * ang.sin(),
+                    };
+                    if near(prev, cur) <= tol {
+                        return true;
+                    }
+                    prev = cur;
+                }
+                false
+            }
             NoteShape::Text { pos, .. } => {
                 let w = 90.0;
                 let h = 18.0;
@@ -133,6 +168,43 @@ impl NoteShape {
             }
         }
     }
+
+    /// Translate this shape in-place by `delta` (world units). Used by the
+    /// Move tool to drag existing shapes.
+    pub fn translate(&mut self, delta: makepad_widgets::Vec2d) {
+        let d = |p: &mut makepad_widgets::Vec2d| {
+            p.x += delta.x;
+            p.y += delta.y;
+        };
+        match self {
+            NoteShape::Arrow { a, b }
+            | NoteShape::Line { a, b }
+            | NoteShape::Rect { a, b }
+            | NoteShape::Ellipse { a, b } => {
+                d(a);
+                d(b);
+            }
+            NoteShape::Circle { center, .. } => d(center),
+            NoteShape::Pen { points } | NoteShape::Polyline { points } => {
+                for p in points.iter_mut() {
+                    d(p);
+                }
+            }
+            NoteShape::Text { pos, .. } => d(pos),
+        }
+    }
+}
+
+/// A drawn whiteboard shape together with the ink color and stroke width
+/// it was drawn with. Storing the style per shape lets the color/width
+/// picker apply to each stroke independently.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DrawnShape {
+    pub shape: NoteShape,
+    /// RGBA ink color.
+    pub color: [f32; 4],
+    /// Stroke width in world units.
+    pub width: f64,
 }
 
 /// A single canvas item (note, terminal, or browser).

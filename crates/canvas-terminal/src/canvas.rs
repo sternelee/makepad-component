@@ -2,7 +2,7 @@ use makepad_widgets::*;
 
 use crate::camera::Camera;
 use crate::command::{self, Command};
-use crate::items::{CanvasItem, ItemKind, NoteShape, NoteTool};
+use crate::items::{CanvasItem, DrawnShape, ItemKind, NoteShape, NoteTool};
 use crate::terminal::state::{Cell, DEFAULT_BG};
 
 /// Grid spacing in world units.
@@ -34,6 +34,18 @@ const CHIP_BG: [f32; 4] = [0.16, 0.18, 0.24, 1.0];
 const CHIP_BG_HOVER: [f32; 4] = [0.22, 0.26, 0.34, 1.0];
 const CHIP_BORDER: [f32; 4] = [0.28, 0.32, 0.42, 1.0];
 
+/// Whiteboard ink color presets (RGBA) shown in the tool palette.
+const INK_COLORS: [[f32; 4]; 6] = [
+    [0.92, 0.95, 1.00, 1.0], // white
+    [0.30, 0.62, 0.98, 1.0], // blue
+    [0.62, 0.78, 0.34, 1.0], // green
+    [0.95, 0.75, 0.28, 1.0], // yellow
+    [0.95, 0.26, 0.21, 1.0], // red
+    [0.90, 0.39, 0.70, 1.0], // magenta
+];
+/// Whiteboard stroke width presets (world units) shown in the tool palette.
+const INK_WIDTHS: [f64; 3] = [1.5, 3.0, 6.0];
+
 /// Drag state while moving or resizing an item.
 struct DragState {
     item_id: u64,
@@ -56,6 +68,23 @@ enum DragMode {
 enum BtnKind {
     Minimize,
     Close,
+}
+
+/// What part of the global tool palette a click landed on.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum PaletteHit {
+    Tool(usize),
+    Color(usize),
+    Width(usize),
+}
+
+/// Active Move-tool drag: which shape is being dragged and the grab point.
+struct MoveDrag {
+    shape_idx: usize,
+    grab_world: Vec2d,
+    /// Snapshot of shapes before the move, for undo (committed only if the
+    /// shape actually moved).
+    snapshot: Vec<DrawnShape>,
 }
 
 /// A minimized item's stored data.
@@ -140,7 +169,7 @@ pub struct CanvasPanel {
     tool: NoteTool,
     /// Global whiteboard: completed shapes in world coords.
     #[rust]
-    shapes: Vec<NoteShape>,
+    shapes: Vec<DrawnShape>,
     /// Global whiteboard: shape being drawn (mouse-down → move → up).
     #[rust]
     pending: Option<NoteShape>,
@@ -150,6 +179,37 @@ pub struct CanvasPanel {
     /// True while the Text tool is editing an in-progress text shape.
     #[rust]
     text_editing: bool,
+    /// Undo/redo history for the whiteboard shapes list.
+    #[rust]
+    undo_stack: Vec<Vec<DrawnShape>>,
+    #[rust]
+    redo_stack: Vec<Vec<DrawnShape>>,
+    /// Selected ink color index into `INK_COLORS`.
+    #[rust]
+    ink_color_idx: usize,
+    /// Selected ink width index into `INK_WIDTHS`.
+    #[rust]
+    ink_width_idx: usize,
+    /// Snapshot of `shapes` taken when an eraser drag starts; committed to
+    /// the undo stack only if the eraser actually removed something.
+    #[rust]
+    erase_snapshot: Option<Vec<DrawnShape>>,
+    /// Last mouse-down time/pos, for Polyline double-click to finish.
+    #[rust]
+    last_click_time: f64,
+    #[rust]
+    last_click_pos: Vec2d,
+    /// True while the canvas is keeping the platform text IME active for
+    /// whiteboard text editing. Toggled in draw_walk so hide_text_ime
+    /// fires once when editing ends.
+    #[rust]
+    ime_active: bool,
+    /// Active Move-tool drag (shape index + grab point + undo snapshot).
+    #[rust]
+    move_drag: Option<MoveDrag>,
+    /// Shape index hovered by the Move tool (for highlight), if any.
+    #[rust]
+    hovered_shape: Option<usize>,
 }
 
 impl CanvasPanel {
@@ -160,6 +220,123 @@ impl CanvasPanel {
     fn item_screen_rect(&self, item: &CanvasItem) -> Rect {
         self.camera
             .world_rect_to_screen(item.world(), self.world_viewport())
+    }
+
+    /// Current ink color (RGBA) from the palette selection.
+    fn ink_color(&self) -> [f32; 4] {
+        INK_COLORS[self.ink_color_idx.min(INK_COLORS.len() - 1)]
+    }
+
+    /// Current stroke width (world units) from the palette selection.
+    fn ink_width(&self) -> f64 {
+        INK_WIDTHS[self.ink_width_idx.min(INK_WIDTHS.len() - 1)]
+    }
+
+    /// Snapshot the current shapes list onto the undo stack and clear redo.
+    /// Call before any mutation to `self.shapes`.
+    fn push_undo(&mut self) {
+        self.undo_stack.push(self.shapes.clone());
+        // Cap history to avoid unbounded growth.
+        if self.undo_stack.len() > 100 {
+            self.undo_stack.remove(0);
+        }
+        self.redo_stack.clear();
+    }
+
+    /// Undo the last whiteboard change. Restores shapes from the undo stack
+    /// and pushes the current state onto the redo stack.
+    fn undo(&mut self) -> bool {
+        if let Some(prev) = self.undo_stack.pop() {
+            self.redo_stack.push(std::mem::replace(&mut self.shapes, prev));
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Redo the last undone whiteboard change.
+    fn redo(&mut self) -> bool {
+        if let Some(next) = self.redo_stack.pop() {
+            self.undo_stack.push(std::mem::replace(&mut self.shapes, next));
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Commit the in-progress `pending` shape to `shapes` with the current
+    /// ink color/width, recording an undo entry. Returns true if a shape was
+    /// committed.
+    fn commit_pending(&mut self) -> bool {
+        if let Some(shape) = self.pending.take() {
+            self.push_undo();
+            self.shapes.push(DrawnShape {
+                shape,
+                color: self.ink_color(),
+                width: self.ink_width(),
+            });
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Screen-space bounding rect of a whiteboard text shape. Text is drawn
+    /// at a fixed screen font size (not scaled by zoom), so bounds live in
+    /// screen space.
+    fn text_screen_bounds(&self, pos: Vec2d, text: &str) -> Rect {
+        let p = self.camera.world_to_screen(pos, self.world_viewport());
+        const CHAR_W: f64 = 7.5;
+        const LINE_H: f64 = 16.0;
+        let mut max_w = 0.0;
+        let mut lines = 0;
+        for line in text.split('\n') {
+            let w = line.chars().count() as f64 * CHAR_W;
+            if w > max_w {
+                max_w = w;
+            }
+            lines += 1;
+        }
+        if lines == 0 {
+            lines = 1;
+        }
+        Rect {
+            pos: p,
+            size: Vec2d {
+                x: max_w.max(CHAR_W),
+                y: lines as f64 * LINE_H,
+            },
+        }
+    }
+
+    /// Index of an existing Text shape whose screen bounds contain `screen`.
+    fn text_shape_under(&self, screen: Vec2d) -> Option<usize> {
+        for (i, ds) in self.shapes.iter().enumerate().rev() {
+            if let NoteShape::Text { pos, text } = &ds.shape {
+                if self.text_screen_bounds(*pos, text).contains(screen) {
+                    return Some(i);
+                }
+            }
+        }
+        None
+    }
+
+    /// Index of the topmost whiteboard shape under `screen` (for the Move
+    /// tool). Text shapes are hit-tested in screen space (fixed font size);
+    /// all others are hit-tested in world space with a zoom-aware tolerance.
+    fn shape_under(&self, screen: Vec2d) -> Option<usize> {
+        let world = self.camera.screen_to_world(screen, self.world_viewport());
+        let tol = 8.0 / (self.camera.zoom as f64).max(0.1);
+        for (i, ds) in self.shapes.iter().enumerate().rev() {
+            if let NoteShape::Text { pos, text } = &ds.shape {
+                if self.text_screen_bounds(*pos, text).contains(screen) {
+                    return Some(i);
+                }
+            } else if ds.shape.hit(world, tol) {
+                return Some(i);
+            }
+        }
+        None
     }
 
     /// Spawn a note item at the current view center (world coords).
@@ -472,40 +649,98 @@ impl CanvasPanel {
 
     /// Geometry for the global left tool palette. The palette stays fixed
     /// in screen space and is vertically centered in the canvas viewport.
-    fn tool_palette_rect(&self) -> Rect {
-        const PALETTE_W: f64 = 40.0;
-        const BTN: f64 = 28.0;
-        const GAP: f64 = 4.0;
-        const PADDING: f64 = 4.0;
-        let height = 8.0 * (BTN + GAP) + PADDING * 2.0;
-        Rect {
+    /// Palette layout constants shared by drawing and hit-testing.
+    const PAL_W: f64 = 40.0;
+    const PAL_BTN: f64 = 28.0;
+    const PAL_GAP: f64 = 4.0;
+    const PAL_PAD: f64 = 4.0;
+    const PAL_SWATCH: f64 = 16.0;
+    const PAL_SWATCH_GAP: f64 = 2.0;
+    const PAL_WIDTH_BTN_H: f64 = 16.0;
+
+    /// Absolute palette rect plus the Y origin of each section (tools,
+    /// colors, widths), computed once so draw and hit-test agree.
+    fn palette_layout(&self) -> (Rect, f64, f64, f64) {
+        let tools_h = 10.0 * (Self::PAL_BTN + Self::PAL_GAP);
+        let colors_h = 3.0 * (Self::PAL_SWATCH + Self::PAL_SWATCH_GAP);
+        let widths_h = 3.0 * (Self::PAL_WIDTH_BTN_H + Self::PAL_GAP);
+        let total_h = Self::PAL_PAD
+            + tools_h
+            + Self::PAL_GAP
+            + colors_h
+            + Self::PAL_GAP
+            + widths_h
+            + Self::PAL_PAD;
+        let palette_rect = Rect {
             pos: Vec2d {
                 x: 2.0,
-                y: ((self.viewport.y - height) * 0.5).max(2.0),
+                y: ((self.viewport.y - total_h) * 0.5).max(2.0),
             },
             size: Vec2d {
-                x: PALETTE_W,
-                y: height,
+                x: Self::PAL_W,
+                y: total_h,
             },
-        }
+        };
+        let tools_y = palette_rect.pos.y + Self::PAL_PAD;
+        let colors_y = tools_y + tools_h + Self::PAL_GAP;
+        let widths_y = colors_y + colors_h + Self::PAL_GAP;
+        (palette_rect, tools_y, colors_y, widths_y)
     }
 
-    /// Tool button index (0..7) under `screen` for the global palette, or None.
-    fn tool_under(&self, screen: Vec2d) -> Option<usize> {
-        const BTN: f64 = 28.0;
-        const GAP: f64 = 4.0;
-        let palette = self.tool_palette_rect();
-        for i in 0..8 {
+    /// What part of the global tool palette a screen point hits, if any.
+    fn palette_hit(&self, screen: Vec2d) -> Option<PaletteHit> {
+        let (palette, tools_y, colors_y, widths_y) = self.palette_layout();
+        // Tools: 8 buttons, centered horizontally.
+        for i in 0..10 {
             let r = Rect {
                 pos: palette.pos
                     + Vec2d {
-                        x: (palette.size.x - BTN) * 0.5,
-                        y: 4.0 + i as f64 * (BTN + GAP),
+                        x: (palette.size.x - Self::PAL_BTN) * 0.5,
+                        y: tools_y - palette.pos.y + i as f64 * (Self::PAL_BTN + Self::PAL_GAP),
                     },
-                size: Vec2d { x: BTN, y: BTN },
+                size: Vec2d {
+                    x: Self::PAL_BTN,
+                    y: Self::PAL_BTN,
+                },
             };
             if r.contains(screen) {
-                return Some(i);
+                return Some(PaletteHit::Tool(i));
+            }
+        }
+        // Colors: 6 swatches in a 2-column grid.
+        let col_w = Self::PAL_SWATCH + Self::PAL_SWATCH_GAP;
+        let grid_x = palette.pos.x + (palette.size.x - 2.0 * col_w + Self::PAL_SWATCH_GAP) * 0.5;
+        for i in 0..6 {
+            let col = i % 2;
+            let row = i / 2;
+            let r = Rect {
+                pos: Vec2d {
+                    x: grid_x + col as f64 * col_w,
+                    y: colors_y + row as f64 * (Self::PAL_SWATCH + Self::PAL_SWATCH_GAP),
+                },
+                size: Vec2d {
+                    x: Self::PAL_SWATCH,
+                    y: Self::PAL_SWATCH,
+                },
+            };
+            if r.contains(screen) {
+                return Some(PaletteHit::Color(i));
+            }
+        }
+        // Widths: 3 buttons (full palette width), each shows a sample line.
+        for i in 0..3 {
+            let r = Rect {
+                pos: Vec2d {
+                    x: palette.pos.x + (palette.size.x - Self::PAL_BTN) * 0.5,
+                    y: widths_y + i as f64 * (Self::PAL_WIDTH_BTN_H + Self::PAL_GAP),
+                },
+                size: Vec2d {
+                    x: Self::PAL_BTN,
+                    y: Self::PAL_WIDTH_BTN_H,
+                },
+            };
+            if r.contains(screen) {
+                return Some(PaletteHit::Width(i));
             }
         }
         None
@@ -524,13 +759,15 @@ impl CanvasPanel {
     }
 
     /// Tool list in palette order (must match draw order).
-    fn note_tools() -> [NoteTool; 8] {
+    fn note_tools() -> [NoteTool; 10] {
         [
+            NoteTool::Move,
             NoteTool::Arrow,
             NoteTool::Pen,
+            NoteTool::Line,
             NoteTool::Rect,
             NoteTool::Circle,
-            NoteTool::Line,
+            NoteTool::Ellipse,
             NoteTool::Polyline,
             NoteTool::Text,
             NoteTool::Eraser,
@@ -626,8 +863,18 @@ impl CanvasPanel {
             Command::Help => {
                 self.status(
                     cx,
-                    "Commands: @name text · /new terminal NAME · /new browser URL · /focus NAME · /zoom N · /help",
+                    "Commands: @name text · /new terminal NAME · /new browser URL · /focus NAME · /zoom N · /clear · /help",
                 );
+            }
+            Command::Clear => {
+                if self.shapes.is_empty() {
+                    self.status(cx, "Whiteboard already empty");
+                } else {
+                    self.push_undo();
+                    self.shapes.clear();
+                    self.redraw(cx);
+                    self.status(cx, "Whiteboard cleared");
+                }
             }
             Command::Forward { text } => {
                 if let Some(id) = self.focused_terminal {
@@ -866,14 +1113,21 @@ impl CanvasPanel {
     }
 
     /// Draw one completed or in-progress global whiteboard shape in world coords.
-    fn draw_note_shape(&mut self, cx: &mut Cx2d, shape: &NoteShape, zoom: f64, color: [f32; 4]) {
+    fn draw_note_shape(
+        &mut self,
+        cx: &mut Cx2d,
+        shape: &NoteShape,
+        zoom: f64,
+        color: [f32; 4],
+        width: f64,
+    ) {
         let viewport = self.world_viewport();
         let pan = self.camera.pan;
         let zoom_f = self.camera.zoom as f64;
         let to_screen = move |p: makepad_widgets::Vec2d| -> makepad_widgets::Vec2d {
             (p - pan) * zoom_f + viewport * 0.5
         };
-        let w = (2.0 * zoom).max(1.5);
+        let w = (width * zoom).max(1.5);
         match shape {
             NoteShape::Arrow { a, b } => {
                 self.draw_segment(cx, to_screen(*a), to_screen(*b), w, color);
@@ -952,12 +1206,38 @@ impl CanvasPanel {
                     prev = cur;
                 }
             }
+            NoteShape::Ellipse { a, b } => {
+                // Ellipse inscribed in the bounding box [a, b], drawn in
+                // screen space (corners → screen, then sample perimeter).
+                let sa = to_screen(*a);
+                let sb = to_screen(*b);
+                let mx = (sa.x + sb.x) * 0.5;
+                let my = (sa.y + sb.y) * 0.5;
+                let rx = ((sb.x - sa.x).abs() * 0.5).max(0.5);
+                let ry = ((sb.y - sa.y).abs() * 0.5).max(0.5);
+                let n = ((rx.max(ry) * std::f64::consts::TAU) / (w * 0.5))
+                    .ceil()
+                    .max(24.0) as usize;
+                let mut prev = makepad_widgets::Vec2d {
+                    x: mx + rx,
+                    y: my,
+                };
+                for i in 1..=n {
+                    let ang = (i as f64 / n as f64) * std::f64::consts::TAU;
+                    let cur = makepad_widgets::Vec2d {
+                        x: mx + rx * ang.cos(),
+                        y: my + ry * ang.sin(),
+                    };
+                    self.draw_segment(cx, prev, cur, w, color);
+                    prev = cur;
+                }
+            }
             NoteShape::Text { pos, text } => {
                 let p = to_screen(*pos);
                 self.draw_title.draw_vars.set_dyn_instance(
                     cx.cx,
                     live_id!(color),
-                    &[1.0, 1.0, 1.0, 1.0],
+                    &[color[0], color[1], color[2], color[3]],
                 );
                 // Show a blinking caret while the in-progress text shape is
                 // being edited (empty text still shows the caret).
@@ -975,20 +1255,22 @@ impl CanvasPanel {
     /// Global whiteboard palette: a fixed vertical tool bar on the LEFT edge
     /// of the canvas (screen-fixed, like the dock), always available.
     fn draw_tool_palette(&mut self, cx: &mut Cx2d) {
-        const PALETTE_W: f64 = 40.0;
-        const BTN: f64 = 28.0;
-        const GAP: f64 = 4.0;
-        let palette_rect = self.tool_palette_rect();
+        let (palette_rect, tools_y, colors_y, widths_y) = self.palette_layout();
         self.draw_item_bg_rect(cx, palette_rect, [0.12, 0.14, 0.20, 0.94]);
 
+        // ── Tools ──
         for (i, t) in Self::note_tools().iter().enumerate() {
             let r = Rect {
                 pos: palette_rect.pos
                     + Vec2d {
-                        x: (PALETTE_W - BTN) * 0.5,
-                        y: 4.0 + i as f64 * (BTN + GAP),
+                        x: (Self::PAL_W - Self::PAL_BTN) * 0.5,
+                        y: tools_y - palette_rect.pos.y
+                            + i as f64 * (Self::PAL_BTN + Self::PAL_GAP),
                     },
-                size: Vec2d { x: BTN, y: BTN },
+                size: Vec2d {
+                    x: Self::PAL_BTN,
+                    y: Self::PAL_BTN,
+                },
             };
             let active = *t == self.tool;
             self.draw_item_bg_rect(
@@ -1015,6 +1297,69 @@ impl CanvasPanel {
             self.draw_title
                 .draw_abs(cx, r.pos + Vec2d { x: 6.0, y: 4.0 }, t.label());
         }
+
+        // ── Color swatches ──
+        let col_w = Self::PAL_SWATCH + Self::PAL_SWATCH_GAP;
+        let grid_x = palette_rect.pos.x + (palette_rect.size.x - 2.0 * col_w + Self::PAL_SWATCH_GAP) * 0.5;
+        for (i, c) in INK_COLORS.iter().enumerate() {
+            let col = i % 2;
+            let row = i / 2;
+            let r = Rect {
+                pos: Vec2d {
+                    x: grid_x + col as f64 * col_w,
+                    y: colors_y + row as f64 * (Self::PAL_SWATCH + Self::PAL_SWATCH_GAP),
+                },
+                size: Vec2d {
+                    x: Self::PAL_SWATCH,
+                    y: Self::PAL_SWATCH,
+                },
+            };
+            self.draw_item_bg_rect(cx, r, *c);
+            if i == self.ink_color_idx {
+                self.draw_border_rect(cx, r, [1.0, 1.0, 1.0, 1.0]);
+            } else {
+                self.draw_border_rect(cx, r, [0.28, 0.32, 0.42, 1.0]);
+            }
+        }
+
+        // ── Width buttons (sample stroke at each preset width) ──
+        for (i, &wd) in INK_WIDTHS.iter().enumerate() {
+            let r = Rect {
+                pos: Vec2d {
+                    x: palette_rect.pos.x + (palette_rect.size.x - Self::PAL_BTN) * 0.5,
+                    y: widths_y + i as f64 * (Self::PAL_WIDTH_BTN_H + Self::PAL_GAP),
+                },
+                size: Vec2d {
+                    x: Self::PAL_BTN,
+                    y: Self::PAL_WIDTH_BTN_H,
+                },
+            };
+            self.draw_item_bg_rect(
+                cx,
+                r,
+                if i == self.ink_width_idx {
+                    [0.30, 0.62, 0.98, 0.55]
+                } else {
+                    [0.17, 0.19, 0.26, 1.0]
+                },
+            );
+            if i == self.ink_width_idx {
+                self.draw_border_rect(cx, r, [0.45, 0.72, 1.0, 1.0]);
+            }
+            // Sample stroke across the button, clamped to the button height.
+            let sw = wd.min(Self::PAL_WIDTH_BTN_H - 4.0);
+            let mid = r.pos.y + r.size.y * 0.5;
+            self.draw_segment(
+                cx,
+                Vec2d { x: r.pos.x + 4.0, y: mid },
+                Vec2d {
+                    x: r.pos.x + r.size.x - 4.0,
+                    y: mid,
+                },
+                sw,
+                self.ink_color(),
+            );
+        }
     }
 
     /// Draw all global whiteboard shapes (world coords) plus the in-progress
@@ -1023,20 +1368,28 @@ impl CanvasPanel {
         &mut self,
         cx: &mut Cx2d,
         viewport: Vec2d,
-        shapes: &[NoteShape],
+        shapes: &[DrawnShape],
         pending: Option<&NoteShape>,
     ) {
         let zoom = self.camera.zoom as f64;
-        let ink: [f32; 4] = [0.92, 0.95, 1.0, 1.0];
+        let ink_color = self.ink_color();
+        let ink_width = self.ink_width();
         cx.push_clip_rect(Rect {
             pos: Vec2d { x: 0.0, y: 0.0 },
             size: viewport,
         });
-        for shape in shapes {
-            self.draw_note_shape(cx, shape, zoom, ink);
+        for ds in shapes {
+            self.draw_note_shape(cx, &ds.shape, zoom, ds.color, ds.width);
+        }
+        // Move tool: highlight the shape under the cursor.
+        if let Some(idx) = self.hovered_shape {
+            if let Some(ds) = shapes.get(idx) {
+                let hw = ds.width + 4.0 / zoom;
+                self.draw_note_shape(cx, &ds.shape, zoom, [0.40, 0.70, 1.0, 0.45], hw);
+            }
         }
         if let Some(p) = pending {
-            self.draw_note_shape(cx, p, zoom, ink);
+            self.draw_note_shape(cx, p, zoom, ink_color, ink_width);
         }
         cx.pop_clip_rect();
     }
@@ -1579,11 +1932,45 @@ impl Widget for CanvasPanel {
                     self.restore_item(cx, id);
                     return;
                 }
-                // Global whiteboard palette: clicking a tool switches it.
-                if let Some(tool_idx) = self.tool_under(me.abs) {
-                    self.tool = Self::note_tools()[tool_idx];
+                // Global whiteboard palette: clicking a tool/color/width
+                // switches the active selection.
+                if let Some(hit) = self.palette_hit(me.abs) {
+                    match hit {
+                        PaletteHit::Tool(idx) => {
+                            // Switching tool commits any in-progress work.
+                            if self.text_editing
+                                || self.pending.is_some()
+                            {
+                                self.commit_pending();
+                                self.text_editing = false;
+                            }
+                            self.hovered_shape = None;
+                            self.tool = Self::note_tools()[idx];
+                        }
+                        PaletteHit::Color(idx) => {
+                            self.ink_color_idx = idx;
+                        }
+                        PaletteHit::Width(idx) => {
+                            self.ink_width_idx = idx;
+                        }
+                    }
                     self.redraw(cx);
                     return;
+                }
+                // Move tool: grab a whiteboard shape BEFORE item hit-testing,
+                // since shapes are drawn on top of items and should be
+                // grabbable even when overlapping a terminal or browser.
+                if self.tool == NoteTool::Move {
+                    if let Some(idx) = self.shape_under(me.abs) {
+                        let world = self.camera.screen_to_world(me.abs, self.world_viewport());
+                        self.move_drag = Some(MoveDrag {
+                            shape_idx: idx,
+                            grab_world: world,
+                            snapshot: self.shapes.clone(),
+                        });
+                        self.redraw(cx);
+                        return;
+                    }
                 }
                 // Resize handle hit-test first: bottom-right corner of the
                 // topmost item under the cursor.
@@ -1656,34 +2043,131 @@ impl Widget for CanvasPanel {
                     let ui_hit = self.is_canvas_ui_hit(cx, me.abs);
                     let world = self.camera.screen_to_world(me.abs, self.world_viewport());
                     if !ui_hit {
-                        if self.tool == NoteTool::Text {
-                            // Text tool: click places an empty, editable text
-                            // shape; typing appends until Return/Escape. No
-                            // note_draw session, so MouseUp won't commit it.
-                            self.text_editing = true;
-                            self.pending = Some(NoteShape::Text {
-                                pos: world,
-                                text: String::new(),
-                            });
-                        } else {
-                            self.note_draw = Some(world);
-                            if self.tool != NoteTool::Eraser {
+                        // If a Polyline was in progress and the user switched
+                        // tools (or picks Text/Eraser), commit it first.
+                        if matches!(self.pending, Some(NoteShape::Polyline { .. }))
+                            && self.tool != NoteTool::Polyline
+                        {
+                            self.commit_pending();
+                        }
+                        // Commit any in-progress text edit before starting a
+                        // new action (clicking elsewhere finishes the text).
+                        if self.text_editing {
+                            self.commit_pending();
+                            self.text_editing = false;
+                        }
+
+                        match self.tool {
+                            NoteTool::Text => {
+                                // Click on an existing text shape → edit it
+                                // (pull it back into `pending`).
+                                if let Some(idx) = self.text_shape_under(me.abs) {
+                                    if let Some(DrawnShape { shape, .. }) =
+                                        self.shapes.get(idx).cloned()
+                                    {
+                                        self.push_undo();
+                                        self.shapes.remove(idx);
+                                        if let NoteShape::Text { .. } = &shape {
+                                            self.pending = Some(shape);
+                                            self.text_editing = true;
+                                        }
+                                    }
+                                } else {
+                                    self.text_editing = true;
+                                    self.pending = Some(NoteShape::Text {
+                                        pos: world,
+                                        text: String::new(),
+                                    });
+                                }
+                                // Route keyboard to the canvas so terminal
+                                // keys and text editing are captured here.
+                                // IME is activated from draw_walk below.
+                                self.set_canvas_focus(cx);
+                            }
+                            NoteTool::Polyline => {
+                                // Click-to-vertex: each click adds a vertex.
+                                // Double-click (or Enter) finishes the polyline.
+                                let now = me.time;
+                                let double = (now - self.last_click_time) < 0.4
+                                    && (me.abs.x - self.last_click_pos.x).hypot(
+                                        me.abs.y - self.last_click_pos.y,
+                                    ) < 6.0;
+                                self.last_click_time = now;
+                                self.last_click_pos = me.abs;
+                                match &mut self.pending {
+                                    Some(NoteShape::Polyline { points }) => {
+                                        if double {
+                                            // A double-click on the last
+                                            // vertex finishes the polyline.
+                                            self.commit_pending();
+                                        } else {
+                                            points.push(world);
+                                        }
+                                    }
+                                    _ => {
+                                        self.pending = Some(NoteShape::Polyline {
+                                            points: vec![world],
+                                        });
+                                    }
+                                }
+                            }
+                            NoteTool::Eraser => {
+                                // Drag eraser: snapshot for undo, erase along
+                                // the drag path in MouseMove.
+                                self.erase_snapshot = Some(self.shapes.clone());
+                                self.note_draw = Some(world);
+                                let tol = 8.0 / (self.camera.zoom as f64).max(0.1);
+                                let before = self.shapes.len();
+                                self.shapes.retain(|sh| !sh.shape.hit(world, tol));
+                                if self.shapes.len() != before {
+                                    // Erased on the initial click: consume the
+                                    // snapshot so MouseUp won't re-push it.
+                                    if let Some(snap) = self.erase_snapshot.take() {
+                                        self.undo_stack.push(snap);
+                                        self.redo_stack.clear();
+                                    }
+                                }
+                            }
+                            NoteTool::Move => {
+                                // Move tool is handled before item hit-testing
+                                // (above); reaching here means no shape was
+                                // under the cursor — nothing to do.
+                            }
+                            NoteTool::Pen
+                            | NoteTool::Arrow
+                            | NoteTool::Rect
+                            | NoteTool::Circle
+                            | NoteTool::Ellipse
+                            | NoteTool::Line => {
+                                self.note_draw = Some(world);
                                 self.pending = Some(match self.tool {
                                     NoteTool::Pen => NoteShape::Pen {
                                         points: vec![world],
                                     },
-                                    NoteTool::Polyline => NoteShape::Polyline {
-                                        points: vec![world],
+                                    NoteTool::Arrow => NoteShape::Arrow {
+                                        a: world,
+                                        b: world,
                                     },
-                                    NoteTool::Arrow => NoteShape::Arrow { a: world, b: world },
-                                    NoteTool::Rect => NoteShape::Rect { a: world, b: world },
+                                    NoteTool::Rect => NoteShape::Rect {
+                                        a: world,
+                                        b: world,
+                                    },
                                     NoteTool::Circle => NoteShape::Circle {
                                         center: world,
                                         r: 0.0,
                                     },
-                                    NoteTool::Line => NoteShape::Line { a: world, b: world },
-                                    NoteTool::Text => unreachable!(),
-                                    NoteTool::Eraser => unreachable!(),
+                                    NoteTool::Ellipse => NoteShape::Ellipse {
+                                        a: world,
+                                        b: world,
+                                    },
+                                    NoteTool::Line => NoteShape::Line {
+                                        a: world,
+                                        b: world,
+                                    },
+                                    NoteTool::Move
+                                    | NoteTool::Polyline
+                                    | NoteTool::Text
+                                    | NoteTool::Eraser => unreachable!(),
                                 });
                             }
                         }
@@ -1700,10 +2184,8 @@ impl Widget for CanvasPanel {
                 let pending = &mut self.pending;
                 let tool = self.tool;
                 match tool {
-                    NoteTool::Pen | NoteTool::Polyline => {
-                        if let Some(NoteShape::Pen { points })
-                        | Some(NoteShape::Polyline { points }) = pending
-                        {
+                    NoteTool::Pen => {
+                        if let Some(NoteShape::Pen { points }) = pending {
                             let last = points.last().copied().unwrap_or(start);
                             if (local.x - last.x).hypot(local.y - last.y) > 2.0 {
                                 points.push(local);
@@ -1726,9 +2208,41 @@ impl Widget for CanvasPanel {
                         let r = ((local.x - start.x).powi(2) + (local.y - start.y).powi(2)).sqrt();
                         *pending = Some(NoteShape::Circle { center: start, r });
                     }
-                    NoteTool::Text | NoteTool::Eraser => {}
+                    NoteTool::Ellipse => {
+                        *pending = Some(NoteShape::Ellipse { a: start, b: local });
+                    }
+                    NoteTool::Eraser => {
+                        // Drag eraser: remove shapes hit along the path.
+                        let tol = 8.0 / (self.camera.zoom as f64).max(0.1);
+                        let before = self.shapes.len();
+                        self.shapes.retain(|sh| !sh.shape.hit(local, tol));
+                        if self.shapes.len() != before {
+                            // First erase of this drag: commit the snapshot
+                            // taken at MouseDown to the undo stack.
+                            if let Some(snap) = self.erase_snapshot.take() {
+                                self.undo_stack.push(snap);
+                                self.redo_stack.clear();
+                            }
+                        }
+                    }
+                    NoteTool::Text | NoteTool::Polyline | NoteTool::Move => {}
                 }
                 self.redraw(cx);
+                return;
+            }
+            // Move tool: translate the grabbed shape by the incremental
+            // world delta. Take move_drag out of self to avoid split borrows.
+            if let Some(mut md) = self.move_drag.take() {
+                let local = self.camera.screen_to_world(me.abs, self.world_viewport());
+                let delta = local - md.grab_world;
+                if delta.x != 0.0 || delta.y != 0.0 {
+                    if let Some(ds) = self.shapes.get_mut(md.shape_idx) {
+                        ds.shape.translate(delta);
+                    }
+                    md.grab_world = local;
+                    self.redraw(cx);
+                }
+                self.move_drag = Some(md);
                 return;
             }
             if let Some((sel_id, sr, sc)) = self.selecting {
@@ -1773,13 +2287,22 @@ impl Widget for CanvasPanel {
                 let hov = self.hit_test(me.abs);
                 let hov_btn = self.control_button_under(me.abs);
                 let hov_chip = self.dock_chip_under(me.abs, self.viewport);
+                // Move tool: track which shape is under the cursor for
+                // highlight feedback.
+                let hov_shape = if self.tool == NoteTool::Move {
+                    self.shape_under(me.abs)
+                } else {
+                    None
+                };
                 if hov != self.hovered
                     || hov_btn != self.hovered_btn
                     || hov_chip != self.hovered_chip
+                    || hov_shape != self.hovered_shape
                 {
                     self.hovered = hov;
                     self.hovered_btn = hov_btn;
                     self.hovered_chip = hov_chip;
+                    self.hovered_shape = hov_shape;
                     self.redraw(cx);
                 }
             }
@@ -1792,12 +2315,36 @@ impl Widget for CanvasPanel {
                 // Commit a global whiteboard drawing session (draw shape / erase).
                 if let Some(_start) = self.note_draw.take() {
                     if self.tool == NoteTool::Eraser {
-                        // Erase shapes under the release point.
+                        // Final erase at the release point.
                         let local = self.camera.screen_to_world(me.abs, self.world_viewport());
                         let tol = 8.0 / (self.camera.zoom as f64).max(0.1);
-                        self.shapes.retain(|sh| !sh.hit(local, tol));
-                    } else if let Some(shape) = self.pending.take() {
-                        self.shapes.push(shape);
+                        let before = self.shapes.len();
+                        self.shapes.retain(|sh| !sh.shape.hit(local, tol));
+                        if self.shapes.len() != before {
+                            if let Some(snap) = self.erase_snapshot.take() {
+                                self.undo_stack.push(snap);
+                                self.redo_stack.clear();
+                            }
+                        }
+                        // Discard any unused snapshot (nothing erased this drag).
+                        self.erase_snapshot = None;
+                    } else {
+                        self.commit_pending();
+                    }
+                    self.redraw(cx);
+                }
+                // Finalize a Move-tool drag: commit the pre-move snapshot
+                // to the undo stack only if the shape actually moved.
+                if let Some(md) = self.move_drag.take() {
+                    let moved = self
+                        .shapes
+                        .get(md.shape_idx)
+                        .zip(md.snapshot.get(md.shape_idx))
+                        .map(|(cur, orig)| cur != orig)
+                        .unwrap_or(false);
+                    if moved {
+                        self.undo_stack.push(md.snapshot);
+                        self.redo_stack.clear();
                     }
                     self.redraw(cx);
                 }
@@ -1859,21 +2406,46 @@ impl Widget for CanvasPanel {
         }
 
         if let Event::KeyDown(key) = event {
+            let ctrl = key.modifiers.control;
+            let shift = key.modifiers.shift;
+            // Whiteboard undo/redo — canvas-level only (no terminal focused,
+            // not editing text) so Ctrl+Z still reaches a focused shell.
+            if !self.text_editing && self.focused_terminal.is_none() {
+                if ctrl && key.key_code == KeyCode::KeyZ {
+                    if shift {
+                        if self.redo() {
+                            self.redraw(cx);
+                        }
+                    } else if self.undo() {
+                        self.redraw(cx);
+                    }
+                    return;
+                }
+                if ctrl && key.key_code == KeyCode::KeyY {
+                    if self.redo() {
+                        self.redraw(cx);
+                    }
+                    return;
+                }
+                // Polyline click-to-vertex: Enter finishes, Escape cancels.
+                if matches!(self.pending, Some(NoteShape::Polyline { .. })) {
+                    match key.key_code {
+                        KeyCode::ReturnKey => {
+                            self.commit_pending();
+                            self.redraw(cx);
+                            return;
+                        }
+                        KeyCode::Escape => {
+                            self.pending = None;
+                            self.redraw(cx);
+                            return;
+                        }
+                        _ => {}
+                    }
+                }
+            }
             // Whiteboard text editing takes priority over terminal input.
             if self.text_editing {
-                let commit = |pending: &mut Option<NoteShape>,
-                             shapes: &mut Vec<NoteShape>|
-                -> bool {
-                    match pending.take() {
-                        Some(NoteShape::Text { .. }) => true,
-                        other => {
-                            if let Some(s) = other {
-                                shapes.push(s);
-                            }
-                            false
-                        }
-                    }
-                };
                 match key.key_code {
                     KeyCode::Backspace => {
                         if let Some(NoteShape::Text { text, .. }) = &mut self.pending {
@@ -1882,13 +2454,21 @@ impl Widget for CanvasPanel {
                         self.redraw(cx);
                     }
                     KeyCode::ReturnKey => {
-                        let was_text = commit(&mut self.pending, &mut self.shapes);
-                        self.text_editing = false;
-                        if was_text {
+                        if shift {
+                            // Shift+Return inserts a newline (multi-line text).
+                            if let Some(NoteShape::Text { text, .. }) = &mut self.pending {
+                                text.push('\n');
+                            }
+                            self.redraw(cx);
+                        } else {
+                            // Return commits the text shape.
+                            self.commit_pending();
+                            self.text_editing = false;
                             self.redraw(cx);
                         }
                     }
                     KeyCode::Escape => {
+                        // Escape discards the in-progress text.
                         self.pending = None;
                         self.text_editing = false;
                         self.redraw(cx);
@@ -2112,6 +2692,23 @@ impl Widget for CanvasPanel {
 
         // Global tool palette: fixed to the left edge, always on top.
         self.draw_tool_palette(cx);
+
+        // Keep the platform text IME active while editing a whiteboard text
+        // shape so the OS generates Event::TextInput for the canvas (which
+        // holds key focus via set_canvas_focus). The OS only sends text
+        // input while IME is active, and IME is activated from draw, so we
+        // call show_text_ime every frame while editing. When editing ends,
+        // hide_text_ime fires once to release the IME.
+        if self.text_editing {
+            if let Some(NoteShape::Text { pos, .. }) = &self.pending {
+                let screen_pos = self.camera.world_to_screen(*pos, self.world_viewport());
+                cx.show_text_ime(self.area, screen_pos);
+            }
+            self.ime_active = true;
+        } else if self.ime_active {
+            cx.hide_text_ime();
+            self.ime_active = false;
+        }
 
         DrawStep::done()
     }
