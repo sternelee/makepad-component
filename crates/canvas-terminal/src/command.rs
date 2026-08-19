@@ -27,6 +27,13 @@ pub enum Command {
     NewBrowser {
         url: String,
     },
+    NewMusicPlayer {
+        title: String,
+    },
+    SetStatus {
+        name: String,
+        status: String,
+    },
     Focus {
         name: String,
     },
@@ -40,6 +47,8 @@ pub enum Command {
     Help,
     /// Clear all whiteboard shapes.
     Clear,
+    /// Toggle the grid overlay on the CNVS background.
+    Grid,
     /// No recognized prefix: forward to the active terminal.
     Forward {
         text: String,
@@ -89,6 +98,10 @@ pub fn parse(line: &str) -> Command {
                     let url = parts.next().unwrap_or("https://github.com").to_string();
                     return Command::NewBrowser { url };
                 }
+                Some("music") => {
+                    let title = parts.next().unwrap_or("Music").to_string();
+                    return Command::NewMusicPlayer { title };
+                }
                 _ => {}
             },
             Some("focus") => {
@@ -96,6 +109,13 @@ pub fn parse(line: &str) -> Command {
                     return Command::Focus {
                         name: name.to_string(),
                     };
+                }
+            }
+            Some("status") => {
+                let name = parts.next().unwrap_or("").to_string();
+                let status = parts.next().unwrap_or("online").to_string();
+                if !name.is_empty() {
+                    return Command::SetStatus { name, status };
                 }
             }
             Some("zoom") => {
@@ -112,6 +132,7 @@ pub fn parse(line: &str) -> Command {
             }
             Some("help") => return Command::Help,
             Some("clear") => return Command::Clear,
+            Some("grid") => return Command::Grid,
             _ => {}
         }
     }

@@ -2,7 +2,7 @@ use makepad_widgets::*;
 
 use crate::camera::Camera;
 use crate::command::{self, Command};
-use crate::items::{CanvasItem, DrawnShape, ItemKind, NoteShape, NoteTool};
+use crate::items::{AgentStatus, CanvasItem, DrawnShape, ItemKind, NoteShape, NoteTool};
 use crate::terminal::state::{Cell, DEFAULT_BG};
 
 /// Grid spacing in world units.
@@ -17,6 +17,15 @@ const TERM_BG: [f32; 4] = [0.075, 0.082, 0.10, 1.0];
 const TERM_BORDER: [f32; 4] = [0.20, 0.24, 0.32, 1.0];
 const SEL_BORDER: [f32; 4] = [0.30, 0.62, 0.98, 1.0];
 const TITLE_TEXT: [f32; 4] = [0.85, 0.88, 0.94, 1.0];
+
+/// Music player card colors.
+const MUSIC_BG: [f32; 4] = [0.10, 0.11, 0.16, 1.0];
+const MUSIC_BORDER: [f32; 4] = [0.28, 0.32, 0.44, 1.0];
+const MUSIC_ACCENT: [f32; 4] = [0.95, 0.48, 0.32, 1.0];
+const MUSIC_TEXT: [f32; 4] = [0.90, 0.92, 0.96, 1.0];
+const MUSIC_SECONDARY: [f32; 4] = [0.55, 0.60, 0.72, 1.0];
+const MUSIC_PROGRESS_BG: [f32; 4] = [0.18, 0.20, 0.28, 1.0];
+const MUSIC_BAR: [f32; 4] = [0.30, 0.62, 0.98, 1.0];
 
 /// Title-bar control buttons (minimize / close).
 const BTN_W: f64 = 22.0;
@@ -34,6 +43,14 @@ const CHIP_BG: [f32; 4] = [0.16, 0.18, 0.24, 1.0];
 const CHIP_BG_HOVER: [f32; 4] = [0.22, 0.26, 0.34, 1.0];
 const CHIP_BORDER: [f32; 4] = [0.28, 0.32, 0.42, 1.0];
 
+/// Top workspace tab bar.
+const TAB_BAR_H: f64 = 34.0;
+const TAB_BG: [f32; 4] = [0.10, 0.11, 0.15, 1.0];
+const TAB_ACTIVE_BG: [f32; 4] = [0.20, 0.24, 0.34, 1.0];
+const TAB_INACTIVE_BG: [f32; 4] = [0.14, 0.16, 0.22, 1.0];
+const TAB_BORDER: [f32; 4] = [0.28, 0.32, 0.42, 1.0];
+const TAB_PLUS_W: f64 = 32.0;
+
 /// Whiteboard ink color presets (RGBA) shown in the tool palette.
 const INK_COLORS: [[f32; 4]; 6] = [
     [0.92, 0.95, 1.00, 1.0], // white
@@ -45,6 +62,37 @@ const INK_COLORS: [[f32; 4]; 6] = [
 ];
 /// Whiteboard stroke width presets (world units) shown in the tool palette.
 const INK_WIDTHS: [f64; 3] = [1.5, 3.0, 6.0];
+
+/// Note body text color presets (RGBA).
+const NOTE_TEXT_COLORS: [[f32; 4]; 6] = [
+    [0.92, 0.95, 1.00, 1.0], // white
+    [0.30, 0.62, 0.98, 1.0], // blue
+    [0.62, 0.78, 0.34, 1.0], // green
+    [0.95, 0.75, 0.28, 1.0], // yellow
+    [0.95, 0.48, 0.32, 1.0], // orange
+    [0.90, 0.39, 0.70, 1.0], // magenta
+];
+
+/// Avatar color presets (RGBA) for terminal/agent cards.
+const AVATAR_COLORS: [[f32; 4]; 8] = [
+    [0.30, 0.62, 0.98, 1.0], // blue
+    [0.95, 0.48, 0.32, 1.0], // orange
+    [0.62, 0.78, 0.34, 1.0], // green
+    [0.90, 0.39, 0.70, 1.0], // magenta
+    [0.95, 0.75, 0.28, 1.0], // yellow
+    [0.55, 0.90, 0.93, 1.0], // cyan
+    [0.98, 0.55, 0.55, 1.0], // red
+    [0.75, 0.55, 0.95, 1.0], // purple
+];
+
+/// Pick a stable avatar color from a name string.
+fn name_color(name: &str) -> [f32; 4] {
+    let mut h = 0u32;
+    for b in name.bytes() {
+        h = h.wrapping_mul(31).wrapping_add(b as u32);
+    }
+    AVATAR_COLORS[h as usize % AVATAR_COLORS.len()]
+}
 
 /// Drag state while moving or resizing an item.
 struct DragState {
@@ -70,6 +118,13 @@ enum BtnKind {
     Close,
 }
 
+/// What part of the workspace tab bar a click landed on.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum WorkspaceTabHit {
+    Tab(usize),
+    Add,
+}
+
 /// What part of the global tool palette a click landed on.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum PaletteHit {
@@ -87,14 +142,80 @@ struct MoveDrag {
     snapshot: Vec<DrawnShape>,
 }
 
+/// Per-workspace canvas state. The panel swaps the active workspace in and out
+/// so each space keeps its own terminals, camera, whiteboard, etc.
+struct Workspace {
+    camera: Camera,
+    items: Vec<CanvasItem>,
+    next_item_id: u64,
+    selected: Option<u64>,
+    focused_terminal: Option<u64>,
+    minimized: Vec<MinimizedItem>,
+    browser_spawned: Vec<u64>,
+    browser_slots: Vec<(u64, usize)>,
+    tool: NoteTool,
+    shapes: Vec<DrawnShape>,
+    pending: Option<NoteShape>,
+    note_draw: Option<Vec2d>,
+    text_editing: bool,
+    undo_stack: Vec<Vec<DrawnShape>>,
+    redo_stack: Vec<Vec<DrawnShape>>,
+    ink_color_idx: usize,
+    ink_width_idx: usize,
+    erase_snapshot: Option<Vec<DrawnShape>>,
+    last_click_time: f64,
+    last_click_pos: Vec2d,
+    move_drag: Option<MoveDrag>,
+    hovered_shape: Option<usize>,
+    grid_enabled: bool,
+    prop_selected_id: Option<u64>,
+    prop_synced: bool,
+    ime_active: bool,
+}
+
+impl Workspace {
+    fn empty() -> Self {
+        Self {
+            camera: Camera::default(),
+            items: Vec::new(),
+            next_item_id: 1,
+            selected: None,
+            focused_terminal: None,
+            minimized: Vec::new(),
+            browser_spawned: Vec::new(),
+            browser_slots: Vec::new(),
+            tool: NoteTool::default(),
+            shapes: Vec::new(),
+            pending: None,
+            note_draw: None,
+            text_editing: false,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            ink_color_idx: 0,
+            ink_width_idx: 1,
+            erase_snapshot: None,
+            last_click_time: 0.0,
+            last_click_pos: Vec2d::default(),
+            move_drag: None,
+            hovered_shape: None,
+            grid_enabled: false,
+            prop_selected_id: None,
+            prop_synced: false,
+            ime_active: false,
+        }
+    }
+}
+
 /// A minimized item's stored data.
-/// For Terminal, `extra` = command and `session` keeps the live PTY alive.
+/// For Terminal, `extra` = command, `status` = agent presence, and `session`
+/// keeps the live PTY alive.
 type MinimizedItem = (
     u64,
     ItemKind,
     Rect,
     String,
     String,
+    Option<crate::items::AgentStatus>,
     Option<Box<crate::terminal::session::TerminalSession>>,
 );
 
@@ -210,11 +331,155 @@ pub struct CanvasPanel {
     /// Shape index hovered by the Move tool (for highlight), if any.
     #[rust]
     hovered_shape: Option<usize>,
+    /// Whether to draw the grid overlay on top of the CNVS background.
+    #[rust]
+    grid_enabled: bool,
+    /// Recently executed commands (oldest first), capped to 50.
+    #[rust]
+    command_history: Vec<String>,
+    /// Index into `command_history` when browsing with Ctrl+Up/Down.
+    /// None means not browsing history.
+    #[rust]
+    history_index: Option<usize>,
+    /// Last text seen in the command input, to detect changes.
+    #[rust]
+    last_input_text: String,
+    /// Current suggestion selection index.
+    #[rust]
+    suggestion_index: usize,
+    /// Which item id is currently shown in the properties panel.
+    #[rust]
+    prop_selected_id: Option<u64>,
+    /// Whether the properties panel widgets were just synced from the item.
+    #[rust]
+    prop_synced: bool,
+    /// All workspaces; only the active one is unpacked into the panel fields.
+    #[rust]
+    workspaces: Vec<Workspace>,
+    /// Index of the currently active workspace.
+    #[rust]
+    current_workspace: usize,
+    /// Note currently being edited inline, if any.
+    #[rust]
+    note_edit_id: Option<u64>,
+    /// Inline edit buffer for the note being edited.
+    #[rust]
+    note_edit_buffer: String,
+    /// Caret position in `note_edit_buffer` (char index).
+    #[rust]
+    note_edit_caret: usize,
 }
 
 impl CanvasPanel {
     fn world_viewport(&self) -> Vec2d {
         self.viewport
+    }
+
+    pub fn set_grid_enabled(&mut self, enabled: bool) {
+        self.grid_enabled = enabled;
+    }
+
+    /// Ensure at least one workspace exists (called lazily from draw_walk).
+    fn ensure_workspace(&mut self) {
+        if self.workspaces.is_empty() {
+            self.workspaces.push(Workspace::empty());
+            self.current_workspace = 0;
+        }
+    }
+
+    /// Pack the current panel fields back into the active workspace slot.
+    fn save_current_workspace(&mut self) {
+        self.ensure_workspace();
+        let ws = Workspace {
+            camera: self.camera,
+            items: std::mem::take(&mut self.items),
+            next_item_id: self.next_item_id,
+            selected: self.selected,
+            focused_terminal: self.focused_terminal,
+            minimized: std::mem::take(&mut self.minimized),
+            browser_spawned: std::mem::take(&mut self.browser_spawned),
+            browser_slots: std::mem::take(&mut self.browser_slots),
+            tool: self.tool,
+            shapes: std::mem::take(&mut self.shapes),
+            pending: self.pending.take(),
+            note_draw: self.note_draw,
+            text_editing: self.text_editing,
+            undo_stack: std::mem::take(&mut self.undo_stack),
+            redo_stack: std::mem::take(&mut self.redo_stack),
+            ink_color_idx: self.ink_color_idx,
+            ink_width_idx: self.ink_width_idx,
+            erase_snapshot: self.erase_snapshot.take(),
+            last_click_time: self.last_click_time,
+            last_click_pos: self.last_click_pos,
+            move_drag: self.move_drag.take(),
+            hovered_shape: self.hovered_shape,
+            grid_enabled: self.grid_enabled,
+            prop_selected_id: self.prop_selected_id,
+            prop_synced: self.prop_synced,
+            ime_active: self.ime_active,
+        };
+        if self.current_workspace < self.workspaces.len() {
+            self.workspaces[self.current_workspace] = ws;
+        } else {
+            self.workspaces.push(ws);
+            self.current_workspace = self.workspaces.len() - 1;
+        }
+    }
+
+    /// Switch to workspace `idx`, swapping the stored state into the panel.
+    fn switch_workspace(&mut self, cx: &mut Cx, idx: usize) {
+        if idx >= self.workspaces.len() || idx == self.current_workspace {
+            return;
+        }
+        self.save_current_workspace();
+        let mut ws = std::mem::replace(&mut self.workspaces[idx], Workspace::empty());
+        self.camera = ws.camera;
+        self.items = std::mem::take(&mut ws.items);
+        self.next_item_id = ws.next_item_id;
+        self.selected = ws.selected;
+        self.focused_terminal = ws.focused_terminal;
+        self.minimized = std::mem::take(&mut ws.minimized);
+        self.browser_spawned = std::mem::take(&mut ws.browser_spawned);
+        self.browser_slots = std::mem::take(&mut ws.browser_slots);
+        self.tool = ws.tool;
+        self.shapes = std::mem::take(&mut ws.shapes);
+        self.pending = ws.pending.take();
+        self.note_draw = ws.note_draw;
+        self.text_editing = ws.text_editing;
+        self.undo_stack = std::mem::take(&mut ws.undo_stack);
+        self.redo_stack = std::mem::take(&mut ws.redo_stack);
+        self.ink_color_idx = ws.ink_color_idx;
+        self.ink_width_idx = ws.ink_width_idx;
+        self.erase_snapshot = ws.erase_snapshot.take();
+        self.last_click_time = ws.last_click_time;
+        self.last_click_pos = ws.last_click_pos;
+        self.move_drag = ws.move_drag.take();
+        self.hovered_shape = ws.hovered_shape;
+        self.grid_enabled = ws.grid_enabled;
+        self.prop_selected_id = ws.prop_selected_id;
+        self.prop_synced = ws.prop_synced;
+        self.ime_active = ws.ime_active;
+        self.current_workspace = idx;
+        // Clear transient cross-workspace interaction state.
+        self.drag = None;
+        self.panning = false;
+        self.selecting = None;
+        self.hovered = None;
+        self.hovered_btn = None;
+        self.hovered_chip = None;
+        self.note_draw = None;
+        self.text_editing = false;
+        self.note_edit_id = None;
+        self.note_edit_buffer.clear();
+        self.note_edit_caret = 0;
+        self.redraw(cx);
+    }
+
+    /// Add a new empty workspace and switch to it.
+    fn add_workspace(&mut self, cx: &mut Cx) {
+        self.save_current_workspace();
+        self.workspaces.push(Workspace::empty());
+        self.switch_workspace(cx, self.workspaces.len() - 1);
     }
 
     fn item_screen_rect(&self, item: &CanvasItem) -> Rect {
@@ -339,6 +604,90 @@ impl CanvasPanel {
         None
     }
 
+    /// Enter inline-edit mode for the note `id`.
+    fn start_note_edit(&mut self, cx: &mut Cx, id: u64) {
+        if let Some(item) = self.items.iter().find(|i| i.id() == id) {
+            if let Some(body) = item.body() {
+                self.note_edit_id = Some(id);
+                self.note_edit_buffer = body.to_string();
+                self.note_edit_caret = self.note_edit_buffer.chars().count();
+                self.selected = Some(id);
+                // A focused terminal must not keep receiving keys while we edit
+                // a note; otherwise typed text leaks into the shell.
+                self.focused_terminal = None;
+                // Hand the focus over to the hidden note editor so that Makepad's
+                // TextInput handles IME composition, backspace, arrows, etc.
+                // The canvas draws the buffer itself in draw_note_title.
+                let editor = self.view.text_input(cx, ids!(note_editor));
+                editor.set_text(cx, body);
+                editor.set_cursor(
+                    cx,
+                    makepad_widgets::makepad_draw::text::selection::Cursor {
+                        index: body.len(),
+                        prefer_next_row: false,
+                    },
+                    false,
+                );
+                editor.set_key_focus(cx);
+                self.redraw(cx);
+            }
+        }
+    }
+
+    /// Commit the inline edit buffer back to the note and exit edit mode.
+    fn finish_note_edit(&mut self, cx: &mut Cx) {
+        if let Some(id) = self.note_edit_id.take() {
+            // Prefer the hidden editor's text so the final IME composition is
+            // captured; fall back to the cached buffer if the editor is gone.
+            let buffer = {
+                let editor = self.view.text_input(cx, ids!(note_editor));
+                let text = editor.text();
+                if text.is_empty() {
+                    std::mem::take(&mut self.note_edit_buffer)
+                } else {
+                    text
+                }
+            };
+            self.note_edit_buffer.clear();
+            self.note_edit_caret = 0;
+            if let Some(item) = self.items.iter_mut().find(|i| i.id() == id) {
+                if let Some(body) = item.body_mut() {
+                    *body = buffer;
+                }
+            }
+            // Release the hidden editor and return focus to the command bar
+            // without changing the current selection.
+            self.view
+                .text_input(cx, ids!(note_editor))
+                .set_text(cx, "");
+            self.view
+                .text_input(cx, ids!(command_wrap.command_bar.input_row.input_capsule.command_input))
+                .set_key_focus(cx);
+            self.redraw(cx);
+        }
+    }
+
+    /// Pull the latest text/cursor from the hidden note editor so the canvas
+    /// can draw the body and caret in sync with IME composition.
+    fn sync_note_editor(&mut self, cx: &mut Cx) {
+        if self.note_edit_id.is_none() {
+            return;
+        }
+        let editor = self.view.text_input(cx, ids!(note_editor));
+        let text = editor.text();
+        if text != self.note_edit_buffer {
+            self.note_edit_buffer = text;
+            self.redraw(cx);
+        }
+        let cursor = editor.cursor();
+        let index = cursor.index.min(self.note_edit_buffer.len());
+        let new_caret = self.note_edit_buffer[..index].chars().count();
+        if new_caret != self.note_edit_caret {
+            self.note_edit_caret = new_caret;
+            self.redraw(cx);
+        }
+    }
+
     /// Spawn a note item at the current view center (world coords).
     pub fn spawn_note(&mut self, cx: &mut Cx) {
         let world_pos = self
@@ -348,12 +697,37 @@ impl CanvasPanel {
             id: self.next_item_id,
             world: Rect {
                 pos: world_pos,
-                size: Vec2d { x: 240.0, y: 120.0 },
+                size: Vec2d { x: 260.0, y: 160.0 },
             },
             title: format!("Note {}", self.next_item_id),
+            body: "Double-click to edit this note.\nUse the right panel to style it.".to_string(),
+            font_size: 13.0,
+            color_idx: 0,
         };
         self.next_item_id += 1;
         self.items.push(item);
+        self.redraw(cx);
+    }
+
+    /// Spawn a music player card at the current view center.
+    pub fn spawn_music_player(&mut self, cx: &mut Cx, title: &str) {
+        let world_pos = self
+            .camera
+            .screen_to_world(self.viewport * 0.5, self.world_viewport());
+        let item = CanvasItem::MusicPlayer {
+            id: self.next_item_id,
+            world: Rect {
+                pos: world_pos,
+                size: Vec2d { x: 320.0, y: 140.0 },
+            },
+            title: title.to_string(),
+            progress: 0.0,
+            playing: true,
+        };
+        self.next_item_id += 1;
+        let id = item.id();
+        self.items.push(item);
+        self.selected = Some(id);
         self.redraw(cx);
     }
 
@@ -374,6 +748,7 @@ impl CanvasPanel {
                 size: Vec2d { x: 620.0, y: 380.0 },
             },
             title: name.to_string(),
+            status: crate::items::AgentStatus::default(),
             session: None,
         };
         let (cols, rows) = self.term_grid_size(&item);
@@ -383,7 +758,9 @@ impl CanvasPanel {
                 // Store the session into the Terminal variant's slot.
                 match &mut item {
                     CanvasItem::Terminal { session: slot, .. } => *slot = Some(Box::new(session)),
-                    CanvasItem::Note { .. } | CanvasItem::Browser { .. } => unreachable!(),
+                    CanvasItem::Note { .. }
+                    | CanvasItem::Browser { .. }
+                    | CanvasItem::MusicPlayer { .. } => unreachable!(),
                 }
                 self.items.push(item);
                 self.selected = Some(id);
@@ -451,7 +828,10 @@ impl CanvasPanel {
             self.set_canvas_focus(cx);
         } else {
             // Return focus to the command bar.
-            let ti = self.view.text_input(cx, ids!(command_input));
+            let ti = self.view.text_input(
+                cx,
+                ids!(command_wrap.command_bar.input_row.input_capsule.command_input),
+            );
             ti.set_key_focus(cx);
         }
         self.redraw(cx);
@@ -547,6 +927,7 @@ impl CanvasPanel {
             CanvasItem::Terminal {
                 world,
                 title,
+                status,
                 session,
                 ..
             } => {
@@ -554,13 +935,42 @@ impl CanvasPanel {
                     .as_ref()
                     .map(|s| s.command.clone())
                     .unwrap_or_default();
-                (id, ItemKind::Terminal, world, title, command, session)
+                (
+                    id,
+                    ItemKind::Terminal,
+                    world,
+                    title,
+                    command,
+                    Some(status),
+                    session,
+                )
             }
             CanvasItem::Browser {
                 world, title, url, ..
-            } => (id, ItemKind::Browser, world, title, url, None),
-            CanvasItem::Note { world, title, .. } => {
-                (id, ItemKind::Note, world, title, String::new(), None)
+            } => (id, ItemKind::Browser, world, title, url, None, None),
+            CanvasItem::Note {
+                world,
+                title,
+                body,
+                ..
+            } => {
+                (id, ItemKind::Note, world, title, body, None, None)
+            }
+            CanvasItem::MusicPlayer {
+                world,
+                title,
+                progress,
+                ..
+            } => {
+                (
+                    id,
+                    ItemKind::MusicPlayer,
+                    world,
+                    title,
+                    progress.to_string(),
+                    None,
+                    None,
+                )
             }
         };
         self.minimized.push(meta);
@@ -574,7 +984,7 @@ impl CanvasPanel {
         let Some(pos) = self.minimized.iter().position(|m| m.0 == id) else {
             return;
         };
-        let (id, kind, world, title, extra, session) = self.minimized.remove(pos);
+        let (id, kind, world, title, extra, status, session) = self.minimized.remove(pos);
         match kind {
             ItemKind::Terminal => {
                 // Reuse the live session saved at minimize time; re-spawning
@@ -583,6 +993,7 @@ impl CanvasPanel {
                     id,
                     world,
                     title,
+                    status: status.unwrap_or_default(),
                     session,
                 });
             }
@@ -595,10 +1006,31 @@ impl CanvasPanel {
                 });
             }
             ItemKind::Note => {
-                self.items.push(CanvasItem::Note { id, world, title });
+                self.items.push(CanvasItem::Note {
+                    id,
+                    world,
+                    title,
+                    body: extra,
+                    font_size: 13.0,
+                    color_idx: 0,
+                });
+            }
+            ItemKind::MusicPlayer => {
+                let progress = extra.parse::<f32>().unwrap_or(0.0);
+                self.items.push(CanvasItem::MusicPlayer {
+                    id,
+                    world,
+                    title,
+                    progress,
+                    playing: false,
+                });
             }
         }
         self.selected = Some(id);
+        // Restoring a non-terminal item should not leave a stale terminal focus.
+        if !matches!(kind, ItemKind::Terminal) {
+            self.focused_terminal = None;
+        }
         self.redraw(cx);
     }
 
@@ -611,6 +1043,11 @@ impl CanvasPanel {
         }
         if self.focused_terminal == Some(id) {
             self.focused_terminal = None;
+        }
+        if self.note_edit_id == Some(id) {
+            self.note_edit_id = None;
+            self.note_edit_buffer.clear();
+            self.note_edit_caret = 0;
         }
         self.redraw(cx);
     }
@@ -748,14 +1185,40 @@ impl CanvasPanel {
 
     /// Return whether a screen point belongs to the fixed UI overlays rather
     /// than the drawable canvas. The bottom band contains the command bar and
-    /// dock; an open new-item menu is also UI and must remain clickable.
+    /// dock; the right-side properties panel and an open new-item menu are also
+    /// UI and must remain clickable.
     fn is_canvas_ui_hit(&self, cx: &Cx, screen: Vec2d) -> bool {
+        if screen.y <= TAB_BAR_H {
+            return true;
+        }
         const BOTTOM_UI_H: f64 = 112.0;
         if screen.y >= self.viewport.y - BOTTOM_UI_H {
             return true;
         }
         let menu = self.view.view(cx, ids!(new_item_menu));
-        menu.visible() && menu.area().is_valid(cx) && menu.area().rect(cx).contains(screen)
+        if menu.visible() && menu.area().is_valid(cx) && menu.area().rect(cx).contains(screen) {
+            return true;
+        }
+        // Right-side properties panel (known geometry fallback in case the
+        // panel's own area rect does not yet reflect its right-aligned layout).
+        const RIGHT_PANEL_W: f64 = 220.0;
+        const RIGHT_PANEL_RIGHT_PAD: f64 = 12.0;
+        const RIGHT_PANEL_TOP_PAD: f64 = 46.0;
+        const RIGHT_PANEL_BOTTOM_PAD: f64 = 120.0;
+        let panel = self.view.view(cx, ids!(right_panel_container.properties_panel));
+        if panel.visible() {
+            if panel.area().is_valid(cx) && panel.area().rect(cx).contains(screen) {
+                return true;
+            }
+            if screen.x >= self.viewport.x - RIGHT_PANEL_W - RIGHT_PANEL_RIGHT_PAD
+                && screen.x <= self.viewport.x - RIGHT_PANEL_RIGHT_PAD
+                && screen.y >= RIGHT_PANEL_TOP_PAD
+                && screen.y <= self.viewport.y - RIGHT_PANEL_BOTTOM_PAD
+            {
+                return true;
+            }
+        }
+        false
     }
 
     /// Tool list in palette order (must match draw order).
@@ -835,6 +1298,33 @@ impl CanvasPanel {
                 self.spawn_browser(cx, &url);
                 self.status(cx, &format!("Browser: {url}"));
             }
+            Command::NewMusicPlayer { title } => {
+                self.spawn_music_player(cx, &title);
+                self.status(cx, &format!("Music player: {title}"));
+            }
+            Command::SetStatus { name, status } => {
+                let new_status = match status.to_lowercase().as_str() {
+                    "busy" => AgentStatus::Busy,
+                    "idle" => AgentStatus::Idle,
+                    _ => AgentStatus::Online,
+                };
+                if let Some(item) = self
+                    .items
+                    .iter_mut()
+                    .find(|i| i.kind() == ItemKind::Terminal && i.title() == name)
+                {
+                    if let Some(st) = item.agent_status_mut() {
+                        *st = new_status;
+                        self.redraw(cx);
+                        self.status(
+                            cx,
+                            &format!("{name} is now {}", new_status.label()),
+                        );
+                    }
+                } else {
+                    self.status(cx, &format!("No terminal named '{name}'"));
+                }
+            }
             Command::Focus { name } => {
                 if let Some(item) = self.find_terminal(&name) {
                     self.focus_terminal(cx, Some(item.id()));
@@ -863,7 +1353,7 @@ impl CanvasPanel {
             Command::Help => {
                 self.status(
                     cx,
-                    "Commands: @name text · /new terminal NAME · /new browser URL · /focus NAME · /zoom N · /clear · /help",
+                    "Commands: @name text · /new terminal NAME · /new browser URL · /new music TITLE · /new note · /status NAME online|busy|idle · /focus NAME · /zoom N · /grid · /clear · /help",
                 );
             }
             Command::Clear => {
@@ -875,6 +1365,18 @@ impl CanvasPanel {
                     self.redraw(cx);
                     self.status(cx, "Whiteboard cleared");
                 }
+            }
+            Command::Grid => {
+                self.grid_enabled = !self.grid_enabled;
+                self.redraw(cx);
+                self.status(
+                    cx,
+                    if self.grid_enabled {
+                        "Grid overlay on"
+                    } else {
+                        "Grid overlay off"
+                    },
+                );
             }
             Command::Forward { text } => {
                 if let Some(id) = self.focused_terminal {
@@ -889,6 +1391,180 @@ impl CanvasPanel {
                     cx,
                     "No focused terminal — use @name text or click a terminal",
                 );
+            }
+        }
+    }
+
+    /// Push an executed command onto the history ring, avoiding duplicates at
+    /// the tail and capping at 50 entries.
+    fn push_command_history(&mut self, text: String) {
+        let text = text.trim().to_string();
+        if text.is_empty() {
+            return;
+        }
+        if self.command_history.last() == Some(&text) {
+            return;
+        }
+        self.command_history.push(text);
+        if self.command_history.len() > 50 {
+            self.command_history.remove(0);
+        }
+    }
+
+    /// All static command templates offered as suggestions.
+    fn command_templates() -> &'static [&'static str] {
+        &[
+            "@",
+            "/new terminal ",
+            "/new browser ",
+            "/new note",
+            "/new music ",
+            "/status ",
+            "/focus ",
+            "/rename ",
+            "/zoom ",
+            "/grid",
+            "/clear",
+            "/help",
+        ]
+    }
+
+    /// Suggestions for the current command input text.
+    fn suggestions_for(&self, text: &str) -> Vec<String> {
+        let text = text.trim_start();
+        let mut out: Vec<String> = Vec::new();
+        // Static templates that start with the typed prefix.
+        for t in Self::command_templates() {
+            if t.starts_with(text) && !out.contains(&t.to_string()) {
+                out.push(t.to_string());
+            }
+        }
+        // History items that start with the typed prefix.
+        for h in self.command_history.iter().rev() {
+            if h.starts_with(text) && !out.contains(h) {
+                out.push(h.clone());
+            }
+        }
+        out.into_iter().take(6).collect()
+    }
+
+    /// Update the suggestion dropdown labels and visibility.
+    fn update_suggestions(&mut self, cx: &mut Cx) {
+        let input_id = ids!(command_wrap.command_bar.input_row.input_capsule.command_input);
+        let text = self.view.text_input(cx, input_id).text();
+        if text != self.last_input_text {
+            self.last_input_text = text.clone();
+            self.suggestion_index = 0;
+            let suggestions = self.suggestions_for(&text);
+            let list = self.view.view(cx, ids!(command_wrap.command_bar.suggestion_list));
+            let has_suggestions = !suggestions.is_empty() && !text.is_empty();
+            list.set_visible(cx, has_suggestions);
+            for i in 0..6 {
+                let id = LiveId::from_str(&format!("suggestion_{i}"));
+                let label = list.label(cx, &[id]);
+                if let Some(s) = suggestions.get(i) {
+                    label.set_visible(cx, true);
+                    let prefix = if i == self.suggestion_index { "▸ " } else { "  " };
+                    label.set_text(cx, &format!("{prefix}{s}"));
+                } else {
+                    label.set_visible(cx, false);
+                    label.set_text(cx, "");
+                }
+            }
+        }
+    }
+
+    /// Accept the currently selected suggestion into the command input.
+    fn accept_suggestion(&mut self, cx: &mut Cx) {
+        let input_id = ids!(command_wrap.command_bar.input_row.input_capsule.command_input);
+        let text = self.view.text_input(cx, input_id).text();
+        let suggestions = self.suggestions_for(&text);
+        if let Some(s) = suggestions.get(self.suggestion_index) {
+            let ti = self.view.text_input(cx, input_id);
+            ti.set_text(cx, s);
+            ti.set_key_focus(cx);
+            self.last_input_text = s.clone();
+        }
+        self.view
+            .view(cx, ids!(command_wrap.command_bar.suggestion_list))
+            .set_visible(cx, false);
+    }
+
+    /// Sync the right-side properties panel with the currently selected item.
+    /// Only updates the panel when the selection changes to avoid overwriting
+    /// user edits while typing.
+    fn sync_properties_panel(&mut self, cx: &mut Cx) {
+        let panel = self.view.view(cx, ids!(right_panel_container.properties_panel));
+        if self.selected == self.prop_selected_id && self.prop_synced {
+            return;
+        }
+        self.prop_selected_id = self.selected;
+        self.prop_synced = true;
+        if let Some(id) = self.selected {
+            if let Some(item) = self.items.iter().find(|i| i.id() == id) {
+                if let CanvasItem::Note {
+                    title,
+                    body,
+                    font_size,
+                    color_idx,
+                    ..
+                } = item
+                {
+                    panel.set_visible(cx, true);
+                    self.view
+                        .text_input(cx, ids!(right_panel_container.properties_panel.prop_title))
+                        .set_text(cx, title);
+                    self.view
+                        .text_input(cx, ids!(right_panel_container.properties_panel.prop_body))
+                        .set_text(cx, body);
+                    // Highlight selected color/font buttons by toggling text.
+                    for i in 0..6 {
+                        let id = LiveId::from_str(&format!("prop_color_{i}"));
+                        let btn = self.view.button(cx, &[id]);
+                        let label = if i == *color_idx { "◉" } else { "●" };
+                        btn.set_text(cx, label);
+                    }
+                    let font_labels = ["11", "13", "16", "20"];
+                    let font_values = [11.0f32, 13.0, 16.0, 20.0];
+                    for i in 0..4 {
+                        let id = LiveId::from_str(&format!("prop_font_{i}"));
+                        let btn = self.view.button(cx, &[id]);
+                        let label = if (font_values[i] - *font_size).abs() < 0.5 {
+                            format!("[{}]", font_labels[i])
+                        } else {
+                            font_labels[i].to_string()
+                        };
+                        btn.set_text(cx, &label);
+                    }
+                    return;
+                }
+            }
+        }
+        panel.set_visible(cx, false);
+    }
+
+    /// Apply property panel edits to the selected Note item.
+    fn apply_properties_panel(&mut self, cx: &mut Cx) {
+        let Some(id) = self.selected else {
+            return;
+        };
+        let title = self
+            .view
+            .text_input(cx, ids!(right_panel_container.properties_panel.prop_title))
+            .text();
+        let body = self
+            .view
+            .text_input(cx, ids!(right_panel_container.properties_panel.prop_body))
+            .text();
+        if let Some(item) = self.items.iter_mut().find(|i| i.id() == id) {
+            if let CanvasItem::Note {
+                title: t,
+                body: b,
+                ..
+            } = item
+            {
+                *t = title;
+                *b = body;
             }
         }
     }
@@ -993,6 +1669,14 @@ impl CanvasPanel {
         self.draw_grid
             .draw_vars
             .set_uniform(cx.cx, live_id!(grid_size), &[GRID_SIZE as f32]);
+        self.draw_grid
+            .draw_vars
+            .set_uniform(cx.cx, live_id!(time), &[cx.cx.time() as f32]);
+        self.draw_grid.draw_vars.set_uniform(
+            cx.cx,
+            live_id!(grid_enabled),
+            &[if self.grid_enabled { 1.0f32 } else { 0.0f32 }],
+        );
         self.draw_grid.draw_abs(cx, rect);
     }
 
@@ -1067,13 +1751,200 @@ impl CanvasPanel {
         );
     }
 
-    fn draw_note_title(&mut self, cx: &mut Cx2d, title: &str, screen: Rect) {
+    /// Draw a soft drop shadow behind `rect` using a few offset translucent
+    /// quads. Kept simple (no blur) to stay within DrawColor and avoid the
+    /// DrawQuad-pixel-shader text corruption issue.
+    fn draw_shadow_rect(&mut self, cx: &mut Cx2d, rect: Rect) {
+        let offsets = [2.0, 5.0, 9.0, 14.0];
+        let alphas = [0.18, 0.10, 0.05, 0.02];
+        for (i, off) in offsets.iter().enumerate() {
+            let a = alphas[i];
+            let r = Rect {
+                pos: rect.pos + Vec2d { x: *off, y: *off },
+                size: rect.size,
+            };
+            self.draw_item_bg_rect(cx, r, [0.0, 0.0, 0.0, a]);
+        }
+    }
+
+    /// Draw a glow border around `rect` for selected items. Uses concentric
+    /// translucent quads to fake a soft outer glow.
+    fn draw_glow_border(&mut self, cx: &mut Cx2d, rect: Rect, color: [f32; 4]) {
+        let layers = [
+            (14.0, 0.03),
+            (10.0, 0.06),
+            (6.0, 0.10),
+            (3.0, 0.18),
+            (1.5, 0.55),
+        ];
+        for (pad, alpha) in layers {
+            let r = Rect {
+                pos: rect.pos - Vec2d { x: pad, y: pad },
+                size: rect.size + Vec2d { x: pad * 2.0, y: pad * 2.0 },
+            };
+            let c = [color[0], color[1], color[2], alpha];
+            self.draw_item_bg_rect(cx, r, c);
+        }
+    }
+
+    /// Draw a small avatar chip (colored square + initials) for agent/terminal
+    /// cards. We use DrawColor instead of SDF to avoid pixel-shader side effects.
+    fn draw_avatar(
+        &mut self,
+        cx: &mut Cx2d,
+        pos: makepad_widgets::Vec2d,
+        name: &str,
+        bg: [f32; 4],
+    ) {
+        const SIZE: f64 = 18.0;
+        let rect = Rect {
+            pos,
+            size: Vec2d { x: SIZE, y: SIZE },
+        };
+        self.draw_item_bg_rect(cx, rect, bg);
+        // Slight border to define the chip.
+        self.draw_border_rect(cx, rect, [1.0, 1.0, 1.0, 0.2]);
+        let initial: String = name
+            .chars()
+            .filter(|c| c.is_alphabetic())
+            .take(1)
+            .collect::<String>()
+            .to_uppercase();
+        if !initial.is_empty() {
+            self.draw_title
+                .draw_vars
+                .set_dyn_instance(cx.cx, live_id!(color), &[1.0, 1.0, 1.0, 0.9]);
+            self.draw_title
+                .draw_abs(cx, pos + Vec2d { x: 5.0, y: 2.0 }, &initial);
+        }
+    }
+
+    fn draw_note_title(
+        &mut self,
+        cx: &mut Cx2d,
+        title: &str,
+        body: &str,
+        font_size: f32,
+        color_idx: usize,
+        screen: Rect,
+        is_sel: bool,
+        editing: bool,
+        caret: usize,
+    ) {
+        self.draw_shadow_rect(cx, screen);
+        if is_sel {
+            self.draw_glow_border(cx, screen, SEL_BORDER);
+        }
         self.draw_item_bg_rect(cx, screen, NOTE_COLOR);
+        self.draw_border_rect(cx, screen, if is_sel { SEL_BORDER } else { NOTE_BORDER });
+        // Note icon avatar.
+        self.draw_avatar(
+            cx,
+            screen.pos + Vec2d { x: 8.0, y: 5.0 },
+            "N",
+            [0.95, 0.75, 0.28, 1.0],
+        );
         self.draw_title
             .draw_vars
             .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
         self.draw_title
-            .draw_abs(cx, screen.pos + Vec2d { x: 10.0, y: 8.0 }, title);
+            .draw_abs(cx, screen.pos + Vec2d { x: 32.0, y: 6.0 }, title);
+
+        // Note body text, clipped to the card content area.
+        let body_rect = Rect {
+            pos: screen.pos + Vec2d { x: 10.0, y: 32.0 },
+            size: Vec2d {
+                x: (screen.size.x - 20.0).max(1.0),
+                y: (screen.size.y - 40.0).max(1.0),
+            },
+        };
+        cx.push_clip_rect(body_rect);
+        let color = NOTE_TEXT_COLORS[color_idx.min(NOTE_TEXT_COLORS.len() - 1)];
+        self.draw_title
+            .draw_vars
+            .set_dyn_instance(cx.cx, live_id!(color), &color);
+        // Use a smaller font size for body; scale line height accordingly.
+        let font_scale = font_size / 13.0;
+        self.draw_title.font_scale = font_scale;
+        let line_h = font_size as f64 * 1.4;
+        let display_body = if editing {
+            &self.note_edit_buffer
+        } else {
+            body
+        };
+        const CHAR_W: f64 = 7.5;
+        let max_chars = ((body_rect.size.x / (CHAR_W * font_scale as f64))
+            .floor()
+            .max(1.0) as usize)
+            .max(1);
+        let max_lines = (body_rect.size.y / line_h).max(1.0) as usize;
+
+        // Soft-wrap the body to the card width.
+        let mut wrapped: Vec<String> = Vec::new();
+        let mut current = String::new();
+        for ch in display_body.chars() {
+            if ch == '\n' {
+                wrapped.push(std::mem::take(&mut current));
+            } else {
+                if current.chars().count() >= max_chars {
+                    wrapped.push(std::mem::take(&mut current));
+                }
+                current.push(ch);
+            }
+        }
+        if !current.is_empty() || wrapped.is_empty() {
+            wrapped.push(current);
+        }
+        for (i, line) in wrapped.iter().take(max_lines).enumerate() {
+            let y = body_rect.pos.y + i as f64 * line_h;
+            self.draw_title
+                .draw_abs(cx, Vec2d { x: body_rect.pos.x, y }, line);
+        }
+
+        // Blinking caret when the note is being edited inline.
+        if editing {
+            let mut line_idx = 0usize;
+            let mut col = 0usize;
+            let mut chars_on_line = 0usize;
+            for (i, c) in display_body.chars().enumerate() {
+                if i >= caret {
+                    break;
+                }
+                if c == '\n' {
+                    line_idx += 1;
+                    col = 0;
+                    chars_on_line = 0;
+                } else if chars_on_line >= max_chars {
+                    line_idx += 1;
+                    col = 1;
+                    chars_on_line = 1;
+                } else {
+                    col += 1;
+                    chars_on_line += 1;
+                }
+            }
+            let caret_x = body_rect.pos.x + col as f64 * CHAR_W * font_scale as f64;
+            let caret_y = body_rect.pos.y + line_idx as f64 * line_h;
+            let blink = (cx.cx.time() * 2.0) as i32 % 2 == 0;
+            if blink {
+                self.draw_cursor.color = Vec4f {
+                    x: color[0],
+                    y: color[1],
+                    z: color[2],
+                    w: 0.9,
+                };
+                let caret_rect = Rect {
+                    pos: Vec2d { x: caret_x, y: caret_y },
+                    size: Vec2d {
+                        x: 2.0,
+                        y: line_h,
+                    },
+                };
+                self.draw_cursor.draw_abs(cx, caret_rect);
+            }
+        }
+        self.draw_title.font_scale = 1.0;
+        cx.pop_clip_rect();
     }
 
     /// Draw a straight stroke from `a` to `b` as overlapping unit squares
@@ -1526,6 +2397,7 @@ impl CanvasPanel {
                 ItemKind::Terminal => ">_",
                 ItemKind::Browser => "◎",
                 ItemKind::Note => "📝",
+                ItemKind::MusicPlayer => "♫",
             };
             let label = format!("{kind_label} {title}");
             self.draw_cell_text
@@ -1533,6 +2405,106 @@ impl CanvasPanel {
                 .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
             self.draw_cell_text
                 .draw_abs(cx, rect.pos + Vec2d { x: 8.0, y: 6.0 }, &label);
+        }
+    }
+
+    /// Draw the top workspace tab bar. Each workspace gets a tab; the active
+    /// one is highlighted and a "+" button at the right creates a new space.
+    fn draw_workspace_tabs(&mut self, cx: &mut Cx2d, viewport: Vec2d) {
+        let bar_rect = Rect {
+            pos: Vec2d { x: 0.0, y: 0.0 },
+            size: Vec2d {
+                x: viewport.x,
+                y: TAB_BAR_H,
+            },
+        };
+        self.draw_item_bg_rect(cx, bar_rect, TAB_BG);
+        self.draw_border_rect(cx, bar_rect, TAB_BORDER);
+
+        let mut x = 8.0;
+        let tab_h = TAB_BAR_H - 8.0;
+        let tab_y = 4.0;
+        let n = self.workspaces.len().max(1);
+        for i in 0..n {
+            let label = format!("Space {}", i + 1);
+            let text_w = label.chars().count() as f64 * 7.5;
+            let tab_w = (text_w + 28.0).max(70.0);
+            let tab_rect = Rect {
+                pos: Vec2d { x, y: tab_y },
+                size: Vec2d { x: tab_w, y: tab_h },
+            };
+            let active = i == self.current_workspace;
+            self.draw_item_bg_rect(
+                cx,
+                tab_rect,
+                if active {
+                    TAB_ACTIVE_BG
+                } else {
+                    TAB_INACTIVE_BG
+                },
+            );
+            self.draw_border_rect(cx, tab_rect, TAB_BORDER);
+            self.draw_title
+                .draw_vars
+                .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
+            self.draw_title.draw_abs(
+                cx,
+                tab_rect.pos + Vec2d { x: 12.0, y: 5.0 },
+                &label,
+            );
+            x += tab_w + 6.0;
+        }
+
+        // Add-workspace button.
+        let plus_rect = Rect {
+            pos: Vec2d { x, y: tab_y },
+            size: Vec2d {
+                x: TAB_PLUS_W,
+                y: tab_h,
+            },
+        };
+        self.draw_item_bg_rect(cx, plus_rect, TAB_INACTIVE_BG);
+        self.draw_border_rect(cx, plus_rect, TAB_BORDER);
+        self.draw_title
+            .draw_vars
+            .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
+        self.draw_title
+            .draw_abs(cx, plus_rect.pos + Vec2d { x: 10.0, y: 5.0 }, "+");
+    }
+
+    /// Which workspace tab (or the add button) is under `screen`, if any.
+    fn workspace_tab_hit(&self, screen: Vec2d, _viewport: Vec2d) -> Option<WorkspaceTabHit> {
+        if screen.y < 0.0 || screen.y > TAB_BAR_H {
+            return None;
+        }
+        let mut x = 8.0;
+        let tab_h = TAB_BAR_H - 8.0;
+        let tab_y = 4.0;
+        let n = self.workspaces.len().max(1);
+        for i in 0..n {
+            let label = format!("Space {}", i + 1);
+            let text_w = label.chars().count() as f64 * 7.5;
+            let tab_w = (text_w + 28.0).max(70.0);
+            let tab_rect = Rect {
+                pos: Vec2d { x, y: tab_y },
+                size: Vec2d { x: tab_w, y: tab_h },
+            };
+            if tab_rect.contains(screen) {
+                return Some(WorkspaceTabHit::Tab(i));
+            }
+            x += tab_w + 6.0;
+        }
+        let plus_rect = Rect {
+            pos: Vec2d { x, y: tab_y },
+            size: Vec2d {
+                x: TAB_PLUS_W,
+                y: tab_h,
+            },
+        };
+        if plus_rect.contains(screen) {
+            Some(WorkspaceTabHit::Add)
+        } else {
+            None
         }
     }
 
@@ -1633,20 +2605,68 @@ impl CanvasPanel {
         screen: Rect,
         title: &str,
         command: &str,
+        status: AgentStatus,
+        is_sel: bool,
         state: &std::sync::Arc<std::sync::Mutex<crate::terminal::state::TerminalState>>,
     ) {
+        // Drop shadow behind the card.
+        self.draw_shadow_rect(cx, screen);
+        // Outer glow for selected items.
+        if is_sel {
+            self.draw_glow_border(cx, screen, SEL_BORDER);
+        }
         // Background first (DrawColor)
         self.draw_item_bg_rect(cx, screen, TERM_BG);
         // Border (DrawColor)
-        self.draw_border_rect(cx, screen, TERM_BORDER);
+        self.draw_border_rect(cx, screen, if is_sel { SEL_BORDER } else { TERM_BORDER });
+        // Avatar chip + title.
+        let avatar_color = name_color(title);
+        self.draw_avatar(
+            cx,
+            screen.pos + Vec2d { x: 8.0, y: 5.0 },
+            title,
+            avatar_color,
+        );
         // Title text (DrawText) - drawn after bg/border but before content
         self.draw_title
             .draw_vars
             .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
         self.draw_title.draw_abs(
             cx,
-            screen.pos + Vec2d { x: 8.0, y: 6.0 },
+            screen.pos + Vec2d { x: 32.0, y: 6.0 },
             &format!("{} — {}", title, command),
+        );
+
+        // Agent status dot + label on the right side of the title bar.
+        let status_label = status.label();
+        let status_color = status.color();
+        let dot_size = 8.0;
+        let status_x = screen.pos.x + screen.size.x - 80.0;
+        let status_y = screen.pos.y + 9.0;
+        self.draw_item_bg_rect(
+            cx,
+            Rect {
+                pos: Vec2d {
+                    x: status_x,
+                    y: status_y,
+                },
+                size: Vec2d {
+                    x: dot_size,
+                    y: dot_size,
+                },
+            },
+            status_color,
+        );
+        self.draw_title
+            .draw_vars
+            .set_dyn_instance(cx.cx, live_id!(color), &MUSIC_SECONDARY);
+        self.draw_title.draw_abs(
+            cx,
+            Vec2d {
+            x: status_x + dot_size + 5.0,
+                y: status_y - 2.0,
+            },
+            status_label,
         );
 
         let grid = match state.lock() {
@@ -1813,6 +2833,10 @@ impl CanvasPanel {
     /// the regular `view.draw_walk` pass never lays it out.
     fn draw_browser_at(&mut self, cx: &mut Cx2d, id: u64, screen: Rect, is_sel: bool, url: &str) {
         // Card background + border + title chrome.
+        self.draw_shadow_rect(cx, screen);
+        if is_sel {
+            self.draw_glow_border(cx, screen, SEL_BORDER);
+        }
         self.draw_item_bg_rect(cx, screen, TERM_BG);
         self.draw_border_rect(cx, screen, if is_sel { SEL_BORDER } else { TERM_BORDER });
 
@@ -1824,13 +2848,20 @@ impl CanvasPanel {
             },
         };
         self.draw_item_bg_rect(cx, bar_rect, [0.14, 0.16, 0.22, 1.0]);
+        // Browser icon avatar.
+        self.draw_avatar(
+            cx,
+            screen.pos + Vec2d { x: 8.0, y: 5.0 },
+            "W",
+            [0.30, 0.62, 0.98, 1.0],
+        );
         self.draw_title
             .draw_vars
             .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
         self.draw_title.draw_abs(
             cx,
-            bar_rect.pos + Vec2d { x: 10.0, y: 7.0 },
-            &format!("🌐 {url}"),
+            bar_rect.pos + Vec2d { x: 32.0, y: 7.0 },
+            url,
         );
 
         // Page area below the title bar.
@@ -1873,6 +2904,150 @@ impl CanvasPanel {
         let _ = slot_widget.draw_walk(cx, &mut Scope::empty(), walk);
         slot_browser.set_visible(cx.cx, false);
     }
+
+    /// Draw a CNVS-style music player card.
+    ///
+    /// The card has a title bar, a play/pause toggle, a progress bar, and a
+    /// tiny simulated frequency visualizer (no real audio stream). Clicking
+    /// the body toggles playback; the title bar can still be used to drag the
+    /// card around.
+    fn draw_music_player(
+        &mut self,
+        cx: &mut Cx2d,
+        id: u64,
+        screen: Rect,
+        is_sel: bool,
+        title: &str,
+        progress: f32,
+        playing: bool,
+    ) {
+        self.draw_shadow_rect(cx, screen);
+        if is_sel {
+            self.draw_glow_border(cx, screen, SEL_BORDER);
+        }
+        self.draw_item_bg_rect(cx, screen, MUSIC_BG);
+        self.draw_border_rect(cx, screen, if is_sel { SEL_BORDER } else { MUSIC_BORDER });
+
+        // Avatar + title.
+        self.draw_avatar(
+            cx,
+            screen.pos + Vec2d { x: 8.0, y: 5.0 },
+            "♫",
+            MUSIC_ACCENT,
+        );
+        self.draw_title
+            .draw_vars
+            .set_dyn_instance(cx.cx, live_id!(color), &MUSIC_TEXT);
+        self.draw_title.draw_abs(
+            cx,
+            screen.pos + Vec2d { x: 32.0, y: 6.0 },
+            title,
+        );
+
+        // Body starts below the title bar.
+        let body_y = screen.pos.y + 34.0;
+        let body_h = (screen.size.y - 42.0).max(1.0);
+        let pad = 12.0;
+        let inner_x = screen.pos.x + pad;
+        let inner_w = (screen.size.x - pad * 2.0).max(1.0);
+
+        // Play / pause button.
+        let btn_size = 36.0;
+        let btn_rect = Rect {
+            pos: Vec2d {
+                x: inner_x,
+                y: body_y + body_h * 0.5 - btn_size * 0.5,
+            },
+            size: Vec2d {
+                x: btn_size,
+                y: btn_size,
+            },
+        };
+        self.draw_item_bg_rect(
+            cx,
+            btn_rect,
+            if playing { MUSIC_ACCENT } else { MUSIC_PROGRESS_BG },
+        );
+        self.draw_border_rect(cx, btn_rect, MUSIC_BORDER);
+        self.draw_title
+            .draw_vars
+            .set_dyn_instance(cx.cx, live_id!(color), &MUSIC_TEXT);
+        let icon = if playing { "❚❚" } else { "▶" };
+        self.draw_title.draw_abs(
+            cx,
+            btn_rect.pos + Vec2d { x: 10.0, y: 8.0 },
+            icon,
+        );
+
+        // Progress bar to the right of the button.
+        let bar_x = btn_rect.pos.x + btn_rect.size.x + 14.0;
+        let bar_w = (inner_x + inner_w - bar_x - 8.0).max(1.0);
+        let bar_h = 6.0;
+        let bar_y = body_y + body_h * 0.5 - bar_h * 0.5 - 10.0;
+        let bar_bg = Rect {
+            pos: Vec2d { x: bar_x, y: bar_y },
+            size: Vec2d { x: bar_w, y: bar_h },
+        };
+        self.draw_item_bg_rect(cx, bar_bg, MUSIC_PROGRESS_BG);
+        let fill_w = (bar_w * progress as f64).max(0.0).min(bar_w);
+        if fill_w > 0.0 {
+            let bar_fill = Rect {
+                pos: bar_bg.pos,
+                size: Vec2d { x: fill_w, y: bar_h },
+            };
+            self.draw_item_bg_rect(cx, bar_fill, MUSIC_ACCENT);
+        }
+
+        // Time labels.
+        let total_s = 180u32;
+        let cur_s = (total_s as f32 * progress) as u32;
+        let fmt = |s: u32| format!("{:02}:{:02}", s / 60, s % 60);
+        self.draw_title
+            .draw_vars
+            .set_dyn_instance(cx.cx, live_id!(color), &MUSIC_SECONDARY);
+        self.draw_title.draw_abs(
+            cx,
+            Vec2d {
+                x: bar_x,
+                y: bar_y + bar_h + 6.0,
+            },
+            &fmt(cur_s),
+        );
+        let total_label = fmt(total_s);
+        let total_w = total_label.chars().count() as f64 * 6.0;
+        self.draw_title.draw_abs(
+            cx,
+            Vec2d {
+                x: bar_x + bar_w - total_w,
+                y: bar_y + bar_h + 6.0,
+            },
+            &total_label,
+        );
+
+        // Simulated frequency visualizer (small bars under the progress bar).
+        let n_bars = 16usize;
+        let vis_y = bar_y + bar_h + 22.0;
+        let vis_h = 22.0;
+        let gap = 3.0;
+        let bar_w2 = (bar_w - gap * (n_bars as f64 - 1.0)) / n_bars as f64;
+        let time = cx.cx.time() as f64;
+        for i in 0..n_bars {
+            let x = bar_x + i as f64 * (bar_w2 + gap);
+            let level = if playing {
+                let wave = (time * 3.0 + i as f64 * 1.1 + id as f64 * 0.13).sin();
+                let wave2 = (time * 5.5 + i as f64 * 2.7 + id as f64 * 0.07).sin();
+                0.25 + 0.45 * wave.abs() + 0.25 * wave2.abs()
+            } else {
+                0.12
+            };
+            let h = (vis_h * level).max(2.0);
+            let r = Rect {
+                pos: Vec2d { x, y: vis_y + vis_h - h },
+                size: Vec2d { x: bar_w2.max(1.0), y: h },
+            };
+            self.draw_item_bg_rect(cx, r, MUSIC_BAR);
+        }
+    }
 }
 
 fn push_modified_char(out: &mut Vec<u8>, ch: char, ctrl: bool, alt: bool, shift: bool) {
@@ -1895,18 +3070,108 @@ fn push_modified_char(out: &mut Vec<u8>, ch: char, ctrl: bool, alt: bool, shift:
 impl Widget for CanvasPanel {
     #[allow(clippy::collapsible_match)]
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        let input_id = ids!(command_wrap.command_bar.input_row.input_capsule.command_input);
+        let list_id = ids!(command_wrap.command_bar.suggestion_list);
+
+        // Intercept command-bar navigation keys before TextInput consumes them.
+        if let Event::KeyDown(key) = event {
+            let suggestions_visible = self.view.view(cx, list_id).visible();
+            if suggestions_visible {
+                match key.key_code {
+                    KeyCode::ArrowDown => {
+                        self.suggestion_index += 1;
+                        self.last_input_text.clear();
+                        self.update_suggestions(cx);
+                        return;
+                    }
+                    KeyCode::ArrowUp => {
+                        if self.suggestion_index > 0 {
+                            self.suggestion_index -= 1;
+                        }
+                        self.last_input_text.clear();
+                        self.update_suggestions(cx);
+                        return;
+                    }
+                    KeyCode::Tab => {
+                        self.accept_suggestion(cx);
+                        return;
+                    }
+                    KeyCode::Escape => {
+                        self.view.view(cx, list_id).set_visible(cx, false);
+                        return;
+                    }
+                    _ => {}
+                }
+            }
+            // Ctrl+Up/Down browses command history when the command input is focused.
+            let ctrl = key.modifiers.control;
+            let input_focused = self.view.text_input(cx, input_id).key_focus(cx);
+            if input_focused && ctrl {
+                match key.key_code {
+                    KeyCode::ArrowUp => {
+                        if self.history_index.is_none() && !self.command_history.is_empty() {
+                            self.history_index = Some(self.command_history.len() - 1);
+                        } else if let Some(idx) = self.history_index {
+                            if idx > 0 {
+                                self.history_index = Some(idx - 1);
+                            }
+                        }
+                        if let Some(idx) = self.history_index {
+                            if let Some(h) = self.command_history.get(idx) {
+                                let ti = self.view.text_input(cx, input_id);
+                                ti.set_text(cx, h);
+                            }
+                        }
+                    }
+                    KeyCode::ArrowDown => {
+                        if let Some(idx) = self.history_index {
+                            if idx + 1 < self.command_history.len() {
+                                self.history_index = Some(idx + 1);
+                                if let Some(h) = self.command_history.get(idx + 1) {
+                                    let ti = self.view.text_input(cx, input_id);
+                                    ti.set_text(cx, h);
+                                }
+                            } else {
+                                self.history_index = None;
+                                let ti = self.view.text_input(cx, input_id);
+                                ti.set_text(cx, "");
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         let actions = cx.capture_actions(|cx| {
             self.view.handle_event(cx, event, scope);
         });
 
+        // Sync the hidden note editor with the canvas-drawn buffer.
+        self.sync_note_editor(cx);
+
+        // Refresh suggestions whenever the command input text may have changed.
+        self.update_suggestions(cx);
+
         if let Event::Timer(te) = event {
-            if self
-                .timer
-                .map(|t| t.is_timer(te).is_some())
-                .unwrap_or(false)
-                && self.poll_sessions()
-            {
-                self.redraw(cx);
+            let is_our_timer = self.timer.map(|t| t.is_timer(te).is_some()).unwrap_or(false);
+            if is_our_timer {
+                // Advance any playing music players.
+                let mut changed = false;
+                for item in self.items.iter_mut() {
+                    if let CanvasItem::MusicPlayer { progress, playing, .. } = item {
+                        if *playing {
+                            *progress += 0.001;
+                            if *progress >= 1.0 {
+                                *progress = 0.0;
+                            }
+                            changed = true;
+                        }
+                    }
+                }
+                if changed || self.poll_sessions() {
+                    self.redraw(cx);
+                }
             }
         }
 
@@ -1919,6 +3184,37 @@ impl Widget for CanvasPanel {
         if let Event::MouseDown(me) = event {
             if me.button.contains(MouseButton::PRIMARY) {
                 self.last_mouse = me.abs;
+                // If a note is being edited inline, clicking outside it commits
+                // the edit; clicking on the same note keeps the editor active.
+                if let Some(edit_id) = self.note_edit_id {
+                    if let Some(id) = self.hit_test(me.abs) {
+                        if id != edit_id {
+                            self.finish_note_edit(cx);
+                        } else {
+                            self.selected = Some(id);
+                            self.redraw(cx);
+                            return;
+                        }
+                    } else {
+                        self.finish_note_edit(cx);
+                    }
+                }
+                // Shared double-click detection (notes, polyline, etc.).
+                let now = me.time;
+                let is_double = (now - self.last_click_time) < 0.4
+                    && (me.abs.x - self.last_click_pos.x)
+                        .hypot(me.abs.y - self.last_click_pos.y)
+                        < 6.0;
+                self.last_click_time = now;
+                self.last_click_pos = me.abs;
+                // Top workspace tab bar.
+                if let Some(hit) = self.workspace_tab_hit(me.abs, self.viewport) {
+                    match hit {
+                        WorkspaceTabHit::Tab(i) => self.switch_workspace(cx, i),
+                        WorkspaceTabHit::Add => self.add_workspace(cx),
+                    }
+                    return;
+                }
                 // Title-bar control buttons take priority.
                 if let Some((id, kind)) = self.control_button_under(me.abs) {
                     match kind {
@@ -1978,6 +3274,11 @@ impl Widget for CanvasPanel {
                 if let Some(id) = resize_target {
                     self.selected = Some(id);
                     if let Some(item) = self.items.iter().find(|i| i.id() == id) {
+                        // Resizing a non-terminal item should not leave a
+                        // previously focused terminal consuming keystrokes.
+                        if item.kind() != ItemKind::Terminal {
+                            self.focused_terminal = None;
+                        }
                         self.drag = Some(DragState {
                             item_id: id,
                             grab_world: self.camera.screen_to_world(me.abs, self.world_viewport()),
@@ -1989,7 +3290,46 @@ impl Widget for CanvasPanel {
                     self.redraw(cx);
                 } else if let Some(id) = self.hit_test(me.abs) {
                     self.selected = Some(id);
+                    // Selecting a non-terminal item must clear any stale
+                    // terminal focus so the property panel keys don't leak
+                    // into the shell.
                     if let Some(item) = self.items.iter().find(|i| i.id() == id) {
+                        if item.kind() != ItemKind::Terminal {
+                            self.focused_terminal = None;
+                        }
+                    }
+                    // Double-click a note to edit it inline.
+                    if is_double {
+                        if let Some(item) = self.items.iter().find(|i| i.id() == id) {
+                            if item.kind() == ItemKind::Note {
+                                self.start_note_edit(cx, id);
+                                return;
+                            }
+                        }
+                    }
+                    // Music player: clicking the body toggles play/pause; the
+                    // title bar can still be used to drag the card.
+                    let is_music_content =
+                        if let Some(item) = self.items.iter().find(|i| i.id() == id) {
+                            if item.kind() == ItemKind::MusicPlayer {
+                                let r = self
+                                    .camera
+                                    .world_rect_to_screen(item.world(), self.world_viewport());
+                                me.abs.y > r.pos.y + 26.0
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        };
+                    if is_music_content {
+                        if let Some(item) = self.items.iter_mut().find(|i| i.id() == id) {
+                            if let CanvasItem::MusicPlayer { playing, .. } = item {
+                                *playing = !*playing;
+                                self.redraw(cx);
+                            }
+                        }
+                    } else if let Some(item) = self.items.iter().find(|i| i.id() == id) {
                         let is_terminal = item.kind() == ItemKind::Terminal;
                         // In the terminal CONTENT area (below title bar),
                         // drag starts a text selection like alacritty/wezterm;
@@ -2037,12 +3377,14 @@ impl Widget for CanvasPanel {
                     // Empty canvas press: start a global whiteboard stroke
                     // with the active tool. Canvas panning stays on the
                     // trackpad scroll (or middle-drag) like other whiteboards.
-                    self.selected = None;
-                    self.focused_terminal = None;
-                    self.panning = false;
+                    // UI overlays (command bar, right panel, etc.) should stay
+                    // interactive and must not clear the current selection.
                     let ui_hit = self.is_canvas_ui_hit(cx, me.abs);
-                    let world = self.camera.screen_to_world(me.abs, self.world_viewport());
                     if !ui_hit {
+                        self.selected = None;
+                        self.focused_terminal = None;
+                        self.panning = false;
+                        let world = self.camera.screen_to_world(me.abs, self.world_viewport());
                         // If a Polyline was in progress and the user switched
                         // tools (or picks Text/Eraser), commit it first.
                         if matches!(self.pending, Some(NoteShape::Polyline { .. }))
@@ -2408,9 +3750,18 @@ impl Widget for CanvasPanel {
         if let Event::KeyDown(key) = event {
             let ctrl = key.modifiers.control;
             let shift = key.modifiers.shift;
+            // Inline note editing: only Escape commits; everything else
+            // (typing, backspace, arrows, newlines) is handled by the focused
+            // hidden TextInput widget, which we sync after view.handle_event.
+            if self.note_edit_id.is_some() {
+                if key.key_code == KeyCode::Escape {
+                    self.finish_note_edit(cx);
+                    return;
+                }
+            }
             // Whiteboard undo/redo — canvas-level only (no terminal focused,
             // not editing text) so Ctrl+Z still reaches a focused shell.
-            if !self.text_editing && self.focused_terminal.is_none() {
+            if !self.text_editing && self.focused_terminal.is_none() && self.note_edit_id.is_none() {
                 if ctrl && key.key_code == KeyCode::KeyZ {
                     if shift {
                         if self.redo() {
@@ -2507,6 +3858,60 @@ impl Widget for CanvasPanel {
             }
         }
 
+        // ── Properties panel ──
+        // Live-apply title/body edits as the user types, not just on Return.
+        let prop_title = ids!(right_panel_container.properties_panel.prop_title);
+        let prop_body = ids!(right_panel_container.properties_panel.prop_body);
+        if self.view.text_input(cx, prop_title).changed(&actions).is_some()
+            || self.view.text_input(cx, prop_body).changed(&actions).is_some()
+        {
+            self.apply_properties_panel(cx);
+            self.redraw(cx);
+        }
+        // Color swatches.
+        let color_ids = [
+            ids!(right_panel_container.properties_panel.prop_color_row.prop_color_0),
+            ids!(right_panel_container.properties_panel.prop_color_row.prop_color_1),
+            ids!(right_panel_container.properties_panel.prop_color_row.prop_color_2),
+            ids!(right_panel_container.properties_panel.prop_color_row.prop_color_3),
+            ids!(right_panel_container.properties_panel.prop_color_row.prop_color_4),
+            ids!(right_panel_container.properties_panel.prop_color_row.prop_color_5),
+        ];
+        for i in 0..6 {
+            if self.view.button(cx, color_ids[i]).clicked(&actions) {
+                if let Some(item_id) = self.selected {
+                    if let Some(item) = self.items.iter_mut().find(|it| it.id() == item_id) {
+                        if let CanvasItem::Note { color_idx, .. } = item {
+                            *color_idx = i;
+                            self.prop_synced = false;
+                            self.redraw(cx);
+                        }
+                    }
+                }
+            }
+        }
+        // Font size buttons.
+        let font_values = [11.0f32, 13.0, 16.0, 20.0];
+        let font_ids = [
+            ids!(right_panel_container.properties_panel.prop_font_row.prop_font_0),
+            ids!(right_panel_container.properties_panel.prop_font_row.prop_font_1),
+            ids!(right_panel_container.properties_panel.prop_font_row.prop_font_2),
+            ids!(right_panel_container.properties_panel.prop_font_row.prop_font_3),
+        ];
+        for i in 0..4 {
+            if self.view.button(cx, font_ids[i]).clicked(&actions) {
+                if let Some(item_id) = self.selected {
+                    if let Some(item) = self.items.iter_mut().find(|it| it.id() == item_id) {
+                        if let CanvasItem::Note { font_size, .. } = item {
+                            *font_size = font_values[i];
+                            self.prop_synced = false;
+                            self.redraw(cx);
+                        }
+                    }
+                }
+            }
+        }
+
         // ── New-item menu ──
         let menu_btn = self.view.button(cx, ids!(menu_button));
         if menu_btn.clicked(&actions) {
@@ -2531,13 +3936,27 @@ impl Widget for CanvasPanel {
         }
         if self
             .view
+            .button(cx, ids!(menu_new_note))
+            .clicked(&actions)
+        {
+            self.spawn_note(cx);
+            self.view
+                .view(cx, ids!(new_item_menu))
+                .set_visible(cx, false);
+            self.redraw(cx);
+        }
+        if self
+            .view
             .button(cx, ids!(menu_new_browser))
             .clicked(&actions)
         {
             self.view
                 .view(cx, ids!(new_item_menu))
                 .set_visible(cx, false);
-            let ti = self.view.text_input(cx, ids!(command_input));
+            let ti = self.view.text_input(
+                cx,
+                ids!(command_wrap.command_bar.input_row.input_capsule.command_input),
+            );
             let prefix = "/new browser ";
             ti.set_text(cx, prefix);
             ti.set_key_focus(cx);
@@ -2552,14 +3971,15 @@ impl Widget for CanvasPanel {
             self.redraw(cx);
         }
         // Unified command input.
-        if let Some((text, _mods)) = self
-            .view
-            .text_input(cx, ids!(command_input))
-            .returned(&actions)
-        {
+        let input_id = ids!(command_wrap.command_bar.input_row.input_capsule.command_input);
+        if let Some((text, _mods)) = self.view.text_input(cx, input_id).returned(&actions) {
+            self.push_command_history(text.clone());
             self.exec_command(cx, &text);
-            let ti = self.view.text_input(cx, ids!(command_input));
+            let ti = self.view.text_input(cx, input_id);
             ti.set_text(cx, "");
+            self.view
+                .view(cx, ids!(command_wrap.command_bar.suggestion_list))
+                .set_visible(cx, false);
             self.redraw(cx);
         }
     }
@@ -2576,6 +3996,7 @@ impl Widget for CanvasPanel {
             self.timer = Some(cx.cx.start_interval(0.05));
         }
 
+        self.ensure_workspace();
         self.draw_grid(cx, rect);
 
         // Draw items (world → screen) by index; extract item data first to
@@ -2588,6 +4009,12 @@ impl Widget for CanvasPanel {
             String,
             String,
             String,
+            String,
+            f32,
+            usize,
+            f32,
+            bool,
+            AgentStatus,
             Option<std::sync::Arc<std::sync::Mutex<crate::terminal::state::TerminalState>>>,
         );
         let n_items = self.items.len();
@@ -2605,6 +4032,22 @@ impl Widget for CanvasPanel {
                 .unwrap_or_default();
             let url = item.url().unwrap_or("").to_string();
             let state = item.session().map(|t| t.state.clone());
+            let (body, font_size, color_idx) = match item {
+                CanvasItem::Note {
+                    body,
+                    font_size,
+                    color_idx,
+                    ..
+                } => (body.clone(), *font_size, *color_idx),
+                _ => (String::new(), 13.0, 0),
+            };
+            let (progress, playing) = match item {
+                CanvasItem::MusicPlayer {
+                    progress, playing, ..
+                } => (*progress, *playing),
+                _ => (0.0f32, false),
+            };
+            let status = item.agent_status().unwrap_or_default();
             draw_queue.push((
                 item.id(),
                 item.kind(),
@@ -2613,18 +4056,35 @@ impl Widget for CanvasPanel {
                 item.title().to_string(),
                 command,
                 url,
+                body,
+                font_size,
+                color_idx,
+                progress,
+                playing,
+                status,
                 state,
             ));
         }
 
-        for (item_id, kind, item_screen, is_sel, title, command, url, state) in draw_queue {
+        for (
+            item_id,
+            kind,
+            item_screen,
+            is_sel,
+            title,
+            command,
+            url,
+            body,
+            font_size,
+            color_idx,
+            progress,
+            playing,
+            status,
+            state,
+        ) in draw_queue
+        {
             match kind {
                 ItemKind::Terminal => {
-                    self.draw_border_rect(
-                        cx,
-                        item_screen,
-                        if is_sel { SEL_BORDER } else { TERM_BORDER },
-                    );
                     // Keep the PTY grid in sync with the on-screen content
                     // area every frame (handles zoom and item resizes).
                     if let Some(session) = self
@@ -2644,7 +4104,9 @@ impl Widget for CanvasPanel {
                         session.resize(cols, rows);
                     }
                     if let Some(state) = state {
-                        self.draw_terminal_at(cx, item_screen, &title, &command, &state);
+                        self.draw_terminal_at(
+                            cx, item_screen, &title, &command, status, is_sel, &state,
+                        );
                     }
                     self.draw_control_buttons(cx, item_id, item_screen);
                     if is_sel {
@@ -2652,12 +4114,18 @@ impl Widget for CanvasPanel {
                     }
                 }
                 ItemKind::Note => {
-                    self.draw_border_rect(
+                    let editing = self.note_edit_id == Some(item_id);
+                    self.draw_note_title(
                         cx,
+                        &title,
+                        &body,
+                        font_size,
+                        color_idx,
                         item_screen,
-                        if is_sel { SEL_BORDER } else { NOTE_BORDER },
+                        is_sel,
+                        editing,
+                        self.note_edit_caret,
                     );
-                    self.draw_note_title(cx, &title, item_screen);
                     self.draw_control_buttons(cx, item_id, item_screen);
                     if is_sel {
                         self.draw_resize_handle(cx, item_screen);
@@ -2670,8 +4138,20 @@ impl Widget for CanvasPanel {
                         self.draw_resize_handle(cx, item_screen);
                     }
                 }
+                ItemKind::MusicPlayer => {
+                    self.draw_music_player(
+                        cx, item_id, item_screen, is_sel, &title, progress, playing,
+                    );
+                    self.draw_control_buttons(cx, item_id, item_screen);
+                    if is_sel {
+                        self.draw_resize_handle(cx, item_screen);
+                    }
+                }
             }
         }
+
+        // Right-side properties panel reflects the current selection.
+        self.sync_properties_panel(cx);
 
         // Global whiteboard shapes (world coords) draw ON TOP of items so
         // annotations/flowcharts can mark terminals and browsers.
@@ -2690,15 +4170,16 @@ impl Widget for CanvasPanel {
         // dock, so the menu always covers the dock tray.
         while self.view.draw_walk(cx, scope, walk).step().is_some() {}
 
+        // Workspace tab bar sits on top of the canvas items and dock.
+        self.draw_workspace_tabs(cx, rect.size);
+
         // Global tool palette: fixed to the left edge, always on top.
         self.draw_tool_palette(cx);
 
         // Keep the platform text IME active while editing a whiteboard text
         // shape so the OS generates Event::TextInput for the canvas (which
-        // holds key focus via set_canvas_focus). The OS only sends text
-        // input while IME is active, and IME is activated from draw, so we
-        // call show_text_ime every frame while editing. When editing ends,
-        // hide_text_ime fires once to release the IME.
+        // holds key focus via set_canvas_focus). Inline note editing uses the
+        // hidden TextInput widget, which manages its own IME.
         if self.text_editing {
             if let Some(NoteShape::Text { pos, .. }) = &self.pending {
                 let screen_pos = self.camera.world_to_screen(*pos, self.world_viewport());

@@ -6,8 +6,36 @@ use crate::terminal::session::TerminalSession;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ItemKind {
     Note,
+    MusicPlayer,
     Terminal,
     Browser,
+}
+
+/// Agent status shown on terminal/agent cards (CNVS-style presence indicator).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum AgentStatus {
+    #[default]
+    Online,
+    Busy,
+    Idle,
+}
+
+impl AgentStatus {
+    pub fn label(self) -> &'static str {
+        match self {
+            AgentStatus::Online => "online",
+            AgentStatus::Busy => "busy",
+            AgentStatus::Idle => "idle",
+        }
+    }
+
+    pub fn color(self) -> [f32; 4] {
+        match self {
+            AgentStatus::Online => [0.38, 0.85, 0.50, 1.0],
+            AgentStatus::Busy => [0.95, 0.75, 0.28, 1.0],
+            AgentStatus::Idle => [0.55, 0.60, 0.72, 1.0],
+        }
+    }
 }
 
 /// Active drawing tool for a note whiteboard (cnvs-style tool palette).
@@ -213,11 +241,28 @@ pub enum CanvasItem {
         id: u64,
         world: Rect,
         title: String,
+        /// Editable body text rendered inside the note card.
+        body: String,
+        /// Font size for the note body.
+        font_size: f32,
+        /// Index into a color palette for the note body text.
+        color_idx: usize,
+    },
+    MusicPlayer {
+        id: u64,
+        world: Rect,
+        title: String,
+        /// Current play progress 0..1.
+        progress: f32,
+        /// Whether the player is "playing" (animates visualizer).
+        playing: bool,
     },
     Terminal {
         id: u64,
         world: Rect,
         title: String,
+        /// Presence/status indicator for agent-style terminal cards.
+        status: AgentStatus,
         session: Option<Box<TerminalSession>>,
     },
     Browser {
@@ -232,6 +277,7 @@ impl CanvasItem {
     pub fn id(&self) -> u64 {
         match self {
             CanvasItem::Note { id, .. }
+            | CanvasItem::MusicPlayer { id, .. }
             | CanvasItem::Terminal { id, .. }
             | CanvasItem::Browser { id, .. } => *id,
         }
@@ -240,6 +286,7 @@ impl CanvasItem {
     pub fn kind(&self) -> ItemKind {
         match self {
             CanvasItem::Note { .. } => ItemKind::Note,
+            CanvasItem::MusicPlayer { .. } => ItemKind::MusicPlayer,
             CanvasItem::Terminal { .. } => ItemKind::Terminal,
             CanvasItem::Browser { .. } => ItemKind::Browser,
         }
@@ -248,6 +295,7 @@ impl CanvasItem {
     pub fn world(&self) -> Rect {
         match self {
             CanvasItem::Note { world, .. }
+            | CanvasItem::MusicPlayer { world, .. }
             | CanvasItem::Terminal { world, .. }
             | CanvasItem::Browser { world, .. } => *world,
         }
@@ -256,6 +304,7 @@ impl CanvasItem {
     pub fn world_mut(&mut self) -> &mut Rect {
         match self {
             CanvasItem::Note { world, .. }
+            | CanvasItem::MusicPlayer { world, .. }
             | CanvasItem::Terminal { world, .. }
             | CanvasItem::Browser { world, .. } => world,
         }
@@ -264,6 +313,7 @@ impl CanvasItem {
     pub fn title(&self) -> &str {
         match self {
             CanvasItem::Note { title, .. }
+            | CanvasItem::MusicPlayer { title, .. }
             | CanvasItem::Terminal { title, .. }
             | CanvasItem::Browser { title, .. } => title,
         }
@@ -273,6 +323,7 @@ impl CanvasItem {
     pub fn title_mut(&mut self) -> &mut String {
         match self {
             CanvasItem::Note { title, .. }
+            | CanvasItem::MusicPlayer { title, .. }
             | CanvasItem::Terminal { title, .. }
             | CanvasItem::Browser { title, .. } => title,
         }
@@ -281,7 +332,9 @@ impl CanvasItem {
     pub fn session(&self) -> Option<&TerminalSession> {
         match self {
             CanvasItem::Terminal { session, .. } => session.as_deref(),
-            CanvasItem::Note { .. } | CanvasItem::Browser { .. } => None,
+            CanvasItem::Note { .. }
+            | CanvasItem::MusicPlayer { .. }
+            | CanvasItem::Browser { .. } => None,
         }
     }
 
@@ -289,7 +342,9 @@ impl CanvasItem {
     pub fn session_mut(&mut self) -> Option<&mut TerminalSession> {
         match self {
             CanvasItem::Terminal { session, .. } => session.as_deref_mut(),
-            CanvasItem::Note { .. } | CanvasItem::Browser { .. } => None,
+            CanvasItem::Note { .. }
+            | CanvasItem::MusicPlayer { .. }
+            | CanvasItem::Browser { .. } => None,
         }
     }
 
@@ -304,6 +359,49 @@ impl CanvasItem {
     pub fn url_mut(&mut self) -> Option<&mut String> {
         match self {
             CanvasItem::Browser { url, .. } => Some(url),
+            _ => None,
+        }
+    }
+
+    pub fn body(&self) -> Option<&str> {
+        match self {
+            CanvasItem::Note { body, .. } => Some(body),
+            _ => None,
+        }
+    }
+
+    pub fn body_mut(&mut self) -> Option<&mut String> {
+        match self {
+            CanvasItem::Note { body, .. } => Some(body),
+            _ => None,
+        }
+    }
+
+    pub fn note_font_size(&self) -> Option<f32> {
+        match self {
+            CanvasItem::Note { font_size, .. } => Some(*font_size),
+            _ => None,
+        }
+    }
+
+    pub fn note_color_idx(&self) -> Option<usize> {
+        match self {
+            CanvasItem::Note { color_idx, .. } => Some(*color_idx),
+            _ => None,
+        }
+    }
+
+    pub fn agent_status(&self) -> Option<AgentStatus> {
+        match self {
+            CanvasItem::Terminal { status, .. } => Some(*status),
+            _ => None,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn agent_status_mut(&mut self) -> Option<&mut AgentStatus> {
+        match self {
+            CanvasItem::Terminal { status, .. } => Some(status),
             _ => None,
         }
     }
