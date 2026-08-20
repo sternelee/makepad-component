@@ -514,9 +514,25 @@ impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
         if let Event::Startup = event {
             self.ui
-                .text_input(cx, ids!(main_window.body.canvas.command_wrap.command_bar.input_row.input_capsule.command_input))
+                .text_input(
+                    cx,
+                    ids!(
+                        main_window
+                            .body
+                            .canvas
+                            .command_wrap
+                            .command_bar
+                            .input_row
+                            .input_capsule
+                            .command_input
+                    ),
+                )
                 .set_key_focus(cx);
-            if let Some(mut panel) = self.ui.widget(cx, ids!(main_window.body.canvas)).borrow_mut::<CanvasPanel>() {
+            if let Some(mut panel) = self
+                .ui
+                .widget(cx, ids!(main_window.body.canvas))
+                .borrow_mut::<CanvasPanel>()
+            {
                 panel.set_grid_enabled(false);
                 panel.spawn_terminal(cx, "claude", None, "zsh");
             }

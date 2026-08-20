@@ -54,24 +54,6 @@ pub enum NoteTool {
     Eraser,
 }
 
-impl NoteTool {
-    /// Short label / glyph for the vertical tool palette.
-    pub fn label(self) -> &'static str {
-        match self {
-            NoteTool::Move => "✥",
-            NoteTool::Arrow => "↗",
-            NoteTool::Pen => "✏",
-            NoteTool::Line => "╱",
-            NoteTool::Rect => "▭",
-            NoteTool::Circle => "○",
-            NoteTool::Ellipse => "◯",
-            NoteTool::Polyline => "⌁",
-            NoteTool::Text => "T",
-            NoteTool::Eraser => "▤",
-        }
-    }
-}
-
 /// A completed (or in-progress) drawing on a note whiteboard.
 #[derive(Clone, Debug, PartialEq)]
 pub enum NoteShape {
@@ -172,10 +154,7 @@ impl NoteShape {
                 let rx = ((b.x - a.x).abs() * 0.5).max(0.5);
                 let ry = ((b.y - a.y).abs() * 0.5).max(0.5);
                 let n = 48;
-                let mut prev = makepad_widgets::Vec2d {
-                    x: cx + rx,
-                    y: cy,
-                };
+                let mut prev = makepad_widgets::Vec2d { x: cx + rx, y: cy };
                 for i in 1..=n {
                     let ang = (i as f64 / n as f64) * std::f64::consts::TAU;
                     let cur = makepad_widgets::Vec2d {
@@ -233,6 +212,9 @@ pub struct DrawnShape {
     pub color: [f32; 4],
     /// Stroke width in world units.
     pub width: f64,
+    /// Random seed driving the hand-drawn wobble. Fixed at creation so the
+    /// sketchy stroke keeps its exact shape across frames (no flicker).
+    pub seed: u32,
 }
 
 /// A single canvas item (note, terminal, or browser).

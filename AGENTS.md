@@ -41,6 +41,8 @@ makepad-component/
 │   │       ├── a2ui_bridge.rs + a2ui_bridge_impl/  # LLM → A2UI bridge (server, builder, tools, types, mureka)
 │   │       ├── watch_server.rs  # File-watching SSE server (port 8080)
 │   │       ├── mock_server.rs, streaming_main.rs, math_charts.rs, fft_demo.rs
+│   ├── canvas-terminal/         # Infinite-canvas terminal workspace (CNVS-style): PTY via
+│   │                            #   rmux-sdk, CEF browsers, hand-drawn whiteboard/notes
 │   ├── raycast-launcher/        # Raycast-style launcher, Makepad 2.0 `script_mod!` API
 │   │                            #   (runtime Splash app loading from *-app.json descriptors)
 │   ├── gemini-talker/           # Gemini Live voice companion, Makepad 2.0 `script_mod!` API

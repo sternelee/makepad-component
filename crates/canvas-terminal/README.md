@@ -14,7 +14,9 @@
 - ✅ 音乐播放器卡片
 - ✅ Agent 终端头像与状态指示
 - ✅ 多画布工作区切换
-- ✅ 左侧白板工具栏（Move/Pen/Rect/Circle/Text/Eraser 等）
+- ✅ 左侧白板工具栏（Move/Pen/Rect/Circle/Text/Eraser 等，手绘风矢量图标）
+- ✅ 手绘（rough.js 风格）白板笔触：确定性抖动 + 双描边，seed 固定不闪烁
+- ✅ 便利贴风格 Note 卡片：奶油纸面、铅笔抖动边、和纸胶带、深墨文字
 - ✅ 嵌入 CEF 浏览器
 - ✅ 通过 `＋` 菜单或命令创建终端/浏览器/便签/音乐播放器
 
@@ -72,3 +74,5 @@ crates/canvas-terminal/
 - 行内便签编辑由隐藏 `TextInput` 代理，IME 候选窗口可能出现在屏幕左上角，不影响输入。
 - 字体换行目前使用固定字符宽度估算，CJK/等宽字体下可能略有偏差。
 - 测试覆盖主要集中在 `command` 与 `terminal/session`；UI 行为通过 `cargo run` 手动验证。
+- 给 `draw_title` / `draw_cell_text` 设置文字颜色必须直接赋值 `.color` 字段；
+  `draw_vars.set_dyn_instance(live_id!(color), ...)` 对这些 shader 无效。

@@ -78,13 +78,11 @@ impl TerminalSession {
 
         // Resolve the working directory: explicit value (with `~` expanded),
         // else the current process directory.
-        let working_directory = cwd
-            .map(expand_tilde)
-            .unwrap_or_else(|| {
-                std::env::current_dir()
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_else(|_| ".".to_string())
-            });
+        let working_directory = cwd.map(expand_tilde).unwrap_or_else(|| {
+            std::env::current_dir()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| ".".to_string())
+        });
 
         let session = runtime()
             .block_on(async {
@@ -131,11 +129,7 @@ impl TerminalSession {
                 if killed_poll.load(std::sync::atomic::Ordering::SeqCst) {
                     break;
                 }
-                let next = tokio::time::timeout(
-                    Duration::from_secs(30),
-                    stream.next(),
-                )
-                .await;
+                let next = tokio::time::timeout(Duration::from_secs(30), stream.next()).await;
                 match next {
                     Ok(Ok(Some(chunk))) => {
                         if let rmux_sdk::PaneOutputChunk::Bytes { bytes, .. } = chunk {

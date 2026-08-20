@@ -11,8 +11,13 @@ const GRID_SIZE: f64 = 24.0;
 const TERM_CELL_W: f64 = 8.0;
 const TERM_CELL_H: f64 = 17.3;
 
-const NOTE_COLOR: [f32; 4] = [0.20, 0.24, 0.34, 1.0];
-const NOTE_BORDER: [f32; 4] = [0.36, 0.43, 0.60, 1.0];
+/// Sticky-note (hand-drawn) palette: cream paper, pencil-brown wobbly edge,
+/// translucent washi tape strip, dark ink text.
+const NOTE_PAPER: [f32; 4] = [0.97, 0.93, 0.80, 1.0];
+const NOTE_PAPER_EDGE: [f32; 4] = [0.45, 0.37, 0.26, 1.0];
+const NOTE_TAPE: [f32; 4] = [0.55, 0.78, 0.92, 0.45];
+const NOTE_TAPE_EDGE: [f32; 4] = [1.0, 1.0, 1.0, 0.35];
+const NOTE_TITLE_INK: [f32; 4] = [0.28, 0.22, 0.14, 1.0];
 const TERM_BG: [f32; 4] = [0.075, 0.082, 0.10, 1.0];
 const TERM_BORDER: [f32; 4] = [0.20, 0.24, 0.32, 1.0];
 const SEL_BORDER: [f32; 4] = [0.30, 0.62, 0.98, 1.0];
@@ -63,15 +68,18 @@ const INK_COLORS: [[f32; 4]; 6] = [
 /// Whiteboard stroke width presets (world units) shown in the tool palette.
 const INK_WIDTHS: [f64; 3] = [1.5, 3.0, 6.0];
 
-/// Note body text color presets (RGBA).
+/// Note body ink color presets (RGBA), dark enough to read on cream paper.
 const NOTE_TEXT_COLORS: [[f32; 4]; 6] = [
-    [0.92, 0.95, 1.00, 1.0], // white
-    [0.30, 0.62, 0.98, 1.0], // blue
-    [0.62, 0.78, 0.34, 1.0], // green
-    [0.95, 0.75, 0.28, 1.0], // yellow
-    [0.95, 0.48, 0.32, 1.0], // orange
-    [0.90, 0.39, 0.70, 1.0], // magenta
+    [0.25, 0.21, 0.16, 1.0], // ink black
+    [0.16, 0.32, 0.72, 1.0], // indigo
+    [0.25, 0.48, 0.24, 1.0], // forest green
+    [0.72, 0.42, 0.10, 1.0], // ochre
+    [0.78, 0.22, 0.18, 1.0], // brick red
+    [0.55, 0.26, 0.62, 1.0], // plum
 ];
+
+/// Warm amber accent for hand-drawn UI markers (active tool ring, selection).
+const PAL_ACCENT: [f32; 4] = [0.98, 0.72, 0.28, 1.0];
 
 /// Avatar color presets (RGBA) for terminal/agent cards.
 const AVATAR_COLORS: [[f32; 4]; 8] = [
@@ -92,6 +100,28 @@ fn name_color(name: &str) -> [f32; 4] {
         h = h.wrapping_mul(31).wrapping_add(b as u32);
     }
     AVATAR_COLORS[h as usize % AVATAR_COLORS.len()]
+}
+
+/// Deterministic pseudo-random in [-1, 1] from (seed, index). Stable across
+/// frames so hand-drawn wobble never flickers.
+fn sketch_rand(seed: u32, i: u32) -> f64 {
+    let mut h = seed.wrapping_mul(0x9E3779B1) ^ i.wrapping_mul(0x85EBCA77);
+    h ^= h >> 13;
+    h = h.wrapping_mul(0xC2B2AE3D);
+    h ^= h >> 16;
+    (h % 2000) as f64 / 1000.0 - 1.0
+}
+
+/// Convenience: RGBA array → Vec4f for direct DrawText/DrawColor assignment
+/// (draw_vars.set_dyn_instance is a no-op for these shaders; the direct
+/// `.color` field is the reliable path, as used by the terminal cell renderer).
+fn vec4f(c: [f32; 4]) -> Vec4f {
+    Vec4f {
+        x: c[0],
+        y: c[1],
+        z: c[2],
+        w: c[3],
+    }
 }
 
 /// Drag state while moving or resizing an item.
@@ -156,6 +186,8 @@ struct Workspace {
     tool: NoteTool,
     shapes: Vec<DrawnShape>,
     pending: Option<NoteShape>,
+    /// Seed of the in-progress shape's hand-drawn wobble.
+    pending_seed: u32,
     note_draw: Option<Vec2d>,
     text_editing: bool,
     undo_stack: Vec<Vec<DrawnShape>>,
@@ -187,6 +219,7 @@ impl Workspace {
             tool: NoteTool::default(),
             shapes: Vec::new(),
             pending: None,
+            pending_seed: 0,
             note_draw: None,
             text_editing: false,
             undo_stack: Vec::new(),
@@ -294,6 +327,12 @@ pub struct CanvasPanel {
     /// Global whiteboard: shape being drawn (mouse-down → move → up).
     #[rust]
     pending: Option<NoteShape>,
+    /// Hand-drawn wobble seed for the `pending` shape.
+    #[rust]
+    pending_seed: u32,
+    /// Monotonic counter used to mint fresh wobble seeds.
+    #[rust]
+    next_seed: u32,
     /// Global whiteboard: drawing session start point in world coords.
     #[rust]
     note_draw: Option<makepad_widgets::Vec2d>,
@@ -402,6 +441,7 @@ impl CanvasPanel {
             tool: self.tool,
             shapes: std::mem::take(&mut self.shapes),
             pending: self.pending.take(),
+            pending_seed: self.pending_seed,
             note_draw: self.note_draw,
             text_editing: self.text_editing,
             undo_stack: std::mem::take(&mut self.undo_stack),
@@ -444,6 +484,7 @@ impl CanvasPanel {
         self.tool = ws.tool;
         self.shapes = std::mem::take(&mut ws.shapes);
         self.pending = ws.pending.take();
+        self.pending_seed = ws.pending_seed;
         self.note_draw = ws.note_draw;
         self.text_editing = ws.text_editing;
         self.undo_stack = std::mem::take(&mut ws.undo_stack);
@@ -512,7 +553,8 @@ impl CanvasPanel {
     /// and pushes the current state onto the redo stack.
     fn undo(&mut self) -> bool {
         if let Some(prev) = self.undo_stack.pop() {
-            self.redo_stack.push(std::mem::replace(&mut self.shapes, prev));
+            self.redo_stack
+                .push(std::mem::replace(&mut self.shapes, prev));
             true
         } else {
             false
@@ -522,7 +564,8 @@ impl CanvasPanel {
     /// Redo the last undone whiteboard change.
     fn redo(&mut self) -> bool {
         if let Some(next) = self.redo_stack.pop() {
-            self.undo_stack.push(std::mem::replace(&mut self.shapes, next));
+            self.undo_stack
+                .push(std::mem::replace(&mut self.shapes, next));
             true
         } else {
             false
@@ -539,11 +582,18 @@ impl CanvasPanel {
                 shape,
                 color: self.ink_color(),
                 width: self.ink_width(),
+                seed: self.pending_seed,
             });
             true
         } else {
             false
         }
+    }
+
+    /// Mint a fresh hand-drawn wobble seed for a new pending shape.
+    fn fresh_seed(&mut self) -> u32 {
+        self.next_seed = self.next_seed.wrapping_add(1);
+        self.next_seed.wrapping_mul(0x9E3779B1) | 1
     }
 
     /// Screen-space bounding rect of a whiteboard text shape. Text is drawn
@@ -657,11 +707,18 @@ impl CanvasPanel {
             }
             // Release the hidden editor and return focus to the command bar
             // without changing the current selection.
+            self.view.text_input(cx, ids!(note_editor)).set_text(cx, "");
             self.view
-                .text_input(cx, ids!(note_editor))
-                .set_text(cx, "");
-            self.view
-                .text_input(cx, ids!(command_wrap.command_bar.input_row.input_capsule.command_input))
+                .text_input(
+                    cx,
+                    ids!(
+                        command_wrap
+                            .command_bar
+                            .input_row
+                            .input_capsule
+                            .command_input
+                    ),
+                )
                 .set_key_focus(cx);
             self.redraw(cx);
         }
@@ -830,7 +887,13 @@ impl CanvasPanel {
             // Return focus to the command bar.
             let ti = self.view.text_input(
                 cx,
-                ids!(command_wrap.command_bar.input_row.input_capsule.command_input),
+                ids!(
+                    command_wrap
+                        .command_bar
+                        .input_row
+                        .input_capsule
+                        .command_input
+                ),
             );
             ti.set_key_focus(cx);
         }
@@ -949,29 +1012,22 @@ impl CanvasPanel {
                 world, title, url, ..
             } => (id, ItemKind::Browser, world, title, url, None, None),
             CanvasItem::Note {
-                world,
-                title,
-                body,
-                ..
-            } => {
-                (id, ItemKind::Note, world, title, body, None, None)
-            }
+                world, title, body, ..
+            } => (id, ItemKind::Note, world, title, body, None, None),
             CanvasItem::MusicPlayer {
                 world,
                 title,
                 progress,
                 ..
-            } => {
-                (
-                    id,
-                    ItemKind::MusicPlayer,
-                    world,
-                    title,
-                    progress.to_string(),
-                    None,
-                    None,
-                )
-            }
+            } => (
+                id,
+                ItemKind::MusicPlayer,
+                world,
+                title,
+                progress.to_string(),
+                None,
+                None,
+            ),
         };
         self.minimized.push(meta);
         self.selected = None;
@@ -1205,7 +1261,9 @@ impl CanvasPanel {
         const RIGHT_PANEL_RIGHT_PAD: f64 = 12.0;
         const RIGHT_PANEL_TOP_PAD: f64 = 46.0;
         const RIGHT_PANEL_BOTTOM_PAD: f64 = 120.0;
-        let panel = self.view.view(cx, ids!(right_panel_container.properties_panel));
+        let panel = self
+            .view
+            .view(cx, ids!(right_panel_container.properties_panel));
         if panel.visible() {
             if panel.area().is_valid(cx) && panel.area().rect(cx).contains(screen) {
                 return true;
@@ -1316,10 +1374,7 @@ impl CanvasPanel {
                     if let Some(st) = item.agent_status_mut() {
                         *st = new_status;
                         self.redraw(cx);
-                        self.status(
-                            cx,
-                            &format!("{name} is now {}", new_status.label()),
-                        );
+                        self.status(cx, &format!("{name} is now {}", new_status.label()));
                     }
                 } else {
                     self.status(cx, &format!("No terminal named '{name}'"));
@@ -1450,13 +1505,21 @@ impl CanvasPanel {
 
     /// Update the suggestion dropdown labels and visibility.
     fn update_suggestions(&mut self, cx: &mut Cx) {
-        let input_id = ids!(command_wrap.command_bar.input_row.input_capsule.command_input);
+        let input_id = ids!(
+            command_wrap
+                .command_bar
+                .input_row
+                .input_capsule
+                .command_input
+        );
         let text = self.view.text_input(cx, input_id).text();
         if text != self.last_input_text {
             self.last_input_text = text.clone();
             self.suggestion_index = 0;
             let suggestions = self.suggestions_for(&text);
-            let list = self.view.view(cx, ids!(command_wrap.command_bar.suggestion_list));
+            let list = self
+                .view
+                .view(cx, ids!(command_wrap.command_bar.suggestion_list));
             let has_suggestions = !suggestions.is_empty() && !text.is_empty();
             list.set_visible(cx, has_suggestions);
             for i in 0..6 {
@@ -1464,7 +1527,11 @@ impl CanvasPanel {
                 let label = list.label(cx, &[id]);
                 if let Some(s) = suggestions.get(i) {
                     label.set_visible(cx, true);
-                    let prefix = if i == self.suggestion_index { "▸ " } else { "  " };
+                    let prefix = if i == self.suggestion_index {
+                        "▸ "
+                    } else {
+                        "  "
+                    };
                     label.set_text(cx, &format!("{prefix}{s}"));
                 } else {
                     label.set_visible(cx, false);
@@ -1476,7 +1543,13 @@ impl CanvasPanel {
 
     /// Accept the currently selected suggestion into the command input.
     fn accept_suggestion(&mut self, cx: &mut Cx) {
-        let input_id = ids!(command_wrap.command_bar.input_row.input_capsule.command_input);
+        let input_id = ids!(
+            command_wrap
+                .command_bar
+                .input_row
+                .input_capsule
+                .command_input
+        );
         let text = self.view.text_input(cx, input_id).text();
         let suggestions = self.suggestions_for(&text);
         if let Some(s) = suggestions.get(self.suggestion_index) {
@@ -1494,7 +1567,9 @@ impl CanvasPanel {
     /// Only updates the panel when the selection changes to avoid overwriting
     /// user edits while typing.
     fn sync_properties_panel(&mut self, cx: &mut Cx) {
-        let panel = self.view.view(cx, ids!(right_panel_container.properties_panel));
+        let panel = self
+            .view
+            .view(cx, ids!(right_panel_container.properties_panel));
         if self.selected == self.prop_selected_id && self.prop_synced {
             return;
         }
@@ -1558,9 +1633,7 @@ impl CanvasPanel {
             .text();
         if let Some(item) = self.items.iter_mut().find(|i| i.id() == id) {
             if let CanvasItem::Note {
-                title: t,
-                body: b,
-                ..
+                title: t, body: b, ..
             } = item
             {
                 *t = title;
@@ -1780,7 +1853,11 @@ impl CanvasPanel {
         for (pad, alpha) in layers {
             let r = Rect {
                 pos: rect.pos - Vec2d { x: pad, y: pad },
-                size: rect.size + Vec2d { x: pad * 2.0, y: pad * 2.0 },
+                size: rect.size
+                    + Vec2d {
+                        x: pad * 2.0,
+                        y: pad * 2.0,
+                    },
             };
             let c = [color[0], color[1], color[2], alpha];
             self.draw_item_bg_rect(cx, r, c);
@@ -1811,9 +1888,7 @@ impl CanvasPanel {
             .collect::<String>()
             .to_uppercase();
         if !initial.is_empty() {
-            self.draw_title
-                .draw_vars
-                .set_dyn_instance(cx.cx, live_id!(color), &[1.0, 1.0, 1.0, 0.9]);
+            self.draw_title.color = vec4f([1.0, 1.0, 1.0, 0.9]);
             self.draw_title
                 .draw_abs(cx, pos + Vec2d { x: 5.0, y: 2.0 }, &initial);
         }
@@ -1822,6 +1897,7 @@ impl CanvasPanel {
     fn draw_note_title(
         &mut self,
         cx: &mut Cx2d,
+        id: u64,
         title: &str,
         body: &str,
         font_size: f32,
@@ -1831,24 +1907,51 @@ impl CanvasPanel {
         editing: bool,
         caret: usize,
     ) {
+        // Per-note seed keeps the hand-drawn wobble stable for this card.
+        let seed = (id as u32).wrapping_mul(0x9E3779B1) | 1;
         self.draw_shadow_rect(cx, screen);
-        if is_sel {
-            self.draw_glow_border(cx, screen, SEL_BORDER);
-        }
-        self.draw_item_bg_rect(cx, screen, NOTE_COLOR);
-        self.draw_border_rect(cx, screen, if is_sel { SEL_BORDER } else { NOTE_BORDER });
-        // Note icon avatar.
-        self.draw_avatar(
+        // Cream sticky-note paper.
+        self.draw_item_bg_rect(cx, screen, NOTE_PAPER);
+        // Wobbly pencil edge instead of a hard rect border.
+        self.draw_sketch_rect_outline(
             cx,
-            screen.pos + Vec2d { x: 8.0, y: 5.0 },
-            "N",
-            [0.95, 0.75, 0.28, 1.0],
+            screen,
+            1.6,
+            if is_sel { SEL_BORDER } else { NOTE_PAPER_EDGE },
+            seed,
+            0.6,
         );
+        if is_sel {
+            // Second, looser outline as the selection marker.
+            let outer = Rect {
+                pos: screen.pos - Vec2d { x: 3.0, y: 3.0 },
+                size: screen.size + Vec2d { x: 6.0, y: 6.0 },
+            };
+            self.draw_sketch_rect_outline(
+                cx,
+                outer,
+                1.1,
+                [SEL_BORDER[0], SEL_BORDER[1], SEL_BORDER[2], 0.6],
+                seed ^ 0x5A5A,
+                0.6,
+            );
+        }
+        // Washi tape strip holding the note at the top.
+        let tape_w = (screen.size.x * 0.34).clamp(30.0, 86.0);
+        let tape = Rect {
+            pos: Vec2d {
+                x: screen.pos.x + (screen.size.x - tape_w) * 0.5,
+                y: screen.pos.y - 6.0,
+            },
+            size: Vec2d { x: tape_w, y: 12.0 },
+        };
+        self.draw_item_bg_rect(cx, tape, NOTE_TAPE);
+        self.draw_sketch_rect_outline(cx, tape, 0.9, NOTE_TAPE_EDGE, seed ^ 0x7E57, 0.5);
+
+        // Title in dark handwriting ink.
+        self.draw_title.color = vec4f(NOTE_TITLE_INK);
         self.draw_title
-            .draw_vars
-            .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
-        self.draw_title
-            .draw_abs(cx, screen.pos + Vec2d { x: 32.0, y: 6.0 }, title);
+            .draw_abs(cx, screen.pos + Vec2d { x: 12.0, y: 7.0 }, title);
 
         // Note body text, clipped to the card content area.
         let body_rect = Rect {
@@ -1860,9 +1963,7 @@ impl CanvasPanel {
         };
         cx.push_clip_rect(body_rect);
         let color = NOTE_TEXT_COLORS[color_idx.min(NOTE_TEXT_COLORS.len() - 1)];
-        self.draw_title
-            .draw_vars
-            .set_dyn_instance(cx.cx, live_id!(color), &color);
+        self.draw_title.color = vec4f(color);
         // Use a smaller font size for body; scale line height accordingly.
         let font_scale = font_size / 13.0;
         self.draw_title.font_scale = font_scale;
@@ -1897,8 +1998,14 @@ impl CanvasPanel {
         }
         for (i, line) in wrapped.iter().take(max_lines).enumerate() {
             let y = body_rect.pos.y + i as f64 * line_h;
-            self.draw_title
-                .draw_abs(cx, Vec2d { x: body_rect.pos.x, y }, line);
+            self.draw_title.draw_abs(
+                cx,
+                Vec2d {
+                    x: body_rect.pos.x,
+                    y,
+                },
+                line,
+            );
         }
 
         // Blinking caret when the note is being edited inline.
@@ -1934,11 +2041,11 @@ impl CanvasPanel {
                     w: 0.9,
                 };
                 let caret_rect = Rect {
-                    pos: Vec2d { x: caret_x, y: caret_y },
-                    size: Vec2d {
-                        x: 2.0,
-                        y: line_h,
+                    pos: Vec2d {
+                        x: caret_x,
+                        y: caret_y,
                     },
+                    size: Vec2d { x: 2.0, y: line_h },
                 };
                 self.draw_cursor.draw_abs(cx, caret_rect);
             }
@@ -1983,6 +2090,439 @@ impl CanvasPanel {
         }
     }
 
+    /// Hand-drawn polyline through `pts` (screen coords): interior points get
+    /// a perpendicular wobble and the path is stroked twice (rough.js-style
+    /// double stroke). Jitter derives from `seed`, so it is frame-stable.
+    #[allow(clippy::too_many_arguments)]
+    fn draw_sketch_polyline(
+        &mut self,
+        cx: &mut Cx2d,
+        pts: &[makepad_widgets::Vec2d],
+        closed: bool,
+        width: f64,
+        color: [f32; 4],
+        seed: u32,
+        // Wobble scale: 1.0 = freehand canvas strokes, ~0.35 = neat UI icons.
+        sloppy: f64,
+    ) {
+        if pts.len() < 2 {
+            if let Some(p) = pts.first() {
+                self.draw_item_bg_rect(
+                    cx,
+                    Rect {
+                        pos: makepad_widgets::Vec2d {
+                            x: p.x - width * 0.5,
+                            y: p.y - width * 0.5,
+                        },
+                        size: makepad_widgets::Vec2d { x: width, y: width },
+                    },
+                    color,
+                );
+            }
+            return;
+        }
+        let jitter = (width * 0.9).clamp(0.6, 2.5) * sloppy;
+        let n = pts.len();
+        for pass in 0..2u32 {
+            let pseed = seed.wrapping_add(pass.wrapping_mul(0x9E3779B1));
+            let (pw, alpha) = if pass == 0 {
+                (width, color[3])
+            } else {
+                (
+                    width * 0.7,
+                    color[3] * (0.55 * sloppy.clamp(0.4, 1.0)) as f32,
+                )
+            };
+            let mut jpts: Vec<makepad_widgets::Vec2d> = Vec::with_capacity(n);
+            for (i, p) in pts.iter().enumerate() {
+                // Keep open endpoints fixed on the main pass so strokes land
+                // exactly where the user drew them.
+                let fixed = !closed && pass == 0 && (i == 0 || i == n - 1);
+                if fixed {
+                    jpts.push(*p);
+                } else {
+                    jpts.push(makepad_widgets::Vec2d {
+                        x: p.x + sketch_rand(pseed, i as u32 * 2) * jitter,
+                        y: p.y + sketch_rand(pseed, i as u32 * 2 + 1) * jitter,
+                    });
+                }
+            }
+            let c = [color[0], color[1], color[2], alpha];
+            let seg_count = if closed { n } else { n - 1 };
+            for i in 0..seg_count {
+                let a = jpts[i];
+                let b = jpts[(i + 1) % n];
+                self.draw_segment(cx, a, b, pw, c);
+            }
+        }
+    }
+
+    /// Hand-drawn straight stroke from `a` to `b` (screen coords):
+    /// subdivided so the wobble reads as a sketchy line, not a straight edge.
+    #[allow(clippy::too_many_arguments)]
+    fn draw_sketch_segment(
+        &mut self,
+        cx: &mut Cx2d,
+        a: makepad_widgets::Vec2d,
+        b: makepad_widgets::Vec2d,
+        width: f64,
+        color: [f32; 4],
+        seed: u32,
+        // Wobble scale: 1.0 = freehand canvas strokes, ~0.35 = neat UI icons.
+        sloppy: f64,
+    ) {
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let dist = dx.hypot(dy);
+        if dist < 1.0 {
+            self.draw_sketch_polyline(cx, &[a], false, width, color, seed, sloppy);
+            return;
+        }
+        let n = ((dist / 14.0).ceil() as usize).clamp(2, 24);
+        let mut pts = Vec::with_capacity(n + 1);
+        for i in 0..=n {
+            let t = i as f64 / n as f64;
+            pts.push(makepad_widgets::Vec2d {
+                x: a.x + dx * t,
+                y: a.y + dy * t,
+            });
+        }
+        self.draw_sketch_polyline(cx, &pts, false, width, color, seed, sloppy);
+    }
+
+    /// Hand-drawn wobbly rectangle outline (screen coords), edge by edge.
+    fn draw_sketch_rect_outline(
+        &mut self,
+        cx: &mut Cx2d,
+        rect: Rect,
+        width: f64,
+        color: [f32; 4],
+        seed: u32,
+        // Wobble scale: 1.0 = freehand canvas strokes, ~0.35 = neat UI icons.
+        sloppy: f64,
+    ) {
+        let x0 = rect.pos.x;
+        let y0 = rect.pos.y;
+        let x1 = rect.pos.x + rect.size.x;
+        let y1 = rect.pos.y + rect.size.y;
+        let corners = [
+            makepad_widgets::Vec2d { x: x0, y: y0 },
+            makepad_widgets::Vec2d { x: x1, y: y0 },
+            makepad_widgets::Vec2d { x: x1, y: y1 },
+            makepad_widgets::Vec2d { x: x0, y: y1 },
+        ];
+        for i in 0..4u32 {
+            let a = corners[i as usize];
+            let b = corners[((i + 1) % 4) as usize];
+            self.draw_sketch_segment(cx, a, b, width, color, seed.wrapping_add(i * 7919), sloppy);
+        }
+    }
+
+    /// Hand-drawn wobbly ellipse outline (screen coords) with radial wobble.
+    #[allow(clippy::too_many_arguments)]
+    fn draw_sketch_ellipse(
+        &mut self,
+        cx: &mut Cx2d,
+        center: makepad_widgets::Vec2d,
+        rx: f64,
+        ry: f64,
+        width: f64,
+        color: [f32; 4],
+        seed: u32,
+        // Wobble scale: 1.0 = freehand canvas strokes, ~0.35 = neat UI icons.
+        sloppy: f64,
+    ) {
+        let rx = rx.max(0.5);
+        let ry = ry.max(0.5);
+        let n = ((rx.max(ry) * std::f64::consts::TAU) / 10.0)
+            .ceil()
+            .clamp(16.0, 96.0) as usize;
+        let wob_frac = ((width * 0.9).clamp(0.6, 2.5) / rx.max(ry)).min(0.2) * 1.2 * sloppy;
+        let mut pts = Vec::with_capacity(n);
+        for i in 0..n {
+            let ang = (i as f64 / n as f64) * std::f64::consts::TAU;
+            let rj = 1.0 + sketch_rand(seed, i as u32) * wob_frac;
+            pts.push(makepad_widgets::Vec2d {
+                x: center.x + rx * rj * ang.cos(),
+                y: center.y + ry * rj * ang.sin(),
+            });
+        }
+        self.draw_sketch_polyline(cx, &pts, true, width, color, seed, sloppy);
+    }
+
+    /// Short arrowhead (two strokes) at `tip`, pointing along unit (dx, dy).
+    #[allow(clippy::too_many_arguments)]
+    fn draw_icon_arrowhead(
+        &mut self,
+        cx: &mut Cx2d,
+        tip: Vec2d,
+        dx: f64,
+        dy: f64,
+        size: f64,
+        w: f64,
+        color: [f32; 4],
+        seed: u32,
+        // Wobble scale: 1.0 = freehand canvas strokes, ~0.35 = neat UI icons.
+        sloppy: f64,
+    ) {
+        let px = -dy;
+        let py = dx;
+        let a = Vec2d {
+            x: tip.x - dx * size + px * size * 0.5,
+            y: tip.y - dy * size + py * size * 0.5,
+        };
+        let b = Vec2d {
+            x: tip.x - dx * size - px * size * 0.5,
+            y: tip.y - dy * size - py * size * 0.5,
+        };
+        self.draw_sketch_segment(cx, tip, a, w, color, seed, sloppy);
+        self.draw_sketch_segment(cx, tip, b, w, color, seed + 1, sloppy);
+    }
+
+    /// Vector tool icon drawn with hand-drawn strokes (no font glyphs —
+    /// several palette glyphs rendered as tofu in the bundled font).
+    fn draw_tool_icon(
+        &mut self,
+        cx: &mut Cx2d,
+        idx: usize,
+        tool: NoteTool,
+        r: Rect,
+        color: [f32; 4],
+    ) {
+        let x0 = r.pos.x + 7.0;
+        let y0 = r.pos.y + 7.0;
+        let x1 = r.pos.x + r.size.x - 7.0;
+        let y1 = r.pos.y + r.size.y - 7.0;
+        let mx = (x0 + x1) * 0.5;
+        let my = (y0 + y1) * 0.5;
+        let seed = 900 + idx as u32 * 131;
+        let w = 1.6;
+        // Icons are small: keep the wobble subtle so they read as tidy
+        // hand-drawn glyphs rather than scribbles.
+        const SLOPPY: f64 = 0.35;
+        match tool {
+            NoteTool::Move => {
+                // Four arrows out of the center.
+                self.draw_sketch_segment(
+                    cx,
+                    Vec2d { x: mx, y: y0 + 2.0 },
+                    Vec2d { x: mx, y: y1 - 2.0 },
+                    w,
+                    color,
+                    seed,
+                    SLOPPY,
+                );
+                self.draw_sketch_segment(
+                    cx,
+                    Vec2d { x: x0 + 2.0, y: my },
+                    Vec2d { x: x1 - 2.0, y: my },
+                    w,
+                    color,
+                    seed + 2,
+                    SLOPPY,
+                );
+                self.draw_icon_arrowhead(
+                    cx,
+                    Vec2d { x: mx, y: y0 + 1.0 },
+                    0.0,
+                    -1.0,
+                    3.4,
+                    w,
+                    color,
+                    seed + 10,
+                    SLOPPY,
+                );
+                self.draw_icon_arrowhead(
+                    cx,
+                    Vec2d { x: mx, y: y1 - 1.0 },
+                    0.0,
+                    1.0,
+                    3.4,
+                    w,
+                    color,
+                    seed + 12,
+                    SLOPPY,
+                );
+                self.draw_icon_arrowhead(
+                    cx,
+                    Vec2d { x: x0 + 1.0, y: my },
+                    -1.0,
+                    0.0,
+                    3.4,
+                    w,
+                    color,
+                    seed + 14,
+                    SLOPPY,
+                );
+                self.draw_icon_arrowhead(
+                    cx,
+                    Vec2d { x: x1 - 1.0, y: my },
+                    1.0,
+                    0.0,
+                    3.4,
+                    w,
+                    color,
+                    seed + 16,
+                    SLOPPY,
+                );
+            }
+            NoteTool::Arrow => {
+                let tip = Vec2d { x: x1, y: y0 };
+                self.draw_sketch_segment(cx, Vec2d { x: x0, y: y1 }, tip, w, color, seed, SLOPPY);
+                let len = (x1 - x0).hypot(y0 - y1);
+                self.draw_icon_arrowhead(
+                    cx,
+                    tip,
+                    (x1 - x0) / len,
+                    (y0 - y1) / len,
+                    4.5,
+                    w,
+                    color,
+                    seed + 2,
+                    SLOPPY,
+                );
+            }
+            NoteTool::Pen => {
+                // Pencil: thick diagonal body + small lead cross-stroke.
+                self.draw_sketch_segment(
+                    cx,
+                    Vec2d {
+                        x: x0 + 1.0,
+                        y: y1 - 1.0,
+                    },
+                    Vec2d {
+                        x: x1 - 2.0,
+                        y: y0 + 2.0,
+                    },
+                    2.4,
+                    color,
+                    seed,
+                    SLOPPY,
+                );
+                self.draw_sketch_segment(
+                    cx,
+                    Vec2d {
+                        x: x1 - 6.0,
+                        y: y0 + 1.0,
+                    },
+                    Vec2d {
+                        x: x1 - 1.0,
+                        y: y0 + 6.0,
+                    },
+                    1.2,
+                    color,
+                    seed + 2,
+                    SLOPPY,
+                );
+            }
+            NoteTool::Line => {
+                self.draw_sketch_segment(
+                    cx,
+                    Vec2d { x: x0, y: y1 },
+                    Vec2d { x: x1, y: y0 },
+                    w,
+                    color,
+                    seed,
+                    SLOPPY,
+                );
+            }
+            NoteTool::Rect => {
+                self.draw_sketch_rect_outline(
+                    cx,
+                    Rect {
+                        pos: Vec2d { x: x0, y: y0 + 1.0 },
+                        size: Vec2d {
+                            x: x1 - x0,
+                            y: y1 - y0 - 2.0,
+                        },
+                    },
+                    1.2,
+                    color,
+                    seed,
+                    SLOPPY,
+                );
+            }
+            NoteTool::Circle => {
+                let rr = (x1 - x0).min(y1 - y0) * 0.5;
+                self.draw_sketch_ellipse(
+                    cx,
+                    Vec2d { x: mx, y: my },
+                    rr,
+                    rr,
+                    1.2,
+                    color,
+                    seed,
+                    SLOPPY,
+                );
+            }
+            NoteTool::Ellipse => {
+                self.draw_sketch_ellipse(
+                    cx,
+                    Vec2d { x: mx, y: my },
+                    (x1 - x0) * 0.5,
+                    (y1 - y0) * 0.32,
+                    1.2,
+                    color,
+                    seed,
+                    SLOPPY,
+                );
+            }
+            NoteTool::Polyline => {
+                let pts = [
+                    Vec2d { x: x0, y: my + 4.0 },
+                    Vec2d { x: mx - 2.0, y: y0 },
+                    Vec2d { x: mx + 2.0, y: y1 },
+                    Vec2d { x: x1, y: my - 4.0 },
+                ];
+                self.draw_sketch_polyline(cx, &pts, false, w, color, seed, SLOPPY);
+            }
+            NoteTool::Text => {
+                self.draw_title.color = vec4f(color);
+                self.draw_title
+                    .draw_abs(cx, r.pos + Vec2d { x: 9.0, y: 4.0 }, "T");
+            }
+            NoteTool::Eraser => {
+                // Tilted eraser block (rotated rect outline).
+                let ang = -0.6f64;
+                let (hw, hh) = (6.0, 4.0);
+                let rot = |px: f64, py: f64| Vec2d {
+                    x: mx + px * ang.cos() - py * ang.sin(),
+                    y: my + px * ang.sin() + py * ang.cos(),
+                };
+                let pts = [rot(-hw, -hh), rot(hw, -hh), rot(hw, hh), rot(-hw, hh)];
+                self.draw_sketch_polyline(cx, &pts, true, 1.3, color, seed, SLOPPY);
+            }
+        }
+    }
+
+    /// Filled disc (screen coords) via scanline quads — for palette swatches.
+    fn draw_filled_disc(
+        &mut self,
+        cx: &mut Cx2d,
+        center: makepad_widgets::Vec2d,
+        r: f64,
+        color: [f32; 4],
+    ) {
+        let ri = r.ceil() as i32;
+        for dy in -ri..=ri {
+            let half = (r * r - (dy as f64) * (dy as f64)).max(0.0).sqrt();
+            self.draw_item_bg_rect(
+                cx,
+                Rect {
+                    pos: makepad_widgets::Vec2d {
+                        x: center.x - half,
+                        y: center.y + dy as f64,
+                    },
+                    size: makepad_widgets::Vec2d {
+                        x: half * 2.0,
+                        y: 1.0,
+                    },
+                },
+                color,
+            );
+        }
+    }
+
     /// Draw one completed or in-progress global whiteboard shape in world coords.
     fn draw_note_shape(
         &mut self,
@@ -1991,6 +2531,7 @@ impl CanvasPanel {
         zoom: f64,
         color: [f32; 4],
         width: f64,
+        seed: u32,
     ) {
         let viewport = self.world_viewport();
         let pan = self.camera.pan;
@@ -2001,14 +2542,14 @@ impl CanvasPanel {
         let w = (width * zoom).max(1.5);
         match shape {
             NoteShape::Arrow { a, b } => {
-                self.draw_segment(cx, to_screen(*a), to_screen(*b), w, color);
-                // Arrowhead: two short strokes near `b`.
+                self.draw_sketch_segment(cx, to_screen(*a), to_screen(*b), w, color, seed, 1.0);
+                // Arrowhead: two short sketchy strokes near `b`.
                 let dx = b.x - a.x;
                 let dy = b.y - a.y;
                 let len = (dx * dx + dy * dy).sqrt().max(1e-6);
                 let ux = dx / len;
                 let uy = dy / len;
-                let h = 8.0 * zoom;
+                let h = 9.0 * zoom;
                 let tip = to_screen(*b);
                 let left = to_screen(makepad_widgets::Vec2d {
                     x: b.x - ux * h + uy * h * 0.5,
@@ -2018,98 +2559,70 @@ impl CanvasPanel {
                     x: b.x - ux * h - uy * h * 0.5,
                     y: b.y - uy * h + ux * h * 0.5,
                 });
-                self.draw_segment(cx, tip, left, w, color);
-                self.draw_segment(cx, tip, right, w, color);
+                self.draw_sketch_segment(cx, tip, left, w, color, seed.wrapping_add(101), 1.0);
+                self.draw_sketch_segment(cx, tip, right, w, color, seed.wrapping_add(102), 1.0);
             }
             NoteShape::Line { a, b } => {
-                self.draw_segment(cx, to_screen(*a), to_screen(*b), w, color);
+                self.draw_sketch_segment(
+                    cx,
+                    to_screen(*a),
+                    to_screen(*b),
+                    w,
+                    color,
+                    seed.wrapping_add(1),
+                    1.0,
+                );
             }
             NoteShape::Pen { points } | NoteShape::Polyline { points } => {
-                for seg in points.windows(2) {
-                    self.draw_segment(cx, to_screen(seg[0]), to_screen(seg[1]), w, color);
-                }
-                if let Some(p) = points.last() {
-                    let p = to_screen(*p);
-                    self.draw_item_bg_rect(
-                        cx,
-                        Rect {
-                            pos: makepad_widgets::Vec2d {
-                                x: p.x - w * 0.5,
-                                y: p.y - w * 0.5,
-                            },
-                            size: makepad_widgets::Vec2d { x: w, y: w },
-                        },
-                        color,
-                    );
-                }
+                // Freehand strokes are already organic: a single jittered
+                // double-pass over the sampled points keeps the ink feel.
+                let pts: Vec<makepad_widgets::Vec2d> =
+                    points.iter().map(|p| to_screen(*p)).collect();
+                self.draw_sketch_polyline(cx, &pts, false, w, color, seed, 1.0);
             }
             NoteShape::Rect { a, b } => {
-                let x0 = a.x.min(b.x);
-                let y0 = a.y.min(b.y);
-                let x1 = a.x.max(b.x);
-                let y1 = a.y.max(b.y);
-                let corners = [
-                    makepad_widgets::Vec2d { x: x0, y: y0 },
-                    makepad_widgets::Vec2d { x: x1, y: y0 },
-                    makepad_widgets::Vec2d { x: x1, y: y1 },
-                    makepad_widgets::Vec2d { x: x0, y: y1 },
-                    makepad_widgets::Vec2d { x: x0, y: y0 },
-                ];
-                for seg in corners.windows(2) {
-                    self.draw_segment(cx, to_screen(seg[0]), to_screen(seg[1]), w, color);
-                }
+                let sa = to_screen(*a);
+                let sb = to_screen(*b);
+                let rect = Rect {
+                    pos: makepad_widgets::Vec2d {
+                        x: sa.x.min(sb.x),
+                        y: sa.y.min(sb.y),
+                    },
+                    size: makepad_widgets::Vec2d {
+                        x: (sb.x - sa.x).abs(),
+                        y: (sb.y - sa.y).abs(),
+                    },
+                };
+                self.draw_sketch_rect_outline(cx, rect, w, color, seed, 1.0);
             }
             NoteShape::Circle { center, r } => {
                 let c = to_screen(*center);
-                let rr = r * zoom;
-                let n = ((rr * std::f64::consts::TAU) / (w * 0.5)).ceil().max(12.0) as usize;
-                let mut prev = makepad_widgets::Vec2d {
-                    x: c.x + rr,
-                    y: c.y,
-                };
-                for i in 1..=n {
-                    let ang = (i as f64 / n as f64) * std::f64::consts::TAU;
-                    let cur = makepad_widgets::Vec2d {
-                        x: c.x + rr * ang.cos(),
-                        y: c.y + rr * ang.sin(),
-                    };
-                    self.draw_segment(cx, prev, cur, w, color);
-                    prev = cur;
-                }
+                let rr = (r * zoom).max(0.5);
+                self.draw_sketch_ellipse(cx, c, rr, rr, w, color, seed, 1.0);
             }
             NoteShape::Ellipse { a, b } => {
                 // Ellipse inscribed in the bounding box [a, b], drawn in
-                // screen space (corners → screen, then sample perimeter).
+                // screen space (corners → screen, then wobbly perimeter).
                 let sa = to_screen(*a);
                 let sb = to_screen(*b);
                 let mx = (sa.x + sb.x) * 0.5;
                 let my = (sa.y + sb.y) * 0.5;
                 let rx = ((sb.x - sa.x).abs() * 0.5).max(0.5);
                 let ry = ((sb.y - sa.y).abs() * 0.5).max(0.5);
-                let n = ((rx.max(ry) * std::f64::consts::TAU) / (w * 0.5))
-                    .ceil()
-                    .max(24.0) as usize;
-                let mut prev = makepad_widgets::Vec2d {
-                    x: mx + rx,
-                    y: my,
-                };
-                for i in 1..=n {
-                    let ang = (i as f64 / n as f64) * std::f64::consts::TAU;
-                    let cur = makepad_widgets::Vec2d {
-                        x: mx + rx * ang.cos(),
-                        y: my + ry * ang.sin(),
-                    };
-                    self.draw_segment(cx, prev, cur, w, color);
-                    prev = cur;
-                }
+                self.draw_sketch_ellipse(
+                    cx,
+                    makepad_widgets::Vec2d { x: mx, y: my },
+                    rx,
+                    ry,
+                    w,
+                    color,
+                    seed,
+                    1.0,
+                );
             }
             NoteShape::Text { pos, text } => {
                 let p = to_screen(*pos);
-                self.draw_title.draw_vars.set_dyn_instance(
-                    cx.cx,
-                    live_id!(color),
-                    &[color[0], color[1], color[2], color[3]],
-                );
+                self.draw_title.color = vec4f(color);
                 // Show a blinking caret while the in-progress text shape is
                 // being edited (empty text still shows the caret).
                 if self.text_editing {
@@ -2127,7 +2640,9 @@ impl CanvasPanel {
     /// of the canvas (screen-fixed, like the dock), always available.
     fn draw_tool_palette(&mut self, cx: &mut Cx2d) {
         let (palette_rect, tools_y, colors_y, widths_y) = self.palette_layout();
-        self.draw_item_bg_rect(cx, palette_rect, [0.12, 0.14, 0.20, 0.94]);
+        self.draw_item_bg_rect(cx, palette_rect, [0.13, 0.15, 0.21, 0.92]);
+        // Hand-drawn wobbly frame around the palette panel.
+        self.draw_sketch_rect_outline(cx, palette_rect, 1.2, [0.44, 0.50, 0.64, 0.8], 42, 0.5);
 
         // ── Tools ──
         for (i, t) in Self::note_tools().iter().enumerate() {
@@ -2144,34 +2659,35 @@ impl CanvasPanel {
                 },
             };
             let active = *t == self.tool;
-            self.draw_item_bg_rect(
-                cx,
-                r,
-                if active {
-                    [0.30, 0.62, 0.98, 0.85]
-                } else {
-                    [0.17, 0.19, 0.26, 1.0]
-                },
-            );
             if active {
-                self.draw_border_rect(cx, r, [0.45, 0.72, 1.0, 1.0]);
+                // Hand-drawn ring marks the active tool (no hard fill).
+                let center = Vec2d {
+                    x: r.pos.x + r.size.x * 0.5,
+                    y: r.pos.y + r.size.y * 0.5,
+                };
+                self.draw_sketch_ellipse(
+                    cx,
+                    center,
+                    r.size.x * 0.52,
+                    r.size.y * 0.52,
+                    1.4,
+                    PAL_ACCENT,
+                    300 + i as u32,
+                    0.35,
+                );
             }
-            self.draw_title.draw_vars.set_dyn_instance(
-                cx.cx,
-                live_id!(color),
-                &if active {
-                    [1.0, 1.0, 1.0, 1.0]
-                } else {
-                    [0.72, 0.78, 0.90, 1.0]
-                },
-            );
-            self.draw_title
-                .draw_abs(cx, r.pos + Vec2d { x: 6.0, y: 4.0 }, t.label());
+            let icon_color = if active {
+                PAL_ACCENT
+            } else {
+                [0.68, 0.72, 0.82, 1.0]
+            };
+            self.draw_tool_icon(cx, i, *t, r, icon_color);
         }
 
         // ── Color swatches ──
         let col_w = Self::PAL_SWATCH + Self::PAL_SWATCH_GAP;
-        let grid_x = palette_rect.pos.x + (palette_rect.size.x - 2.0 * col_w + Self::PAL_SWATCH_GAP) * 0.5;
+        let grid_x =
+            palette_rect.pos.x + (palette_rect.size.x - 2.0 * col_w + Self::PAL_SWATCH_GAP) * 0.5;
         for (i, c) in INK_COLORS.iter().enumerate() {
             let col = i % 2;
             let row = i / 2;
@@ -2185,11 +2701,33 @@ impl CanvasPanel {
                     y: Self::PAL_SWATCH,
                 },
             };
-            self.draw_item_bg_rect(cx, r, *c);
+            let center = Vec2d {
+                x: r.pos.x + Self::PAL_SWATCH * 0.5,
+                y: r.pos.y + Self::PAL_SWATCH * 0.5,
+            };
+            self.draw_filled_disc(cx, center, Self::PAL_SWATCH * 0.5 - 1.0, *c);
             if i == self.ink_color_idx {
-                self.draw_border_rect(cx, r, [1.0, 1.0, 1.0, 1.0]);
+                self.draw_sketch_ellipse(
+                    cx,
+                    center,
+                    Self::PAL_SWATCH * 0.5 + 2.0,
+                    Self::PAL_SWATCH * 0.5 + 2.0,
+                    1.3,
+                    PAL_ACCENT,
+                    400 + i as u32,
+                    0.35,
+                );
             } else {
-                self.draw_border_rect(cx, r, [0.28, 0.32, 0.42, 1.0]);
+                self.draw_sketch_ellipse(
+                    cx,
+                    center,
+                    Self::PAL_SWATCH * 0.5,
+                    Self::PAL_SWATCH * 0.5,
+                    0.8,
+                    [0.30, 0.34, 0.44, 0.6],
+                    500 + i as u32,
+                    0.35,
+                );
             }
         }
 
@@ -2205,30 +2743,28 @@ impl CanvasPanel {
                     y: Self::PAL_WIDTH_BTN_H,
                 },
             };
-            self.draw_item_bg_rect(
-                cx,
-                r,
-                if i == self.ink_width_idx {
-                    [0.30, 0.62, 0.98, 0.55]
-                } else {
-                    [0.17, 0.19, 0.26, 1.0]
-                },
-            );
             if i == self.ink_width_idx {
-                self.draw_border_rect(cx, r, [0.45, 0.72, 1.0, 1.0]);
+                // Hand-drawn frame marks the active width.
+                self.draw_sketch_rect_outline(cx, r, 1.2, PAL_ACCENT, 600 + i as u32, 0.4);
             }
-            // Sample stroke across the button, clamped to the button height.
+            // Sample stroke across the button, clamped to the button height,
+            // drawn with the same sketchy wobble as real strokes.
             let sw = wd.min(Self::PAL_WIDTH_BTN_H - 4.0);
             let mid = r.pos.y + r.size.y * 0.5;
-            self.draw_segment(
+            self.draw_sketch_segment(
                 cx,
-                Vec2d { x: r.pos.x + 4.0, y: mid },
+                Vec2d {
+                    x: r.pos.x + 4.0,
+                    y: mid,
+                },
                 Vec2d {
                     x: r.pos.x + r.size.x - 4.0,
                     y: mid,
                 },
                 sw,
                 self.ink_color(),
+                700 + i as u32,
+                0.9,
             );
         }
     }
@@ -2250,17 +2786,17 @@ impl CanvasPanel {
             size: viewport,
         });
         for ds in shapes {
-            self.draw_note_shape(cx, &ds.shape, zoom, ds.color, ds.width);
+            self.draw_note_shape(cx, &ds.shape, zoom, ds.color, ds.width, ds.seed);
         }
         // Move tool: highlight the shape under the cursor.
         if let Some(idx) = self.hovered_shape {
             if let Some(ds) = shapes.get(idx) {
                 let hw = ds.width + 4.0 / zoom;
-                self.draw_note_shape(cx, &ds.shape, zoom, [0.40, 0.70, 1.0, 0.45], hw);
+                self.draw_note_shape(cx, &ds.shape, zoom, [0.40, 0.70, 1.0, 0.45], hw, ds.seed);
             }
         }
         if let Some(p) = pending {
-            self.draw_note_shape(cx, p, zoom, ink_color, ink_width);
+            self.draw_note_shape(cx, p, zoom, ink_color, ink_width, self.pending_seed);
         }
         cx.pop_clip_rect();
     }
@@ -2400,9 +2936,7 @@ impl CanvasPanel {
                 ItemKind::MusicPlayer => "♫",
             };
             let label = format!("{kind_label} {title}");
-            self.draw_cell_text
-                .draw_vars
-                .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
+            self.draw_cell_text.color = vec4f(TITLE_TEXT);
             self.draw_cell_text
                 .draw_abs(cx, rect.pos + Vec2d { x: 8.0, y: 6.0 }, &label);
         }
@@ -2444,14 +2978,9 @@ impl CanvasPanel {
                 },
             );
             self.draw_border_rect(cx, tab_rect, TAB_BORDER);
+            self.draw_title.color = vec4f(TITLE_TEXT);
             self.draw_title
-                .draw_vars
-                .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
-            self.draw_title.draw_abs(
-                cx,
-                tab_rect.pos + Vec2d { x: 12.0, y: 5.0 },
-                &label,
-            );
+                .draw_abs(cx, tab_rect.pos + Vec2d { x: 12.0, y: 5.0 }, &label);
             x += tab_w + 6.0;
         }
 
@@ -2465,9 +2994,7 @@ impl CanvasPanel {
         };
         self.draw_item_bg_rect(cx, plus_rect, TAB_INACTIVE_BG);
         self.draw_border_rect(cx, plus_rect, TAB_BORDER);
-        self.draw_title
-            .draw_vars
-            .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
+        self.draw_title.color = vec4f(TITLE_TEXT);
         self.draw_title
             .draw_abs(cx, plus_rect.pos + Vec2d { x: 10.0, y: 5.0 }, "+");
     }
@@ -2628,9 +3155,7 @@ impl CanvasPanel {
             avatar_color,
         );
         // Title text (DrawText) - drawn after bg/border but before content
-        self.draw_title
-            .draw_vars
-            .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
+        self.draw_title.color = vec4f(TITLE_TEXT);
         self.draw_title.draw_abs(
             cx,
             screen.pos + Vec2d { x: 32.0, y: 6.0 },
@@ -2657,13 +3182,11 @@ impl CanvasPanel {
             },
             status_color,
         );
-        self.draw_title
-            .draw_vars
-            .set_dyn_instance(cx.cx, live_id!(color), &MUSIC_SECONDARY);
+        self.draw_title.color = vec4f(MUSIC_SECONDARY);
         self.draw_title.draw_abs(
             cx,
             Vec2d {
-            x: status_x + dot_size + 5.0,
+                x: status_x + dot_size + 5.0,
                 y: status_y - 2.0,
             },
             status_label,
@@ -2855,14 +3378,9 @@ impl CanvasPanel {
             "W",
             [0.30, 0.62, 0.98, 1.0],
         );
+        self.draw_title.color = vec4f(TITLE_TEXT);
         self.draw_title
-            .draw_vars
-            .set_dyn_instance(cx.cx, live_id!(color), &TITLE_TEXT);
-        self.draw_title.draw_abs(
-            cx,
-            bar_rect.pos + Vec2d { x: 32.0, y: 7.0 },
-            url,
-        );
+            .draw_abs(cx, bar_rect.pos + Vec2d { x: 32.0, y: 7.0 }, url);
 
         // Page area below the title bar.
         let page_rect = Rect {
@@ -2929,20 +3447,10 @@ impl CanvasPanel {
         self.draw_border_rect(cx, screen, if is_sel { SEL_BORDER } else { MUSIC_BORDER });
 
         // Avatar + title.
-        self.draw_avatar(
-            cx,
-            screen.pos + Vec2d { x: 8.0, y: 5.0 },
-            "♫",
-            MUSIC_ACCENT,
-        );
+        self.draw_avatar(cx, screen.pos + Vec2d { x: 8.0, y: 5.0 }, "♫", MUSIC_ACCENT);
+        self.draw_title.color = vec4f(MUSIC_TEXT);
         self.draw_title
-            .draw_vars
-            .set_dyn_instance(cx.cx, live_id!(color), &MUSIC_TEXT);
-        self.draw_title.draw_abs(
-            cx,
-            screen.pos + Vec2d { x: 32.0, y: 6.0 },
-            title,
-        );
+            .draw_abs(cx, screen.pos + Vec2d { x: 32.0, y: 6.0 }, title);
 
         // Body starts below the title bar.
         let body_y = screen.pos.y + 34.0;
@@ -2966,18 +3474,17 @@ impl CanvasPanel {
         self.draw_item_bg_rect(
             cx,
             btn_rect,
-            if playing { MUSIC_ACCENT } else { MUSIC_PROGRESS_BG },
+            if playing {
+                MUSIC_ACCENT
+            } else {
+                MUSIC_PROGRESS_BG
+            },
         );
         self.draw_border_rect(cx, btn_rect, MUSIC_BORDER);
-        self.draw_title
-            .draw_vars
-            .set_dyn_instance(cx.cx, live_id!(color), &MUSIC_TEXT);
+        self.draw_title.color = vec4f(MUSIC_TEXT);
         let icon = if playing { "❚❚" } else { "▶" };
-        self.draw_title.draw_abs(
-            cx,
-            btn_rect.pos + Vec2d { x: 10.0, y: 8.0 },
-            icon,
-        );
+        self.draw_title
+            .draw_abs(cx, btn_rect.pos + Vec2d { x: 10.0, y: 8.0 }, icon);
 
         // Progress bar to the right of the button.
         let bar_x = btn_rect.pos.x + btn_rect.size.x + 14.0;
@@ -2993,7 +3500,10 @@ impl CanvasPanel {
         if fill_w > 0.0 {
             let bar_fill = Rect {
                 pos: bar_bg.pos,
-                size: Vec2d { x: fill_w, y: bar_h },
+                size: Vec2d {
+                    x: fill_w,
+                    y: bar_h,
+                },
             };
             self.draw_item_bg_rect(cx, bar_fill, MUSIC_ACCENT);
         }
@@ -3002,9 +3512,7 @@ impl CanvasPanel {
         let total_s = 180u32;
         let cur_s = (total_s as f32 * progress) as u32;
         let fmt = |s: u32| format!("{:02}:{:02}", s / 60, s % 60);
-        self.draw_title
-            .draw_vars
-            .set_dyn_instance(cx.cx, live_id!(color), &MUSIC_SECONDARY);
+        self.draw_title.color = vec4f(MUSIC_SECONDARY);
         self.draw_title.draw_abs(
             cx,
             Vec2d {
@@ -3042,8 +3550,14 @@ impl CanvasPanel {
             };
             let h = (vis_h * level).max(2.0);
             let r = Rect {
-                pos: Vec2d { x, y: vis_y + vis_h - h },
-                size: Vec2d { x: bar_w2.max(1.0), y: h },
+                pos: Vec2d {
+                    x,
+                    y: vis_y + vis_h - h,
+                },
+                size: Vec2d {
+                    x: bar_w2.max(1.0),
+                    y: h,
+                },
             };
             self.draw_item_bg_rect(cx, r, MUSIC_BAR);
         }
@@ -3070,7 +3584,13 @@ fn push_modified_char(out: &mut Vec<u8>, ch: char, ctrl: bool, alt: bool, shift:
 impl Widget for CanvasPanel {
     #[allow(clippy::collapsible_match)]
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        let input_id = ids!(command_wrap.command_bar.input_row.input_capsule.command_input);
+        let input_id = ids!(
+            command_wrap
+                .command_bar
+                .input_row
+                .input_capsule
+                .command_input
+        );
         let list_id = ids!(command_wrap.command_bar.suggestion_list);
 
         // Intercept command-bar navigation keys before TextInput consumes them.
@@ -3154,12 +3674,18 @@ impl Widget for CanvasPanel {
         self.update_suggestions(cx);
 
         if let Event::Timer(te) = event {
-            let is_our_timer = self.timer.map(|t| t.is_timer(te).is_some()).unwrap_or(false);
+            let is_our_timer = self
+                .timer
+                .map(|t| t.is_timer(te).is_some())
+                .unwrap_or(false);
             if is_our_timer {
                 // Advance any playing music players.
                 let mut changed = false;
                 for item in self.items.iter_mut() {
-                    if let CanvasItem::MusicPlayer { progress, playing, .. } = item {
+                    if let CanvasItem::MusicPlayer {
+                        progress, playing, ..
+                    } = item
+                    {
                         if *playing {
                             *progress += 0.001;
                             if *progress >= 1.0 {
@@ -3202,8 +3728,7 @@ impl Widget for CanvasPanel {
                 // Shared double-click detection (notes, polyline, etc.).
                 let now = me.time;
                 let is_double = (now - self.last_click_time) < 0.4
-                    && (me.abs.x - self.last_click_pos.x)
-                        .hypot(me.abs.y - self.last_click_pos.y)
+                    && (me.abs.x - self.last_click_pos.x).hypot(me.abs.y - self.last_click_pos.y)
                         < 6.0;
                 self.last_click_time = now;
                 self.last_click_pos = me.abs;
@@ -3234,9 +3759,7 @@ impl Widget for CanvasPanel {
                     match hit {
                         PaletteHit::Tool(idx) => {
                             // Switching tool commits any in-progress work.
-                            if self.text_editing
-                                || self.pending.is_some()
-                            {
+                            if self.text_editing || self.pending.is_some() {
                                 self.commit_pending();
                                 self.text_editing = false;
                             }
@@ -3404,18 +3927,20 @@ impl Widget for CanvasPanel {
                                 // Click on an existing text shape → edit it
                                 // (pull it back into `pending`).
                                 if let Some(idx) = self.text_shape_under(me.abs) {
-                                    if let Some(DrawnShape { shape, .. }) =
+                                    if let Some(DrawnShape { shape, seed, .. }) =
                                         self.shapes.get(idx).cloned()
                                     {
                                         self.push_undo();
                                         self.shapes.remove(idx);
                                         if let NoteShape::Text { .. } = &shape {
                                             self.pending = Some(shape);
+                                            self.pending_seed = seed;
                                             self.text_editing = true;
                                         }
                                     }
                                 } else {
                                     self.text_editing = true;
+                                    self.pending_seed = self.fresh_seed();
                                     self.pending = Some(NoteShape::Text {
                                         pos: world,
                                         text: String::new(),
@@ -3431,9 +3956,9 @@ impl Widget for CanvasPanel {
                                 // Double-click (or Enter) finishes the polyline.
                                 let now = me.time;
                                 let double = (now - self.last_click_time) < 0.4
-                                    && (me.abs.x - self.last_click_pos.x).hypot(
-                                        me.abs.y - self.last_click_pos.y,
-                                    ) < 6.0;
+                                    && (me.abs.x - self.last_click_pos.x)
+                                        .hypot(me.abs.y - self.last_click_pos.y)
+                                        < 6.0;
                                 self.last_click_time = now;
                                 self.last_click_pos = me.abs;
                                 match &mut self.pending {
@@ -3447,6 +3972,7 @@ impl Widget for CanvasPanel {
                                         }
                                     }
                                     _ => {
+                                        self.pending_seed = self.fresh_seed();
                                         self.pending = Some(NoteShape::Polyline {
                                             points: vec![world],
                                         });
@@ -3482,30 +4008,19 @@ impl Widget for CanvasPanel {
                             | NoteTool::Ellipse
                             | NoteTool::Line => {
                                 self.note_draw = Some(world);
+                                self.pending_seed = self.fresh_seed();
                                 self.pending = Some(match self.tool {
                                     NoteTool::Pen => NoteShape::Pen {
                                         points: vec![world],
                                     },
-                                    NoteTool::Arrow => NoteShape::Arrow {
-                                        a: world,
-                                        b: world,
-                                    },
-                                    NoteTool::Rect => NoteShape::Rect {
-                                        a: world,
-                                        b: world,
-                                    },
+                                    NoteTool::Arrow => NoteShape::Arrow { a: world, b: world },
+                                    NoteTool::Rect => NoteShape::Rect { a: world, b: world },
                                     NoteTool::Circle => NoteShape::Circle {
                                         center: world,
                                         r: 0.0,
                                     },
-                                    NoteTool::Ellipse => NoteShape::Ellipse {
-                                        a: world,
-                                        b: world,
-                                    },
-                                    NoteTool::Line => NoteShape::Line {
-                                        a: world,
-                                        b: world,
-                                    },
+                                    NoteTool::Ellipse => NoteShape::Ellipse { a: world, b: world },
+                                    NoteTool::Line => NoteShape::Line { a: world, b: world },
                                     NoteTool::Move
                                     | NoteTool::Polyline
                                     | NoteTool::Text
@@ -3761,7 +4276,8 @@ impl Widget for CanvasPanel {
             }
             // Whiteboard undo/redo — canvas-level only (no terminal focused,
             // not editing text) so Ctrl+Z still reaches a focused shell.
-            if !self.text_editing && self.focused_terminal.is_none() && self.note_edit_id.is_none() {
+            if !self.text_editing && self.focused_terminal.is_none() && self.note_edit_id.is_none()
+            {
                 if ctrl && key.key_code == KeyCode::KeyZ {
                     if shift {
                         if self.redo() {
@@ -3862,20 +4378,58 @@ impl Widget for CanvasPanel {
         // Live-apply title/body edits as the user types, not just on Return.
         let prop_title = ids!(right_panel_container.properties_panel.prop_title);
         let prop_body = ids!(right_panel_container.properties_panel.prop_body);
-        if self.view.text_input(cx, prop_title).changed(&actions).is_some()
-            || self.view.text_input(cx, prop_body).changed(&actions).is_some()
+        if self
+            .view
+            .text_input(cx, prop_title)
+            .changed(&actions)
+            .is_some()
+            || self
+                .view
+                .text_input(cx, prop_body)
+                .changed(&actions)
+                .is_some()
         {
             self.apply_properties_panel(cx);
             self.redraw(cx);
         }
         // Color swatches.
         let color_ids = [
-            ids!(right_panel_container.properties_panel.prop_color_row.prop_color_0),
-            ids!(right_panel_container.properties_panel.prop_color_row.prop_color_1),
-            ids!(right_panel_container.properties_panel.prop_color_row.prop_color_2),
-            ids!(right_panel_container.properties_panel.prop_color_row.prop_color_3),
-            ids!(right_panel_container.properties_panel.prop_color_row.prop_color_4),
-            ids!(right_panel_container.properties_panel.prop_color_row.prop_color_5),
+            ids!(
+                right_panel_container
+                    .properties_panel
+                    .prop_color_row
+                    .prop_color_0
+            ),
+            ids!(
+                right_panel_container
+                    .properties_panel
+                    .prop_color_row
+                    .prop_color_1
+            ),
+            ids!(
+                right_panel_container
+                    .properties_panel
+                    .prop_color_row
+                    .prop_color_2
+            ),
+            ids!(
+                right_panel_container
+                    .properties_panel
+                    .prop_color_row
+                    .prop_color_3
+            ),
+            ids!(
+                right_panel_container
+                    .properties_panel
+                    .prop_color_row
+                    .prop_color_4
+            ),
+            ids!(
+                right_panel_container
+                    .properties_panel
+                    .prop_color_row
+                    .prop_color_5
+            ),
         ];
         for i in 0..6 {
             if self.view.button(cx, color_ids[i]).clicked(&actions) {
@@ -3893,10 +4447,30 @@ impl Widget for CanvasPanel {
         // Font size buttons.
         let font_values = [11.0f32, 13.0, 16.0, 20.0];
         let font_ids = [
-            ids!(right_panel_container.properties_panel.prop_font_row.prop_font_0),
-            ids!(right_panel_container.properties_panel.prop_font_row.prop_font_1),
-            ids!(right_panel_container.properties_panel.prop_font_row.prop_font_2),
-            ids!(right_panel_container.properties_panel.prop_font_row.prop_font_3),
+            ids!(
+                right_panel_container
+                    .properties_panel
+                    .prop_font_row
+                    .prop_font_0
+            ),
+            ids!(
+                right_panel_container
+                    .properties_panel
+                    .prop_font_row
+                    .prop_font_1
+            ),
+            ids!(
+                right_panel_container
+                    .properties_panel
+                    .prop_font_row
+                    .prop_font_2
+            ),
+            ids!(
+                right_panel_container
+                    .properties_panel
+                    .prop_font_row
+                    .prop_font_3
+            ),
         ];
         for i in 0..4 {
             if self.view.button(cx, font_ids[i]).clicked(&actions) {
@@ -3934,11 +4508,7 @@ impl Widget for CanvasPanel {
                 .set_visible(cx, false);
             self.redraw(cx);
         }
-        if self
-            .view
-            .button(cx, ids!(menu_new_note))
-            .clicked(&actions)
-        {
+        if self.view.button(cx, ids!(menu_new_note)).clicked(&actions) {
             self.spawn_note(cx);
             self.view
                 .view(cx, ids!(new_item_menu))
@@ -3955,7 +4525,13 @@ impl Widget for CanvasPanel {
                 .set_visible(cx, false);
             let ti = self.view.text_input(
                 cx,
-                ids!(command_wrap.command_bar.input_row.input_capsule.command_input),
+                ids!(
+                    command_wrap
+                        .command_bar
+                        .input_row
+                        .input_capsule
+                        .command_input
+                ),
             );
             let prefix = "/new browser ";
             ti.set_text(cx, prefix);
@@ -3971,7 +4547,13 @@ impl Widget for CanvasPanel {
             self.redraw(cx);
         }
         // Unified command input.
-        let input_id = ids!(command_wrap.command_bar.input_row.input_capsule.command_input);
+        let input_id = ids!(
+            command_wrap
+                .command_bar
+                .input_row
+                .input_capsule
+                .command_input
+        );
         if let Some((text, _mods)) = self.view.text_input(cx, input_id).returned(&actions) {
             self.push_command_history(text.clone());
             self.exec_command(cx, &text);
@@ -4105,7 +4687,13 @@ impl Widget for CanvasPanel {
                     }
                     if let Some(state) = state {
                         self.draw_terminal_at(
-                            cx, item_screen, &title, &command, status, is_sel, &state,
+                            cx,
+                            item_screen,
+                            &title,
+                            &command,
+                            status,
+                            is_sel,
+                            &state,
                         );
                     }
                     self.draw_control_buttons(cx, item_id, item_screen);
@@ -4117,6 +4705,7 @@ impl Widget for CanvasPanel {
                     let editing = self.note_edit_id == Some(item_id);
                     self.draw_note_title(
                         cx,
+                        item_id,
                         &title,
                         &body,
                         font_size,
@@ -4140,7 +4729,13 @@ impl Widget for CanvasPanel {
                 }
                 ItemKind::MusicPlayer => {
                     self.draw_music_player(
-                        cx, item_id, item_screen, is_sel, &title, progress, playing,
+                        cx,
+                        item_id,
+                        item_screen,
+                        is_sel,
+                        &title,
+                        progress,
+                        playing,
                     );
                     self.draw_control_buttons(cx, item_id, item_screen);
                     if is_sel {
