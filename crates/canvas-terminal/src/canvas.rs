@@ -2090,6 +2090,45 @@ impl CanvasPanel {
         }
     }
 
+    /// Clean (non-hand-drawn) polyline outline through `pts` (screen coords).
+    fn draw_clean_polyline(&mut self, cx: &mut Cx2d, pts: &[makepad_widgets::Vec2d], closed: bool, width: f64, color: [f32; 4]) {
+        if pts.len() < 2 {
+            if let Some(p) = pts.first() {
+                self.draw_item_bg_rect(cx, Rect { pos: makepad_widgets::Vec2d { x: p.x - width * 0.5, y: p.y - width * 0.5 }, size: makepad_widgets::Vec2d { x: width, y: width } }, color);
+            }
+            return;
+        }
+        let seg_count = if closed { pts.len() } else { pts.len() - 1 };
+        for i in 0..seg_count {
+            self.draw_segment(cx, pts[i], pts[(i + 1) % pts.len()], width, color);
+        }
+    }
+
+    /// Clean rectangle outline (screen coords), no wobble.
+    fn draw_rect_outline(&mut self, cx: &mut Cx2d, rect: Rect, width: f64, color: [f32; 4]) {
+        let x0 = rect.pos.x;
+        let y0 = rect.pos.y;
+        let x1 = rect.pos.x + rect.size.x;
+        let y1 = rect.pos.y + rect.size.y;
+        self.draw_segment(cx, Vec2d { x: x0, y: y0 }, Vec2d { x: x1, y: y0 }, width, color);
+        self.draw_segment(cx, Vec2d { x: x1, y: y0 }, Vec2d { x: x1, y: y1 }, width, color);
+        self.draw_segment(cx, Vec2d { x: x1, y: y1 }, Vec2d { x: x0, y: y1 }, width, color);
+        self.draw_segment(cx, Vec2d { x: x0, y: y1 }, Vec2d { x: x0, y: y0 }, width, color);
+    }
+
+    /// Clean ellipse outline (screen coords), no wobble.
+    fn draw_ellipse_outline(&mut self, cx: &mut Cx2d, center: makepad_widgets::Vec2d, rx: f64, ry: f64, width: f64, color: [f32; 4]) {
+        let rx = rx.max(0.5);
+        let ry = ry.max(0.5);
+        let n = ((rx.max(ry) * std::f64::consts::TAU) / 8.0).ceil().clamp(16.0, 96.0) as usize;
+        let mut pts = Vec::with_capacity(n);
+        for i in 0..n {
+            let ang = (i as f64 / n as f64) * std::f64::consts::TAU;
+            pts.push(makepad_widgets::Vec2d { x: center.x + rx * ang.cos(), y: center.y + ry * ang.sin() });
+        }
+        self.draw_clean_polyline(cx, &pts, true, width, color);
+    }
+
     /// Hand-drawn polyline through `pts` (screen coords): interior points get
     /// a perpendicular wobble and the path is stroked twice (rough.js-style
     /// double stroke). Jitter derives from `seed`, so it is frame-stable.
@@ -2261,9 +2300,6 @@ impl CanvasPanel {
         size: f64,
         w: f64,
         color: [f32; 4],
-        seed: u32,
-        // Wobble scale: 1.0 = freehand canvas strokes, ~0.35 = neat UI icons.
-        sloppy: f64,
     ) {
         let px = -dy;
         let py = dx;
@@ -2275,13 +2311,13 @@ impl CanvasPanel {
             x: tip.x - dx * size - px * size * 0.5,
             y: tip.y - dy * size - py * size * 0.5,
         };
-        self.draw_sketch_segment(cx, tip, a, w, color, seed, sloppy);
-        self.draw_sketch_segment(cx, tip, b, w, color, seed + 1, sloppy);
+        self.draw_segment(cx, tip, a, w, color);
+        self.draw_segment(cx, tip, b, w, color);
     }
 
     /// Vector tool icon drawn with hand-drawn strokes (no font glyphs —
     /// several palette glyphs rendered as tofu in the bundled font).
-    fn draw_tool_icon(
+        fn draw_tool_icon(
         &mut self,
         cx: &mut Cx2d,
         idx: usize,
@@ -2295,177 +2331,43 @@ impl CanvasPanel {
         let y1 = r.pos.y + r.size.y - 7.0;
         let mx = (x0 + x1) * 0.5;
         let my = (y0 + y1) * 0.5;
-        let seed = 900 + idx as u32 * 131;
+        let _ = idx;
         let w = 1.6;
-        // Icons are small: keep the wobble subtle so they read as tidy
-        // hand-drawn glyphs rather than scribbles.
-        const SLOPPY: f64 = 0.35;
+        // Clean vector icons, no hand-drawn wobble.
         match tool {
             NoteTool::Move => {
-                // Four arrows out of the center.
-                self.draw_sketch_segment(
-                    cx,
-                    Vec2d { x: mx, y: y0 + 2.0 },
-                    Vec2d { x: mx, y: y1 - 2.0 },
-                    w,
-                    color,
-                    seed,
-                    SLOPPY,
-                );
-                self.draw_sketch_segment(
-                    cx,
-                    Vec2d { x: x0 + 2.0, y: my },
-                    Vec2d { x: x1 - 2.0, y: my },
-                    w,
-                    color,
-                    seed + 2,
-                    SLOPPY,
-                );
-                self.draw_icon_arrowhead(
-                    cx,
-                    Vec2d { x: mx, y: y0 + 1.0 },
-                    0.0,
-                    -1.0,
-                    3.4,
-                    w,
-                    color,
-                    seed + 10,
-                    SLOPPY,
-                );
-                self.draw_icon_arrowhead(
-                    cx,
-                    Vec2d { x: mx, y: y1 - 1.0 },
-                    0.0,
-                    1.0,
-                    3.4,
-                    w,
-                    color,
-                    seed + 12,
-                    SLOPPY,
-                );
-                self.draw_icon_arrowhead(
-                    cx,
-                    Vec2d { x: x0 + 1.0, y: my },
-                    -1.0,
-                    0.0,
-                    3.4,
-                    w,
-                    color,
-                    seed + 14,
-                    SLOPPY,
-                );
-                self.draw_icon_arrowhead(
-                    cx,
-                    Vec2d { x: x1 - 1.0, y: my },
-                    1.0,
-                    0.0,
-                    3.4,
-                    w,
-                    color,
-                    seed + 16,
-                    SLOPPY,
-                );
+                self.draw_segment(cx, Vec2d { x: mx, y: y0 + 2.0 }, Vec2d { x: mx, y: y1 - 2.0 }, w, color);
+                self.draw_segment(cx, Vec2d { x: x0 + 2.0, y: my }, Vec2d { x: x1 - 2.0, y: my }, w, color);
+                self.draw_icon_arrowhead(cx, Vec2d { x: mx, y: y0 + 1.0 }, 0.0, -1.0, 3.4, w, color);
+                self.draw_icon_arrowhead(cx, Vec2d { x: mx, y: y1 - 1.0 }, 0.0, 1.0, 3.4, w, color);
+                self.draw_icon_arrowhead(cx, Vec2d { x: x0 + 1.0, y: my }, -1.0, 0.0, 3.4, w, color);
+                self.draw_icon_arrowhead(cx, Vec2d { x: x1 - 1.0, y: my }, 1.0, 0.0, 3.4, w, color);
             }
             NoteTool::Arrow => {
                 let tip = Vec2d { x: x1, y: y0 };
-                self.draw_sketch_segment(cx, Vec2d { x: x0, y: y1 }, tip, w, color, seed, SLOPPY);
+                self.draw_segment(cx, Vec2d { x: x0, y: y1 }, tip, w, color);
                 let len = (x1 - x0).hypot(y0 - y1);
-                self.draw_icon_arrowhead(
-                    cx,
-                    tip,
-                    (x1 - x0) / len,
-                    (y0 - y1) / len,
-                    4.5,
-                    w,
-                    color,
-                    seed + 2,
-                    SLOPPY,
-                );
+                self.draw_icon_arrowhead(cx, tip, (x1 - x0) / len, (y0 - y1) / len, 4.5, w, color);
             }
             NoteTool::Pen => {
-                // Pencil: thick diagonal body + small lead cross-stroke.
-                self.draw_sketch_segment(
-                    cx,
-                    Vec2d {
-                        x: x0 + 1.0,
-                        y: y1 - 1.0,
-                    },
-                    Vec2d {
-                        x: x1 - 2.0,
-                        y: y0 + 2.0,
-                    },
-                    2.4,
-                    color,
-                    seed,
-                    SLOPPY,
-                );
-                self.draw_sketch_segment(
-                    cx,
-                    Vec2d {
-                        x: x1 - 6.0,
-                        y: y0 + 1.0,
-                    },
-                    Vec2d {
-                        x: x1 - 1.0,
-                        y: y0 + 6.0,
-                    },
-                    1.2,
-                    color,
-                    seed + 2,
-                    SLOPPY,
-                );
+                self.draw_segment(cx, Vec2d { x: x0 + 1.0, y: y1 - 1.0 }, Vec2d { x: x1 - 2.0, y: y0 + 2.0 }, 2.4, color);
+                self.draw_segment(cx, Vec2d { x: x1 - 6.0, y: y0 + 1.0 }, Vec2d { x: x1 - 1.0, y: y0 + 6.0 }, 1.2, color);
             }
             NoteTool::Line => {
-                self.draw_sketch_segment(
-                    cx,
-                    Vec2d { x: x0, y: y1 },
-                    Vec2d { x: x1, y: y0 },
-                    w,
-                    color,
-                    seed,
-                    SLOPPY,
-                );
+                self.draw_segment(cx, Vec2d { x: x0, y: y1 }, Vec2d { x: x1, y: y0 }, w, color);
             }
             NoteTool::Rect => {
-                self.draw_sketch_rect_outline(
-                    cx,
-                    Rect {
-                        pos: Vec2d { x: x0, y: y0 + 1.0 },
-                        size: Vec2d {
-                            x: x1 - x0,
-                            y: y1 - y0 - 2.0,
-                        },
-                    },
-                    1.2,
-                    color,
-                    seed,
-                    SLOPPY,
-                );
+                self.draw_rect_outline(cx, Rect {
+                    pos: Vec2d { x: x0, y: y0 + 1.0 },
+                    size: Vec2d { x: x1 - x0, y: y1 - y0 - 2.0 },
+                }, 1.2, color);
             }
             NoteTool::Circle => {
                 let rr = (x1 - x0).min(y1 - y0) * 0.5;
-                self.draw_sketch_ellipse(
-                    cx,
-                    Vec2d { x: mx, y: my },
-                    rr,
-                    rr,
-                    1.2,
-                    color,
-                    seed,
-                    SLOPPY,
-                );
+                self.draw_ellipse_outline(cx, Vec2d { x: mx, y: my }, rr, rr, 1.2, color);
             }
             NoteTool::Ellipse => {
-                self.draw_sketch_ellipse(
-                    cx,
-                    Vec2d { x: mx, y: my },
-                    (x1 - x0) * 0.5,
-                    (y1 - y0) * 0.32,
-                    1.2,
-                    color,
-                    seed,
-                    SLOPPY,
-                );
+                self.draw_ellipse_outline(cx, Vec2d { x: mx, y: my }, (x1 - x0) * 0.5, (y1 - y0) * 0.32, 1.2, color);
             }
             NoteTool::Polyline => {
                 let pts = [
@@ -2474,15 +2376,13 @@ impl CanvasPanel {
                     Vec2d { x: mx + 2.0, y: y1 },
                     Vec2d { x: x1, y: my - 4.0 },
                 ];
-                self.draw_sketch_polyline(cx, &pts, false, w, color, seed, SLOPPY);
+                self.draw_clean_polyline(cx, &pts, false, w, color);
             }
             NoteTool::Text => {
                 self.draw_title.color = vec4f(color);
-                self.draw_title
-                    .draw_abs(cx, r.pos + Vec2d { x: 9.0, y: 4.0 }, "T");
+                self.draw_title.draw_abs(cx, r.pos + Vec2d { x: 9.0, y: 4.0 }, "T");
             }
             NoteTool::Eraser => {
-                // Tilted eraser block (rotated rect outline).
                 let ang = -0.6f64;
                 let (hw, hh) = (6.0, 4.0);
                 let rot = |px: f64, py: f64| Vec2d {
@@ -2490,13 +2390,11 @@ impl CanvasPanel {
                     y: my + px * ang.sin() + py * ang.cos(),
                 };
                 let pts = [rot(-hw, -hh), rot(hw, -hh), rot(hw, hh), rot(-hw, hh)];
-                self.draw_sketch_polyline(cx, &pts, true, 1.3, color, seed, SLOPPY);
+                self.draw_clean_polyline(cx, &pts, true, 1.3, color);
             }
         }
     }
-
-    /// Filled disc (screen coords) via scanline quads — for palette swatches.
-    fn draw_filled_disc(
+fn draw_filled_disc(
         &mut self,
         cx: &mut Cx2d,
         center: makepad_widgets::Vec2d,
@@ -3538,7 +3436,7 @@ impl CanvasPanel {
         let vis_h = 22.0;
         let gap = 3.0;
         let bar_w2 = (bar_w - gap * (n_bars as f64 - 1.0)) / n_bars as f64;
-        let time = cx.cx.time() as f64;
+        let time = cx.cx.time();
         for i in 0..n_bars {
             let x = bar_x + i as f64 * (bar_w2 + gap);
             let level = if playing {
@@ -4268,12 +4166,11 @@ impl Widget for CanvasPanel {
             // Inline note editing: only Escape commits; everything else
             // (typing, backspace, arrows, newlines) is handled by the focused
             // hidden TextInput widget, which we sync after view.handle_event.
-            if self.note_edit_id.is_some() {
-                if key.key_code == KeyCode::Escape {
+            if self.note_edit_id.is_some()
+                && key.key_code == KeyCode::Escape {
                     self.finish_note_edit(cx);
                     return;
                 }
-            }
             // Whiteboard undo/redo — canvas-level only (no terminal focused,
             // not editing text) so Ctrl+Z still reaches a focused shell.
             if !self.text_editing && self.focused_terminal.is_none() && self.note_edit_id.is_none()
