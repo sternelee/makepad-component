@@ -19,6 +19,7 @@
 - ✅ 便利贴风格 Note 卡片：奶油纸面、铅笔抖动边、和纸胶带、深墨文字
 - ✅ 嵌入 CEF 浏览器
 - ✅ 通过 `＋` 菜单或命令创建终端/浏览器/便签/音乐播放器
+- ✅ 持久终端会话：daemon 跨 GUI 重启持有 PTY，下次启动自动 re-attach 并回放 scrollback
 
 ## 运行
 
@@ -27,13 +28,19 @@ cargo run -p canvas-terminal
 ```
 
 需要桌面环境（macOS / Linux / Windows）。首次运行会拉取 Makepad 与 CEF 依赖。
+终端会话由同一二进制以 `--daemon` 模式持有——GUI 启动时自动以 detach 方式重新
+执行自己并加上 `--daemon`，无需系统安装 rmux。如需单独运行/调试 daemon：
+
+```bash
+cargo run -p canvas-terminal -- --daemon
+```
 
 ## 命令栏
 
 底部输入框支持以下命令：
 
 | 命令 | 说明 |
-|------|------|
+| ------ | ------ |
 | `@name message` | 向名为 `name` 的终端发送原始文本 |
 | `/new note` | 在画布中心创建便签 |
 | `/new terminal NAME[:CWD]` | 创建终端，可指定工作目录 |
@@ -61,13 +68,26 @@ cargo run -p canvas-terminal
 
 ```
 crates/canvas-terminal/
-├── src/main.rs      # Makepad script_mod! DSL、App 入口
-├── src/canvas.rs    # CanvasPanel：画布、项管理、事件、绘制
-├── src/items.rs     # CanvasItem、NoteShape、NoteTool、AgentStatus
-├── src/terminal/    # PTY 会话与终端渲染
-├── src/command.rs   # 命令栏解析
-└── Cargo.toml
+├── src/main.rs          # Makepad script_mod! DSL、App 入口；`--daemon` 时转运行 daemon
+├── src/daemon.rs        # PTY daemon 运行时：持有 PTY、IPC 监听、会话表、scrollback ring
+├── src/ipc.rs           # GUI ↔ daemon 线协议（length-prefixed，控制帧 JSON / 字节帧内联）
+├── src/canvas.rs        # CanvasPanel：画布、项管理、事件、绘制
+├── src/items.rs         # CanvasItem、NoteShape、NoteTool、AgentStatus
+├── src/command.rs       # 命令栏解析
+└── src/terminal/        # 终端会话与渲染
+    ├── session.rs       # IPC 客户端：连 daemon、Create/Attach、喂本地 vte 网格
+    └── state.rs         # vte 解析的本地终端网格（alacritty 语义）
 ```
+
+只有一个二进制 `canvas-terminal`：默认启动 GUI，带 `--daemon` 参数时则以 PTY
+daemon 模式运行。终端会话由这个 daemon 持有（跨平台 PTY 走 `rmux-pty`，本地 IPC
+走 `rmux-ipc`：Unix domain socket / Windows named pipe）。GUI 启动时若连不上
+daemon，会以 detach 方式重新执行自己并加上 `--daemon`，之后所有终端的 PTY 都由
+它管理——不依赖系统安装的 rmux，也无需单独的 daemon 二进制。GUI 退出后 daemon
+继续存活，下次启动时 GUI 会自动 `List` 存活会话并按名 `Attach`，回放 scrollback
+后继续实时输出（已退出的会话不会恢复）。`/rename` 会同步 daemon 里的会话名，
+关闭终端卡片（✕）会 `Kill` 对应会话。本地终端网格（`TerminalState`，vte 解析）
+仍在 GUI 侧维护，daemon 只负责持有 PTY、转发字节、缓存重放缓冲。
 
 ## 已知限制
 

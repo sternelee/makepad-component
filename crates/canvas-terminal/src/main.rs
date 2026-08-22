@@ -4,6 +4,8 @@ use makepad_widgets::*;
 mod camera;
 mod canvas;
 mod command;
+mod daemon;
+mod ipc;
 mod items;
 mod terminal;
 
@@ -534,7 +536,29 @@ impl AppMain for App {
                 .borrow_mut::<CanvasPanel>()
             {
                 panel.set_grid_enabled(false);
-                panel.spawn_terminal(cx, "claude", None, "zsh");
+                // Persistent sessions: re-attach to any terminal the daemon
+                // is still holding from a previous GUI run; otherwise start
+                // a fresh default terminal.
+                match crate::terminal::TerminalSession::list_sessions() {
+                    Ok(infos) => {
+                        let live: Vec<String> = infos
+                            .into_iter()
+                            .filter(|s| s.alive)
+                            .map(|s| s.name)
+                            .collect();
+                        if live.is_empty() {
+                            panel.spawn_terminal(cx, "claude", None, "zsh");
+                        } else {
+                            for name in live {
+                                panel.attach_terminal(cx, &name);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log!("canvas-terminal: list sessions failed: {e}");
+                        panel.spawn_terminal(cx, "claude", None, "zsh");
+                    }
+                }
             }
         }
         self.ui.handle_event(cx, event, &mut Scope::empty());
@@ -542,6 +566,18 @@ impl AppMain for App {
 }
 
 fn main() {
+    // `canvas-terminal --daemon` runs the bundled PTY daemon (no GUI). The
+    // GUI spawns itself in this mode detached so terminal sessions survive
+    // GUI restarts; see `terminal::session::ensure_daemon`.
+    if std::env::args().any(|a| a == "--daemon") {
+        std::process::exit(match daemon::run() {
+            Ok(()) => 0,
+            Err(e) => {
+                eprintln!("canvas-terminal daemon: {e}");
+                1
+            }
+        });
+    }
     app_main();
 }
 

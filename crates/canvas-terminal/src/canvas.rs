@@ -792,44 +792,72 @@ impl CanvasPanel {
     /// given `name`; `cwd` sets the PTY working directory (None = current
     /// directory).
     pub fn spawn_terminal(&mut self, cx: &mut Cx, name: &str, cwd: Option<&str>, command: &str) {
-        let world_pos = self
-            .camera
-            .screen_to_world(self.viewport * 0.5, self.world_viewport());
-        let id = self.next_item_id;
-        self.next_item_id += 1;
-
-        let item = CanvasItem::Terminal {
-            id,
-            world: Rect {
-                pos: world_pos,
-                size: Vec2d { x: 620.0, y: 380.0 },
-            },
-            title: name.to_string(),
-            status: crate::items::AgentStatus::default(),
-            session: None,
-        };
-        let (cols, rows) = self.term_grid_size(&item);
+        let (world, cols, rows) = self.new_terminal_geometry();
         match crate::terminal::TerminalSession::spawn(name, command, cwd, cols, rows) {
-            Ok(session) => {
-                let mut item = item;
-                // Store the session into the Terminal variant's slot.
-                match &mut item {
-                    CanvasItem::Terminal { session: slot, .. } => *slot = Some(Box::new(session)),
-                    CanvasItem::Note { .. }
-                    | CanvasItem::Browser { .. }
-                    | CanvasItem::MusicPlayer { .. } => unreachable!(),
-                }
-                self.items.push(item);
-                self.selected = Some(id);
-                self.focused_terminal = Some(id);
-                self.set_canvas_focus(cx);
-                self.redraw(cx);
-            }
+            Ok(session) => self.place_terminal(cx, world, session),
             Err(e) => {
                 log!("canvas: failed to spawn terminal '{name}': {e}");
                 self.status(cx, &format!("Failed to spawn {name}: {e}"));
             }
         }
+    }
+
+    /// Re-attach a terminal card to a persistent daemon session by name
+    /// (GUI restart path), replaying its scrollback into the local grid.
+    /// Failures are logged silently — startup may race a session dying
+    /// right as we attach.
+    pub fn attach_terminal(&mut self, cx: &mut Cx, name: &str) {
+        let (mut world, cols, rows) = self.new_terminal_geometry();
+        // Cascade each restored card by the number of terminals already on
+        // the canvas, so several re-attached sessions don't stack exactly.
+        let n = self
+            .items
+            .iter()
+            .filter(|i| i.kind() == ItemKind::Terminal)
+            .count() as f64;
+        world.pos.x += n * 26.0;
+        world.pos.y += n * 22.0;
+        match crate::terminal::TerminalSession::attach(name, cols, rows) {
+            Ok(session) => self.place_terminal(cx, world, session),
+            Err(e) => log!("canvas: failed to attach terminal '{name}': {e}"),
+        }
+    }
+
+    /// Default terminal card geometry: 620×380 world units at canvas center.
+    fn new_terminal_geometry(&self) -> (Rect, usize, usize) {
+        let world_pos = self
+            .camera
+            .screen_to_world(self.viewport * 0.5, self.world_viewport());
+        let world = Rect {
+            pos: world_pos,
+            size: Vec2d { x: 620.0, y: 380.0 },
+        };
+        let (cols, rows) = self.term_grid_size_from(world.size.x, world.size.y);
+        (world, cols, rows)
+    }
+
+    /// Push a terminal card at `world` with a live `session`; the card title
+    /// is the session name. Selects and focuses it.
+    fn place_terminal(
+        &mut self,
+        cx: &mut Cx,
+        world: Rect,
+        session: crate::terminal::TerminalSession,
+    ) {
+        let id = self.next_item_id;
+        self.next_item_id += 1;
+        let name = session.name.clone();
+        self.items.push(CanvasItem::Terminal {
+            id,
+            world,
+            title: name,
+            status: crate::items::AgentStatus::default(),
+            session: Some(Box::new(session)),
+        });
+        self.selected = Some(id);
+        self.focused_terminal = Some(id);
+        self.set_canvas_focus(cx);
+        self.redraw(cx);
     }
 
     /// Spawn a browser item showing `url` (via the OS WebView system browser).
@@ -858,12 +886,6 @@ impl CanvasPanel {
         let cols = ((w - 12.0) / TERM_CELL_W).floor().max(10.0) as usize;
         let rows = ((h - 34.0) / TERM_CELL_H).floor().max(3.0) as usize;
         (cols, rows)
-    }
-
-    fn term_grid_size(&self, item: &CanvasItem) -> (usize, usize) {
-        let w = item.world().size.x;
-        let h = item.world().size.y;
-        self.term_grid_size_from(w, h)
     }
 
     fn status(&mut self, cx: &mut Cx, text: &str) {
@@ -1090,8 +1112,15 @@ impl CanvasPanel {
         self.redraw(cx);
     }
 
-    /// Close `id`: fully remove it from the canvas and the dock.
+    /// Close `id`: fully remove it from the canvas and the dock. Terminal
+    /// sessions are killed so a closed terminal doesn't keep running in the
+    /// daemon and resurrect on the next launch.
     fn close_item(&mut self, cx: &mut Cx, id: u64) {
+        if let Some(item) = self.items.iter().find(|i| i.id() == id) {
+            if let Some(session) = item.session() {
+                session.kill();
+            }
+        }
         self.minimized.retain(|m| m.0 != id);
         self.items.retain(|i| i.id() != id);
         if self.selected == Some(id) {
@@ -1393,6 +1422,12 @@ impl CanvasPanel {
                     .iter_mut()
                     .find(|i| i.kind() == ItemKind::Terminal && i.title() == old)
                 {
+                    // Update the daemon session name too, so a renamed
+                    // terminal keeps its name across a GUI restart
+                    // (sessions are re-attached by name).
+                    if let Some(session) = item.session() {
+                        session.rename(&new);
+                    }
                     *item.title_mut() = new.clone();
                     self.redraw(cx);
                     self.status(cx, &format!("Renamed '{old}' → '{new}'"));
@@ -4449,8 +4484,8 @@ impl Widget for CanvasPanel {
                     .prop_color_5
             ),
         ];
-        for i in 0..6 {
-            if self.view.button(cx, color_ids[i]).clicked(&actions) {
+        for (i, id) in color_ids.iter().enumerate() {
+            if self.view.button(cx, *id).clicked(&actions) {
                 if let Some(item_id) = self.selected {
                     if let Some(item) = self.items.iter_mut().find(|it| it.id() == item_id) {
                         if let CanvasItem::Note { color_idx, .. } = item {

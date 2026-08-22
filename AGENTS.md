@@ -41,8 +41,10 @@ makepad-component/
 │   │       ├── a2ui_bridge.rs + a2ui_bridge_impl/  # LLM → A2UI bridge (server, builder, tools, types, mureka)
 │   │       ├── watch_server.rs  # File-watching SSE server (port 8080)
 │   │       ├── mock_server.rs, streaming_main.rs, math_charts.rs, fft_demo.rs
-│   ├── canvas-terminal/         # Infinite-canvas terminal workspace (CNVS-style): PTY via
-│   │                            #   rmux-sdk, CEF browsers, hand-drawn whiteboard/notes
+│   ├── canvas-terminal/         # Infinite-canvas terminal workspace (CNVS-style): PTY via a
+│   │                            #   bundled daemon mode (`canvas-terminal --daemon`, rmux-pty +
+│   │                            #   rmux-ipc, no system-installed rmux needed), CEF browsers,
+│   │                            #   hand-drawn whiteboard/notes. Single binary, dual mode.
 │   ├── raycast-launcher/        # Raycast-style launcher, Makepad 2.0 `script_mod!` API
 │   │                            #   (runtime Splash app loading from *-app.json descriptors)
 │   ├── gemini-talker/           # Gemini Live voice companion, Makepad 2.0 `script_mod!` API
@@ -69,6 +71,32 @@ The workspace has been migrated to the Makepad 2.0 `script_mod!` API. Everything
 - `cargo check -p gemini-talker` — **fails** (4 pre-existing errors: unresolved `gemini_live::prelude` import, type annotation errors). Unrelated to the script_mod migration.
 
 Before assuming a change broke something, check whether the failure pre-exists. When fixing builds, prefer pinning/updating the dependency deliberately over speculative edits, and record what you did.
+
+### ⚠️ CEF (canvas-terminal) runtime: helper architecture mismatch
+
+`canvas-terminal` embeds Chromium via `makepad-cef` on macOS. Its `build.rs`
+compiles `helper_main_macos.c` with plain `clang` (**no `-arch` flag**), so the
+helper binary inherits whatever the `clang` in `PATH` defaults to. If an
+Android NDK x86_64 `clang` (e.g. `~/Library/Android/sdk/ndk/*/toolchains/
+llvm/prebuilt/darwin-x86_64/bin`) appears before `/usr/bin` in `PATH`, the
+helper is built `x86_64` while the app/framework are `arm64`, and the app dies
+at startup with:
+
+```text
+makepad-cef-helper: dlopen ... Chromium Embedded Framework failed:
+incompatible architecture (have 'arm64', need 'x86_64')
+```
+
+**Fix:** rebuild with Apple `clang` first in `PATH`, after clearing the stale
+helper outputs and the runtime bundle cache:
+
+```bash
+rm -rf target/debug/build/makepad-cef-* "$(getconf DARWIN_USER_TEMP_DIR)makepad-cef"
+PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH" cargo +stable build -p canvas-terminal
+```
+
+Verify: `file target/debug/build/makepad-cef-*/out/makepad-cef-helper` must
+report `arm64`. (`/usr/bin/clang` → arm64; NDK clang → x86_64.)
 
 ## 4. Build, Test, and Lint Commands
 

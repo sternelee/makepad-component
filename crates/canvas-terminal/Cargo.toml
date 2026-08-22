@@ -16,11 +16,20 @@ makepad-cef = { git = "https://github.com/makepad/makepad" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-rmux-sdk = "0.10.0"
+# PTY + local IPC layer (cross-platform: Unix PTY / Windows ConPTY,
+# Unix domain sockets / Windows named pipes). These replace the previous
+# rmux-sdk dependency so the app no longer requires a system-installed rmux
+# daemon — `canvas-terminal` re-executes itself in `--daemon` mode to hold
+# the PTYs, surviving GUI restarts for session re-attach.
+rmux-pty = "0.10.0"
+rmux-ipc = "0.10.0"
+libc = "0.2"
 tokio = { version = "1", features = [
   "macros",
   "rt-multi-thread",
   "time",
   "sync",
+  "io-util",
+  "net",
 ] }
 vte = "0.14"
