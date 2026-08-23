@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================
     // Font Size Constants
@@ -32,7 +32,7 @@ script_mod! {
                 font_size: TEXT_FONT_SIZE_MD
                 line_spacing: TEXT_LINE_HEIGHT
             }
-            color: FOREGROUND
+            color: TEXT
         }
 
         text: ""
@@ -65,11 +65,11 @@ script_mod! {
     // Color Variants
     // ============================================
     mod.widgets.MpTextMuted = mod.widgets.MpText{
-        draw_text +: { color: MUTED_FOREGROUND }
+        draw_text +: { color: TEXT_MUTED }
     }
 
     mod.widgets.MpTextPrimary = mod.widgets.MpText{
-        draw_text +: { color: PRIMARY }
+        draw_text +: { color: ACCENT }
     }
 
     mod.widgets.MpTextDanger = mod.widgets.MpText{
@@ -114,7 +114,7 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            color: instance(MUTED)
+            color: instance(SURFACE)
             radius: instance(4.0)
 
             pixel: fn() {
@@ -141,7 +141,7 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            border_color: instance(MUTED_FOREGROUND)
+            border_color: instance(TEXT_MUTED)
             bg_color: instance(#x00000008)
 
             pixel: fn() {
@@ -158,7 +158,7 @@ script_mod! {
 
         mp_text := mod.widgets.MpText{
             draw_text +: {
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
                 text_style: theme.font_regular{
                     font_size: TEXT_FONT_SIZE_MD
                     line_spacing: TEXT_LINE_HEIGHT
@@ -174,7 +174,7 @@ script_mod! {
                 font_size: TEXT_FONT_SIZE_XL
                 line_spacing: 1.7
             }
-            color: MUTED_FOREGROUND
+            color: TEXT_MUTED
         }
     }
 
@@ -185,7 +185,7 @@ script_mod! {
                 font_size: TEXT_FONT_SIZE_XS
                 line_spacing: TEXT_LINE_HEIGHT
             }
-            color: MUTED_FOREGROUND
+            color: TEXT_MUTED
         }
     }
 }

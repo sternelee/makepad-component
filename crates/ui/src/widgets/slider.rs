@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     mod.widgets.MpSliderBase = #(MpSlider::register_widget(vm))
 
@@ -14,10 +14,10 @@ script_mod! {
         progress_end: 0.0
         disabled: 0.0
         vertical: 0.0
-        track_color: #xe2e8f0
-        fill_color: #x3b82f6
-        disabled_track_color: #xf1f5f9
-        disabled_fill_color: #x94a3b8
+        track_color: SURFACE_RAISED
+        fill_color: ACCENT
+        disabled_track_color: SURFACE
+        disabled_fill_color: TEXT_FAINT
 
         pixel: fn() {
             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -78,8 +78,8 @@ script_mod! {
         hover: 0.0
         pressed: 0.0
         disabled: 0.0
-        border_color: #x3b82f6
-        disabled_border_color: #x94a3b8
+        border_color: ACCENT
+        disabled_border_color: TEXT_FAINT
 
         pixel: fn() {
             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -97,9 +97,9 @@ script_mod! {
             // Main circle
             sdf.circle(c.x, c.y, c.x - 2.0)
 
-            let base_color = mix(#xffffff, #xf8fafc, self.disabled)
-            let hover_color = #xf0f9ff
-            let pressed_color = #xe0f2fe
+            let base_color = mix(#xf8fafc, #x334155, self.disabled)
+            let hover_color = ELEMENT_HOVER
+            let pressed_color = ELEMENT_ACTIVE
 
             // Only apply hover/pressed when not disabled
             let active_hover = self.hover * (1.0 - self.disabled)
@@ -157,21 +157,21 @@ script_mod! {
 
     // Slider variants
     mod.widgets.MpSliderSuccess = mod.widgets.MpSlider{
-        draw_track +: { fill_color: #x22c55e }
-        draw_thumb +: { border_color: #x22c55e }
-        draw_thumb_start +: { border_color: #x22c55e }
+        draw_track +: { fill_color: SUCCESS }
+        draw_thumb +: { border_color: SUCCESS }
+        draw_thumb_start +: { border_color: SUCCESS }
     }
 
     mod.widgets.MpSliderWarning = mod.widgets.MpSlider{
-        draw_track +: { fill_color: #xf59e0b }
-        draw_thumb +: { border_color: #xf59e0b }
-        draw_thumb_start +: { border_color: #xf59e0b }
+        draw_track +: { fill_color: WARNING }
+        draw_thumb +: { border_color: WARNING }
+        draw_thumb_start +: { border_color: WARNING }
     }
 
     mod.widgets.MpSliderDanger = mod.widgets.MpSlider{
-        draw_track +: { fill_color: #xdc2626 }
-        draw_thumb +: { border_color: #xdc2626 }
-        draw_thumb_start +: { border_color: #xdc2626 }
+        draw_track +: { fill_color: DANGER }
+        draw_thumb +: { border_color: DANGER }
+        draw_thumb_start +: { border_color: DANGER }
     }
 }
 

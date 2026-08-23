@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpSelect - shadcn-style select dropdown
@@ -21,20 +21,21 @@ script_mod! {
 
 
         draw_bg +: {
-            bg_color: instance(INPUT)
+            bg_color: instance(INPUT_BG)
+            bg_hover: instance(ELEMENT_HOVER)
             border_color: instance(BORDER)
-            focus_color: instance(RING)
+            focus_color: instance(ACCENT)
             radius: instance(6.0)
             has_focus: instance(0.0)
             hover: instance(0.0)
             border_width: instance(1.0)
-            chevron_color: instance(#x94a3b8)
+            chevron_color: instance(TEXT_MUTED)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 sdf.box(self.border_width, self.border_width, self.rect_size.x - self.border_width*2.0, self.rect_size.y - self.border_width*2.0, self.radius)
 
-                let bg = mix(self.bg_color, #xf8fafc, self.hover)
+                let bg = mix(self.bg_color, self.bg_hover, self.hover)
                 sdf.fill(bg)
 
                 let border_color = mix(self.border_color, self.focus_color, self.has_focus)
@@ -50,7 +51,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_regular{font_size: 13.0}
-                color: FOREGROUND
+                color: TEXT
             }
             text: ""
         }
@@ -85,7 +86,7 @@ script_mod! {
 
 
         draw_bg +: {
-            bg_color: instance(CARD)
+            bg_color: instance(SURFACE_CARD)
             border_color: instance(BORDER)
             radius: instance(8.0)
             shadow_color: instance(#x00000022)
@@ -118,8 +119,8 @@ script_mod! {
 
         draw_bg +: {
             bg_color: instance(#x0000)
-            bg_hover: instance(#xf1f5f9)
-            bg_selected: instance(#xf1f5f9)
+            bg_hover: instance(ELEMENT_HOVER)
+            bg_selected: instance(ELEMENT_ACTIVE)
             hover: instance(0.0)
             selected: instance(0.0)
 
@@ -138,7 +139,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_regular{font_size: 13.0}
-                color: FOREGROUND
+                color: TEXT
             }
             text: ""
         }

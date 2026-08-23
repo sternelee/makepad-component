@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // Base button component - macOS style
     mod.widgets.MpButtonBase = #(MpButton::register_widget(vm))
@@ -20,10 +20,10 @@ script_mod! {
             hover: instance(0.0)
             pressed: instance(0.0)
             disabled: instance(0.0)
-            color: instance(PRIMARY)
-            color_hover: instance(PRIMARY_HOVER)
-            color_pressed: instance(PRIMARY_ACTIVE)
-            color_disabled: instance(#x8f9bb3)
+            color: instance(ACCENT)
+            color_hover: instance(ACCENT_HOVER)
+            color_pressed: instance(ACCENT_HOVER)
+            color_disabled: instance(TEXT_FAINT)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -53,9 +53,9 @@ script_mod! {
 
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
-            color: PRIMARY_FOREGROUND
+            color: ON_ACCENT
             disabled: instance(0.0)
-            color_disabled: instance(#xe6e9ef)
+            color_disabled: instance(ON_SOLID)
             get_color: fn() {
                 return mix(self.color, self.color_disabled, self.disabled)
             }
@@ -100,99 +100,60 @@ script_mod! {
         }
     }
 
-    // Variant: Primary Button (macOS system blue)
-    mod.widgets.MpButtonPrimary = mod.widgets.MpButton{
+    // Variant: Prominent — the solid plate (bezel ButtonStyle.Prominent)
+    mod.widgets.MpButtonProminent = mod.widgets.MpButton{
         draw_bg +: {
-            color: instance(PRIMARY)
-            color_hover: instance(PRIMARY_HOVER)
-            color_pressed: instance(PRIMARY_ACTIVE)
+            color: instance(SOLID)
+            color_hover: instance(SOLID_HOVER)
+            color_pressed: instance(SOLID_HOVER)
         }
         draw_text +: {
-            color: PRIMARY_FOREGROUND
+            color: ON_SOLID
         }
     }
 
-    // Variant: Secondary Button - macOS style (lighter, subtle)
-    mod.widgets.MpButtonSecondary = mod.widgets.MpButton{
-        padding: Inset{left: 14.0, right: 14.0, top: 7.0, bottom: 7.0}
+    // Variant: Ghost — muted label, hover wash (bezel ButtonStyle.Ghost)
+    mod.widgets.MpButtonGhost = mod.widgets.MpButton{
         draw_bg +: {
-            color: instance(SECONDARY)
-            color_hover: instance(SECONDARY_HOVER)
-            color_pressed: instance(SECONDARY_ACTIVE)
+            color: instance(TRANSPARENT)
+            color_hover: instance(ELEMENT_HOVER)
+            color_pressed: instance(ELEMENT_ACTIVE)
             border_width: instance(0.0)
         }
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
-            color: SECONDARY_FOREGROUND
+            color: TEXT_MUTED
         }
     }
 
-    // Variant: Danger Button (macOS system red)
-    mod.widgets.MpButtonDanger = mod.widgets.MpButton{
+    // Variant: Outline — hairline border, body-text label
+    mod.widgets.MpButtonOutline = mod.widgets.MpButton{
+        draw_bg +: {
+            color: instance(TRANSPARENT)
+            color_hover: instance(ELEMENT_HOVER)
+            color_pressed: instance(ELEMENT_ACTIVE)
+            border_width: instance(1.0)
+            border_color: instance(BORDER_STRONG)
+        }
+        draw_text +: {
+            text_style: theme.font_regular{font_size: 13.0}
+            color: TEXT
+        }
+    }
+
+    // Variant: Destructive — danger solid plate
+    mod.widgets.MpButtonDestructive = mod.widgets.MpButton{
         draw_bg +: {
             color: instance(DANGER)
             color_hover: instance(DANGER_HOVER)
-            color_pressed: instance(DANGER_ACTIVE)
+            color_pressed: instance(DANGER_HOVER)
         }
         draw_text +: {
-            color: DANGER_FOREGROUND
+            color: ON_SOLID
         }
     }
 
-    // Variant: Success Button (macOS system green)
-    mod.widgets.MpButtonSuccess = mod.widgets.MpButton{
-        draw_bg +: {
-            color: instance(SUCCESS)
-            color_hover: instance(SUCCESS_HOVER)
-            color_pressed: instance(SUCCESS_ACTIVE)
-        }
-        draw_text +: {
-            color: SUCCESS_FOREGROUND
-        }
-    }
-
-    // Variant: Warning Button (macOS system orange)
-    mod.widgets.MpButtonWarning = mod.widgets.MpButton{
-        draw_bg +: {
-            color: instance(WARNING)
-            color_hover: instance(WARNING_HOVER)
-            color_pressed: instance(WARNING_ACTIVE)
-        }
-        draw_text +: {
-            color: WARNING_FOREGROUND
-        }
-    }
-
-    // Variant: Ghost Button - macOS style (transparent with hover fill)
-    mod.widgets.MpButtonGhost = mod.widgets.MpButton{
-        draw_bg +: {
-            color: instance(TRANSPARENT)
-            color_hover: instance(SECONDARY)
-            color_pressed: instance(SECONDARY_ACTIVE)
-        }
-        draw_text +: {
-            text_style: theme.font_regular{font_size: 13.0}
-            color: PRIMARY
-        }
-    }
-
-    // Variant: Outline Button - macOS style
-    mod.widgets.MpButtonOutline = mod.widgets.MpButton{
-        padding: Inset{left: 14.0, right: 14.0, top: 7.0, bottom: 7.0}
-        draw_bg +: {
-            color: instance(TRANSPARENT)
-            color_hover: instance(SECONDARY)
-            color_pressed: instance(SECONDARY_ACTIVE)
-            border_width: instance(1.0)
-            border_color: instance(BORDER)
-        }
-        draw_text +: {
-            text_style: theme.font_regular{font_size: 13.0}
-            color: FOREGROUND
-        }
-    }
-
-    // Size: Small - macOS compact size
+    // Size: Small — compact control
     mod.widgets.MpButtonSmall = mod.widgets.MpButton{
         padding: Inset{left: 12.0, right: 12.0, top: 4.0, bottom: 4.0}
         draw_text +: {

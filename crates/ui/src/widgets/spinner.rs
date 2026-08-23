@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpSpinner - Base rotating loading spinner component
@@ -74,7 +74,7 @@ script_mod! {
     // Color variants
     // ============================================================
 
-    mod.widgets.MpSpinnerPrimary = mod.widgets.MpSpinner{draw_bg +: {spinner_color: instance(PRIMARY)}}
+    mod.widgets.MpSpinnerPrimary = mod.widgets.MpSpinner{draw_bg +: {spinner_color: instance(ACCENT)}}
     mod.widgets.MpSpinnerSuccess = mod.widgets.MpSpinner{draw_bg +: {spinner_color: instance(#x22c55e), spinner_track: instance(#xdcfce7)}}
     mod.widgets.MpSpinnerWarning = mod.widgets.MpSpinner{draw_bg +: {spinner_color: instance(#xf59e0b), spinner_track: instance(#xfef3c7)}}
     mod.widgets.MpSpinnerDanger = mod.widgets.MpSpinner{draw_bg +: {spinner_color: instance(#xdc2626), spinner_track: instance(#xfee2e2)}}
@@ -136,7 +136,7 @@ script_mod! {
         spinner := mod.widgets.MpSpinner{}
         label := mod.widgets.Label{
             draw_text +: {
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
                 text_style: theme.font_regular{font_size: 14.0}
             }
             text: "Loading..."
@@ -153,7 +153,7 @@ script_mod! {
         spinner := mod.widgets.MpSpinner{}
         label := mod.widgets.Label{
             draw_text +: {
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
                 text_style: theme.font_regular{font_size: 14.0}
             }
             text: "Loading..."

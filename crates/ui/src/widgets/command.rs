@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpCommand - shadcn/cmdk-style command palette
@@ -36,7 +36,7 @@ script_mod! {
             bg_color: instance(#x0000)
             radius: instance(0.0)
             border_color: instance(BORDER)
-            cursor_color: instance(PRIMARY)
+            cursor_color: instance(ACCENT)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -54,7 +54,7 @@ script_mod! {
             width: 16, height: 16
             show_bg: true
             draw_bg +: {
-                icon_color: instance(MUTED_FOREGROUND)
+                icon_color: instance(TEXT_MUTED)
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     let c = self.rect_size * 0.5
@@ -100,7 +100,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 11.0}
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
             }
             text: ""
         }
@@ -120,8 +120,8 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             bg_color: instance(#x0000)
-            bg_hover: instance(#xf1f5f9)
-            bg_selected: instance(PRIMARY)
+            bg_hover: instance(ELEMENT_HOVER)
+            bg_selected: instance(ACCENT)
             hover: instance(0.0)
             selected: instance(0.0)
             radius: instance(6.0)
@@ -141,8 +141,8 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_regular{font_size: 13.0}
-                color: (FOREGROUND)
-                color_selected: (PRIMARY_FOREGROUND)
+                color: (TEXT)
+                color_selected: (ON_ACCENT)
                 selected: instance(0.0)
                 get_color: fn() { return mix(self.color, self.color_selected, self.selected) }
             }
@@ -155,7 +155,7 @@ script_mod! {
             visible: false
             draw_text +: {
                 text_style: theme.font_regular{font_size: 12.0}
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
             }
             text: ""
         }
@@ -194,7 +194,7 @@ script_mod! {
             flow: Down
 
             draw_bg +: {
-                color: CARD
+                color: SURFACE_CARD
                 border_radius: 12.0
                 border_color: BORDER
                 shadow_color: instance(#x00000044)
@@ -218,7 +218,7 @@ script_mod! {
                 height: 80
                 align: Align{x: 0.5, y: 0.5}
                 visible: false
-                draw_text +: { text_style: theme.font_regular{font_size: 14.0} color: MUTED_FOREGROUND }
+                draw_text +: { text_style: theme.font_regular{font_size: 14.0} color: TEXT_MUTED }
                 text: "No results found."
             }
         }

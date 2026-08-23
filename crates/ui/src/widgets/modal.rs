@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpModal - Modal/Dialog component
@@ -46,7 +46,7 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            bg_color: instance(CARD)
+            bg_color: instance(SURFACE_CARD)
             border_radius: instance(12.0)
             border_color: instance(BORDER)
             shadow_color: instance(#x00000033)
@@ -95,7 +95,7 @@ script_mod! {
                 height: Fit
                 draw_text +: {
                     text_style: theme.font_bold{font_size: 18.0}
-                    color: FOREGROUND
+                    color: TEXT
                 }
                 text: "Modal Title"
             }
@@ -108,7 +108,7 @@ script_mod! {
 
                 show_bg: true
                 draw_bg +: {
-                    icon_color: instance(#x94a3b8)
+                    icon_color: instance(TEXT_MUTED)
                     hover: instance(0.0)
 
                     pixel: fn() {
@@ -159,7 +159,7 @@ script_mod! {
                 height: Fit
                 draw_text +: {
                     text_style: theme.font_regular{font_size: 14.0}
-                    color: MUTED_FOREGROUND
+                    color: TEXT_MUTED
                 }
                 text: "Modal content goes here."
             }
@@ -210,7 +210,7 @@ script_mod! {
                 height: Fit
                 draw_text +: {
                     text_style: theme.font_bold{font_size: 18.0}
-                    color: FOREGROUND
+                    color: TEXT
                 }
                 text: "Are you sure?"
             }
@@ -227,7 +227,7 @@ script_mod! {
                 height: Fit
                 draw_text +: {
                     text_style: theme.font_regular{font_size: 14.0}
-                    color: MUTED_FOREGROUND
+                    color: TEXT_MUTED
                 }
                 text: "This action cannot be undone."
             }
@@ -263,7 +263,7 @@ script_mod! {
 
                 show_bg: true
                 draw_bg +: {
-                    bg_color: instance(#xfef2f2)
+                    bg_color: instance(DANGER_MUTED)
                     icon_color: instance(DANGER)
 
                     pixel: fn() {
@@ -299,7 +299,7 @@ script_mod! {
                 height: Fit
                 draw_text +: {
                     text_style: theme.font_bold{font_size: 18.0}
-                    color: FOREGROUND
+                    color: TEXT
                 }
                 text: "Delete item?"
             }

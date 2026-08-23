@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpAccordion - Collapsible panel component
@@ -25,10 +25,10 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             bg_color: instance(#x00000000)
-            bg_color_hover: instance(#xf8fafc)
+            bg_color_hover: instance(ELEMENT_HOVER)
             hover: instance(0.0)
             rotation: instance(0.0)
-            icon_color: instance(#x64748b)
+            icon_color: instance(TEXT_MUTED)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -88,7 +88,7 @@ script_mod! {
             margin: Inset{right: 28.0}
             draw_text +: {
                 text_style: theme.font_bold{font_size: 14.0}
-                color: FOREGROUND
+                color: TEXT
             }
             text: "Accordion Title"
         }
@@ -112,7 +112,7 @@ script_mod! {
         flow: Down
 
         draw_bg +: {
-            color: CARD
+            color: SURFACE_CARD
         }
 
         header := mod.widgets.MpAccordionHeader{}
@@ -129,7 +129,7 @@ script_mod! {
         flow: Down
 
         draw_bg +: {
-            color: CARD
+            color: SURFACE_CARD
             border_radius: 8.0
             border_color: BORDER
         }
@@ -153,7 +153,7 @@ script_mod! {
         flow: Down
 
         draw_bg +: {
-            color: CARD
+            color: SURFACE_CARD
             border_radius: 6.0
             border_color: BORDER
         }
@@ -177,7 +177,7 @@ script_mod! {
         header := mod.widgets.MpAccordionHeader{
             draw_bg +: {
                 bg_color: #x00000000
-                bg_color_hover: #x0000000D
+                bg_color_hover: ELEMENT_HOVER
             }
         }
         body := mod.widgets.MpAccordionContentBase{}

@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpPagination - shadcn-style page navigation
@@ -31,8 +31,8 @@ script_mod! {
         draw_bg +: {
             radius: instance(6.0)
             bg_color: #x0000
-            bg_hover: #xf1f5f9
-            bg_active: (PRIMARY)
+            bg_hover: ELEMENT_HOVER
+            bg_active: (ACCENT)
             hover: instance(0.0)
             active: instance(0.0)
 
@@ -51,8 +51,8 @@ script_mod! {
 
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
-            color: (FOREGROUND)
-            color_active: (PRIMARY_FOREGROUND)
+            color: (TEXT)
+            color_active: (ON_ACCENT)
             active: instance(0.0)
             get_color: fn() {
                 return mix(self.color, self.color_active, self.active)
@@ -103,7 +103,7 @@ script_mod! {
         draw_bg +: {
             radius: instance(6.0)
             bg_color: #x0000
-            bg_hover: #xf1f5f9
+            bg_hover: ELEMENT_HOVER
             hover: instance(0.0)
 
             pixel: fn() {
@@ -172,7 +172,7 @@ script_mod! {
 
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
-            color: MUTED_FOREGROUND
+            color: TEXT_MUTED
         }
         text: "..."
     }

@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // Register MpPopoverTrigger enum for script VM
     mod.widgets.MpPopoverTrigger = set_type_default() do #(MpPopoverTrigger::script_api(vm))
@@ -20,7 +20,7 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            bg_color: instance(CARD)
+            bg_color: instance(SURFACE_CARD)
             border_radius: instance(8.0)
             border_color: instance(BORDER)
             shadow_color: instance(#x0000001A)
@@ -85,7 +85,7 @@ script_mod! {
 
             show_bg: true
             draw_bg +: {
-                arrow_color: instance(CARD)
+                arrow_color: instance(SURFACE_CARD)
                 arrow_border_color: instance(BORDER)
 
                 pixel: fn() {
@@ -137,7 +137,7 @@ script_mod! {
 
             show_bg: true
             draw_bg +: {
-                arrow_color: instance(CARD)
+                arrow_color: instance(SURFACE_CARD)
                 arrow_border_color: instance(BORDER)
 
                 pixel: fn() {
@@ -173,7 +173,7 @@ script_mod! {
 
             show_bg: true
             draw_bg +: {
-                arrow_color: instance(CARD)
+                arrow_color: instance(SURFACE_CARD)
                 arrow_border_color: instance(BORDER)
 
                 pixel: fn() {
@@ -225,7 +225,7 @@ script_mod! {
 
             show_bg: true
             draw_bg +: {
-                arrow_color: instance(CARD)
+                arrow_color: instance(SURFACE_CARD)
                 arrow_border_color: instance(BORDER)
 
                 pixel: fn() {
@@ -271,7 +271,7 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             bg_color: instance(#x00000000)
-            bg_color_hover: instance(#xf1f5f9)
+            bg_color_hover: instance(ELEMENT_HOVER)
             border_radius: instance(4.0)
             hover: instance(0.0)
 
@@ -303,7 +303,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_regular{font_size: 14.0}
-                color: FOREGROUND
+                color: TEXT
             }
             text: "Menu Item"
         }
@@ -312,7 +312,7 @@ script_mod! {
     // Danger menu item
     mod.widgets.MpPopoverMenuItemDanger = mod.widgets.MpPopoverMenuItem{
         draw_bg +: {
-            bg_color_hover: instance(#xfef2f2)
+            bg_color_hover: instance(DANGER_MUTED)
         }
         label := Label{
             draw_text +: {
@@ -346,7 +346,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 11.0}
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
             }
         }
     }
@@ -366,7 +366,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_regular{font_size: 13.0}
-                color: FOREGROUND
+                color: TEXT
             }
             text: "Popover content"
         }
@@ -388,7 +388,7 @@ script_mod! {
                 height: Fit
                 draw_text +: {
                     text_style: theme.font_bold{font_size: 14.0}
-                    color: FOREGROUND
+                    color: TEXT
                 }
                 text: "Popover Title"
             }
@@ -404,7 +404,7 @@ script_mod! {
                 height: Fit
                 draw_text +: {
                     text_style: theme.font_regular{font_size: 13.0}
-                    color: MUTED_FOREGROUND
+                    color: TEXT_MUTED
                 }
                 text: "Popover description text."
             }
@@ -562,7 +562,7 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             bg_color: instance(#x00000000)
-            bg_color_hover: instance(#xf1f5f9)
+            bg_color_hover: instance(ELEMENT_HOVER)
             border_radius: instance(4.0)
             hover: instance(0.0)
 
@@ -594,7 +594,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_regular{font_size: 14.0}
-                color: FOREGROUND
+                color: TEXT
             }
             text: "Menu Item"
         }

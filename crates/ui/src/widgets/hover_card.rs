@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpHoverCard - Rich card that appears on hover
@@ -30,7 +30,7 @@ script_mod! {
         visible: false
 
         draw_bg +: {
-            bg_color: instance(CARD)
+            bg_color: instance(SURFACE_CARD)
             border_color: instance(BORDER)
             radius: instance(8.0)
             hover: instance(0.0)

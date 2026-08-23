@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // Checkbox component - uses DrawQuad begin/end pattern for reliable hit testing
     mod.widgets.MpCheckboxBase = #(MpCheckbox::register_widget(vm))
@@ -27,7 +27,7 @@ script_mod! {
             checked: instance(0.0)
             hover: instance(0.0)
             radius: instance(4.0)
-            primary: uniform(PRIMARY)
+            primary: uniform(ACCENT)
             border_color: uniform(BORDER)
 
             pixel: fn() {
@@ -38,7 +38,7 @@ script_mod! {
                 sdf.box(1.0, 1.0, sz.x - 2.0, sz.y - 2.0, self.radius)
 
                 // Colors
-                let bg_unchecked = #xffffff
+                let bg_unchecked = SOLID
                 let bg_checked = self.primary
                 let border_unchecked = mix(self.border_color, self.primary, self.hover * 0.5)
                 let border_checked = self.primary
@@ -52,7 +52,7 @@ script_mod! {
 
                 // Draw checkmark when checked
                 if (self.checked > 0.5) {
-                    let check_color = #xffffff
+                    let check_color = ON_ACCENT
                     let cx = sz.x * 0.5
                     let cy = sz.y * 0.5
 
@@ -70,7 +70,7 @@ script_mod! {
         // Label text
         draw_label +: {
             text_style: theme.font_regular{font_size: 13.0}
-            color: FOREGROUND
+            color: TEXT
         }
 
         text: ""

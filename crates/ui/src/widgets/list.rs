@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpList - List container and item components
@@ -23,7 +23,7 @@ script_mod! {
         flow: Down
 
         draw_bg +: {
-            color: CARD
+            color: SURFACE_CARD
             border_radius: 8.0
             border_color: BORDER
         }
@@ -154,7 +154,7 @@ script_mod! {
         height: Fit
         draw_text +: {
             text_style: theme.font_regular{font_size: 14.0}
-            color: FOREGROUND
+            color: TEXT
         }
     }
 
@@ -164,7 +164,7 @@ script_mod! {
         height: Fit
         draw_text +: {
             text_style: theme.font_regular{font_size: 12.0}
-            color: MUTED_FOREGROUND
+            color: TEXT_MUTED
         }
     }
 
@@ -206,7 +206,7 @@ script_mod! {
         padding: Inset{left: 16.0, right: 16.0, top: 8.0, bottom: 8.0}
 
         draw_bg +: {
-            color: MUTED
+            color: SURFACE
         }
 
         Label{
@@ -214,7 +214,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 12.0}
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
             }
         }
     }

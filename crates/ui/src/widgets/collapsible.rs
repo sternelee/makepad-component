@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpCollapsible - Expand/collapse content container
@@ -24,7 +24,7 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             bg_color: instance(#x00000000)
-            bg_color_hover: instance(#xf1f5f9)
+            bg_color_hover: instance(ELEMENT_HOVER)
             hover: instance(0.0)
             rotation: instance(0.0)
             disclosure_color: instance(#x64748b)
@@ -86,7 +86,7 @@ script_mod! {
             margin: Inset{left: 14.0}
             draw_text +: {
                 text_style: theme.font_bold{font_size: 13.0}
-                color: FOREGROUND
+                color: TEXT
             }
             text: "Collapsible"
         }

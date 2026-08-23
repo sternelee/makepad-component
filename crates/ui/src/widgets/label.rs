@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     let LABEL_FONT_SIZE_XS = 10.0
     let LABEL_FONT_SIZE_SM = 12.0
@@ -25,7 +25,7 @@ script_mod! {
                 font_size: LABEL_FONT_SIZE_MD
                 line_spacing: LABEL_LINE_HEIGHT
             }
-            color: FOREGROUND
+            color: TEXT
         }
 
         // Secondary text (muted color, shown after main text)
@@ -34,7 +34,7 @@ script_mod! {
                 font_size: LABEL_FONT_SIZE_MD
                 line_spacing: LABEL_LINE_HEIGHT
             }
-            color: MUTED_FOREGROUND
+            color: TEXT_MUTED
         }
 
         text: ""
@@ -94,11 +94,11 @@ script_mod! {
 
     // Color variants
     mod.widgets.MpLabelMuted = mod.widgets.MpLabel{
-        draw_text +: { color: MUTED_FOREGROUND }
+        draw_text +: { color: TEXT_MUTED }
     }
 
     mod.widgets.MpLabelPrimary = mod.widgets.MpLabel{
-        draw_text +: { color: PRIMARY }
+        draw_text +: { color: ACCENT }
     }
 
     mod.widgets.MpLabelDanger = mod.widgets.MpLabel{
@@ -301,7 +301,7 @@ impl MpLabel {
             if let Some(color) = self.highlight_color {
                 self.draw_text.color = color;
             } else {
-                self.draw_text.color = vec4(0.231, 0.51, 0.965, 1.0); // PRIMARY color
+                self.draw_text.color = vec4(0.231, 0.51, 0.965, 1.0); // ACCENT color
             }
             self.draw_text
                 .draw_walk(cx, Walk::fit(), Align::default(), matched);

@@ -1,4 +1,4 @@
-use makepad_component::theme::dark::MpThemeState;
+use makepad_component::widgets::MpThemeState;
 use makepad_component::widgets::MpAvatarWidgetRefExt;
 use makepad_component::widgets::MpBadgeWidgetRefExt;
 use makepad_component::widgets::MpButtonWidgetExt;
@@ -6,6 +6,7 @@ use makepad_component::widgets::MpButtonWidgetRefExt;
 use makepad_component::widgets::MpCardAction;
 use makepad_component::widgets::MpCheckboxWidgetRefExt;
 use makepad_component::widgets::MpCollapsibleTriggerWidgetRefExt;
+use makepad_component::widgets::MpComboboxWidgetRefExt;
 use makepad_component::widgets::MpModalAction;
 use makepad_component::widgets::MpModalWidgetWidgetRefExt;
 use makepad_component::widgets::MpNotificationWidgetWidgetRefExt;
@@ -16,14 +17,19 @@ use makepad_component::widgets::MpSheetTriggerWidgetRefExt;
 use makepad_component::widgets::MpSheetWidgetRefExt;
 use makepad_component::widgets::MpSkeletonWidgetWidgetRefExt;
 use makepad_component::widgets::MpSliderWidgetRefExt;
+use makepad_component::widgets::MpStepperWidgetRefExt;
 use makepad_component::widgets::MpSwitchWidgetRefExt;
 use makepad_component::widgets::MpTabWidgetRefExt;
+use makepad_component::widgets::MpTableWidgetRefExt;
+use makepad_component::widgets::MpTreeWidgetRefExt;
+use makepad_component::widgets::TableColumn;
+use makepad_component::widgets::TreeItem;
 use makepad_widgets::*;
 
 script_mod! {
 use mod.prelude.widgets_internal.*
 use mod.widgets.*
-use mod.mp_theme.*
+use mod.mpc_theme.*
 
 // ============================================================
 // Section Header Component
@@ -32,7 +38,7 @@ let SectionHeader = Label{
     width: Fit, height: Fit,
     draw_text +: {
         text_style: theme.font_bold{ font_size: 18.0 }
-        color: FOREGROUND
+        color: TEXT
     }
 }
 
@@ -40,7 +46,7 @@ let SubsectionLabel = Label{
     width: Fit, height: Fit,
     draw_text +: {
         text_style: theme.font_regular{ font_size: 12.0 }
-        color: MUTED_FOREGROUND
+        color: TEXT_MUTED
     }
 }
 
@@ -614,7 +620,7 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
                 }
             }
 
-            generate_btn := mod.widgets.MpButtonPrimary{ text: "Generate" }
+            generate_btn := mod.widgets.MpButtonProminent{ text: "Generate" }
             clear_btn := mod.widgets.MpButtonGhost{
                 draw_text +: { color: #xf38ba8ff }
                 text: "Clear All"
@@ -660,7 +666,7 @@ mod.widgets.SplashDemo = set_type_default() do mod.widgets.SplashDemoBase{
             padding: 8,
             margin: Inset{ bottom: 8 }
 
-            gen_button := mod.widgets.MpButtonPrimary{
+            gen_button := mod.widgets.MpButtonProminent{
                 width: Fit
                 text: "Button"
             }
@@ -862,14 +868,14 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
                 flow: Right,
                 spacing: 12,
 
-                render_btn := mod.widgets.MpButtonPrimary{ text: "Render" }
+                render_btn := mod.widgets.MpButtonProminent{ text: "Render" }
                 clear_render_btn := mod.widgets.MpButtonGhost{
                     draw_text +: { color: #xf38ba8ff }
                     text: "Clear"
                 }
                 View { width: Fill }
-                load_example_btn := mod.widgets.MpButtonSecondary{ text: "Basic Example" }
-                load_raycast_btn := mod.widgets.MpButtonSecondary{ text: "Raycast Examples" }
+                load_example_btn := mod.widgets.MpButtonGhost{ text: "Basic Example" }
+                load_raycast_btn := mod.widgets.MpButtonGhost{ text: "Raycast Examples" }
             }
         }
 
@@ -955,7 +961,7 @@ mod.widgets.JsonRenderDemo = set_type_default() do mod.widgets.JsonRenderDemoBas
                         width: Fit, height: Fit,
                         margin: Inset{ bottom: 4 }
 
-                        json_button := mod.widgets.MpButtonPrimary{
+                        json_button := mod.widgets.MpButtonProminent{
                             text: "Button"
                         }
                     }
@@ -1101,7 +1107,7 @@ startup() do #(App::script_component(vm)){
             window.inner_size: vec2(1280, 900)
 
             show_bg: true
-            draw_bg +: { color: BACKGROUND }
+            draw_bg +: { color: BG }
 
             body := View{
                 width: Fill,
@@ -1124,7 +1130,7 @@ startup() do #(App::script_component(vm)){
                     Label {
                         draw_text +: {
                             text_style: theme.font_bold{ font_size: 24.0 }
-                            color: FOREGROUND
+                            color: TEXT
                         }
                         text: "Component Zoo"
                     }
@@ -1132,7 +1138,7 @@ startup() do #(App::script_component(vm)){
                     Label {
                         draw_text +: {
                             text_style: theme.font_regular{ font_size: 14.0 }
-                            color: MUTED_FOREGROUND
+                            color: TEXT_MUTED
                         }
                         text: "A showcase of makepad-component widgets"
                     }
@@ -1200,9 +1206,9 @@ startup() do #(App::script_component(vm)){
                                     flow: Right,
                                     spacing: 12,
 
-                                    btn_primary := mod.widgets.MpButtonPrimary{ text: "Primary" }
-                                    btn_secondary := mod.widgets.MpButtonSecondary{ text: "Secondary" }
-                                    btn_danger := mod.widgets.MpButtonDanger{ text: "Danger" }
+                                    btn_primary := mod.widgets.MpButtonProminent{ text: "Primary" }
+                                    btn_secondary := mod.widgets.MpButtonGhost{ text: "Secondary" }
+                                    btn_danger := mod.widgets.MpButtonDestructive{ text: "Danger" }
                                     btn_ghost := mod.widgets.MpButtonGhost{ text: "Ghost" }
                                 }
                             }
@@ -1251,7 +1257,7 @@ startup() do #(App::script_component(vm)){
                             checkbox_status := Label{
                                 draw_text +: {
                                     text_style: theme.font_regular{ font_size: 12.0 }
-                                    color: MUTED_FOREGROUND
+                                    color: TEXT_MUTED
                                 }
                                 text: "Selected: Option 2"
                             }
@@ -1281,7 +1287,7 @@ startup() do #(App::script_component(vm)){
                                     Label {
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: FOREGROUND
+                                            color: TEXT
                                         }
                                         text: "Wi-Fi"
                                     }
@@ -1296,7 +1302,7 @@ startup() do #(App::script_component(vm)){
                                     Label {
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: FOREGROUND
+                                            color: TEXT
                                         }
                                         text: "Bluetooth"
                                     }
@@ -1311,7 +1317,7 @@ startup() do #(App::script_component(vm)){
                                     Label {
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: FOREGROUND
+                                            color: TEXT
                                         }
                                         text: "Notifications"
                                     }
@@ -1362,7 +1368,7 @@ startup() do #(App::script_component(vm)){
                             radio_status := Label{
                                 draw_text +: {
                                     text_style: theme.font_regular{ font_size: 12.0 }
-                                    color: MUTED_FOREGROUND
+                                    color: TEXT_MUTED
                                 }
                                 text: "Selected: Medium"
                             }
@@ -1399,7 +1405,7 @@ startup() do #(App::script_component(vm)){
                                     dropdown_status := Label{
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: MUTED_FOREGROUND
+                                            color: TEXT_MUTED
                                         }
                                         text: "Selected: Apple"
                                     }
@@ -1501,7 +1507,7 @@ startup() do #(App::script_component(vm)){
                                         width: 100, height: Fit,
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: FOREGROUND
+                                            color: TEXT
                                         }
                                         text: "Value: 50"
                                     }
@@ -1565,7 +1571,7 @@ startup() do #(App::script_component(vm)){
                                         width: 120, height: Fit,
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: FOREGROUND
+                                            color: TEXT
                                         }
                                         text: "Vertical value: 30"
                                     }
@@ -1597,7 +1603,7 @@ startup() do #(App::script_component(vm)){
                                         width: 150, height: Fit,
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: FOREGROUND
+                                            color: TEXT
                                         }
                                         text: "Range: 20 - 80"
                                     }
@@ -1620,7 +1626,7 @@ startup() do #(App::script_component(vm)){
                                         width: 150, height: Fit,
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: FOREGROUND
+                                            color: TEXT
                                         }
                                         text: "Range: 30 - 70 (step 5)"
                                     }
@@ -1732,7 +1738,7 @@ startup() do #(App::script_component(vm)){
                                     input_status := Label{
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: MUTED_FOREGROUND
+                                            color: TEXT_MUTED
                                         }
                                         text: "Value: (empty)"
                                     }
@@ -2050,7 +2056,7 @@ startup() do #(App::script_component(vm)){
                                     mod.widgets.MpBadge {
                                         count: 5
                                         content +: {
-                                            mod.widgets.MpButtonSecondary { text: "Messages" }
+                                            mod.widgets.MpButtonGhost { text: "Messages" }
                                         }
                                     }
 
@@ -2058,7 +2064,7 @@ startup() do #(App::script_component(vm)){
                                     mod.widgets.MpBadgeSuccess {
                                         count: 3
                                         content +: {
-                                            mod.widgets.MpButtonSecondary { text: "Completed" }
+                                            mod.widgets.MpButtonGhost { text: "Completed" }
                                         }
                                     }
 
@@ -2066,7 +2072,7 @@ startup() do #(App::script_component(vm)){
                                     mod.widgets.MpBadgeWarning {
                                         count: 2
                                         content +: {
-                                            mod.widgets.MpButtonSecondary { text: "Pending" }
+                                            mod.widgets.MpButtonGhost { text: "Pending" }
                                         }
                                     }
                                 }
@@ -2125,19 +2131,19 @@ startup() do #(App::script_component(vm)){
 
                                     mod.widgets.MpBadgeDot {
                                         content +: {
-                                            mod.widgets.MpButtonSecondary { text: "Notifications" }
+                                            mod.widgets.MpButtonGhost { text: "Notifications" }
                                         }
                                     }
 
                                     mod.widgets.MpBadgeDotSuccess {
                                         content +: {
-                                            mod.widgets.MpButtonSecondary { text: "Online" }
+                                            mod.widgets.MpButtonGhost { text: "Online" }
                                         }
                                     }
 
                                     mod.widgets.MpBadgeDotWarning {
                                         content +: {
-                                            mod.widgets.MpButtonSecondary { text: "Away" }
+                                            mod.widgets.MpButtonGhost { text: "Away" }
                                         }
                                     }
                                 }
@@ -2190,7 +2196,7 @@ startup() do #(App::script_component(vm)){
                                     interactive_badge := mod.widgets.MpBadge{
                                         count: 5
                                         content +: {
-                                            mod.widgets.MpButtonSecondary { text: "Items" }
+                                            mod.widgets.MpButtonGhost { text: "Items" }
                                         }
                                     }
                                     badge_inc_btn := mod.widgets.MpButtonGhost{ text: "+" }
@@ -2198,7 +2204,7 @@ startup() do #(App::script_component(vm)){
                                     badge_count_label := Label{
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 12.0 }
-                                            color: MUTED_FOREGROUND
+                                            color: TEXT_MUTED
                                         }
                                         text: "Count: 5"
                                     }
@@ -2275,11 +2281,11 @@ startup() do #(App::script_component(vm)){
                                     align: Align{ y: 0.5 }
 
                                     dynamic_avatar := mod.widgets.MpAvatar{ label +: { text: "??" } }
-                                    avatar_change_btn := mod.widgets.MpButtonSecondary{ text: "Random Name" }
+                                    avatar_change_btn := mod.widgets.MpButtonGhost{ text: "Random Name" }
                                     avatar_name_label := Label{
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: MUTED_FOREGROUND
+                                            color: TEXT_MUTED
                                         }
                                         text: "Click button..."
                                     }
@@ -2313,14 +2319,14 @@ startup() do #(App::script_component(vm)){
                                         Label {
                                             draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 14.0 }
-                                                color: FOREGROUND
+                                                color: TEXT
                                             }
                                             text: "This is the card content area."
                                         }
                                     }
                                     mod.widgets.MpCardFooter {
                                         mod.widgets.MpButtonGhost { text: "Cancel" }
-                                        mod.widgets.MpButtonPrimary { text: "Save" }
+                                        mod.widgets.MpButtonProminent { text: "Save" }
                                     }
                                 }
 
@@ -2335,7 +2341,7 @@ startup() do #(App::script_component(vm)){
                                         Label {
                                             draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 14.0 }
-                                                color: FOREGROUND
+                                                color: TEXT
                                             }
                                             text: "Shadow creates depth."
                                         }
@@ -2439,7 +2445,7 @@ startup() do #(App::script_component(vm)){
                                         width: Fit, height: Fit,
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: MUTED_FOREGROUND
+                                            color: TEXT_MUTED
                                         }
                                         text: "Click a card..."
                                     }
@@ -2495,12 +2501,12 @@ startup() do #(App::script_component(vm)){
                                     spacing: 8,
                                     align: Align{ y: 0.5 }
 
-                                    skeleton_toggle_btn := mod.widgets.MpButtonPrimary{ text: "Toggle Loading" }
+                                    skeleton_toggle_btn := mod.widgets.MpButtonProminent{ text: "Toggle Loading" }
 
                                     skeleton_status := Label{
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: MUTED_FOREGROUND
+                                            color: TEXT_MUTED
                                         }
                                         text: "Status: Loading"
                                     }
@@ -2529,14 +2535,14 @@ startup() do #(App::script_component(vm)){
                                         Label {
                                             draw_text +: {
                                                 text_style: theme.font_bold{ font_size: 16.0 }
-                                                color: FOREGROUND
+                                                color: TEXT
                                             }
                                             text: "Content Loaded!"
                                         }
                                         Label {
                                             draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 14.0 }
-                                                color: MUTED_FOREGROUND
+                                                color: TEXT_MUTED
                                             }
                                             text: "This is the actual content that appears after loading."
                                         }
@@ -2812,7 +2818,7 @@ startup() do #(App::script_component(vm)){
                             tab_status := Label{
                                 draw_text +: {
                                     text_style: theme.font_regular{ font_size: 12.0 }
-                                    color: MUTED_FOREGROUND
+                                    color: TEXT_MUTED
                                 }
                                 text: "Selected: Home"
                             }
@@ -2831,7 +2837,7 @@ startup() do #(App::script_component(vm)){
                             Label {
                                 draw_text +: {
                                     text_style: theme.font_regular{ font_size: 14.0 }
-                                    color: MUTED_FOREGROUND
+                                    color: TEXT_MUTED
                                 }
                                 text: "PageFlip enables switching between different pages/views."
                             }
@@ -2842,7 +2848,7 @@ startup() do #(App::script_component(vm)){
                                 flow: Right,
                                 spacing: 8,
 
-                                page_btn_a := mod.widgets.MpButtonPrimary{ text: "Page A" }
+                                page_btn_a := mod.widgets.MpButtonProminent{ text: "Page A" }
                                 page_btn_b := mod.widgets.MpButtonGhost{ text: "Page B" }
                                 page_btn_c := mod.widgets.MpButtonGhost{ text: "Page C" }
                             }
@@ -2852,7 +2858,7 @@ startup() do #(App::script_component(vm)){
                                 width: Fill, height: 120,
                                 show_bg: true,
                                 draw_bg +: {
-                                    color: (MUTED)
+                                    color: (SURFACE)
                                 }
 
                                 demo_page_flip := PageFlip{
@@ -2867,7 +2873,7 @@ startup() do #(App::script_component(vm)){
                                         Label {
                                             draw_text +: {
                                                 text_style: theme.font_bold{ font_size: 24.0 }
-                                                color: PRIMARY
+                                                color: ACCENT
                                             }
                                             text: "Page A Content"
                                         }
@@ -2941,28 +2947,28 @@ startup() do #(App::script_component(vm)){
                                     mod.widgets.MpTooltipTop {
                                         tip: "Tooltip on top"
                                         content +: {
-                                            mod.widgets.MpButtonSecondary { text: "Top" }
+                                            mod.widgets.MpButtonGhost { text: "Top" }
                                         }
                                     }
 
                                     mod.widgets.MpTooltipBottom {
                                         tip: "Tooltip on bottom"
                                         content +: {
-                                            mod.widgets.MpButtonSecondary { text: "Bottom" }
+                                            mod.widgets.MpButtonGhost { text: "Bottom" }
                                         }
                                     }
 
                                     mod.widgets.MpTooltipLeft {
                                         tip: "Tooltip on left"
                                         content +: {
-                                            mod.widgets.MpButtonSecondary { text: "Left" }
+                                            mod.widgets.MpButtonGhost { text: "Left" }
                                         }
                                     }
 
                                     mod.widgets.MpTooltipRight {
                                         tip: "Tooltip on right"
                                         content +: {
-                                            mod.widgets.MpButtonSecondary { text: "Right" }
+                                            mod.widgets.MpButtonGhost { text: "Right" }
                                         }
                                     }
                                 }
@@ -3053,7 +3059,7 @@ startup() do #(App::script_component(vm)){
                                                 Label {
                                                     draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 14.0 }
-                                                        color: FOREGROUND
+                                                        color: TEXT
                                                     }
                                                     text: "Switch"
                                                 }
@@ -3078,7 +3084,7 @@ startup() do #(App::script_component(vm)){
                                             Label {
                                                 draw_text +: {
                                                     text_style: theme.font_regular{ font_size: 20.0 }
-                                                    color: PRIMARY
+                                                    color: ACCENT
                                                 }
                                                 text: "ℹ️"
                                             }
@@ -3208,7 +3214,7 @@ startup() do #(App::script_component(vm)){
                                     progress_label := Label{
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: FOREGROUND
+                                            color: TEXT
                                         }
                                         text: "50%"
                                     }
@@ -3395,10 +3401,10 @@ startup() do #(App::script_component(vm)){
                                 flow: Right,
                                 spacing: 8,
 
-                                show_success_notif := mod.widgets.MpButtonSuccess{ text: "Success" }
-                                show_error_notif := mod.widgets.MpButtonDanger{ text: "Error" }
-                                show_warning_notif := mod.widgets.MpButtonWarning{ text: "Warning" }
-                                show_info_notif := mod.widgets.MpButtonPrimary{ text: "Info" }
+                                show_success_notif := mod.widgets.MpButtonProminent{ text: "Success" }
+                                show_error_notif := mod.widgets.MpButtonDestructive{ text: "Error" }
+                                show_warning_notif := mod.widgets.MpButtonGhost{ text: "Warning" }
+                                show_info_notif := mod.widgets.MpButtonProminent{ text: "Info" }
                             }
 
                             mod.widgets.MpDivider { margin: Inset{ top: 8, bottom: 8 } }
@@ -3406,7 +3412,7 @@ startup() do #(App::script_component(vm)){
                             Label {
                                 draw_text +: {
                                     text_style: theme.font_regular{ font_size: 14.0 }
-                                    color: MUTED_FOREGROUND
+                                    color: TEXT_MUTED
                                 }
                                 text: "Notification previews (static):"
                             }
@@ -3470,12 +3476,12 @@ startup() do #(App::script_component(vm)){
                                 spacing: 16,
                                 align: Align{ y: 0.5 }
 
-                                open_modal_btn := mod.widgets.MpButtonPrimary{ text: "Open Modal" }
+                                open_modal_btn := mod.widgets.MpButtonProminent{ text: "Open Modal" }
 
                                 modal_status := Label{
                                     draw_text +: {
                                         text_style: theme.font_regular{ font_size: 14.0 }
-                                        color: MUTED_FOREGROUND
+                                        color: TEXT_MUTED
                                     }
                                     text: "Click button to open modal"
                                 }
@@ -3486,7 +3492,7 @@ startup() do #(App::script_component(vm)){
                             Label {
                                 draw_text +: {
                                     text_style: theme.font_regular{ font_size: 14.0 }
-                                    color: MUTED_FOREGROUND
+                                    color: TEXT_MUTED
                                 }
                                 text: "Modal previews (static):"
                             }
@@ -3501,14 +3507,14 @@ startup() do #(App::script_component(vm)){
                                     Label {
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: MUTED_FOREGROUND
+                                            color: TEXT_MUTED
                                         }
                                         text: "This is the modal content area."
                                     }
                                 }
                                 footer +: {
                                     mod.widgets.MpButtonGhost { text: "Cancel" }
-                                    mod.widgets.MpButtonPrimary { text: "Confirm" }
+                                    mod.widgets.MpButtonProminent { text: "Confirm" }
                                 }
                             }
 
@@ -3522,14 +3528,14 @@ startup() do #(App::script_component(vm)){
                                     Label {
                                         draw_text +: {
                                             text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: MUTED_FOREGROUND
+                                            color: TEXT_MUTED
                                         }
                                         text: "This action cannot be undone."
                                     }
                                 }
                                 footer +: {
                                     mod.widgets.MpButtonGhost { text: "Cancel" }
-                                    mod.widgets.MpButtonDanger { text: "Delete" }
+                                    mod.widgets.MpButtonDestructive { text: "Delete" }
                                 }
                             }
                         }
@@ -3554,7 +3560,7 @@ startup() do #(App::script_component(vm)){
                                 Label {
                                     draw_text +: {
                                         text_style: theme.font_regular{ font_size: 13.0 }
-                                        color: MUTED_FOREGROUND
+                                        color: TEXT_MUTED
                                     }
                                     text: "The most basic example. The size of the floating layer depends on the contents region."
                                 }
@@ -3566,11 +3572,11 @@ startup() do #(App::script_component(vm)){
 
                                     mod.widgets.MpPopoverBottom {
                                         trigger: mod.widgets.MpPopoverTrigger.Hover
-                                        mod.widgets.MpButtonPrimary { text: "Hover me" }
+                                        mod.widgets.MpButtonProminent { text: "Hover me" }
                                         content +: {
-                                            Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                         }
                                     }
                                 }
@@ -3588,7 +3594,7 @@ startup() do #(App::script_component(vm)){
                                 Label {
                                     draw_text +: {
                                         text_style: theme.font_regular{ font_size: 13.0 }
-                                        color: MUTED_FOREGROUND
+                                        color: TEXT_MUTED
                                     }
                                     text: "Mouse to click, focus and hover."
                                 }
@@ -3603,9 +3609,9 @@ startup() do #(App::script_component(vm)){
                                         trigger: mod.widgets.MpPopoverTrigger.Hover
                                         mod.widgets.MpButton { text: "Hover me" }
                                         content +: {
-                                            Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                         }
                                     }
 
@@ -3614,9 +3620,9 @@ startup() do #(App::script_component(vm)){
                                         trigger: mod.widgets.MpPopoverTrigger.Focus
                                         mod.widgets.MpButton { text: "Focus me" }
                                         content +: {
-                                            Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                         }
                                     }
 
@@ -3625,9 +3631,9 @@ startup() do #(App::script_component(vm)){
                                         trigger: mod.widgets.MpPopoverTrigger.Focus
                                         mod.widgets.MpButton { text: "Click me" }
                                         content +: {
-                                            Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                            Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                            Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                         }
                                     }
                                 }
@@ -3645,7 +3651,7 @@ startup() do #(App::script_component(vm)){
                                 Label {
                                     draw_text +: {
                                         text_style: theme.font_regular{ font_size: 13.0 }
-                                        color: MUTED_FOREGROUND
+                                        color: TEXT_MUTED
                                     }
                                     text: "There are 12 placement options available."
                                 }
@@ -3667,27 +3673,27 @@ startup() do #(App::script_component(vm)){
                                         mod.widgets.MpPopoverTopLeft {
                                             mod.widgets.MpButton { width: 80, text: "TL" }
                                             content +: {
-                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                             }
                                         }
 
                                         mod.widgets.MpPopoverTop {
                                             mod.widgets.MpButton { width: 80, text: "Top" }
                                             content +: {
-                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                             }
                                         }
 
                                         mod.widgets.MpPopoverTopRight {
                                             mod.widgets.MpButton { width: 80, text: "TR" }
                                             content +: {
-                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                             }
                                         }
                                     }
@@ -3707,27 +3713,27 @@ startup() do #(App::script_component(vm)){
                                             mod.widgets.MpPopoverLeftTop {
                                                 mod.widgets.MpButton { width: 80, text: "LT" }
                                                 content +: {
-                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                                 }
                                             }
 
                                             mod.widgets.MpPopoverLeft {
                                                 mod.widgets.MpButton { width: 80, text: "Left" }
                                                 content +: {
-                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                                 }
                                             }
 
                                             mod.widgets.MpPopoverLeftBottom {
                                                 mod.widgets.MpButton { width: 80, text: "LB" }
                                                 content +: {
-                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                                 }
                                             }
                                         }
@@ -3741,27 +3747,27 @@ startup() do #(App::script_component(vm)){
                                             mod.widgets.MpPopoverRightTop {
                                                 mod.widgets.MpButton { width: 80, text: "RT" }
                                                 content +: {
-                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                                 }
                                             }
 
                                             mod.widgets.MpPopoverRight {
                                                 mod.widgets.MpButton { width: 80, text: "Right" }
                                                 content +: {
-                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                                 }
                                             }
 
                                             mod.widgets.MpPopoverRightBottom {
                                                 mod.widgets.MpButton { width: 80, text: "RB" }
                                                 content +: {
-                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                                 }
                                             }
                                         }
@@ -3776,27 +3782,27 @@ startup() do #(App::script_component(vm)){
                                         mod.widgets.MpPopoverBottomLeft {
                                             mod.widgets.MpButton { width: 80, text: "BL" }
                                             content +: {
-                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                             }
                                         }
 
                                         mod.widgets.MpPopoverBottom {
                                             mod.widgets.MpButton { width: 80, text: "Bottom" }
                                             content +: {
-                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                             }
                                         }
 
                                         mod.widgets.MpPopoverBottomRight {
                                             mod.widgets.MpButton { width: 80, text: "BR" }
                                             content +: {
-                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                             }
                                         }
                                     }
@@ -3815,7 +3821,7 @@ startup() do #(App::script_component(vm)){
                                 Label {
                                     draw_text +: {
                                         text_style: theme.font_regular{ font_size: 13.0 }
-                                        color: MUTED_FOREGROUND
+                                        color: TEXT_MUTED
                                     }
                                     text: "You can display an arrow pointing to the target element."
                                 }
@@ -3835,14 +3841,14 @@ startup() do #(App::script_component(vm)){
                                         Label {
                                             draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
-                                                color: MUTED_FOREGROUND
+                                                color: TEXT_MUTED
                                             }
                                             text: "Arrow Up"
                                         }
                                         mod.widgets.MpPopoverArrowUp {
                                             content +: {
-                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                             }
                                         }
                                     }
@@ -3856,14 +3862,14 @@ startup() do #(App::script_component(vm)){
                                         Label {
                                             draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
-                                                color: MUTED_FOREGROUND
+                                                color: TEXT_MUTED
                                             }
                                             text: "Arrow Down"
                                         }
                                         mod.widgets.MpPopoverArrowDown {
                                             content +: {
-                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                             }
                                         }
                                     }
@@ -3877,14 +3883,14 @@ startup() do #(App::script_component(vm)){
                                         Label {
                                             draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
-                                                color: MUTED_FOREGROUND
+                                                color: TEXT_MUTED
                                             }
                                             text: "Arrow Left"
                                         }
                                         mod.widgets.MpPopoverArrowLeft {
                                             content +: {
-                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                             }
                                         }
                                     }
@@ -3898,14 +3904,14 @@ startup() do #(App::script_component(vm)){
                                         Label {
                                             draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
-                                                color: MUTED_FOREGROUND
+                                                color: TEXT_MUTED
                                             }
                                             text: "Arrow Right"
                                         }
                                         mod.widgets.MpPopoverArrowRight {
                                             content +: {
-                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: FOREGROUND }, text: "Title" }
-                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: MUTED_FOREGROUND }, text: "Content" }
+                                                Label { draw_text +: { text_style: theme.font_bold{ font_size: 14.0 }, color: TEXT }, text: "Title" }
+                                                Label { draw_text +: { text_style: theme.font_regular{ font_size: 13.0 }, color: TEXT_MUTED }, text: "Content" }
                                             }
                                         }
                                     }
@@ -3924,7 +3930,7 @@ startup() do #(App::script_component(vm)){
                                 Label {
                                     draw_text +: {
                                         text_style: theme.font_regular{ font_size: 13.0 }
-                                        color: MUTED_FOREGROUND
+                                        color: TEXT_MUTED
                                     }
                                     text: "Use open prop to control the display of the card."
                                 }
@@ -3933,7 +3939,7 @@ startup() do #(App::script_component(vm)){
                                     width: Fit, height: Fit,
                                     flow: Overlay,
 
-                                    popover_trigger_btn := mod.widgets.MpButtonPrimary{ text: "Click me" }
+                                    popover_trigger_btn := mod.widgets.MpButtonProminent{ text: "Click me" }
 
                                     View {
                                         width: Fit, height: Fit,
@@ -3949,7 +3955,7 @@ startup() do #(App::script_component(vm)){
                                                 Label {
                                                     draw_text +: {
                                                         text_style: theme.font_bold{ font_size: 14.0 }
-                                                        color: FOREGROUND
+                                                        color: TEXT
                                                     }
                                                     text: "Title"
                                                 }
@@ -3957,7 +3963,7 @@ startup() do #(App::script_component(vm)){
                                                     width: Fill,
                                                     draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 13.0 }
-                                                        color: MUTED_FOREGROUND
+                                                        color: TEXT_MUTED
                                                     }
                                                     text: "Content"
                                                 }
@@ -3965,7 +3971,7 @@ startup() do #(App::script_component(vm)){
                                                     width: Fill,
                                                     draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 13.0 }
-                                                        color: MUTED_FOREGROUND
+                                                        color: TEXT_MUTED
                                                     }
                                                     text: "Content"
                                                 }
@@ -3987,7 +3993,7 @@ startup() do #(App::script_component(vm)){
                                 Label {
                                     draw_text +: {
                                         text_style: theme.font_regular{ font_size: 13.0 }
-                                        color: MUTED_FOREGROUND
+                                        color: TEXT_MUTED
                                     }
                                     text: "Different content styles for popover."
                                 }
@@ -4007,7 +4013,7 @@ startup() do #(App::script_component(vm)){
                                         Label {
                                             draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
-                                                color: MUTED_FOREGROUND
+                                                color: TEXT_MUTED
                                             }
                                             text: "Basic"
                                         }
@@ -4018,7 +4024,7 @@ startup() do #(App::script_component(vm)){
                                                 height: Fit,
                                                 draw_text +: {
                                                     text_style: theme.font_regular{ font_size: 13.0 }
-                                                    color: FOREGROUND
+                                                    color: TEXT
                                                 }
                                                 text: "Content"
                                             }
@@ -4034,7 +4040,7 @@ startup() do #(App::script_component(vm)){
                                         Label {
                                             draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
-                                                color: MUTED_FOREGROUND
+                                                color: TEXT_MUTED
                                             }
                                             text: "With Title"
                                         }
@@ -4058,7 +4064,7 @@ startup() do #(App::script_component(vm)){
                                         Label {
                                             draw_text +: {
                                                 text_style: theme.font_regular{ font_size: 11.0 }
-                                                color: MUTED_FOREGROUND
+                                                color: TEXT_MUTED
                                             }
                                             text: "Menu"
                                         }
@@ -4207,7 +4213,7 @@ startup() do #(App::script_component(vm)){
                                                 Label {
                                                     draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 14.0 }
-                                                        color: MUTED_FOREGROUND
+                                                        color: TEXT_MUTED
                                                     }
                                                     text: "Content for section 1."
                                                 }
@@ -4224,7 +4230,7 @@ startup() do #(App::script_component(vm)){
                                                 Label {
                                                     draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 14.0 }
-                                                        color: MUTED_FOREGROUND
+                                                        color: TEXT_MUTED
                                                     }
                                                     text: "Content for section 2."
                                                 }
@@ -4241,7 +4247,7 @@ startup() do #(App::script_component(vm)){
                                                 Label {
                                                     draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 14.0 }
-                                                        color: MUTED_FOREGROUND
+                                                        color: TEXT_MUTED
                                                     }
                                                     text: "Content for section 3."
                                                 }
@@ -4267,7 +4273,7 @@ startup() do #(App::script_component(vm)){
                                                 Label {
                                                     draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 14.0 }
-                                                        color: MUTED_FOREGROUND
+                                                        color: TEXT_MUTED
                                                     }
                                                     text: "Answer to FAQ 1."
                                                 }
@@ -4282,7 +4288,7 @@ startup() do #(App::script_component(vm)){
                                                 Label {
                                                     draw_text +: {
                                                         text_style: theme.font_regular{ font_size: 14.0 }
-                                                        color: MUTED_FOREGROUND
+                                                        color: TEXT_MUTED
                                                     }
                                                     text: "Answer to FAQ 2."
                                                 }
@@ -4309,14 +4315,141 @@ startup() do #(App::script_component(vm)){
                                 spacing: 16,
                                 align: Align{ y: 0.5 }
 
-                                counter_btn := mod.widgets.MpButtonPrimary{ text: "Click me!" }
+                                counter_btn := mod.widgets.MpButtonProminent{ text: "Click me!" }
 
                                 counter_label := Label{
                                     draw_text +: {
                                         text_style: theme.font_regular{ font_size: 14.0 }
-                                        color: FOREGROUND
+                                        color: TEXT
                                     }
                                     text: "Clicked: 0 times"
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Table Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Table" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Sortable + Selectable" }
+
+                                demo_table := mod.widgets.MpTable{
+                                    width: 640, height: 220
+                                }
+
+                                table_status := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{ font_size: 12.0 }
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Selected row: none"
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Tree Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Tree" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Expand / Collapse" }
+
+                                demo_tree := mod.widgets.MpTree{
+                                    width: 360, height: 240
+                                }
+
+                                tree_status := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{ font_size: 12.0 }
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Selected item: none"
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Combobox Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Combobox" }
+
+                            View {
+                                width: 360, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Type to filter" }
+
+                                demo_combobox := mod.widgets.MpCombobox{
+                                    width: Fill
+                                }
+
+                                combobox_status := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{ font_size: 12.0 }
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Selected: none"
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Stepper Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Stepper" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Numeric +/-" }
+
+                                demo_stepper := mod.widgets.MpStepper{
+                                    value: 10.0
+                                    step: 1.0
+                                    min: 0.0
+                                    max: 50.0
+                                }
+
+                                stepper_status := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{ font_size: 12.0 }
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Value: 10"
                                 }
                             }
                         }
@@ -4560,7 +4693,7 @@ startup() do #(App::script_component(vm)){
                         spacing: 20.0,
 
                         Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 20.0} color: FOREGROUND }
+                            draw_text +: { text_style: theme.font_bold{font_size: 20.0} color: TEXT }
                             text: "Shadcn-Style Components"
                         }
 
@@ -4572,18 +4705,18 @@ startup() do #(App::script_component(vm)){
                             flow: Right,
                             spacing: 12.0,
                             align: Align{y: 0.5},
-                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
                             padding: Inset{left: 16, right: 16, top: 10, bottom: 10}
 
                             Label{
-                                draw_text +: { text_style: theme.font_bold{font_size: 14.0} color: FOREGROUND }
+                                draw_text +: { text_style: theme.font_bold{font_size: 14.0} color: TEXT }
                                 text: "Theme:"
                             }
                             theme_toggle_btn := mod.widgets.MpButtonOutline{
                                 text: "Toggle Dark Mode"
                             }
                             theme_status := Label{
-                                draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: MUTED_FOREGROUND }
+                                draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT_MUTED }
                                 text: "Light"
                             }
                         }
@@ -4592,14 +4725,14 @@ startup() do #(App::script_component(vm)){
                         // Collapsible
                         // ============================================================
                         Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
                             text: "Collapsible"
                         }
 
                         RoundedView{
                             width: Fill, height: Fit,
                             flow: Down,
-                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
                             padding: Inset{left: 4, right: 4, top: 4, bottom: 4}
 
                             demo_collapsible_1 := View{
@@ -4610,7 +4743,7 @@ startup() do #(App::script_component(vm)){
                                 collapsible_content := mod.widgets.MpCollapsibleContent{
                                     visible: false
                                     Label{
-                                        draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: MUTED_FOREGROUND }
+                                        draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT_MUTED }
                                         text: "shadcn/ui is a collection of re-usable components built with Radix UI and Tailwind CSS. This Makepad port brings the same patterns to native desktop apps."
                                     }
                                 }
@@ -4624,7 +4757,7 @@ startup() do #(App::script_component(vm)){
                                 collapsible_content2 := mod.widgets.MpCollapsibleContent{
                                     visible: false
                                     Label{
-                                        draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: MUTED_FOREGROUND }
+                                        draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT_MUTED }
                                         text: "Each component follows macOS design conventions while maintaining the composability and variant system from shadcn. Components are built with Makepad's script_mod! DSL and Rust widget structs."
                                     }
                                 }
@@ -4635,7 +4768,7 @@ startup() do #(App::script_component(vm)){
                         // Link
                         // ============================================================
                         Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
                             text: "Link"
                         }
 
@@ -4643,7 +4776,7 @@ startup() do #(App::script_component(vm)){
                             width: Fill, height: Fit,
                             flow: Down,
                             spacing: 8.0,
-                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
                             padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
 
                             View{
@@ -4652,7 +4785,7 @@ startup() do #(App::script_component(vm)){
                                 spacing: 8.0,
                                 align: Align{y: 0.5}
 
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Default:" }
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Default:" }
                                 demo_link := mod.widgets.MpLink{ text: "Click here" }
                             }
                             View{
@@ -4661,7 +4794,7 @@ startup() do #(App::script_component(vm)){
                                 spacing: 8.0,
                                 align: Align{y: 0.5}
 
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Muted:" }
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Muted:" }
                                 mod.widgets.MpLinkMuted{ text: "Learn more" }
                             }
                             View{
@@ -4670,7 +4803,7 @@ startup() do #(App::script_component(vm)){
                                 spacing: 8.0,
                                 align: Align{y: 0.5}
 
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Ghost:" }
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Ghost:" }
                                 mod.widgets.MpLinkGhost{ text: "Visit site" }
                             }
                             View{
@@ -4679,7 +4812,7 @@ startup() do #(App::script_component(vm)){
                                 spacing: 8.0,
                                 align: Align{y: 0.5}
 
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Destructive:" }
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Destructive:" }
                                 mod.widgets.MpLinkDestructive{ text: "Delete account" }
                             }
                             View{
@@ -4688,7 +4821,7 @@ startup() do #(App::script_component(vm)){
                                 spacing: 8.0,
                                 align: Align{y: 0.5}
 
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Small / Large:" }
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Small / Large:" }
                                 mod.widgets.MpLinkSmall{ text: "small" }
                                 mod.widgets.MpLinkLarge{ text: "LARGE" }
                             }
@@ -4698,7 +4831,7 @@ startup() do #(App::script_component(vm)){
                         // Breadcrumb
                         // ============================================================
                         Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
                             text: "Breadcrumb"
                         }
 
@@ -4706,7 +4839,7 @@ startup() do #(App::script_component(vm)){
                             width: Fill, height: Fit,
                             flow: Down,
                             spacing: 8.0,
-                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
                             padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
 
                             demo_breadcrumb := View{
@@ -4729,7 +4862,7 @@ startup() do #(App::script_component(vm)){
                         // Textarea
                         // ============================================================
                         Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
                             text: "Textarea"
                         }
 
@@ -4737,16 +4870,16 @@ startup() do #(App::script_component(vm)){
                             width: Fill, height: Fit,
                             flow: Down,
                             spacing: 8.0,
-                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
                             padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
 
-                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Default:" }
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Default:" }
                             demo_textarea := mod.widgets.MpTextArea{ placeholder: "Type your message here..." }
 
-                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Small:" }
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Small:" }
                             mod.widgets.MpTextAreaSmall{ placeholder: "Small textarea" }
 
-                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Large:" }
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Large:" }
                             mod.widgets.MpTextAreaLarge{ placeholder: "Large textarea" }
                         }
 
@@ -4754,7 +4887,7 @@ startup() do #(App::script_component(vm)){
                         // Sheet
                         // ============================================================
                         Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
                             text: "Sheet"
                         }
 
@@ -4762,7 +4895,7 @@ startup() do #(App::script_component(vm)){
                             width: Fill, height: Fit,
                             flow: Down,
                             spacing: 8.0,
-                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
                             padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
 
                             View{
@@ -4771,7 +4904,7 @@ startup() do #(App::script_component(vm)){
                                 spacing: 8.0,
                                 align: Align{y: 0.5}
 
-                                demo_sheet_trigger := mod.widgets.MpSheetTrigger{ 0: mod.widgets.MpButtonPrimary{ text: "Open Sheet" } }
+                                demo_sheet_trigger := mod.widgets.MpSheetTrigger{ 0: mod.widgets.MpButtonProminent{ text: "Open Sheet" } }
                             }
                         }
 
@@ -4782,7 +4915,7 @@ startup() do #(App::script_component(vm)){
                         // Dialog
                         // ============================================================
                         Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
                             text: "Dialog"
                         }
 
@@ -4790,13 +4923,13 @@ startup() do #(App::script_component(vm)){
                             width: Fill, height: Fit,
                             flow: Down,
                             spacing: 8.0,
-                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
                             padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
 
                             View{
                                 width: Fill, height: Fit, flow: Right, spacing: 8.0, align: Align{y: 0.5}
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Click to open:" }
-                                demo_dialog_trigger := mod.widgets.MpButtonPrimary{ text: "Open Dialog" }
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Click to open:" }
+                                demo_dialog_trigger := mod.widgets.MpButtonProminent{ text: "Open Dialog" }
                             }
                         }
 
@@ -4804,7 +4937,7 @@ startup() do #(App::script_component(vm)){
                         // Select
                         // ============================================================
                         Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
                             text: "Select"
                         }
 
@@ -4812,12 +4945,12 @@ startup() do #(App::script_component(vm)){
                             width: Fill, height: Fit,
                             flow: Down,
                             spacing: 8.0,
-                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
                             padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
 
                             View{
                                 width: Fill, height: Fit, flow: Right, spacing: 8.0, align: Align{y: 0.5}
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Framework:" }
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Framework:" }
                                 demo_select := mod.widgets.MpSelect{
                                     trigger +: {
                                         label: { text: "Select a framework" }
@@ -4841,11 +4974,11 @@ startup() do #(App::script_component(vm)){
                                         description +: { text: "This dialog has smooth fade-in animation." }
                                     }
                                     body +: {
-                                        Label{ draw_text +: { text_style: theme.font_regular{font_size: 14.0} color: FOREGROUND } text: "Dialog content with custom children." }
+                                        Label{ draw_text +: { text_style: theme.font_regular{font_size: 14.0} color: TEXT } text: "Dialog content with custom children." }
                                     }
                                     footer +: {
                                         dialog_close_btn := mod.widgets.MpButtonGhost{ text: "Cancel" }
-                                        dialog_confirm_btn := mod.widgets.MpButtonPrimary{ text: "Confirm" }
+                                        dialog_confirm_btn := mod.widgets.MpButtonProminent{ text: "Confirm" }
                                     }
                                 }
                             }
@@ -4872,7 +5005,7 @@ startup() do #(App::script_component(vm)){
                         // Separator
                         // ============================================================
                         Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
                             text: "Separator"
                         }
 
@@ -4880,23 +5013,23 @@ startup() do #(App::script_component(vm)){
                             width: Fill, height: Fit,
                             flow: Down,
                             spacing: 12.0,
-                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
                             padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
 
-                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Default:" }
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Default:" }
                             mod.widgets.MpSeparator{}
 
-                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "With label:" }
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "With label:" }
                             mod.widgets.MpSeparatorWithLabel{ label: { text: "OR" } }
 
-                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Subtle:" }
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Subtle:" }
                             mod.widgets.MpSeparatorSubtle{}
 
-                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Vertical:" }
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Vertical:" }
                             View{ width: Fill, height: 60, flow: Right, spacing: 8.0, align: Align{y: 0.5}
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: FOREGROUND } text: "Left" }
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT } text: "Left" }
                                 mod.widgets.MpSeparatorVertical{}
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: FOREGROUND } text: "Right" }
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT } text: "Right" }
                             }
                         }
 
@@ -4904,7 +5037,7 @@ startup() do #(App::script_component(vm)){
                         // Toggle
                         // ============================================================
                         Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
                             text: "Toggle"
                         }
 
@@ -4912,7 +5045,7 @@ startup() do #(App::script_component(vm)){
                             width: Fill, height: Fit,
                             flow: Down,
                             spacing: 8.0,
-                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
                             padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
 
                             View{
@@ -4920,7 +5053,7 @@ startup() do #(App::script_component(vm)){
                                 flow: Right,
                                 spacing: 8.0,
                                 align: Align{y: 0.5}
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Default:" }
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Default:" }
                                 demo_toggle_bold := mod.widgets.MpToggle{ text: "Bold" }
                                 mod.widgets.MpToggle{ text: "Italic" }
                                 mod.widgets.MpToggle{ text: "Underline" }
@@ -4930,7 +5063,7 @@ startup() do #(App::script_component(vm)){
                                 flow: Right,
                                 spacing: 8.0,
                                 align: Align{y: 0.5}
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Ghost:" }
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Ghost:" }
                                 mod.widgets.MpToggleGhost{ text: "Bold" }
                                 mod.widgets.MpToggleGhost{ text: "Italic" }
                             }
@@ -4939,7 +5072,7 @@ startup() do #(App::script_component(vm)){
                                 flow: Right,
                                 spacing: 8.0,
                                 align: Align{y: 0.5}
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: MUTED_FOREGROUND } text: "Sizes:" }
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Sizes:" }
                                 demo_toggle_sm := mod.widgets.MpToggleSmall{ text: "Small" }
                                 demo_toggle_lg := mod.widgets.MpToggleLarge{ text: "Large" }
                             }
@@ -4949,7 +5082,7 @@ startup() do #(App::script_component(vm)){
                         // Pagination
                         // ============================================================
                         Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
                             text: "Pagination"
                         }
 
@@ -4957,7 +5090,7 @@ startup() do #(App::script_component(vm)){
                             width: Fill, height: Fit,
                             flow: Down,
                             spacing: 8.0,
-                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
                             padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
 
                             View{
@@ -4995,7 +5128,7 @@ startup() do #(App::script_component(vm)){
                         // HoverCard
                         // ============================================================
                         Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: FOREGROUND }
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
                             text: "HoverCard"
                         }
 
@@ -5003,12 +5136,12 @@ startup() do #(App::script_component(vm)){
                             width: Fill, height: Fit,
                             flow: Down,
                             spacing: 8.0,
-                            draw_bg +: { color: CARD, border_radius: 8.0, border_color: BORDER }
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
                             padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
 
                             View{
                                 width: Fill, height: Fit, flow: Right, spacing: 8.0, align: Align{y: 0.5}
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: FOREGROUND } text: "Hover 🔍 over this text to see more details (hover_card requires app-level integration)" }
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Hover 🔍 over this text to see more details (hover_card requires app-level integration)" }
                             }
                         }
                     }
@@ -5029,14 +5162,14 @@ startup() do #(App::script_component(vm)){
                                 height: Fit,
                                 draw_text +: {
                                     text_style: theme.font_regular{ font_size: 14.0 }
-                                    color: MUTED_FOREGROUND
+                                    color: TEXT_MUTED
                                 }
                                 text: "This is an interactive modal dialog. Click the X button or the backdrop to close it."
                             }
                         }
                         footer +: {
                             modal_cancel_btn := mod.widgets.MpButtonGhost{ text: "Cancel" }
-                            modal_confirm_btn := mod.widgets.MpButtonPrimary{ text: "Confirm" }
+                            modal_confirm_btn := mod.widgets.MpButtonProminent{ text: "Confirm" }
                         }
                     }
                 }
@@ -6096,6 +6229,67 @@ impl MatchEvent for App {
         self.ui
             .mp_skeleton_widget(cx, ids!(interactive_skeleton))
             .set_loading(cx, true);
+
+        // Populate table demo
+        self.ui
+            .mp_table(cx, ids!(demo_table))
+            .set_columns(vec![
+                TableColumn::new("Name", 220.0, true),
+                TableColumn::new("Language", 140.0, true),
+                TableColumn::new("Stars", 100.0, true),
+                TableColumn::new("License", 180.0, false),
+            ]);
+        self.ui.mp_table(cx, ids!(demo_table)).set_rows(
+            cx,
+            vec![
+                vec!["makepad".to_string(), "Rust".to_string(), "12400".to_string(), "MIT".to_string()],
+                vec!["tokio".to_string(), "Rust".to_string(), "27800".to_string(), "MIT".to_string()],
+                vec!["serde".to_string(), "Rust".to_string(), "9100".to_string(), "Apache-2.0".to_string()],
+                vec!["tauri".to_string(), "Rust".to_string(), "86200".to_string(), "MIT".to_string()],
+                vec!["wgpu".to_string(), "Rust".to_string(), "13100".to_string(), "MIT OR Apache-2.0".to_string()],
+                vec!["bevy".to_string(), "Rust".to_string(), "37400".to_string(), "MIT OR Apache-2.0".to_string()],
+            ],
+        );
+
+        // Populate tree demo
+        self.ui.mp_tree(cx, ids!(demo_tree)).set_items(
+            cx,
+            vec![
+                TreeItem::new("crates", 0),
+                TreeItem::new("ui", 1),
+                TreeItem::new("widgets", 2),
+                TreeItem::new("button.rs", 3),
+                TreeItem::new("table.rs", 3),
+                TreeItem::new("tree.rs", 3),
+                TreeItem::new("a2ui", 2),
+                TreeItem::new("processor.rs", 3),
+                TreeItem::new("theme", 1),
+                TreeItem::new("palette.rs", 2),
+                TreeItem::new("color.rs", 2),
+                TreeItem::new("motion", 1),
+                TreeItem::new("lib.rs", 2),
+                TreeItem::new("Cargo.toml", 0),
+            ],
+        );
+
+        // Populate combobox demo
+        self.ui
+            .mp_combobox(cx, ids!(demo_combobox))
+            .set_items(
+                cx,
+                vec![
+                    "Apple".to_string(),
+                    "Banana".to_string(),
+                    "Cherry".to_string(),
+                    "Durian".to_string(),
+                    "Elderberry".to_string(),
+                    "Fig".to_string(),
+                    "Grape".to_string(),
+                    "Honeydew".to_string(),
+                    "Kiwi".to_string(),
+                    "Lemon".to_string(),
+                ],
+            );
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -6716,6 +6910,49 @@ impl MatchEvent for App {
             }
             let new_mode = if is_dark { "Light" } else { "Dark" };
             self.ui.label(cx, ids!(theme_status)).set_text(cx, new_mode);
+        }
+
+        // Table demo: row selection + sorting feedback
+        if let Some(row) = self.ui.mp_table(cx, ids!(demo_table)).row_selected(actions) {
+            self.ui
+                .label(cx, ids!(table_status))
+                .set_text(cx, &format!("Selected row: {}", row));
+        }
+        let table = self.ui.mp_table(cx, ids!(demo_table));
+        if let Some((col, dir)) = table.sorted_column(actions) {
+            let dir = match dir {
+                makepad_component::widgets::SortDirection::Ascending => "asc",
+                makepad_component::widgets::SortDirection::Descending => "desc",
+                _ => "none",
+            };
+            self.ui
+                .label(cx, ids!(table_status))
+                .set_text(cx, &format!("Sort: column {} ({})", col, dir));
+        }
+
+        // Tree demo: item selection
+        if let Some(item) = self.ui.mp_tree(cx, ids!(demo_tree)).item_selected(actions) {
+            self.ui
+                .label(cx, ids!(tree_status))
+                .set_text(cx, &format!("Selected item: {}", item));
+        }
+
+        // Combobox demo: selection
+        if let Some(selected) = self
+            .ui
+            .mp_combobox(cx, ids!(demo_combobox))
+            .selected(actions)
+        {
+            self.ui
+                .label(cx, ids!(combobox_status))
+                .set_text(cx, &format!("Selected: {}", selected));
+        }
+
+        // Stepper demo: value change
+        if let Some(value) = self.ui.mp_stepper(cx, ids!(demo_stepper)).changed(actions) {
+            self.ui
+                .label(cx, ids!(stepper_status))
+                .set_text(cx, &format!("Value: {}", value));
         }
     }
 }

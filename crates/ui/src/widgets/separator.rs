@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpSeparator - shadcn-style visual divider
@@ -59,7 +59,7 @@ script_mod! {
             margin: Inset{left: 16.0, right: 16.0}
             draw_text +: {
                 text_style: theme.font_regular{font_size: 12.0}
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
             }
             text: "CONTINUE"
         }

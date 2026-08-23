@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpToggle - shadcn-style toggle button (two-state on/off)
@@ -22,9 +22,9 @@ script_mod! {
             border_width: instance(1.0)
             border_color: instance(BORDER)
             bg_color: instance(#x0000)
-            bg_hover: instance(#xf1f5f9)
-            bg_active: instance(#xe2e8f0)
-            bg_checked: instance(PRIMARY)
+            bg_hover: instance(ELEMENT_HOVER)
+            bg_active: instance(ELEMENT_ACTIVE)
+            bg_checked: instance(ACCENT)
             hover: instance(0.0)
             pressed: instance(0.0)
             active: instance(0.0)
@@ -60,8 +60,8 @@ script_mod! {
 
         draw_text +: {
             text_style: theme.font_bold{font_size: 13.0}
-            color: (FOREGROUND)
-            color_active: instance(PRIMARY_FOREGROUND)
+            color: (TEXT)
+            color_active: instance(ON_ACCENT)
             active: instance(0.0)
             get_color: fn() {
                 return mix(self.color, self.color_active, self.active)

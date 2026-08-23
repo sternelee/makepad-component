@@ -3,6 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
+    use mod.mpc_theme.*
 
     // Badge indicator constants
     let BADGE_HEIGHT = 20.0
@@ -22,7 +23,7 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            bg_color: instance(#xEF4444)
+            bg_color: instance(DANGER)
 
             // True capsule: two semicircles + middle rectangle
             pixel: fn() {
@@ -45,7 +46,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: BADGE_FONT_SIZE}
-                color: #xFFFFFF
+                color: ON_SOLID
             }
             text: ""
         }
@@ -58,7 +59,7 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            bg_color: instance(#xEF4444)
+            bg_color: instance(DANGER)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -104,7 +105,7 @@ script_mod! {
     mod.widgets.MpBadgeSuccess = mod.widgets.MpBadge{
         badge_wrapper +: {
             indicator +: {
-                draw_bg +: { bg_color: instance(#x22C55E) }
+                draw_bg +: { bg_color: instance(SUCCESS) }
             }
         }
     }
@@ -113,7 +114,7 @@ script_mod! {
     mod.widgets.MpBadgeWarning = mod.widgets.MpBadge{
         badge_wrapper +: {
             indicator +: {
-                draw_bg +: { bg_color: instance(#xF59E0B) }
+                draw_bg +: { bg_color: instance(WARNING) }
             }
         }
     }
@@ -122,7 +123,7 @@ script_mod! {
     mod.widgets.MpBadgeInfo = mod.widgets.MpBadge{
         badge_wrapper +: {
             indicator +: {
-                draw_bg +: { bg_color: instance(#x3B82F6) }
+                draw_bg +: { bg_color: instance(INFO) }
             }
         }
     }
@@ -131,7 +132,7 @@ script_mod! {
     mod.widgets.MpBadgeSecondary = mod.widgets.MpBadge{
         badge_wrapper +: {
             indicator +: {
-                draw_bg +: { bg_color: instance(#x6B7280) }
+                draw_bg +: { bg_color: instance(TEXT_MUTED) }
             }
         }
     }
@@ -165,7 +166,7 @@ script_mod! {
     mod.widgets.MpBadgeDotSuccess = mod.widgets.MpBadgeDot{
         badge_wrapper +: {
             indicator +: {
-                draw_bg +: { bg_color: instance(#x22C55E) }
+                draw_bg +: { bg_color: instance(SUCCESS) }
             }
         }
     }
@@ -173,7 +174,7 @@ script_mod! {
     mod.widgets.MpBadgeDotWarning = mod.widgets.MpBadgeDot{
         badge_wrapper +: {
             indicator +: {
-                draw_bg +: { bg_color: instance(#xF59E0B) }
+                draw_bg +: { bg_color: instance(WARNING) }
             }
         }
     }
@@ -182,15 +183,15 @@ script_mod! {
     mod.widgets.MpBadgeStandalone = mod.widgets.MpBadgeIndicator{}
 
     mod.widgets.MpBadgeStandaloneSuccess = mod.widgets.MpBadgeIndicator{
-        draw_bg +: { bg_color: instance(#x22C55E) }
+        draw_bg +: { bg_color: instance(SUCCESS) }
     }
 
     mod.widgets.MpBadgeStandaloneWarning = mod.widgets.MpBadgeIndicator{
-        draw_bg +: { bg_color: instance(#xF59E0B) }
+        draw_bg +: { bg_color: instance(WARNING) }
     }
 
     mod.widgets.MpBadgeStandaloneInfo = mod.widgets.MpBadgeIndicator{
-        draw_bg +: { bg_color: instance(#x3B82F6) }
+        draw_bg +: { bg_color: instance(INFO) }
     }
 }
 

@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpDialogInner - Dialog card (defined FIRST so MpDialog can use it)
@@ -14,7 +14,7 @@ script_mod! {
         flow: Down
 
         draw_bg +: {
-            bg_color: (CARD)
+            bg_color: (SURFACE_CARD)
             radius: instance(12.0)
             border_color: (BORDER)
             shadow_color: #x00000033
@@ -40,12 +40,12 @@ script_mod! {
             flow: Down, spacing: 4,
             title := Label{
                 width: Fill, height: Fit,
-                draw_text +: { text_style: theme.font_bold{font_size: 18.0} color: FOREGROUND }
+                draw_text +: { text_style: theme.font_bold{font_size: 18.0} color: TEXT }
                 text: ""
             }
             description := Label{
                 width: Fill, height: Fit, visible: false,
-                draw_text +: { text_style: theme.font_regular{font_size: 14.0} color: MUTED_FOREGROUND }
+                draw_text +: { text_style: theme.font_regular{font_size: 14.0} color: TEXT_MUTED }
                 text: ""
             }
         }
@@ -123,7 +123,7 @@ script_mod! {
             align: Align{x: 0.5},
             title := Label{
                 width: Fit, height: Fit,
-                draw_text +: { text_style: theme.font_bold{font_size: 18.0} color: FOREGROUND }
+                draw_text +: { text_style: theme.font_bold{font_size: 18.0} color: TEXT }
                 text: ""
             }
         }
@@ -133,7 +133,7 @@ script_mod! {
             align: Align{x: 0.5},
             description := Label{
                 width: Fit, height: Fit,
-                draw_text +: { text_style: theme.font_regular{font_size: 14.0} color: MUTED_FOREGROUND }
+                draw_text +: { text_style: theme.font_regular{font_size: 14.0} color: TEXT_MUTED }
                 text: ""
             }
         }

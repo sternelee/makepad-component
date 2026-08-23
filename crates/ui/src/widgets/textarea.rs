@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpTextArea - Multi-line text input
@@ -19,9 +19,9 @@ script_mod! {
 
 
         draw_bg +: {
-            bg_color: instance(INPUT)
+            bg_color: instance(INPUT_BG)
             border_color: instance(BORDER)
-            focus_color: instance(RING)
+            focus_color: instance(ACCENT)
             has_focus: instance(0.0)
             border_width: instance(1.0)
             radius: instance(6.0)

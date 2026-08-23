@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // Alert Icons - SDF drawn icons for each variant
@@ -145,7 +145,7 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            icon_color: instance(MUTED_FOREGROUND)
+            icon_color: instance(TEXT_MUTED)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -179,9 +179,9 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            icon_color: instance(#x94a3b8)
+            icon_color: instance(TEXT_MUTED)
             hover: instance(0.0)
-            bg_hover_color: instance(#x00000010)
+            bg_hover_color: instance(ELEMENT_HOVER)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -234,7 +234,7 @@ script_mod! {
         height: Fit
         draw_text +: {
             text_style: theme.font_bold{font_size: 14.0}
-            color: FOREGROUND
+            color: TEXT
         }
         text: ""
     }
@@ -252,7 +252,7 @@ script_mod! {
         height: Fit
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
-            color: MUTED_FOREGROUND
+            color: TEXT_MUTED
         }
         text: ""
     }
@@ -282,7 +282,7 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            bg_color: instance(#xf1f5f920)
+            bg_color: instance(ELEMENT_HOVER)
             border_radius: instance(8.0)
             border_color: instance(BORDER)
 
@@ -316,8 +316,8 @@ script_mod! {
     // Info Alert
     mod.widgets.MpAlertInfo = mod.widgets.MpAlert{
         draw_bg +: {
-            bg_color: instance(#x06b6d410)
-            border_color: instance(#xa5f3fc)
+            bg_color: instance(#x0891b210)
+            border_color: instance(INFO)
         }
 
         icon := mod.widgets.MpAlertIconInfo{}
@@ -329,14 +329,14 @@ script_mod! {
                 }
             }
             message := mod.widgets.MpAlertMessage{
-                draw_text +: { color: #x0e7490 }
+                draw_text +: { color: INFO }
             }
         }
 
         close_button := mod.widgets.MpAlertCloseButton{
             draw_bg +: {
-                icon_color: instance(#x06b6d4)
-                bg_hover_color: instance(#x06b6d420)
+                icon_color: instance(INFO)
+                bg_hover_color: instance(INFO)
             }
         }
     }
@@ -345,7 +345,7 @@ script_mod! {
     mod.widgets.MpAlertSuccess = mod.widgets.MpAlert{
         draw_bg +: {
             bg_color: instance(#x16a34a10)
-            border_color: instance(#xbbf7d0)
+            border_color: instance(SUCCESS)
         }
 
         icon := mod.widgets.MpAlertIconSuccess{}
@@ -357,14 +357,14 @@ script_mod! {
                 }
             }
             message := mod.widgets.MpAlertMessage{
-                draw_text +: { color: #x15803d }
+                draw_text +: { color: SUCCESS }
             }
         }
 
         close_button := mod.widgets.MpAlertCloseButton{
             draw_bg +: {
-                icon_color: instance(#x16a34a)
-                bg_hover_color: instance(#x16a34a20)
+                icon_color: instance(SUCCESS)
+                bg_hover_color: instance(SUCCESS)
             }
         }
     }
@@ -372,8 +372,8 @@ script_mod! {
     // Warning Alert
     mod.widgets.MpAlertWarning = mod.widgets.MpAlert{
         draw_bg +: {
-            bg_color: instance(#xf59a0b10)
-            border_color: instance(#xfde68a)
+            bg_color: instance(#xd9770610)
+            border_color: instance(WARNING)
         }
 
         icon := mod.widgets.MpAlertIconWarning{}
@@ -381,18 +381,18 @@ script_mod! {
         content := mod.widgets.MpAlertContent{
             title_wrapper := mod.widgets.MpAlertTitleWrapper{
                 title := mod.widgets.MpAlertTitle{
-                    draw_text +: { color: #xb45309 }
+                    draw_text +: { color: WARNING }
                 }
             }
             message := mod.widgets.MpAlertMessage{
-                draw_text +: { color: #x854d0e }
+                draw_text +: { color: WARNING }
             }
         }
 
         close_button := mod.widgets.MpAlertCloseButton{
             draw_bg +: {
-                icon_color: instance(#xf59a0b)
-                bg_hover_color: instance(#xf59a0b20)
+                icon_color: instance(WARNING)
+                bg_hover_color: instance(WARNING)
             }
         }
     }
@@ -400,8 +400,8 @@ script_mod! {
     // Error/Danger Alert
     mod.widgets.MpAlertError = mod.widgets.MpAlert{
         draw_bg +: {
-            bg_color: instance(#xdc262610)
-            border_color: instance(#xfecaca)
+            bg_color: instance(#xdc26261a)
+            border_color: instance(DANGER)
         }
 
         icon := mod.widgets.MpAlertIconError{}
@@ -413,14 +413,14 @@ script_mod! {
                 }
             }
             message := mod.widgets.MpAlertMessage{
-                draw_text +: { color: #xb91c1c }
+                draw_text +: { color: DANGER }
             }
         }
 
         close_button := mod.widgets.MpAlertCloseButton{
             draw_bg +: {
-                icon_color: instance(#xdc2626)
-                bg_hover_color: instance(#xdc262620)
+                icon_color: instance(DANGER)
+                bg_hover_color: instance(DANGER)
             }
         }
     }
@@ -441,22 +441,22 @@ script_mod! {
 
     mod.widgets.MpAlertBannerInfo = mod.widgets.MpAlertBannerBase{
         draw_bg +: {
-            bg_color: instance(#x06b6d410)
-            border_color: instance(#xa5f3fc)
+            bg_color: instance(#x0891b210)
+            border_color: instance(INFO)
         }
 
         icon := mod.widgets.MpAlertIconInfo{}
 
         content := mod.widgets.MpAlertContent{
             message := mod.widgets.MpAlertMessage{
-                draw_text +: { color: #x0e7490 }
+                draw_text +: { color: INFO }
             }
         }
 
         close_button := mod.widgets.MpAlertCloseButton{
             draw_bg +: {
-                icon_color: instance(#x06b6d4)
-                bg_hover_color: instance(#x06b6d420)
+                icon_color: instance(INFO)
+                bg_hover_color: instance(INFO)
             }
         }
     }
@@ -464,65 +464,65 @@ script_mod! {
     mod.widgets.MpAlertBannerSuccess = mod.widgets.MpAlertBannerBase{
         draw_bg +: {
             bg_color: instance(#x16a34a10)
-            border_color: instance(#xbbf7d0)
+            border_color: instance(SUCCESS)
         }
 
         icon := mod.widgets.MpAlertIconSuccess{}
 
         content := mod.widgets.MpAlertContent{
             message := mod.widgets.MpAlertMessage{
-                draw_text +: { color: #x15803d }
+                draw_text +: { color: SUCCESS }
             }
         }
 
         close_button := mod.widgets.MpAlertCloseButton{
             draw_bg +: {
-                icon_color: instance(#x16a34a)
-                bg_hover_color: instance(#x16a34a20)
+                icon_color: instance(SUCCESS)
+                bg_hover_color: instance(SUCCESS)
             }
         }
     }
 
     mod.widgets.MpAlertBannerWarning = mod.widgets.MpAlertBannerBase{
         draw_bg +: {
-            bg_color: instance(#xf59a0b10)
-            border_color: instance(#xfde68a)
+            bg_color: instance(#xd9770610)
+            border_color: instance(WARNING)
         }
 
         icon := mod.widgets.MpAlertIconWarning{}
 
         content := mod.widgets.MpAlertContent{
             message := mod.widgets.MpAlertMessage{
-                draw_text +: { color: #x854d0e }
+                draw_text +: { color: WARNING }
             }
         }
 
         close_button := mod.widgets.MpAlertCloseButton{
             draw_bg +: {
-                icon_color: instance(#xf59a0b)
-                bg_hover_color: instance(#xf59a0b20)
+                icon_color: instance(WARNING)
+                bg_hover_color: instance(WARNING)
             }
         }
     }
 
     mod.widgets.MpAlertBannerError = mod.widgets.MpAlertBannerBase{
         draw_bg +: {
-            bg_color: instance(#xdc262610)
-            border_color: instance(#xfecaca)
+            bg_color: instance(#xdc26261a)
+            border_color: instance(DANGER)
         }
 
         icon := mod.widgets.MpAlertIconError{}
 
         content := mod.widgets.MpAlertContent{
             message := mod.widgets.MpAlertMessage{
-                draw_text +: { color: #xb91c1c }
+                draw_text +: { color: DANGER }
             }
         }
 
         close_button := mod.widgets.MpAlertCloseButton{
             draw_bg +: {
-                icon_color: instance(#xdc2626)
-                bg_hover_color: instance(#xdc262620)
+                icon_color: instance(DANGER)
+                bg_hover_color: instance(DANGER)
             }
         }
     }

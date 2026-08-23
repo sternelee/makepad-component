@@ -3,6 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpTab - Individual tab item (clickable)
@@ -25,12 +26,12 @@ script_mod! {
             border_radius: uniform(6.0)
             border_width: uniform(1.0)
 
-            color: uniform(#x00000000)
-            color_hover: uniform(#xf1f5f9)
-            color_selected: uniform(#xffffff)
+            color: uniform(TRANSPARENT)
+            color_hover: uniform(ELEMENT_HOVER)
+            color_selected: uniform(SURFACE_CARD)
 
-            border_color: uniform(#x00000000)
-            border_color_selected: uniform(#xe2e8f0)
+            border_color: uniform(TRANSPARENT)
+            border_color_selected: uniform(BORDER)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -64,9 +65,9 @@ script_mod! {
             hover: instance(0.0)
             selected: instance(0.0)
 
-            color: #x64748b
-            color_hover: uniform(#x334155)
-            color_selected: uniform(#x0f172a)
+            color: TEXT_FAINT
+            color_hover: uniform(TEXT)
+            color_selected: uniform(TEXT)
 
             text_style: theme.font_regular{font_size: 14.0}
 
@@ -126,7 +127,7 @@ script_mod! {
 
         draw_bg +: {
             indicator_height: uniform(2.0)
-            indicator_color: uniform(#x3b82f6)
+            indicator_color: uniform(ACCENT)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -147,7 +148,7 @@ script_mod! {
         }
 
         draw_text +: {
-            color_selected: #x3b82f6
+            color_selected: ACCENT
         }
     }
 
@@ -156,15 +157,15 @@ script_mod! {
         padding: Inset{left: 16.0, right: 16.0, top: 6.0, bottom: 6.0}
 
         draw_bg +: {
-            color_hover: #xf8fafc
-            color_selected: #x00000000
+            color_hover: ELEMENT_HOVER
+            color_selected: TRANSPARENT
 
-            border_color: #xe2e8f0
-            border_color_selected: #x3b82f6
+            border_color: BORDER
+            border_color_selected: ACCENT
         }
 
         draw_text +: {
-            color_selected: #x3b82f6
+            color_selected: ACCENT
         }
     }
 
@@ -176,18 +177,18 @@ script_mod! {
             border_radius: 6.0
             border_width: 0.0
 
-            color: #x00000000
-            color_hover: #xdbeafe
-            color_selected: #x3b82f6
+            color: TRANSPARENT
+            color_hover: ELEMENT_HOVER
+            color_selected: ACCENT
 
-            border_color: #x00000000
-            border_color_selected: #x00000000
+            border_color: TRANSPARENT
+            border_color_selected: TRANSPARENT
         }
 
         draw_text +: {
-            color: #x64748b
-            color_hover: #x1d4ed8
-            color_selected: #xffffff
+            color: TEXT_FAINT
+            color_hover: ON_ACCENT
+            color_selected: ON_ACCENT
         }
     }
 
@@ -199,12 +200,12 @@ script_mod! {
             border_radius: 4.0
             border_width: 0.0
 
-            color: #x00000000
-            color_hover: #x00000008
-            color_selected: #xffffff
+            color: TRANSPARENT
+            color_hover: ELEMENT_HOVER
+            color_selected: ON_ACCENT
 
-            border_color: #x00000000
-            border_color_selected: #x00000000
+            border_color: TRANSPARENT
+            border_color_selected: TRANSPARENT
         }
     }
 
@@ -226,7 +227,7 @@ script_mod! {
         spacing: 4
         show_bg: true
         draw_bg +: {
-            color: instance(#xf1f5f9)
+            color: instance(SURFACE_RAISED)
             radius: instance(8.0)
 
             pixel: fn() {
@@ -243,7 +244,7 @@ script_mod! {
         spacing: 0
         show_bg: true
         draw_bg +: {
-            border_color: uniform(#xe2e8f0)
+            border_color: uniform(BORDER)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -273,7 +274,7 @@ script_mod! {
         spacing: 2
         show_bg: true
         draw_bg +: {
-            color: instance(#xf1f5f9)
+            color: instance(SURFACE_RAISED)
             radius: instance(8.0)
 
             pixel: fn() {

@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpCard - Card container component
@@ -18,8 +18,10 @@ script_mod! {
         spacing: 12
 
         draw_bg +: {
-            color: CARD
-            border_radius: 8.0
+            color: SURFACE_CARD
+            border_radius: 12.0
+            border_size: 1.0
+            border_color: BORDER
         }
     }
 
@@ -33,8 +35,8 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            bg_color: instance(CARD)
-            border_radius: instance(8.0)
+            bg_color: instance(SURFACE_CARD)
+            border_radius: instance(12.0)
             shadow_color: instance(#x0000001A)
             shadow_offset_x: instance(0.0)
             shadow_offset_y: instance(2.0)
@@ -77,9 +79,9 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            bg_color: instance(CARD)
-            bg_color_hover: instance(#xf8fafc)
-            border_radius: instance(8.0)
+            bg_color: instance(SURFACE_CARD)
+            bg_color_hover: instance(ELEMENT_HOVER)
+            border_radius: instance(12.0)
             border_color: instance(BORDER)
             hover: instance(0.0)
 
@@ -161,7 +163,7 @@ script_mod! {
         padding: 0
         draw_text +: {
             text_style: theme.font_bold{font_size: 18.0}
-            color: CARD_FOREGROUND
+            color: TEXT
         }
     }
 
@@ -172,7 +174,7 @@ script_mod! {
         padding: 0
         draw_text +: {
             text_style: theme.font_regular{font_size: 14.0}
-            color: MUTED_FOREGROUND
+            color: TEXT_MUTED
         }
     }
 
@@ -224,7 +226,7 @@ script_mod! {
     // Primary card
     mod.widgets.MpCardPrimary = mod.widgets.MpCard{
         draw_bg +: {
-            color: PRIMARY
+            color: ACCENT
         }
     }
 
@@ -279,9 +281,9 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            bg_color: instance(CARD)
-            bg_color_hover: instance(#xf8fafc)
-            border_radius: instance(8.0)
+            bg_color: instance(SURFACE_CARD)
+            bg_color_hover: instance(ELEMENT_HOVER)
+            border_radius: instance(12.0)
             border_color: instance(BORDER)
             hover: instance(0.0)
 

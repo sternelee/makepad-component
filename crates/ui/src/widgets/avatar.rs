@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     let AVATAR_SIZE_XS = 24.0
     let AVATAR_SIZE_SM = 32.0
@@ -25,7 +25,7 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             radius: instance(20.0)
-            bg_color: instance(MUTED)
+            bg_color: instance(SURFACE)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -44,7 +44,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 14.0}
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
             }
             text: ""
         }
@@ -60,7 +60,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 10.0}
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
             }
             text: ""
         }
@@ -76,7 +76,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 12.0}
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
             }
             text: ""
         }
@@ -92,7 +92,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 20.0}
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
             }
             text: ""
         }
@@ -108,7 +108,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 28.0}
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
             }
             text: ""
         }
@@ -154,7 +154,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 12.0}
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
             }
             text: ""
         }
@@ -173,7 +173,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 20.0}
-                color: MUTED_FOREGROUND
+                color: TEXT_MUTED
             }
             text: ""
         }
@@ -185,7 +185,7 @@ script_mod! {
 
     mod.widgets.MpAvatarPrimary = mod.widgets.MpAvatar{
         draw_bg +: {
-            bg_color: instance(PRIMARY)
+            bg_color: instance(ACCENT)
         }
 
         label := Label{
@@ -193,7 +193,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 14.0}
-                color: PRIMARY_FOREGROUND
+                color: ON_ACCENT
             }
             text: ""
         }
@@ -209,7 +209,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 14.0}
-                color: DANGER_FOREGROUND
+                color: BG
             }
             text: ""
         }
@@ -225,7 +225,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 14.0}
-                color: SUCCESS_FOREGROUND
+                color: BG
             }
             text: ""
         }
@@ -241,7 +241,7 @@ script_mod! {
             height: Fit
             draw_text +: {
                 text_style: theme.font_bold{font_size: 14.0}
-                color: WARNING_FOREGROUND
+                color: BG
             }
             text: ""
         }

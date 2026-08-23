@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpBreadcrumb - Navigation breadcrumb trail
@@ -26,7 +26,7 @@ script_mod! {
 
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
-            color: #x3B82F6
+            color: ACCENT
         }
 
         text: ""
@@ -37,11 +37,11 @@ script_mod! {
                 default: @off
                 off: AnimatorState{
                     from: {all: Forward {duration: 0.15}}
-                    apply: {draw_text: {color: #x3B82F6}}
+                    apply: {draw_text: {color: ACCENT}}
                 }
                 on: AnimatorState{
                     from: {all: Forward {duration: 0.15}}
-                    apply: {draw_text: {color: #x2563EB}}
+                    apply: {draw_text: {color: ACCENT}}
                 }
             }
         }
@@ -54,7 +54,7 @@ script_mod! {
         margin: Inset{left: 4.0, right: 4.0}
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
-            color: #x94A3B8
+            color: TEXT_FAINT
         }
         text: "/"
     }
@@ -62,7 +62,7 @@ script_mod! {
     // Active breadcrumb (last item, not clickable)
     mod.widgets.MpBreadcrumbActive = set_type_default() do mod.widgets.MpBreadcrumbItemBase{
         draw_text +: {
-            color: #x1D1D1F
+            color: TEXT
         }
     }
 }

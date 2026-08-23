@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpSkeleton - Loading placeholder component with shimmer animation
@@ -18,8 +18,8 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            color_base: uniform(#xe5e7eb)
-            color_shimmer: uniform(#xf3f4f6)
+            color_base: uniform(SURFACE_RAISED)
+            color_shimmer: uniform(ELEMENT_HOVER)
             shimmer_width: uniform(0.3)
             shimmer_speed: uniform(0.8)
 
@@ -42,8 +42,8 @@ script_mod! {
         draw_bg +: {
             radius: instance(4.0)
 
-            color_base: uniform(#xe5e7eb)
-            color_shimmer: uniform(#xf3f4f6)
+            color_base: uniform(SURFACE_RAISED)
+            color_shimmer: uniform(ELEMENT_HOVER)
             shimmer_speed: uniform(0.8)
 
             pixel: fn() {
@@ -69,8 +69,8 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            color_base: uniform(#xe5e7eb)
-            color_shimmer: uniform(#xf3f4f6)
+            color_base: uniform(SURFACE_RAISED)
+            color_shimmer: uniform(ELEMENT_HOVER)
             shimmer_speed: uniform(0.8)
 
             pixel: fn() {
@@ -144,7 +144,7 @@ script_mod! {
         spacing: 12.0
 
         draw_bg +: {
-            color: CARD
+            color: SURFACE_CARD
             border_radius: 8.0
             border_color: BORDER
         }

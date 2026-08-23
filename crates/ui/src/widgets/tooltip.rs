@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // Register TooltipPosition enum for script VM
     mod.widgets.TooltipPosition = set_type_default() do #(TooltipPosition::script_api(vm))

@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpPageFlip - Page switching container
@@ -54,7 +54,7 @@ script_mod! {
         flow: Down
         padding: 16
         draw_bg +: {
-            color: CARD
+            color: SURFACE_CARD
         }
     }
 
@@ -67,7 +67,7 @@ script_mod! {
         margin: 16
 
         draw_bg +: {
-            color: CARD
+            color: SURFACE_CARD
             border_radius: 8.0
             border_size: 1.0
             border_color: BORDER
@@ -86,7 +86,7 @@ script_mod! {
         align: Align{x: 0.5, y: 0.5}
         padding: 16
         draw_bg +: {
-            color: PRIMARY
+            color: ACCENT
         }
     }
 
@@ -98,7 +98,7 @@ script_mod! {
         align: Align{x: 0.5, y: 0.5}
         padding: 16
         draw_bg +: {
-            color: SECONDARY
+            color: SURFACE_RAISED
         }
     }
 
@@ -110,7 +110,7 @@ script_mod! {
         align: Align{x: 0.5, y: 0.5}
         padding: 16
         draw_bg +: {
-            color: MUTED
+            color: SURFACE
         }
     }
 

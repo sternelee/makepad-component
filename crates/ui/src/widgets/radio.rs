@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // Radio button component - uses DrawQuad begin/end pattern for reliable hit testing
     mod.widgets.MpRadioBase = #(MpRadio::register_widget(vm))
@@ -25,7 +25,7 @@ script_mod! {
         draw_circle +: {
             checked: instance(0.0)
             hover: instance(0.0)
-            primary: uniform(PRIMARY)
+            primary: uniform(ACCENT)
             border_color: uniform(BORDER)
 
             pixel: fn() {
@@ -38,8 +38,8 @@ script_mod! {
                 sdf.circle(center.x, center.y, radius)
 
                 // Colors
-                let bg_unchecked = #xffffff
-                let bg_checked = #xffffff
+                let bg_unchecked = SOLID
+                let bg_checked = SOLID
                 let border_unchecked = mix(self.border_color, self.primary, self.hover * 0.5)
                 let border_checked = self.primary
 
@@ -64,7 +64,7 @@ script_mod! {
         // Label text
         draw_label +: {
             text_style: theme.font_regular{font_size: 14.0}
-            color: FOREGROUND
+            color: TEXT
         }
 
         text: ""

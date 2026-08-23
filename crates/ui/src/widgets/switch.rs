@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // Switch toggle component - macOS style pill track with a sliding knob.
     // Track and knob are drawn in a single SDF shader (the 2.0 animator cannot
@@ -17,9 +17,9 @@ script_mod! {
         draw_bg +: {
             on: instance(0.0)
             hover: instance(0.0)
-            track_off: uniform(SWITCH_TRACK_OFF)
+            track_off: uniform(SURFACE_RAISED)
             track_on: uniform(SUCCESS)
-            thumb_color: uniform(SWITCH_THUMB)
+            thumb_color: uniform(#xf8fafc)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)

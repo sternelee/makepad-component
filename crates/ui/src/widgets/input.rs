@@ -3,6 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
+    use mod.mpc_theme.*
 
     // Base input style
     mod.widgets.MpInputBase = mod.widgets.TextInput{
@@ -14,18 +15,18 @@ script_mod! {
         empty_text: "Enter text..."
 
         draw_bg +: {
-            border_radius: 6.0
+            border_radius: 8.0
             border_width: uniform(1.0)
 
-            bg_color: uniform(#xFFFFFF)
-            bg_color_hover: uniform(#xFAFAFA)
-            bg_color_focus: uniform(#xFFFFFF)
-            bg_color_disabled: uniform(#xF5F5F5)
+            bg_color: uniform(INPUT_BG)
+            bg_color_hover: uniform(INPUT_BG)
+            bg_color_focus: uniform(INPUT_BG)
+            bg_color_disabled: uniform(SURFACE)
 
-            border_color: #xD1D1D6
-            border_color_hover: #xAEAEB2
-            border_color_focus: #x007AFF
-            border_color_disabled: #xD1D1D6
+            border_color: BORDER
+            border_color_hover: BORDER_STRONG
+            border_color_focus: ACCENT
+            border_color_disabled: BORDER
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -66,9 +67,9 @@ script_mod! {
         }
 
         draw_text +: {
-            color: #x3D3D3D
-            color_disabled: #xAEAEB2
-            color_empty: #xAEAEB2
+            color: TEXT
+            color_disabled: TEXT_FAINT
+            color_empty: TEXT_FAINT
 
             text_style: theme.font_regular{
                 font_size: 13.0
@@ -84,7 +85,7 @@ script_mod! {
         }
 
         draw_cursor +: {
-            color: #x007AFF
+            color: CARET
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -95,7 +96,7 @@ script_mod! {
         }
 
         draw_selection +: {
-            color: #x007AFF30
+            color: SELECTION
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)

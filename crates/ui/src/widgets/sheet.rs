@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpSheet - Side panel that slides in from the edge
@@ -50,7 +50,7 @@ script_mod! {
             flow: Down
             visible: false
             draw_bg +: {
-                color: CARD
+                color: SURFACE_CARD
                 border_radius: 0.0
             }
 
@@ -67,7 +67,7 @@ script_mod! {
                     height: Fit
                     draw_text +: {
                         text_style: theme.font_bold{font_size: 18.0}
-                        color: FOREGROUND
+                        color: TEXT
                     }
                     text: ""
                 }
@@ -78,7 +78,7 @@ script_mod! {
                     cursor: MouseCursor.Hand
                     draw_bg +: {
                         bg_color: instance(#x00000000)
-                        bg_hover: instance(#xf1f5f9)
+                        bg_hover: instance(ELEMENT_HOVER)
                         hover: instance(0.0)
                         pixel: fn() {
                             let sdf = Sdf2d.viewport(self.pos * self.rect_size)

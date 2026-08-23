@@ -1,5 +1,7 @@
 [workspace]
 members = [
+  "crates/theme",
+  "crates/motion",
   "crates/ui",
   "crates/component-zoo",
   "crates/a2ui-demo",
@@ -22,6 +24,8 @@ publish = false
 makepad-widgets = { git = "https://github.com/makepad/makepad" }
 makepad-script = { git = "https://github.com/makepad/makepad" }
 makepad-component = { path = "crates/ui" }
+makepad-theme = { path = "crates/theme" }
+makepad-motion = { path = "crates/motion" }
 makepad-plot = { path = "crates/makepad-plot" }
 
 # Optimize audio decoder even in debug builds (symphonia does heavy float math)

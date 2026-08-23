@@ -3,6 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
+    use mod.mpc_theme.*
 
     mod.widgets.MpProgressBase = #(MpProgress::register_widget(vm))
 
@@ -10,8 +11,8 @@ script_mod! {
         ..mod.draw.DrawQuad
 
         progress: 0.0
-        track_color: #xe2e8f0
-        fill_color: #x3b82f6
+        track_color: SURFACE_RAISED
+        fill_color: ACCENT
 
         pixel: fn() {
             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -52,15 +53,15 @@ script_mod! {
 
     // Progress variants
     mod.widgets.MpProgressSuccess = mod.widgets.MpProgress{
-        draw_bg +: { fill_color: #x22c55e }
+        draw_bg +: { fill_color: SUCCESS }
     }
 
     mod.widgets.MpProgressWarning = mod.widgets.MpProgress{
-        draw_bg +: { fill_color: #xf59e0b }
+        draw_bg +: { fill_color: WARNING }
     }
 
     mod.widgets.MpProgressDanger = mod.widgets.MpProgress{
-        draw_bg +: { fill_color: #xdc2626 }
+        draw_bg +: { fill_color: DANGER }
     }
 }
 

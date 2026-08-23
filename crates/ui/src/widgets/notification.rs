@@ -3,7 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-    use mod.mp_theme.*
+    use mod.mpc_theme.*
 
     // ============================================================
     // MpNotification - Toast/notification component
@@ -18,7 +18,7 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            icon_color: instance(#x94a3b8)
+            icon_color: instance(TEXT_MUTED)
             hover: instance(0.0)
 
             pixel: fn() {
@@ -68,7 +68,7 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            icon_color: instance(MUTED_FOREGROUND)
+            icon_color: instance(TEXT_MUTED)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -225,7 +225,7 @@ script_mod! {
         height: Fit
         draw_text +: {
             text_style: theme.font_bold{font_size: 14.0}
-            color: FOREGROUND
+            color: TEXT
         }
         text: "Notification"
     }
@@ -235,7 +235,7 @@ script_mod! {
         height: Fit
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
-            color: MUTED_FOREGROUND
+            color: TEXT_MUTED
         }
         text: ""
     }
@@ -264,7 +264,7 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            bg_color: instance(CARD)
+            bg_color: instance(SURFACE_CARD)
             border_radius: instance(8.0)
             border_color: instance(BORDER)
             shadow_color: instance(#x0000001A)
@@ -318,7 +318,7 @@ script_mod! {
 
     mod.widgets.MpNotificationSuccess = mod.widgets.MpNotificationBase{
         draw_bg +: {
-            border_color: instance(#xbbf7d0)
+            border_color: instance(SUCCESS)
         }
 
         icon := mod.widgets.MpNotificationIconSuccess{}
@@ -343,7 +343,7 @@ script_mod! {
 
     mod.widgets.MpNotificationError = mod.widgets.MpNotificationBase{
         draw_bg +: {
-            border_color: instance(#xfecaca)
+            border_color: instance(DANGER)
         }
 
         icon := mod.widgets.MpNotificationIconError{}
@@ -368,14 +368,14 @@ script_mod! {
 
     mod.widgets.MpNotificationWarning = mod.widgets.MpNotificationBase{
         draw_bg +: {
-            border_color: instance(#xfde68a)
+            border_color: instance(WARNING)
         }
 
         icon := mod.widgets.MpNotificationIconWarning{}
 
         content := mod.widgets.MpNotificationContent{
             title := mod.widgets.MpNotificationTitle{
-                draw_text +: { color: #xb45309 }
+                draw_text +: { color: WARNING }
                 text: "Warning"
             }
         }
@@ -393,7 +393,7 @@ script_mod! {
 
     mod.widgets.MpNotificationInfo = mod.widgets.MpNotificationBase{
         draw_bg +: {
-            border_color: instance(#xa5f3fc)
+            border_color: instance(INFO)
         }
 
         icon := mod.widgets.MpNotificationIconInfo{}
@@ -449,7 +449,7 @@ script_mod! {
 
         show_bg: true
         draw_bg +: {
-            bg_color: instance(CARD)
+            bg_color: instance(SURFACE_CARD)
             border_radius: instance(8.0)
             border_color: instance(BORDER)
             shadow_color: instance(#x0000001A)
