@@ -1677,6 +1677,29 @@ impl CanvasPanel {
         }
     }
 
+    /// True if any text widget (command bar, note editor, properties panel)
+    /// currently holds key focus. While one does, keystrokes belong to it and
+    /// must NOT be forwarded to a focused terminal.
+    fn any_text_focused(&self, cx: &Cx) -> bool {
+        let command_input = ids!(
+            command_wrap
+                .command_bar
+                .input_row
+                .input_capsule
+                .command_input
+        );
+        self.view.text_input(cx, command_input).key_focus(cx)
+            || self.view.text_input(cx, ids!(note_editor)).key_focus(cx)
+            || self
+                .view
+                .text_input(cx, ids!(right_panel_container.properties_panel.prop_title))
+                .key_focus(cx)
+            || self
+                .view
+                .text_input(cx, ids!(right_panel_container.properties_panel.prop_body))
+                .key_focus(cx)
+    }
+
     /// Translate a KeyEvent to PTY bytes.
     ///
     /// NOTE: `KeyCode` variants are ordered by QWERTY layout position, NOT
@@ -4395,19 +4418,21 @@ impl Widget for CanvasPanel {
                     }
                     _ => {}
                 }
-            } else if let Some(id) = self.focused_terminal {
-                if let Some(item) = self.items.iter().find(|i| i.id() == id) {
-                    if let Some(session) = item.session() {
-                        if let Some(bytes) = self.key_to_bytes(key) {
-                            session.write_bytes(&bytes);
+            } else if !self.any_text_focused(cx) {
+                if let Some(id) = self.focused_terminal {
+                    if let Some(item) = self.items.iter().find(|i| i.id() == id) {
+                        if let Some(session) = item.session() {
+                            if let Some(bytes) = self.key_to_bytes(key) {
+                                session.write_bytes(&bytes);
+                            }
                         }
                     }
-                }
-            } else {
-                // Canvas-level keys.
-                if key.key_code == KeyCode::Space {
-                    self.focus_terminal(cx, None);
-                    self.redraw(cx);
+                } else {
+                    // Canvas-level keys (no terminal focused, no text widget).
+                    if key.key_code == KeyCode::Space {
+                        self.focus_terminal(cx, None);
+                        self.redraw(cx);
+                    }
                 }
             }
         }
@@ -4418,10 +4443,12 @@ impl Widget for CanvasPanel {
                     text.push_str(&te.input);
                 }
                 self.redraw(cx);
-            } else if let Some(id) = self.focused_terminal {
-                if let Some(item) = self.items.iter().find(|i| i.id() == id) {
-                    if let Some(session) = item.session() {
-                        session.write_bytes(te.input.as_bytes());
+            } else if !self.any_text_focused(cx) {
+                if let Some(id) = self.focused_terminal {
+                    if let Some(item) = self.items.iter().find(|i| i.id() == id) {
+                        if let Some(session) = item.session() {
+                            session.write_bytes(te.input.as_bytes());
+                        }
                     }
                 }
             }
