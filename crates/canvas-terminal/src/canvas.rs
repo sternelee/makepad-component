@@ -2448,40 +2448,29 @@ impl CanvasPanel {
         // Clean vector icons, no hand-drawn wobble.
         match tool {
             NoteTool::Move => {
-                self.draw_segment(
-                    cx,
-                    Vec2d { x: mx, y: y0 + 2.0 },
-                    Vec2d { x: mx, y: y1 - 2.0 },
-                    w,
-                    color,
-                );
-                self.draw_segment(
-                    cx,
-                    Vec2d { x: x0 + 2.0, y: my },
-                    Vec2d { x: x1 - 2.0, y: my },
-                    w,
-                    color,
-                );
-                self.draw_icon_arrowhead(
-                    cx,
-                    Vec2d { x: mx, y: y0 + 1.0 },
-                    0.0,
-                    -1.0,
-                    3.4,
-                    w,
-                    color,
-                );
-                self.draw_icon_arrowhead(cx, Vec2d { x: mx, y: y1 - 1.0 }, 0.0, 1.0, 3.4, w, color);
-                self.draw_icon_arrowhead(
-                    cx,
-                    Vec2d { x: x0 + 1.0, y: my },
-                    -1.0,
-                    0.0,
-                    3.4,
-                    w,
-                    color,
-                );
-                self.draw_icon_arrowhead(cx, Vec2d { x: x1 - 1.0, y: my }, 1.0, 0.0, 3.4, w, color);
+                // Pointer/select cursor (matches the reference's default tool).
+                let tip = Vec2d { x: x0, y: y0 };
+                let pts = [
+                    tip,
+                    Vec2d { x: x0, y: y1 - 3.0 },
+                    Vec2d {
+                        x: x0 + 3.0,
+                        y: y1 - 3.0,
+                    },
+                    Vec2d {
+                        x: x0 + 4.5,
+                        y: y0 + 5.5,
+                    },
+                    Vec2d {
+                        x: x0 + 10.0,
+                        y: y1 - 1.0,
+                    },
+                    Vec2d {
+                        x: x0 + 7.2,
+                        y: y0 + 3.4,
+                    },
+                ];
+                self.draw_clean_polyline(cx, &pts, true, w, color);
             }
             NoteTool::Arrow => {
                 let tip = Vec2d { x: x1, y: y0 };
@@ -2490,32 +2479,30 @@ impl CanvasPanel {
                 self.draw_icon_arrowhead(cx, tip, (x1 - x0) / len, (y0 - y1) / len, 4.5, w, color);
             }
             NoteTool::Pen => {
-                self.draw_segment(
-                    cx,
+                // Freehand squiggle (reference style).
+                let pts = [
                     Vec2d {
                         x: x0 + 1.0,
                         y: y1 - 1.0,
                     },
                     Vec2d {
-                        x: x1 - 2.0,
+                        x: x0 + 3.5,
+                        y: y0 + 3.0,
+                    },
+                    Vec2d {
+                        x: x0 + 6.0,
+                        y: y1 - 3.0,
+                    },
+                    Vec2d {
+                        x: x0 + 8.5,
                         y: y0 + 2.0,
                     },
-                    2.4,
-                    color,
-                );
-                self.draw_segment(
-                    cx,
                     Vec2d {
-                        x: x1 - 6.0,
-                        y: y0 + 1.0,
+                        x: x0 + 11.0,
+                        y: y1 - 1.0,
                     },
-                    Vec2d {
-                        x: x1 - 1.0,
-                        y: y0 + 6.0,
-                    },
-                    1.2,
-                    color,
-                );
+                ];
+                self.draw_clean_polyline(cx, &pts, false, 2.0, color);
             }
             NoteTool::Line => {
                 self.draw_segment(cx, Vec2d { x: x0, y: y1 }, Vec2d { x: x1, y: y0 }, w, color);
@@ -2558,9 +2545,27 @@ impl CanvasPanel {
                 self.draw_clean_polyline(cx, &pts, false, w, color);
             }
             NoteTool::Text => {
+                // "A" glyph flanked by a text I-beam (reference style).
                 self.draw_title.color = vec4f(color);
                 self.draw_title
-                    .draw_abs(cx, r.pos + Vec2d { x: 9.0, y: 4.0 }, "T");
+                    .draw_abs(cx, r.pos + Vec2d { x: 8.0, y: 3.0 }, "A");
+                // I-beam: top and bottom serifs with a vertical stem.
+                let bx = x1 - 2.0;
+                self.draw_segment(
+                    cx,
+                    Vec2d { x: bx - 2.0, y: y0 },
+                    Vec2d { x: bx + 2.0, y: y0 },
+                    w,
+                    color,
+                );
+                self.draw_segment(
+                    cx,
+                    Vec2d { x: bx - 2.0, y: y1 },
+                    Vec2d { x: bx + 2.0, y: y1 },
+                    w,
+                    color,
+                );
+                self.draw_segment(cx, Vec2d { x: bx, y: y0 }, Vec2d { x: bx, y: y1 }, w, color);
             }
             NoteTool::Eraser => {
                 let ang = -0.6f64;
