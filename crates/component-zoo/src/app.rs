@@ -25,6 +25,7 @@ use makepad_component::widgets::MpSkeletonWidgetWidgetRefExt;
 use makepad_component::widgets::MpSliderWidgetRefExt;
 use makepad_component::widgets::MpStepperWidgetRefExt;
 use makepad_component::widgets::MpSplitPaneWidgetRefExt;
+use makepad_component::widgets::MpStepRowWidgetRefExt;
 use makepad_component::widgets::MpRatingWidgetRefExt;
 use makepad_component::widgets::MpSwitchWidgetRefExt;
 use makepad_component::widgets::MpTabWidgetRefExt;
@@ -4844,6 +4845,36 @@ startup() do #(App::script_component(vm)){
                         }
                     }
 
+                    // ===== Status Section =====
+                    View{
+                        width: Fill, height: Fit,
+                        flow: Down,
+                        spacing: 16,
+
+                        SectionHeader{ text: "Status" }
+
+                        demo_step_row_1 := mod.widgets.MpStepRow{}
+                        demo_step_row_2 := mod.widgets.MpStepRow{}
+
+                        demo_step_output := mod.widgets.MpStepOutput{
+                            output_label := {
+                                text: "$ cargo build --release\n   Compiling makepad-component v0.1.0\n    Finished release in 42.31s"
+                            }
+                        }
+
+                        demo_error_strip := mod.widgets.MpErrorStrip{
+                            message_label := {
+                                text: "Build failed: unresolved import `gemini_live` in crates/gemini-talker"
+                            }
+                        }
+
+                        demo_warning_strip := mod.widgets.MpWarningStrip{
+                            message_label := {
+                                text: "4 warnings emitted (unused imports)"
+                            }
+                        }
+                    }
+
                     // ============================================================
                     // Shader Page - Shadertoy-style fractal effect
                     // ============================================================
@@ -6725,6 +6756,21 @@ impl MatchEvent for App {
 
         // Rating demo: initial value
         self.ui.mp_rating(cx, ids!(demo_rating)).set_value(cx, 3);
+
+        self.ui.mp_step_row(cx, ids!(demo_step_row_1)).set_step(
+            cx,
+            "○",
+            "Install dependencies",
+            "cargo fetch · crates.io",
+            "3.2s",
+        );
+        self.ui.mp_step_row(cx, ids!(demo_step_row_2)).set_step(
+            cx,
+            "✕",
+            "Run tests",
+            "makepad-component::a2ui",
+            "1 failed",
+        );
 
         // Toggle group demo: items + initial selection
         self.ui

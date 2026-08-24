@@ -54,6 +54,7 @@ pub mod textarea;
 pub mod theme_state;
 pub mod toggle;
 pub mod scaffolding;
+pub mod status;
 pub mod toggle_group;
 pub mod tooltip;
 pub mod tree;
@@ -97,6 +98,7 @@ pub use sheet::*;
 pub use skeleton::*;
 pub use option_card::*;
 pub use scaffolding::*;
+pub use status::*;
 pub use stat_card::*;
 pub use slider::*;
 pub use split_pane::*;
@@ -172,6 +174,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::widgets::toggle_group::script_mod(vm);
     crate::widgets::option_card::script_mod(vm);
     crate::widgets::scaffolding::script_mod(vm);
+    crate::widgets::status::script_mod(vm);
     crate::widgets::tooltip::script_mod(vm);
     crate::widgets::tree::script_mod(vm);
 }
