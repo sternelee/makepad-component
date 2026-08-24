@@ -54,20 +54,21 @@ capturable were screenshot-confirmed.
 - Consistent spacing/typography scale across cards, command bar, status.
 - Note/browser card polish (need content to render/verify).
 
-## Reflection (iteration 4)
+## Reflection (iteration 7)
 
-Accomplished 10 committed improvements spanning the toolbar, terminal cards, and
-empty-canvas onboarding. The one-improvement-per-iteration + commit + keep-tests-
-green pattern is working well; the improvements stay cohesive with the CNVS
-hand-drawn aesthetic.
+Accomplished 13 committed improvements covering every card type (terminal,
+note, music, browser), the toolbar, workspace tabs, shadows, and empty-canvas
+onboarding. The pattern of one focused change, verified by `cargo +stable
+check` + `cargo +stable test` (11/11) + fmt, then committed, is working well;
+every change reuses existing helpers/constants (PAL_ACCENT, draw_filled_disc,
+draw_sketch_ellipse) and stays cohesive with the hand-drawn CNVS aesthetic.
 
-The main blocker is GUI screenshot capture: the Metal/CEF window persistently
-won't composite into `screencapture` here. So I bias toward improvements that
-are logically verifiable (layout math, state-driven rendering, conditional
-drawing) and low-risk, and rely on `cargo +stable test` (11/11) + fmt + code
-review for confirmation, flagging visual look for a manual check.
+Screenshot capture remains blocked (Metal/CEF window won't composite into
+screencapture here). One compile error last iteration (stale `btn_rect`
+reference) was caught by `cargo +stable check` before commit — running check
+first is essential. I'll keep favoring Rust-controllable, logically-
+verifiable changes and run `cargo +stable check` before every commit.
 
-Next priorities: keep favoring Rust-controllable changes; avoid subjective
-styling that needs pixel-perfect screenshot confirmation. Candidates:
-command-bar focus/placeholder contrast (DSL), status-bar dynamism, card
-hover/shadow tuning, note/browser card polish.
+Next priorities: the `hovered` state is already tracked, so a card hover
+affordance (highlight on hover) is state-driven and verifiable by code review;
+status-bar dynamism via `status()`; browser-card polish.
