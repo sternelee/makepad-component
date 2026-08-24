@@ -45,6 +45,8 @@ All changes committed to dev. Each verified with `cargo +stable test` (11/11),
     the active swatch, more readable neutral rings on the rest.
 21. Fix empty-hint to also hide when items are docked/minimized (it only
     checked on-canvas items + shapes).
+22. Show zoom level in the status bar when the user zooms via /zoom
+    (e.g. "Zoom: 150%").
 
 ## Screenshot-verification caveat
 
