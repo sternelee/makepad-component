@@ -29,6 +29,7 @@ use makepad_component::widgets::MpSwitchWidgetRefExt;
 use makepad_component::widgets::MpTabWidgetRefExt;
 use makepad_component::widgets::MpTableWidgetRefExt;
 use makepad_component::widgets::MpTreeWidgetRefExt;
+use makepad_component::widgets::MpToggleGroupWidgetRefExt;
 use makepad_component::widgets::TableColumn;
 use makepad_component::widgets::TreeItem;
 use makepad_widgets::*;
@@ -4747,6 +4748,35 @@ startup() do #(App::script_component(vm)){
                         }
                     }
 
+                    mod.widgets.MpDivider {}
+
+                    // ===== Toggle Group Section =====
+                    View {
+                        width: Fill, height: Fit,
+                        flow: Down,
+                        spacing: 16,
+
+                        SectionHeader{ text: "Toggle Group" }
+
+                        View {
+                            width: Fit, height: Fit,
+                            flow: Down,
+                            spacing: 8,
+
+                            SubsectionLabel{ text: "Segmented single-select" }
+
+                            demo_toggle_group := mod.widgets.MpToggleGroup{}
+
+                            toggle_group_status := Label{
+                                draw_text +: {
+                                    text_style: theme.font_regular{ font_size: 12.0 }
+                                    color: TEXT_MUTED
+                                }
+                                text: "Selected: none"
+                            }
+                        }
+                    }
+
                     // ============================================================
                     // Shader Page - Shadertoy-style fractal effect
                     // ============================================================
@@ -6628,6 +6658,22 @@ impl MatchEvent for App {
 
         // Rating demo: initial value
         self.ui.mp_rating(cx, ids!(demo_rating)).set_value(cx, 3);
+
+        // Toggle group demo: items + initial selection
+        self.ui
+            .mp_toggle_group(cx, ids!(demo_toggle_group))
+            .set_items(
+                cx,
+                &[
+                    "Day".to_string(),
+                    "Week".to_string(),
+                    "Month".to_string(),
+                    "Year".to_string(),
+                ],
+            );
+        self.ui
+            .mp_toggle_group(cx, ids!(demo_toggle_group))
+            .set_selected(cx, 1);
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -7327,6 +7373,13 @@ impl MatchEvent for App {
             self.ui
                 .label(cx, ids!(split_status))
                 .set_text(cx, &format!("Left width: {:.0}", width));
+        }
+
+        // Toggle group demo: selection change
+        if let Some(index) = self.ui.mp_toggle_group(cx, ids!(demo_toggle_group)).selected(actions) {
+            self.ui
+                .label(cx, ids!(toggle_group_status))
+                .set_text(cx, &format!("Selected: {}", index));
         }
 
         // Rating demo: star change

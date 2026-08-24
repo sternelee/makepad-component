@@ -13,10 +13,11 @@ script_mod! {
     mod.widgets.MpSelectTriggerBase = #(MpSelectTrigger::register_widget(vm))
     mod.widgets.MpSelectTrigger = set_type_default() do mod.widgets.MpSelectTriggerBase{
         width: Fill
-        height: 36
-        padding: Inset{left: 12, right: 12, top: 0, bottom: 0}
+        height: 32
+        padding: Inset{left: 10, right: 10, top: 0, bottom: 0}
         align: Align{x: 0.0, y: 0.5}
         flow: Right
+        spacing: 8.0
 
 
 
@@ -25,7 +26,7 @@ script_mod! {
             bg_hover: instance(ELEMENT_HOVER)
             border_color: instance(BORDER)
             focus_color: instance(ACCENT)
-            radius: instance(6.0)
+            radius: instance(8.0)
             has_focus: instance(0.0)
             hover: instance(0.0)
             border_width: instance(1.0)

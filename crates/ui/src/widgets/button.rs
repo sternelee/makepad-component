@@ -11,10 +11,10 @@ script_mod! {
         width: Fit
         height: Fit
         align: Align{x: 0.5, y: 0.5}
-        padding: Inset{left: 16.0, right: 16.0, top: 8.0, bottom: 8.0}
+        padding: Inset{left: 12.0, right: 12.0, top: 6.0, bottom: 6.0}
 
         draw_bg +: {
-            radius: instance(6.0)
+            radius: instance(8.0)
             border_width: instance(0.0)
             border_color: instance(#x0000)
             hover: instance(0.0)

@@ -52,6 +52,7 @@ pub mod text;
 pub mod textarea;
 pub mod theme_state;
 pub mod toggle;
+pub mod toggle_group;
 pub mod tooltip;
 pub mod tree;
 
@@ -104,6 +105,7 @@ pub use text::*;
 pub use textarea::*;
 pub use theme_state::*;
 pub use toggle::*;
+pub use toggle_group::*;
 pub use tooltip::*;
 pub use tree::*;
 // dropdown, list are style-only (pure script_mod!, no Rust struct)
@@ -163,6 +165,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::widgets::textarea::script_mod(vm);
     crate::widgets::theme_state::script_mod(vm);
     crate::widgets::toggle::script_mod(vm);
+    crate::widgets::toggle_group::script_mod(vm);
     crate::widgets::tooltip::script_mod(vm);
     crate::widgets::tree::script_mod(vm);
 }
