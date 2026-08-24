@@ -26,6 +26,8 @@ All changes committed to dev. Each verified with `cargo +stable test` (11/11),
     fade smoothly, replacing the 4-layer harsher one.
 12. Accent the active workspace tab: amber underline along its bottom edge
     + accent-colored label, so the current space is unmistakable.
+13. Round the music player play/pause button (filled disc + sketchy ring),
+    matching the round avatar chip; progress bar offset from the circle edge.
 
 ## Screenshot-verification caveat
 
