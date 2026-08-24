@@ -3166,7 +3166,24 @@ impl CanvasPanel {
                 },
             );
             self.draw_border_rect(cx, tab_rect, TAB_BORDER);
-            self.draw_title.color = vec4f(TITLE_TEXT);
+            if active {
+                // Accent underline marks the active workspace clearly.
+                self.draw_item_bg_rect(
+                    cx,
+                    Rect {
+                        pos: Vec2d {
+                            x: tab_rect.pos.x,
+                            y: tab_rect.pos.y + tab_rect.size.y - 2.5,
+                        },
+                        size: Vec2d {
+                            x: tab_rect.size.x,
+                            y: 2.5,
+                        },
+                    },
+                    PAL_ACCENT,
+                );
+            }
+            self.draw_title.color = vec4f(if active { PAL_ACCENT } else { TITLE_TEXT });
             self.draw_title
                 .draw_abs(cx, tab_rect.pos + Vec2d { x: 12.0, y: 5.0 }, &label);
             x += tab_w + 6.0;
