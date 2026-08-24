@@ -22,6 +22,7 @@ use makepad_component::widgets::MpSkeletonWidgetWidgetRefExt;
 use makepad_component::widgets::MpSliderWidgetRefExt;
 use makepad_component::widgets::MpStepperWidgetRefExt;
 use makepad_component::widgets::MpSplitPaneWidgetRefExt;
+use makepad_component::widgets::MpRatingWidgetRefExt;
 use makepad_component::widgets::MpSwitchWidgetRefExt;
 use makepad_component::widgets::MpTabWidgetRefExt;
 use makepad_component::widgets::MpTableWidgetRefExt;
@@ -4651,6 +4652,37 @@ startup() do #(App::script_component(vm)){
                                 }
                             }
                         }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Rating Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Rating" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Click a star" }
+
+                                demo_rating := mod.widgets.MpRating{
+                                    value: 3
+                                }
+
+                                rating_status := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{ font_size: 12.0 }
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Rating: 3"
+                                }
+                            }
+                        }
                     }
 
                     // ============================================================
@@ -6531,6 +6563,9 @@ impl MatchEvent for App {
         self.ui
             .mp_menu_bar(cx, ids!(demo_menu_bar))
             .set_items(cx, 2, &["Zoom In".to_string(), "Zoom Out".to_string()]);
+
+        // Rating demo: initial value
+        self.ui.mp_rating(cx, ids!(demo_rating)).set_value(cx, 3);
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -7230,6 +7265,13 @@ impl MatchEvent for App {
             self.ui
                 .label(cx, ids!(split_status))
                 .set_text(cx, &format!("Left width: {:.0}", width));
+        }
+
+        // Rating demo: star change
+        if let Some(value) = self.ui.mp_rating(cx, ids!(demo_rating)).changed(actions) {
+            self.ui
+                .label(cx, ids!(rating_status))
+                .set_text(cx, &format!("Rating: {}", value));
         }
     }
 }
