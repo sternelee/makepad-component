@@ -3054,28 +3054,26 @@ impl CanvasPanel {
             if close_hov { BTN_CLOSE_HOVER } else { BTN_BG },
         );
         self.draw_border_rect(cx, close_r, BTN_BORDER);
-        self.draw_cursor.color = Vec4f {
-            x: 0.9,
-            y: 0.85,
-            z: 0.85,
-            w: 1.0,
-        };
-        let x1 = Rect {
-            pos: close_r.pos + Vec2d { x: 6.0, y: 5.0 },
-            size: Vec2d {
-                x: close_r.size.x - 12.0,
-                y: 2.0,
-            },
-        };
-        self.draw_cursor.draw_abs(cx, x1);
-        let x2 = Rect {
-            pos: close_r.pos + Vec2d { x: 6.0, y: 11.0 },
-            size: Vec2d {
-                x: close_r.size.x - 12.0,
-                y: 2.0,
-            },
-        };
-        self.draw_cursor.draw_abs(cx, x2);
+        // Proper “×”: two diagonal strokes corner-to-corner.
+        let close_color = [0.90, 0.55, 0.52, 1.0];
+        let in_x = close_r.pos.x + 6.0;
+        let in_y = close_r.pos.y + 5.0;
+        let x_max = close_r.pos.x + close_r.size.x - 6.0;
+        let y_max = close_r.pos.y + close_r.size.y - 5.0;
+        self.draw_segment(
+            cx,
+            Vec2d { x: in_x, y: in_y },
+            Vec2d { x: x_max, y: y_max },
+            1.8,
+            close_color,
+        );
+        self.draw_segment(
+            cx,
+            Vec2d { x: x_max, y: in_y },
+            Vec2d { x: in_x, y: y_max },
+            1.8,
+            close_color,
+        );
     }
 
     /// Draw the bottom dock tray with minimized-item chips.
