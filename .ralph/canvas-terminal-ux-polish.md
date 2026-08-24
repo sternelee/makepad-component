@@ -47,3 +47,21 @@ capturable were screenshot-confirmed.
 - Card hover affordances and shadow tuning.
 - Consistent spacing/typography scale across cards, command bar, status.
 - Note/browser card polish (need content to render/verify).
+
+## Reflection (iteration 4)
+
+Accomplished 10 committed improvements spanning the toolbar, terminal cards, and
+empty-canvas onboarding. The one-improvement-per-iteration + commit + keep-tests-
+green pattern is working well; the improvements stay cohesive with the CNVS
+hand-drawn aesthetic.
+
+The main blocker is GUI screenshot capture: the Metal/CEF window persistently
+won't composite into `screencapture` here. So I bias toward improvements that
+are logically verifiable (layout math, state-driven rendering, conditional
+drawing) and low-risk, and rely on `cargo +stable test` (11/11) + fmt + code
+review for confirmation, flagging visual look for a manual check.
+
+Next priorities: keep favoring Rust-controllable changes; avoid subjective
+styling that needs pixel-perfect screenshot confirmation. Candidates:
+command-bar focus/placeholder contrast (DSL), status-bar dynamism, card
+hover/shadow tuning, note/browser card polish.
