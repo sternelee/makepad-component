@@ -1970,14 +1970,24 @@ impl CanvasPanel {
         name: &str,
         bg: [f32; 4],
     ) {
-        const SIZE: f64 = 18.0;
-        let rect = Rect {
-            pos,
-            size: Vec2d { x: SIZE, y: SIZE },
-        };
-        self.draw_item_bg_rect(cx, rect, bg);
-        // Slight border to define the chip.
-        self.draw_border_rect(cx, rect, [1.0, 1.0, 1.0, 0.2]);
+        const SIZE: f64 = 20.0;
+        let center = pos
+            + Vec2d {
+                x: SIZE * 0.5,
+                y: SIZE * 0.5,
+            };
+        // Circular avatar chip with a soft ring.
+        self.draw_filled_disc(cx, center, SIZE * 0.5, bg);
+        self.draw_sketch_ellipse(
+            cx,
+            center,
+            SIZE * 0.5 - 0.5,
+            SIZE * 0.5 - 0.5,
+            1.0,
+            [1.0, 1.0, 1.0, 0.22],
+            0,
+            0.35,
+        );
         let initial: String = name
             .chars()
             .filter(|c| c.is_alphabetic())
@@ -1985,9 +1995,9 @@ impl CanvasPanel {
             .collect::<String>()
             .to_uppercase();
         if !initial.is_empty() {
-            self.draw_title.color = vec4f([1.0, 1.0, 1.0, 0.9]);
+            self.draw_title.color = vec4f([1.0, 1.0, 1.0, 0.92]);
             self.draw_title
-                .draw_abs(cx, pos + Vec2d { x: 5.0, y: 2.0 }, &initial);
+                .draw_abs(cx, pos + Vec2d { x: 6.0, y: 3.0 }, &initial);
         }
     }
 
@@ -3350,6 +3360,23 @@ impl CanvasPanel {
             Ok(g) => g,
             Err(_) => return,
         };
+
+        // Subtle divider between the title bar and the terminal grid.
+        let div_y = screen.pos.y + 28.0;
+        self.draw_item_bg_rect(
+            cx,
+            Rect {
+                pos: Vec2d {
+                    x: screen.pos.x + 6.0,
+                    y: div_y,
+                },
+                size: Vec2d {
+                    x: screen.size.x - 12.0,
+                    y: 1.0,
+                },
+            },
+            [0.20, 0.24, 0.32, 0.8],
+        );
 
         // Content area (below the title bar, inside the item border).
         let origin = screen.pos + Vec2d { x: 6.0, y: 30.0 };
