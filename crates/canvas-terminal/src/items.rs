@@ -54,6 +54,24 @@ pub enum NoteTool {
     Eraser,
 }
 
+impl NoteTool {
+    /// Human-readable label (used in the status bar when the tool changes).
+    pub fn label(self) -> &'static str {
+        match self {
+            NoteTool::Move => "Select/Move",
+            NoteTool::Arrow => "Arrow",
+            NoteTool::Pen => "Pen",
+            NoteTool::Line => "Line",
+            NoteTool::Rect => "Rectangle",
+            NoteTool::Circle => "Circle",
+            NoteTool::Ellipse => "Ellipse",
+            NoteTool::Polyline => "Polyline",
+            NoteTool::Text => "Text",
+            NoteTool::Eraser => "Eraser",
+        }
+    }
+}
+
 /// A completed (or in-progress) drawing on a note whiteboard.
 #[derive(Clone, Debug, PartialEq)]
 pub enum NoteShape {

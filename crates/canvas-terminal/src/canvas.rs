@@ -4018,6 +4018,7 @@ impl Widget for CanvasPanel {
                             }
                             self.hovered_shape = None;
                             self.tool = Self::note_tools()[idx];
+                            self.status(cx, &format!("Tool: {}", self.tool.label()));
                         }
                         PaletteHit::Color(idx) => {
                             self.ink_color_idx = idx;
