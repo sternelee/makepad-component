@@ -39,6 +39,8 @@ All changes committed to dev. Each verified with `cargo +stable test` (11/11),
     now a proper × (two diagonal strokes) in soft red.
 18. Round the music progress bar fill (a disc at the fill's leading edge),
     matching the circular play button and round avatar chip.
+19. Dim inactive terminal title/status (×0.7), consistent with the dimmed
+    grid and hidden cursor on non-focused cards.
 
 ## Screenshot-verification caveat
 
