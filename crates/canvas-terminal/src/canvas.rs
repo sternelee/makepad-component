@@ -2881,24 +2881,40 @@ impl CanvasPanel {
             };
             self.draw_filled_disc(cx, center, Self::PAL_SWATCH * 0.5 - 1.0, *c);
             if i == self.ink_color_idx {
+                // Active swatch: solid accent ring + soft glow.
                 self.draw_sketch_ellipse(
                     cx,
                     center,
                     Self::PAL_SWATCH * 0.5 + 2.0,
                     Self::PAL_SWATCH * 0.5 + 2.0,
-                    1.3,
+                    1.4,
                     PAL_ACCENT,
                     400 + i as u32,
                     0.35,
                 );
+                self.draw_glow_border(
+                    cx,
+                    Rect {
+                        pos: Vec2d {
+                            x: center.x - Self::PAL_SWATCH * 0.5,
+                            y: center.y - Self::PAL_SWATCH * 0.5,
+                        },
+                        size: Vec2d {
+                            x: Self::PAL_SWATCH,
+                            y: Self::PAL_SWATCH,
+                        },
+                    },
+                    PAL_ACCENT,
+                );
             } else {
+                // Inactive swatch: readable neutral ring.
                 self.draw_sketch_ellipse(
                     cx,
                     center,
                     Self::PAL_SWATCH * 0.5,
                     Self::PAL_SWATCH * 0.5,
                     0.8,
-                    [0.30, 0.34, 0.44, 0.6],
+                    [0.34, 0.38, 0.50, 0.75],
                     500 + i as u32,
                     0.35,
                 );
