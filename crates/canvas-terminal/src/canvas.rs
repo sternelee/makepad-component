@@ -3687,35 +3687,45 @@ impl CanvasPanel {
         let inner_x = screen.pos.x + pad;
         let inner_w = (screen.size.x - pad * 2.0).max(1.0);
 
-        // Play / pause button.
+        // Play / pause button (circular, matching the round avatar chip).
         let btn_size = 36.0;
-        let btn_rect = Rect {
-            pos: Vec2d {
-                x: inner_x,
-                y: body_y + body_h * 0.5 - btn_size * 0.5,
-            },
-            size: Vec2d {
-                x: btn_size,
-                y: btn_size,
-            },
+        let btn_c = Vec2d {
+            x: inner_x + btn_size * 0.5,
+            y: body_y + body_h * 0.5,
         };
-        self.draw_item_bg_rect(
+        self.draw_filled_disc(
             cx,
-            btn_rect,
+            btn_c,
+            btn_size * 0.5,
             if playing {
                 MUSIC_ACCENT
             } else {
                 MUSIC_PROGRESS_BG
             },
         );
-        self.draw_border_rect(cx, btn_rect, MUSIC_BORDER);
+        self.draw_sketch_ellipse(
+            cx,
+            btn_c,
+            btn_size * 0.5 - 0.5,
+            btn_size * 0.5 - 0.5,
+            1.0,
+            MUSIC_BORDER,
+            id as u32,
+            0.35,
+        );
         self.draw_title.color = vec4f(MUSIC_TEXT);
         let icon = if playing { "❚❚" } else { "▶" };
-        self.draw_title
-            .draw_abs(cx, btn_rect.pos + Vec2d { x: 10.0, y: 8.0 }, icon);
+        self.draw_title.draw_abs(
+            cx,
+            Vec2d {
+                x: btn_c.x - 8.0,
+                y: btn_c.y - 9.0,
+            },
+            icon,
+        );
 
         // Progress bar to the right of the button.
-        let bar_x = btn_rect.pos.x + btn_rect.size.x + 14.0;
+        let bar_x = btn_c.x + btn_size * 0.5 + 14.0;
         let bar_w = (inner_x + inner_w - bar_x - 8.0).max(1.0);
         let bar_h = 6.0;
         let bar_y = body_y + body_h * 0.5 - bar_h * 0.5 - 10.0;
