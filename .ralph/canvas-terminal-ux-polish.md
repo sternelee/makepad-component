@@ -33,6 +33,8 @@ All changes committed to dev. Each verified with `cargo +stable test` (11/11),
     clear without competing with the selection glow.
 15. Browser card chrome/page divider: a subtle line between the browser
     chrome and the page area, matching the terminal-card divider.
+16. Show active tool in status bar: add `NoteTool::label()` and update the
+    bottom status text on tool change (e.g. "Tool: Rectangle").
 
 ## Screenshot-verification caveat
 
