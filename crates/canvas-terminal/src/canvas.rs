@@ -1932,10 +1932,11 @@ impl CanvasPanel {
 
     /// Draw a soft drop shadow behind `rect` using a few offset translucent
     /// quads. Kept simple (no blur) to stay within DrawColor and avoid the
-    /// DrawQuad-pixel-shader text corruption issue.
+    /// DrawQuad-pixel-shader text corruption issue. The shadow is offset
+    /// slightly down-right and fades out smoothly (not too harsh up close).
     fn draw_shadow_rect(&mut self, cx: &mut Cx2d, rect: Rect) {
-        let offsets = [2.0, 5.0, 9.0, 14.0];
-        let alphas = [0.18, 0.10, 0.05, 0.02];
+        let offsets = [2.0, 4.0, 7.0, 11.0, 16.0, 22.0];
+        let alphas = [0.10, 0.07, 0.05, 0.03, 0.02, 0.012];
         for (i, off) in offsets.iter().enumerate() {
             let a = alphas[i];
             let r = Rect {
