@@ -1434,6 +1434,7 @@ impl CanvasPanel {
                 self.camera
                     .zoom_at(factor, self.viewport * 0.5, self.world_viewport());
                 self.redraw(cx);
+                self.status(cx, &format!("Zoom: {:.0}%", self.camera.zoom * 100.0));
             }
             Command::Help => {
                 self.status(
