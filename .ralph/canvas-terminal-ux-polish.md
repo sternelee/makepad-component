@@ -35,6 +35,8 @@ All changes committed to dev. Each verified with `cargo +stable test` (11/11),
     chrome and the page area, matching the terminal-card divider.
 16. Show active tool in status bar: add `NoteTool::label()` and update the
     bottom status text on tool change (e.g. "Tool: Rectangle").
+17. Fix the card close button glyph: it was two parallel bars (reads as "=");
+    now a proper × (two diagonal strokes) in soft red.
 
 ## Screenshot-verification caveat
 
