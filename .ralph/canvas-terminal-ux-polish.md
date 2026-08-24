@@ -61,21 +61,18 @@ capturable were screenshot-confirmed.
 - Consistent spacing/typography scale across cards, command bar, status.
 - Note/browser card polish (need content to render/verify).
 
-## Reflection (iteration 7)
+## Reflection (iteration 10)
 
-Accomplished 13 committed improvements covering every card type (terminal,
-note, music, browser), the toolbar, workspace tabs, shadows, and empty-canvas
-onboarding. The pattern of one focused change, verified by `cargo +stable
-check` + `cargo +stable test` (11/11) + fmt, then committed, is working well;
-every change reuses existing helpers/constants (PAL_ACCENT, draw_filled_disc,
-draw_sketch_ellipse) and stays cohesive with the hand-drawn CNVS aesthetic.
+Accomplished 16 committed improvements. Every card type (terminal, note,
+music, browser), the toolbar, workspace tabs, shadows, empty-canvas onboarding,
+hover, and dynamic status bar are polished. The focused-change + verify
+(check/test/fmt) + commit pattern is proven; all changes reuse existing
+helpers/constants and stay cohesive.
 
-Screenshot capture remains blocked (Metal/CEF window won't composite into
-screencapture here). One compile error last iteration (stale `btn_rect`
-reference) was caught by `cargo +stable check` before commit — running check
-first is essential. I'll keep favoring Rust-controllable, logically-
-verifiable changes and run `cargo +stable check` before every commit.
-
-Next priorities: the `hovered` state is already tracked, so a card hover
-affordance (highlight on hover) is state-driven and verifiable by code review;
-status-bar dynamism via `status()`; browser-card polish.
+The main constraint remains screenshot capture (Metal/CEF window won't
+composite into screencapture). Remaining candidate areas are increasingly
+subjective or DSL-bound (note-card layout, suggestion-dropdown styling,
+typography scale), which are hard to verify without visual confirmation. So I
+will favor any remaining improvements that are strongly logically-verifiable
+and low-risk, and stop when those are exhausted rather than churn subjective
+styling I can't see.
