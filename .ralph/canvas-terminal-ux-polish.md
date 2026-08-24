@@ -43,6 +43,8 @@ All changes committed to dev. Each verified with `cargo +stable test` (11/11),
     grid and hidden cursor on non-focused cards.
 20. Clarify color-swatch active state: thicker accent ring + soft glow on
     the active swatch, more readable neutral rings on the rest.
+21. Fix empty-hint to also hide when items are docked/minimized (it only
+    checked on-canvas items + shapes).
 
 ## Screenshot-verification caveat
 
