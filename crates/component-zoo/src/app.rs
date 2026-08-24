@@ -16,6 +16,7 @@ use makepad_component::widgets::MpMenuBarWidgetRefExt;
 use makepad_component::widgets::MpNotificationWidgetWidgetRefExt;
 use makepad_component::widgets::MpPopoverWidgetWidgetRefExt;
 use makepad_component::widgets::MpProgressRingWidgetRefExt;
+use makepad_component::widgets::MpOptionCardWidgetRefExt;
 use makepad_component::widgets::MpProgressWidgetRefExt;
 use makepad_component::widgets::MpRadioWidgetRefExt;
 use makepad_component::widgets::MpSheetTriggerWidgetRefExt;
@@ -4777,6 +4778,72 @@ startup() do #(App::script_component(vm)){
                         }
                     }
 
+                    // ===== Scaffolding Section =====
+                    View {
+                        width: Fill, height: Fit,
+                        flow: Down,
+                        spacing: 16,
+
+                        SectionHeader{ text: "Scaffolding" }
+
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 8,
+
+                            demo_page_header := mod.widgets.MpPageHeader{
+                                title := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_bold{font_size: 20.0}
+                                        color: TEXT
+                                    }
+                                    text: "Project Settings"
+                                }
+                                subtitle := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{font_size: 13.0}
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Configure how this project builds and deploys"
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpGroupBox{
+                            width: 480
+
+                            content := View{
+                                width: Fill, height: Fit,
+                                flow: Right,
+                                spacing: 8,
+
+                                option_card_1 := mod.widgets.MpOptionCard{
+                                    width: 150
+                                    text: "Standard"
+                                    meta_text: "2 vCPU / 4 GB"
+                                }
+                                option_card_2 := mod.widgets.MpOptionCard{
+                                    width: 150
+                                    text: "Performance"
+                                    meta_text: "4 vCPU / 16 GB"
+                                }
+                                option_card_3 := mod.widgets.MpOptionCard{
+                                    width: 150
+                                    text: "Enterprise"
+                                    meta_text: "Custom"
+                                }
+                            }
+                        }
+
+                        scaffolding_status := Label{
+                            draw_text +: {
+                                text_style: theme.font_regular{ font_size: 12.0 }
+                                color: TEXT_MUTED
+                            }
+                            text: "Selected: none"
+                        }
+                    }
+
                     // ============================================================
                     // Shader Page - Shadertoy-style fractal effect
                     // ============================================================
@@ -6674,6 +6741,11 @@ impl MatchEvent for App {
         self.ui
             .mp_toggle_group(cx, ids!(demo_toggle_group))
             .set_selected(cx, 1);
+
+        // Option card demo: preselect first plan
+        self.ui
+            .mp_option_card(cx, ids!(option_card_1))
+            .set_selected(cx, true);
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -7380,6 +7452,28 @@ impl MatchEvent for App {
             self.ui
                 .label(cx, ids!(toggle_group_status))
                 .set_text(cx, &format!("Selected: {}", index));
+        }
+
+        // Option card demo: exclusive selection
+        for (i, name) in ["option_card_1", "option_card_2", "option_card_3"]
+            .iter()
+            .enumerate()
+        {
+            let key = makepad_widgets::LiveId::from_str(name);
+            if self.ui.mp_option_card(cx, &[key]).clicked(actions) {
+                for (j, name2) in ["option_card_1", "option_card_2", "option_card_3"]
+                    .iter()
+                    .enumerate()
+                {
+                    let key2 = makepad_widgets::LiveId::from_str(name2);
+                    self.ui
+                        .mp_option_card(cx, &[key2])
+                        .set_selected(cx, i == j);
+                }
+                self.ui
+                    .label(cx, ids!(scaffolding_status))
+                    .set_text(cx, &format!("Selected: {}", name.replace("option_card_", "Plan ")));
+            }
         }
 
         // Rating demo: star change
