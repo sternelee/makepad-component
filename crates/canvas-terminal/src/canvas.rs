@@ -1800,7 +1800,16 @@ impl CanvasPanel {
         let sub = "⌘ ＋  or  /new terminal  /new note  /new browser";
         // Approximate glyph advance for the bold font at each scale.
         let avg = |s: f64| s * 0.60;
-        // Title (larger, primary), sits above the sub-hint.
+        // Small accent “＋” badge above the title, echoing the menu button.
+        let badge_c = Vec2d {
+            x: cx_pos,
+            y: cy - 44.0,
+        };
+        self.draw_sketch_ellipse(cx, badge_c, 13.0, 13.0, 1.3, PAL_ACCENT, 777, 0.4);
+        self.draw_title.font_scale = 1.2;
+        self.draw_title.color = vec4f([0.98, 0.72, 0.28, 0.9]);
+        self.draw_title
+            .draw_abs(cx, badge_c - Vec2d { x: 4.0, y: -8.0 }, "＋");
         self.draw_title.font_scale = 1.5;
         let w1 = title.len() as f64 * avg(13.0) * 1.5;
         self.draw_title.color = vec4f([0.94, 0.96, 1.0, 0.6]);
@@ -1941,11 +1950,11 @@ impl CanvasPanel {
     /// translucent quads to fake a soft outer glow.
     fn draw_glow_border(&mut self, cx: &mut Cx2d, rect: Rect, color: [f32; 4]) {
         let layers = [
-            (14.0, 0.03),
-            (10.0, 0.06),
-            (6.0, 0.10),
-            (3.0, 0.18),
-            (1.5, 0.55),
+            (16.0, 0.02),
+            (11.0, 0.04),
+            (7.0, 0.07),
+            (3.5, 0.12),
+            (1.5, 0.45),
         ];
         for (pad, alpha) in layers {
             let r = Rect {
