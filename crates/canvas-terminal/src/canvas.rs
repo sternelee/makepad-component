@@ -3349,7 +3349,8 @@ impl CanvasPanel {
         self.draw_item_bg_rect(cx, screen, TERM_BG);
         // Border (DrawColor)
         self.draw_border_rect(cx, screen, if is_sel { SEL_BORDER } else { TERM_BORDER });
-        // Avatar chip + title.
+        // Avatar chip + title (dimmed slightly when the card isn't focused,
+        // consistent with the dimmed grid + hidden cursor).
         let avatar_color = name_color(title);
         self.draw_avatar(
             cx,
@@ -3358,7 +3359,16 @@ impl CanvasPanel {
             avatar_color,
         );
         // Title text (DrawText) - drawn after bg/border but before content
-        self.draw_title.color = vec4f(TITLE_TEXT);
+        self.draw_title.color = vec4f(if is_sel {
+            TITLE_TEXT
+        } else {
+            [
+                TITLE_TEXT[0] * 0.7,
+                TITLE_TEXT[1] * 0.7,
+                TITLE_TEXT[2] * 0.7,
+                1.0,
+            ]
+        });
         self.draw_title.draw_abs(
             cx,
             screen.pos + Vec2d { x: 32.0, y: 6.0 },
@@ -3389,7 +3399,16 @@ impl CanvasPanel {
             },
             status_color,
         );
-        self.draw_title.color = vec4f(MUSIC_SECONDARY);
+        self.draw_title.color = vec4f(if is_sel {
+            MUSIC_SECONDARY
+        } else {
+            [
+                MUSIC_SECONDARY[0] * 0.7,
+                MUSIC_SECONDARY[1] * 0.7,
+                MUSIC_SECONDARY[2] * 0.7,
+                1.0,
+            ]
+        });
         self.draw_title.draw_abs(
             cx,
             Vec2d {
