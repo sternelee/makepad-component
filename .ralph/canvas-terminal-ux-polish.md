@@ -41,6 +41,8 @@ All changes committed to dev. Each verified with `cargo +stable test` (11/11),
     matching the circular play button and round avatar chip.
 19. Dim inactive terminal title/status (×0.7), consistent with the dimmed
     grid and hidden cursor on non-focused cards.
+20. Clarify color-swatch active state: thicker accent ring + soft glow on
+    the active swatch, more readable neutral rings on the rest.
 
 ## Screenshot-verification caveat
 
