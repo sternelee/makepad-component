@@ -5,6 +5,7 @@ use makepad_component::widgets::MpButtonWidgetExt;
 use makepad_component::widgets::MpButtonWidgetRefExt;
 use makepad_component::widgets::MpCardAction;
 use makepad_component::widgets::MpCheckboxWidgetRefExt;
+use makepad_component::widgets::MpChipWidgetRefExt;
 use makepad_component::widgets::MpCollapsibleTriggerWidgetRefExt;
 use makepad_component::widgets::MpContextMenuWidgetRefExt;
 use makepad_component::widgets::MpDropdownMenuWidgetRefExt;
@@ -4683,6 +4684,35 @@ startup() do #(App::script_component(vm)){
                                 }
                             }
                         }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Chips Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Chips" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Right,
+                                spacing: 8,
+
+                                demo_chip1 := mod.widgets.MpChip{ text: "Rust" }
+                                demo_chip2 := mod.widgets.MpChip{ text: "Makepad" }
+                                demo_chip3 := mod.widgets.MpChip{ text: "GPU" }
+                            }
+
+                            chips_status := Label{
+                                draw_text +: {
+                                    text_style: theme.font_regular{ font_size: 12.0 }
+                                    color: TEXT_MUTED
+                                }
+                                text: "Removed: none"
+                            }
+                        }
                     }
 
                     // ============================================================
@@ -7272,6 +7302,16 @@ impl MatchEvent for App {
             self.ui
                 .label(cx, ids!(rating_status))
                 .set_text(cx, &format!("Rating: {}", value));
+        }
+
+        // Chips demo: remove
+        for name in ["demo_chip1", "demo_chip2", "demo_chip3"] {
+            let key = makepad_widgets::LiveId::from_str(name);
+            if let Some(removed) = self.ui.mp_chip(cx, &[key]).removed(actions) {
+                self.ui
+                    .label(cx, ids!(chips_status))
+                    .set_text(cx, &format!("Removed: {}", removed));
+            }
         }
     }
 }
