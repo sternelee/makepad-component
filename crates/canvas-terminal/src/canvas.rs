@@ -3737,7 +3737,7 @@ impl CanvasPanel {
             icon,
         );
 
-        // Progress bar to the right of the button.
+        // Progress bar to the right of the button (rounded ends).
         let bar_x = btn_c.x + btn_size * 0.5 + 14.0;
         let bar_w = (inner_x + inner_w - bar_x - 8.0).max(1.0);
         let bar_h = 6.0;
@@ -3749,14 +3749,20 @@ impl CanvasPanel {
         self.draw_item_bg_rect(cx, bar_bg, MUSIC_PROGRESS_BG);
         let fill_w = (bar_w * progress as f64).max(0.0).min(bar_w);
         if fill_w > 0.0 {
-            let bar_fill = Rect {
+            // Rounded fill: a filled bar plus a disc at the fill's right end.
+            let fill_rect = Rect {
                 pos: bar_bg.pos,
                 size: Vec2d {
                     x: fill_w,
                     y: bar_h,
                 },
             };
-            self.draw_item_bg_rect(cx, bar_fill, MUSIC_ACCENT);
+            self.draw_item_bg_rect(cx, fill_rect, MUSIC_ACCENT);
+            let cap = Vec2d {
+                x: bar_x + fill_w,
+                y: bar_y + bar_h * 0.5,
+            };
+            self.draw_filled_disc(cx, cap, bar_h * 0.5, MUSIC_ACCENT);
         }
 
         // Time labels.
