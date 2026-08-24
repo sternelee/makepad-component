@@ -15,6 +15,7 @@ use makepad_component::widgets::MpModalWidgetWidgetRefExt;
 use makepad_component::widgets::MpMenuBarWidgetRefExt;
 use makepad_component::widgets::MpNotificationWidgetWidgetRefExt;
 use makepad_component::widgets::MpPopoverWidgetWidgetRefExt;
+use makepad_component::widgets::MpProgressRingWidgetRefExt;
 use makepad_component::widgets::MpProgressWidgetRefExt;
 use makepad_component::widgets::MpRadioWidgetRefExt;
 use makepad_component::widgets::MpSheetTriggerWidgetRefExt;
@@ -4711,6 +4712,37 @@ startup() do #(App::script_component(vm)){
                                     color: TEXT_MUTED
                                 }
                                 text: "Removed: none"
+                            }
+                        }
+                    }
+
+                    mod.widgets.MpDivider {}
+
+                    // ===== Progress Ring Section =====
+                    View {
+                        width: Fill, height: Fit,
+                        flow: Down,
+                        spacing: 16,
+
+                        SectionHeader{ text: "Progress Ring" }
+
+                        View {
+                            width: Fit, height: Fit,
+                            flow: Down,
+                            spacing: 8,
+
+                            SubsectionLabel{ text: "Circular progress" }
+
+                            demo_progress_ring := mod.widgets.MpProgressRing{
+                                progress: 0.65
+                            }
+
+                            ring_status := Label{
+                                draw_text +: {
+                                    text_style: theme.font_regular{ font_size: 12.0 }
+                                    color: TEXT_MUTED
+                                }
+                                text: "Progress: 65%"
                             }
                         }
                     }
