@@ -87,3 +87,21 @@ can't be visually confirmed while screenshot capture is blocked. To avoid
 churning blind styling, I'll stop making purely subjective tweaks. I'll only
 continue if a genuinely logically-verifiable improvement is found; otherwise
 this is the natural end of the verifiable-polish phase.
+
+## Final verification (iteration 16)
+
+The verifiable-polish phase is complete. The remaining candidates (command-bar
+placeholder contrast, typography scale, note-card layout, suggestion-list
+styling) are subjective/DSL-bound and can't be visually confirmed while
+screenshot capture is blocked, so the loop is paused rather than churning blind
+styling.
+
+Externally rerunnable verification (run from repo root):
+
+```bash
+cargo +stable check -p canvas-terminal
+cargo +stable test -p canvas-terminal   # 11 passed
+cargo +stable fmt -p canvas-terminal -- --check
+```
+
+Working tree is clean. All 22 improvements are committed to `dev`.
