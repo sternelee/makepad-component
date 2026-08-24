@@ -73,15 +73,17 @@ capturable were screenshot-confirmed.
 - Consistent spacing/typography scale across cards, command bar, status.
 - Note/browser card polish (need content to render/verify).
 
-## Reflection (iteration 13)
+## Reflection (iteration 16)
 
-19 committed improvements are cross-verified (test 11/11 + fmt + code review).
-The focused-change pattern is effective and every change reuses existing
-helpers/constants, keeping the CNVS hand-drawn aesthetic cohesive.
+22 cross-verified improvements. Coverage is thorough: every card type (terminal,
+note, music, browser), toolbar, workspace tabs, shadows, empty-state, hover,
+focus, status bar (tool + zoom), close-button glyph, and the empty-hint dock
+bug. The focused-change pattern works and every change stays cohesive.
 
-Screenshot capture is still blocked, so candidates are limited to logically-
-verifiable, low-risk changes. At iteration 13 there are still genuine such
-improvements (e.g. the note card editing caret, color-swatch active state), so
-I'll continue with tightly-scoped changes. If I reach a point where only
-subjective styling remains (which I can't visually confirm), I'll note it and
-pause rather than churn blind styling.
+I've now reached the point anticipated in earlier reflections: the remaining
+candidate areas (command-bar placeholder contrast, typography scale, note-card
+layout, suggestion-list styling) are largely subjective or DSL-bound and
+can't be visually confirmed while screenshot capture is blocked. To avoid
+churning blind styling, I'll stop making purely subjective tweaks. I'll only
+continue if a genuinely logically-verifiable improvement is found; otherwise
+this is the natural end of the verifiable-polish phase.
