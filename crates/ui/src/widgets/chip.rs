@@ -18,6 +18,7 @@ script_mod! {
 
         draw_bg +: {
             bg_color: instance(SURFACE_RAISED)
+            bg_hover: instance(ELEMENT_HOVER)
             border_color: instance(BORDER)
             radius: instance(6.0)
             hover: instance(0.0)
@@ -25,7 +26,7 @@ script_mod! {
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, self.radius)
-                let bg = mix(self.bg_color, ELEMENT_HOVER, self.hover)
+                let bg = mix(self.bg_color, self.bg_hover, self.hover)
                 sdf.fill_keep(bg)
                 sdf.stroke(self.border_color, 1.0)
                 return sdf.result

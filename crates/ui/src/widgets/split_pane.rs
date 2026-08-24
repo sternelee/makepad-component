@@ -25,7 +25,7 @@ script_mod! {
             width: 5.0
             height: Fill
             flow: Down
-            cursor: ColResize
+            cursor: MouseCursor.ColResize
 
             show_bg: true
             draw_bg +: {
