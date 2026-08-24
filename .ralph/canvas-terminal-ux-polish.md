@@ -31,6 +31,8 @@ All changes committed to dev. Each verified with `cargo +stable test` (11/11),
 14. Card hover backlight: draw a soft glow around a hovered (non-selected)
     card using the already-tracked `hovered` state, so the mouse target is
     clear without competing with the selection glow.
+15. Browser card chrome/page divider: a subtle line between the browser
+    chrome and the page area, matching the terminal-card divider.
 
 ## Screenshot-verification caveat
 
