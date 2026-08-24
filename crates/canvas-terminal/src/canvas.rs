@@ -2916,13 +2916,27 @@ impl CanvasPanel {
                     y: Self::PAL_WIDTH_BTN_H,
                 },
             };
-            if i == self.ink_width_idx {
-                // Hand-drawn frame marks the active width.
+            let active = i == self.ink_width_idx;
+            if active {
+                // Filled pill + accent frame marks the active width, matching
+                // the active-tool treatment for consistency.
+                self.draw_item_bg_rect(cx, r, [0.30, 0.24, 0.12, 0.95]);
                 self.draw_sketch_rect_outline(cx, r, 1.2, PAL_ACCENT, 600 + i as u32, 0.4);
+            } else {
+                // Subtle neutral pill so the row reads as a tappable preset.
+                self.draw_item_bg_rect(cx, r, [0.17, 0.20, 0.28, 0.7]);
+                self.draw_sketch_rect_outline(
+                    cx,
+                    r,
+                    0.8,
+                    [0.30, 0.34, 0.44, 0.5],
+                    600 + i as u32,
+                    0.4,
+                );
             }
             // Sample stroke across the button, clamped to the button height,
             // drawn with the same sketchy wobble as real strokes.
-            let sw = wd.min(Self::PAL_WIDTH_BTN_H - 4.0);
+            let sw = wd.min(Self::PAL_WIDTH_BTN_H - 6.0);
             let mid = r.pos.y + r.size.y * 0.5;
             self.draw_sketch_segment(
                 cx,
