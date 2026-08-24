@@ -22,6 +22,8 @@ All changes committed to dev. Each verified with `cargo +stable test` (11/11),
 10. Right-align the terminal status indicator: the agent status dot + label
     is anchored from the right edge with clearance for the min/close buttons
     instead of a fixed offset, so it never overlaps them.
+11. Softer card drop shadow: 6 lower-alpha layers that extend further and
+    fade smoothly, replacing the 4-layer harsher one.
 
 ## Screenshot-verification caveat
 
