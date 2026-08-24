@@ -1788,7 +1788,9 @@ impl CanvasPanel {
     /// adds anything. Centering is approximate (average glyph advance ~0.6×
     /// font size); good enough for a subtle watermark.
     fn draw_empty_hint(&mut self, cx: &mut Cx2d, rect: Rect) {
-        if !self.items.is_empty() || !self.shapes.is_empty() {
+        // Hide once there's any content: on-canvas items, whiteboard shapes,
+        // or docked (minimized) items in the bottom tray.
+        if !self.items.is_empty() || !self.shapes.is_empty() || !self.minimized.is_empty() {
             return;
         }
         // Center within the free area above the bottom command bar (~114px)
