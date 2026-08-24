@@ -3350,16 +3350,20 @@ impl CanvasPanel {
         );
 
         // Agent status dot + label on the right side of the title bar.
+        // Anchored right so it doesn't collide with the min/close buttons.
         let status_label = status.label();
         let status_color = status.color();
         let dot_size = 8.0;
-        let status_x = screen.pos.x + screen.size.x - 80.0;
+        // Clearance for the two control buttons (2*BTN_W + gap + margin).
+        let buttons_w = 2.0 * BTN_W + 8.0;
+        let label_w = status_label.len() as f64 * 7.0;
+        let status_x = (screen.size.x - buttons_w - label_w - 18.0).max(screen.size.x * 0.5);
         let status_y = screen.pos.y + 9.0;
         self.draw_item_bg_rect(
             cx,
             Rect {
                 pos: Vec2d {
-                    x: status_x,
+                    x: screen.pos.x + status_x,
                     y: status_y,
                 },
                 size: Vec2d {
@@ -3373,7 +3377,7 @@ impl CanvasPanel {
         self.draw_title.draw_abs(
             cx,
             Vec2d {
-                x: status_x + dot_size + 5.0,
+                x: screen.pos.x + status_x + dot_size + 5.0,
                 y: status_y - 2.0,
             },
             status_label,
