@@ -67,18 +67,15 @@ capturable were screenshot-confirmed.
 - Consistent spacing/typography scale across cards, command bar, status.
 - Note/browser card polish (need content to render/verify).
 
-## Reflection (iteration 10)
+## Reflection (iteration 13)
 
-Accomplished 16 committed improvements. Every card type (terminal, note,
-music, browser), the toolbar, workspace tabs, shadows, empty-canvas onboarding,
-hover, and dynamic status bar are polished. The focused-change + verify
-(check/test/fmt) + commit pattern is proven; all changes reuse existing
-helpers/constants and stay cohesive.
+19 committed improvements are cross-verified (test 11/11 + fmt + code review).
+The focused-change pattern is effective and every change reuses existing
+helpers/constants, keeping the CNVS hand-drawn aesthetic cohesive.
 
-The main constraint remains screenshot capture (Metal/CEF window won't
-composite into screencapture). Remaining candidate areas are increasingly
-subjective or DSL-bound (note-card layout, suggestion-dropdown styling,
-typography scale), which are hard to verify without visual confirmation. So I
-will favor any remaining improvements that are strongly logically-verifiable
-and low-risk, and stop when those are exhausted rather than churn subjective
-styling I can't see.
+Screenshot capture is still blocked, so candidates are limited to logically-
+verifiable, low-risk changes. At iteration 13 there are still genuine such
+improvements (e.g. the note card editing caret, color-swatch active state), so
+I'll continue with tightly-scoped changes. If I reach a point where only
+subjective styling remains (which I can't visually confirm), I'll note it and
+pause rather than churn blind styling.
