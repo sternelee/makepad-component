@@ -4978,10 +4978,10 @@ startup() do #(App::script_component(vm)){
                     // ============================================================
                     page_splash := mod.widgets.SplashDemo{}
                     page_json := mod.widgets.JsonRenderDemo{}
-                    page_shadcn := View{
-                        width: Fill, height: Fit,
+                    page_shadcn := ScrollYView{
+                        width: Fill, height: Fill,
                         flow: Down,
-                        padding: Inset{left: 24, right: 24, top: 16, bottom: 16},
+                        padding: Inset{left: 24, right: 24, top: 16, bottom: 200},
                         spacing: 20.0,
 
                         Label{
