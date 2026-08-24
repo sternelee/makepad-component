@@ -28,6 +28,9 @@ All changes committed to dev. Each verified with `cargo +stable test` (11/11),
     + accent-colored label, so the current space is unmistakable.
 13. Round the music player play/pause button (filled disc + sketchy ring),
     matching the round avatar chip; progress bar offset from the circle edge.
+14. Card hover backlight: draw a soft glow around a hovered (non-selected)
+    card using the already-tracked `hovered` state, so the mouse target is
+    clear without competing with the selection glow.
 
 ## Screenshot-verification caveat
 
