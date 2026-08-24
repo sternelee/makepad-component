@@ -30,7 +30,7 @@ script_mod! {
             let is_vert = self.vertical
 
             // Visual track thickness (thin strip centered in the full rect)
-            let visual_thickness = 6.0
+            let visual_thickness = 4.0
 
             if (is_vert > 0.5) {
                 // Vertical: thin track centered horizontally
@@ -425,7 +425,7 @@ impl Widget for MpSlider {
 
         // Get the rect for drawing
         let rect = cx.walk_turtle(walk);
-        let thumb_size = 20.0;
+        let thumb_size = 14.0;
 
         if self.vertical {
             // Vertical layout - draw track at full rect size for hit testing

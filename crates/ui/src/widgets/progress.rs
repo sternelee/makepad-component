@@ -11,8 +11,8 @@ script_mod! {
         ..mod.draw.DrawQuad
 
         progress: 0.0
-        track_color: SURFACE_RAISED
-        fill_color: ACCENT
+        track_color: ELEMENT_ACTIVE
+        fill_color: SOLID
 
         pixel: fn() {
             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -48,7 +48,7 @@ script_mod! {
     // Progress bar component
     mod.widgets.MpProgress = set_type_default() do mod.widgets.MpProgressBase{
         width: Fill
-        height: 8.0
+        height: 4.0
     }
 
     // Progress variants

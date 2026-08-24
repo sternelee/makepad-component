@@ -5,21 +5,24 @@ script_mod! {
     use mod.widgets.*
     use mod.mpc_theme.*
 
-    // Switch toggle component - macOS style pill track with a sliding knob.
+    // Switch toggle component - bezel-style pill track with a sliding knob.
     // Track and knob are drawn in a single SDF shader (the 2.0 animator cannot
     // target named child views, so the old track/thumb_wrap/thumb view tree is
     // merged here, matching the Toggle pattern in makepad's check_box.rs).
+    // Aligned with gpui-bezel Controls::toggle: 32x18 capsule, on-state flips
+    // to the max-contrast plate (SOLID), thumb 14px muted -> on_solid.
     mod.widgets.MpSwitchBase = #(MpSwitch::register_widget(vm))
     mod.widgets.MpSwitch = set_type_default() do mod.widgets.MpSwitchBase{
-        width: 44.0
-        height: 24.0
+        width: 32.0
+        height: 18.0
 
         draw_bg +: {
             on: instance(0.0)
             hover: instance(0.0)
-            track_off: uniform(SURFACE_RAISED)
-            track_on: uniform(SUCCESS)
-            thumb_color: uniform(#xf8fafc)
+            track_off: instance(ELEMENT_ACTIVE)
+            track_on: instance(SOLID)
+            thumb_off: instance(TEXT_FAINT)
+            thumb_on: instance(ON_SOLID)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -31,19 +34,18 @@ script_mod! {
                 sdf.rect(r, 0.0, sz.x - sz.y, sz.y)
                 sdf.circle(sz.x - r, r, r)
 
-                // macOS style colors: subtle gray when off, system green when on
                 let mut color = mix(self.track_off, self.track_on, self.on)
-                // Subtle brighten on hover
-                color = mix(color, #xffffff, self.hover * 0.15)
+                // Subtle lift on hover
+                color = mix(color, self.track_on, self.hover * 0.15)
 
                 sdf.fill(color)
 
-                // Thumb: white knob (18px at the default 44x24 size, 3px padding)
-                // sliding from the left end to the right end as `on` goes 0 -> 1
-                let thumb_r = r - 3.0
+                // Thumb: 14px knob sliding left -> right as `on` goes 0 -> 1
+                let thumb_r = r - 2.0
                 let knob_x = mix(r, sz.x - r, self.on)
+                let thumb_color = mix(self.thumb_off, self.thumb_on, self.on)
                 sdf.circle(knob_x, r, thumb_r)
-                sdf.fill(self.thumb_color)
+                sdf.fill(thumb_color)
 
                 return sdf.result
             }

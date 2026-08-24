@@ -21,12 +21,17 @@ script_mod! {
             }
         }
 
-        // The radio circle with inner dot
+        // The radio circle with inner dot.
+        // Aligned with gpui-bezel Controls::radio_button: a 16px ring; the
+        // selected ring and inner dot take the max-contrast plate (SOLID),
+        // unselected is a quiet BORDER_STRONG ring over INPUT_BG.
         draw_circle +: {
             checked: instance(0.0)
             hover: instance(0.0)
-            primary: uniform(ACCENT)
-            border_color: uniform(BORDER)
+            ring_off: instance(BORDER_STRONG)
+            ring_on: instance(SOLID)
+            bg_off: instance(INPUT_BG)
+            dot_color: instance(SOLID)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -38,14 +43,8 @@ script_mod! {
                 sdf.circle(center.x, center.y, radius)
 
                 // Colors
-                let bg_unchecked = SOLID
-                let bg_checked = SOLID
-                let border_unchecked = mix(self.border_color, self.primary, self.hover * 0.5)
-                let border_checked = self.primary
-
-                // Interpolate based on checked state
-                let bg = mix(bg_unchecked, bg_checked, self.checked)
-                let border = mix(border_unchecked, border_checked, self.checked)
+                let bg = mix(self.bg_off, self.bg_off, self.checked)
+                let border = mix(self.ring_off, self.ring_on, self.checked)
 
                 sdf.fill_keep(bg)
                 sdf.stroke(border, 1.5)
@@ -54,7 +53,7 @@ script_mod! {
                 if (self.checked > 0.5) {
                     let dot_radius = radius * 0.5
                     sdf.circle(center.x, center.y, dot_radius)
-                    sdf.fill(self.primary)
+                    sdf.fill(self.dot_color)
                 }
 
                 return sdf.result
@@ -191,7 +190,7 @@ impl Widget for MpRadio {
         self.draw_bg.begin(cx, walk, self.layout);
 
         // Draw radio circle (18x18)
-        self.draw_circle.draw_walk(cx, Walk::fixed(18.0, 18.0));
+        self.draw_circle.draw_walk(cx, Walk::fixed(16.0, 16.0));
 
         // Draw label text
         if !self.text.as_ref().is_empty() {

@@ -22,13 +22,19 @@ script_mod! {
             }
         }
 
-        // The checkbox box with checkmark
+        // The checkbox box with checkmark.
+        // Aligned with gpui-bezel Controls::checkbox: unchecked is a quiet
+        // INPUT_BG square with a BORDER_STRONG outline; checked fills with the
+        // max-contrast plate (SOLID) and paints the tick in ON_SOLID.
         draw_check +: {
             checked: instance(0.0)
             hover: instance(0.0)
             radius: instance(4.0)
-            primary: uniform(ACCENT)
-            border_color: uniform(BORDER)
+            bg_off: instance(INPUT_BG)
+            bg_on: instance(SOLID)
+            border_off: instance(BORDER_STRONG)
+            border_on: instance(SOLID)
+            check_color: instance(ON_SOLID)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -38,21 +44,14 @@ script_mod! {
                 sdf.box(1.0, 1.0, sz.x - 2.0, sz.y - 2.0, self.radius)
 
                 // Colors
-                let bg_unchecked = SOLID
-                let bg_checked = self.primary
-                let border_unchecked = mix(self.border_color, self.primary, self.hover * 0.5)
-                let border_checked = self.primary
-
-                // Interpolate based on checked state
-                let bg = mix(bg_unchecked, bg_checked, self.checked)
-                let border = mix(border_unchecked, border_checked, self.checked)
+                let bg = mix(self.bg_off, self.bg_on, self.checked)
+                let border = mix(self.border_off, self.border_on, self.checked)
 
                 sdf.fill_keep(bg)
                 sdf.stroke(border, 1.5)
 
                 // Draw checkmark when checked
                 if (self.checked > 0.5) {
-                    let check_color = ON_ACCENT
                     let cx = sz.x * 0.5
                     let cy = sz.y * 0.5
 
@@ -60,7 +59,7 @@ script_mod! {
                     sdf.move_to(cx - 4.0, cy)
                     sdf.line_to(cx - 1.0, cy + 3.0)
                     sdf.line_to(cx + 4.0, cy - 3.0)
-                    sdf.stroke(check_color, 2.0)
+                    sdf.stroke(self.check_color, 2.0)
                 }
 
                 return sdf.result
@@ -203,7 +202,7 @@ impl Widget for MpCheckbox {
         self.draw_bg.begin(cx, walk, self.layout);
 
         // Draw checkbox box (18x18)
-        self.draw_check.draw_walk(cx, Walk::fixed(18.0, 18.0));
+        self.draw_check.draw_walk(cx, Walk::fixed(16.0, 16.0));
 
         // Draw label text
         if !self.text.as_ref().is_empty() {
