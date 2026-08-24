@@ -19,6 +19,9 @@ All changes committed to dev. Each verified with `cargo +stable test` (11/11),
 8. Width presets: neutral pill for inactive, filled accent pill + frame for active.
 9. Inactive terminal focus affordance: non-selected terminal cards dim their
    live grid and hide the cursor, so it's clear which card receives input.
+10. Right-align the terminal status indicator: the agent status dot + label
+    is anchored from the right edge with clearance for the min/close buttons
+    instead of a fixed offset, so it never overlaps them.
 
 ## Screenshot-verification caveat
 
