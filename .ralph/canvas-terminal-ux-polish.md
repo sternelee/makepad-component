@@ -37,6 +37,8 @@ All changes committed to dev. Each verified with `cargo +stable test` (11/11),
     bottom status text on tool change (e.g. "Tool: Rectangle").
 17. Fix the card close button glyph: it was two parallel bars (reads as "=");
     now a proper × (two diagonal strokes) in soft red.
+18. Round the music progress bar fill (a disc at the fill's leading edge),
+    matching the circular play button and round avatar chip.
 
 ## Screenshot-verification caveat
 
