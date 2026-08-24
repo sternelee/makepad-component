@@ -11,6 +11,7 @@ use makepad_component::widgets::MpDropdownMenuWidgetRefExt;
 use makepad_component::widgets::MpComboboxWidgetRefExt;
 use makepad_component::widgets::MpModalAction;
 use makepad_component::widgets::MpModalWidgetWidgetRefExt;
+use makepad_component::widgets::MpMenuBarWidgetRefExt;
 use makepad_component::widgets::MpNotificationWidgetWidgetRefExt;
 use makepad_component::widgets::MpPopoverWidgetWidgetRefExt;
 use makepad_component::widgets::MpProgressWidgetRefExt;
@@ -20,6 +21,7 @@ use makepad_component::widgets::MpSheetWidgetRefExt;
 use makepad_component::widgets::MpSkeletonWidgetWidgetRefExt;
 use makepad_component::widgets::MpSliderWidgetRefExt;
 use makepad_component::widgets::MpStepperWidgetRefExt;
+use makepad_component::widgets::MpSplitPaneWidgetRefExt;
 use makepad_component::widgets::MpSwitchWidgetRefExt;
 use makepad_component::widgets::MpTabWidgetRefExt;
 use makepad_component::widgets::MpTableWidgetRefExt;
@@ -4571,6 +4573,84 @@ startup() do #(App::script_component(vm)){
                                 height: 160
                             }
                         }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Menu Bar Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Menu Bar" }
+
+                            View {
+                                width: 480, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Horizontal menu bar" }
+
+                                demo_menu_bar := mod.widgets.MpMenuBar{
+                                    width: Fill
+                                }
+
+                                menu_bar_status := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{ font_size: 12.0 }
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Selected: none"
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Split Pane Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Split Pane" }
+
+                            View {
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Drag the divider" }
+
+                                demo_split := mod.widgets.MpSplitPane{
+                                    width: Fill, height: 200
+                                    left := View{
+                                        width: Fill, height: Fill,
+                                        flow: Down,
+                                        padding: 12,
+                                        show_bg: true
+                                        draw_bg +: { color: ELEMENT_HOVER }
+                                        Label { text: "Left pane" }
+                                    }
+                                    right := View{
+                                        width: Fill, height: Fill,
+                                        flow: Down,
+                                        padding: 12,
+                                        show_bg: true
+                                        draw_bg +: { color: SURFACE_RAISED }
+                                        Label { text: "Right pane" }
+                                    }
+                                }
+
+                                split_status := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{ font_size: 12.0 }
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Left width: 200"
+                                }
+                            }
+                        }
                     }
 
                     // ============================================================
@@ -6437,6 +6517,20 @@ impl MatchEvent for App {
                     "Export".to_string(),
                 ],
             );
+
+        // Populate menu bar demo
+        self.ui
+            .mp_menu_bar(cx, ids!(demo_menu_bar))
+            .set_trigger_labels(cx, &["File".to_string(), "Edit".to_string(), "View".to_string()]);
+        self.ui
+            .mp_menu_bar(cx, ids!(demo_menu_bar))
+            .set_items(cx, 0, &["New File".to_string(), "Open…".to_string(), "Save".to_string()]);
+        self.ui
+            .mp_menu_bar(cx, ids!(demo_menu_bar))
+            .set_items(cx, 1, &["Undo".to_string(), "Redo".to_string(), "Cut".to_string()]);
+        self.ui
+            .mp_menu_bar(cx, ids!(demo_menu_bar))
+            .set_items(cx, 2, &["Zoom In".to_string(), "Zoom Out".to_string()]);
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -7122,6 +7216,20 @@ impl MatchEvent for App {
             self.ui
                 .label(cx, ids!(dropdown_menu_status))
                 .set_text(cx, &format!("Selected: {}", selected));
+        }
+
+        // Menu bar demo: item selection
+        if let Some((menu, item)) = self.ui.mp_menu_bar(cx, ids!(demo_menu_bar)).selected(actions) {
+            self.ui
+                .label(cx, ids!(menu_bar_status))
+                .set_text(cx, &format!("Menu {}: {}", menu, item));
+        }
+
+        // Split pane demo: divider resize
+        if let Some(width) = self.ui.mp_split_pane(cx, ids!(demo_split)).resized(actions) {
+            self.ui
+                .label(cx, ids!(split_status))
+                .set_text(cx, &format!("Left width: {:.0}", width));
         }
     }
 }
