@@ -4829,6 +4829,7 @@ impl Widget for CanvasPanel {
             ItemKind,
             Rect,
             bool,
+            bool,
             String,
             String,
             String,
@@ -4849,6 +4850,7 @@ impl Widget for CanvasPanel {
                 continue;
             }
             let is_sel = self.selected == Some(item.id());
+            let is_hovered = self.hovered == Some(item.id());
             let command = item
                 .session()
                 .map(|t| t.command.clone())
@@ -4876,6 +4878,7 @@ impl Widget for CanvasPanel {
                 item.kind(),
                 screen,
                 is_sel,
+                is_hovered,
                 item.title().to_string(),
                 command,
                 url,
@@ -4894,6 +4897,7 @@ impl Widget for CanvasPanel {
             kind,
             item_screen,
             is_sel,
+            is_hovered,
             title,
             command,
             url,
@@ -4906,6 +4910,11 @@ impl Widget for CanvasPanel {
             state,
         ) in draw_queue
         {
+            // Subtle hover backlight so the card under the mouse is clear,
+            // without competing with the selected-card glow.
+            if is_hovered && !is_sel {
+                self.draw_glow_border(cx, item_screen, [0.62, 0.72, 0.92, 1.0]);
+            }
             match kind {
                 ItemKind::Terminal => {
                     // Keep the PTY grid in sync with the on-screen content
