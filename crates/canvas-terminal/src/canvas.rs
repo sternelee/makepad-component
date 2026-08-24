@@ -3469,11 +3469,12 @@ impl CanvasPanel {
             );
             disp_r += 1;
         }
-        // Live grid rows (dimmed if scrolled).
+        // Live grid rows (dimmed if scrolled, or if the card isn't the
+        // focused terminal so an inactive card reads as background).
         for r in 0..live_rows {
             let row = &grid.lines[start + r];
             let y = origin.y + disp_r as f64 * line_h;
-            let dim = hist_offset > 0;
+            let dim = hist_offset > 0 || !is_sel;
             let disp_row = disp_r;
             let row_sel = row.clone();
             self.draw_terminal_row(cx, &row_sel, origin.x, y, char_w, line_h, dim, |c0, _c1| {
@@ -3488,8 +3489,9 @@ impl CanvasPanel {
 
         let _ = sel;
 
-        // Cursor (block / beam / underline per PTY style)
-        if grid.cursor_visible() {
+        // Cursor (block / beam / underline per PTY style). Only the focused
+        // terminal shows its cursor; a non-selected card reads as background.
+        if is_sel && grid.cursor_visible() {
             let c = grid.cursor_col.min(cols - 1);
             let r = grid
                 .cursor_row
