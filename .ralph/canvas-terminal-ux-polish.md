@@ -17,6 +17,8 @@ All changes committed to dev. Each verified with `cargo +stable test` (11/11),
 6. Softened selection glow (wider, lower-alpha halo).
 7. Enhanced empty-hint: accent "＋" badge echoing the menu button.
 8. Width presets: neutral pill for inactive, filled accent pill + frame for active.
+9. Inactive terminal focus affordance: non-selected terminal cards dim their
+   live grid and hide the cursor, so it's clear which card receives input.
 
 ## Screenshot-verification caveat
 
