@@ -1183,16 +1183,11 @@ impl CanvasPanel {
     /// Absolute palette rect plus the Y origin of each section (tools,
     /// colors, widths), computed once so draw and hit-test agree.
     fn palette_layout(&self) -> (Rect, f64, f64, f64) {
+        const SECT: f64 = 8.0; // extra gap between groups
         let tools_h = 10.0 * (Self::PAL_BTN + Self::PAL_GAP);
         let colors_h = 3.0 * (Self::PAL_SWATCH + Self::PAL_SWATCH_GAP);
         let widths_h = 3.0 * (Self::PAL_WIDTH_BTN_H + Self::PAL_GAP);
-        let total_h = Self::PAL_PAD
-            + tools_h
-            + Self::PAL_GAP
-            + colors_h
-            + Self::PAL_GAP
-            + widths_h
-            + Self::PAL_PAD;
+        let total_h = Self::PAL_PAD + tools_h + SECT + colors_h + SECT + widths_h + Self::PAL_PAD;
         let palette_rect = Rect {
             pos: Vec2d {
                 x: 2.0,
@@ -1204,8 +1199,8 @@ impl CanvasPanel {
             },
         };
         let tools_y = palette_rect.pos.y + Self::PAL_PAD;
-        let colors_y = tools_y + tools_h + Self::PAL_GAP;
-        let widths_y = colors_y + colors_h + Self::PAL_GAP;
+        let colors_y = tools_y + tools_h + 8.0;
+        let widths_y = colors_y + colors_h + 8.0;
         (palette_rect, tools_y, colors_y, widths_y)
     }
 
@@ -1787,6 +1782,50 @@ impl CanvasPanel {
     }
 
     // ── drawing helpers ──────────────────────────────────────────────────
+
+    /// Soft onboarding hint shown in the middle of an empty canvas (no items
+    /// and no whiteboard shapes yet). Fades out automatically once the user
+    /// adds anything. Centering is approximate (average glyph advance ~0.6×
+    /// font size); good enough for a subtle watermark.
+    fn draw_empty_hint(&mut self, cx: &mut Cx2d, rect: Rect) {
+        if !self.items.is_empty() || !self.shapes.is_empty() {
+            return;
+        }
+        // Center within the free area above the bottom command bar (~114px)
+        // and left of the tool palette (~44px), so the hint isn't crowded
+        // against the chrome.
+        let cx_pos = rect.pos.x + (rect.size.x - 44.0) * 0.5 + 44.0;
+        let cy = rect.pos.y + (rect.size.y - 114.0) * 0.42;
+        let title = "No items yet";
+        let sub = "⌘ ＋  or  /new terminal  /new note  /new browser";
+        // Approximate glyph advance for the bold font at each scale.
+        let avg = |s: f64| s * 0.60;
+        // Title (larger, primary), sits above the sub-hint.
+        self.draw_title.font_scale = 1.5;
+        let w1 = title.len() as f64 * avg(13.0) * 1.5;
+        self.draw_title.color = vec4f([0.94, 0.96, 1.0, 0.6]);
+        self.draw_title.draw_abs(
+            cx,
+            Vec2d {
+                x: cx_pos - w1 * 0.5,
+                y: cy - 10.0,
+            },
+            title,
+        );
+        // Sub-hint (smaller, dimmer), below the title.
+        self.draw_title.font_scale = 1.0;
+        let w2 = sub.len() as f64 * avg(13.0);
+        self.draw_title.color = vec4f([0.62, 0.68, 0.80, 0.5]);
+        self.draw_title.draw_abs(
+            cx,
+            Vec2d {
+                x: cx_pos - w2 * 0.5,
+                y: cy + 12.0,
+            },
+            sub,
+        );
+        self.draw_title.font_scale = 1.0;
+    }
 
     fn draw_grid(&mut self, cx: &mut Cx2d, rect: Rect) {
         self.draw_grid.draw_vars.set_uniform(
@@ -2743,21 +2782,20 @@ impl CanvasPanel {
             };
             let active = *t == self.tool;
             if active {
-                // Hand-drawn ring marks the active tool (no hard fill).
-                let center = Vec2d {
-                    x: r.pos.x + r.size.x * 0.5,
-                    y: r.pos.y + r.size.y * 0.5,
+                // Filled rounded pill behind the active tool, plus a clean
+                // accent border (reads clearly at a glance, like the
+                // reference's highlighted default tool).
+                let pill = Rect {
+                    pos: r.pos + Vec2d { x: 1.0, y: 1.0 },
+                    size: Vec2d {
+                        x: r.size.x - 2.0,
+                        y: r.size.y - 2.0,
+                    },
                 };
-                self.draw_sketch_ellipse(
-                    cx,
-                    center,
-                    r.size.x * 0.52,
-                    r.size.y * 0.52,
-                    1.4,
-                    PAL_ACCENT,
-                    300 + i as u32,
-                    0.35,
-                );
+                self.draw_item_bg_rect(cx, pill, [0.30, 0.24, 0.12, 0.95]);
+                self.draw_border_rect(cx, pill, PAL_ACCENT);
+                // Soft accent glow ring just outside the pill.
+                self.draw_glow_border(cx, pill, PAL_ACCENT);
             }
             let icon_color = if active {
                 PAL_ACCENT
@@ -2766,6 +2804,39 @@ impl CanvasPanel {
             };
             self.draw_tool_icon(cx, i, *t, r, icon_color);
         }
+
+        // ── Group dividers (subtle, matches the reference's grouping) ──
+        let div_color = [0.42, 0.48, 0.62, 0.5];
+        let div_x0 = palette_rect.pos.x + 6.0;
+        let div_x1 = palette_rect.pos.x + palette_rect.size.x - 6.0;
+        let div_y1 = colors_y - 4.0;
+        self.draw_segment(
+            cx,
+            Vec2d {
+                x: div_x0,
+                y: div_y1,
+            },
+            Vec2d {
+                x: div_x1,
+                y: div_y1,
+            },
+            1.0,
+            div_color,
+        );
+        let div_y2 = widths_y - 4.0;
+        self.draw_segment(
+            cx,
+            Vec2d {
+                x: div_x0,
+                y: div_y2,
+            },
+            Vec2d {
+                x: div_x1,
+                y: div_y2,
+            },
+            1.0,
+            div_color,
+        );
 
         // ── Color swatches ──
         let col_w = Self::PAL_SWATCH + Self::PAL_SWATCH_GAP;
@@ -4665,6 +4736,7 @@ impl Widget for CanvasPanel {
 
         self.ensure_workspace();
         self.draw_grid(cx, rect);
+        self.draw_empty_hint(cx, rect);
 
         // Draw items (world → screen) by index; extract item data first to
         // avoid borrowing self.items while mutating self.

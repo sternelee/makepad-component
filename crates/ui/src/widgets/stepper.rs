@@ -48,7 +48,7 @@ pub enum MpStepperAction {
     None,
 }
 
-#[derive(Script, ScriptHook, Widget)]
+#[derive(Script, Widget)]
 pub struct MpStepper {
     #[source]
     source: ScriptObjectRef,

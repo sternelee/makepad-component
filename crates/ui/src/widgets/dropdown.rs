@@ -3,6 +3,7 @@ use makepad_widgets::*;
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
+    use mod.mpc_theme.*
 
     // PopupMenuPosition is not exposed to script by makepad (see makepad AGENTS.md
     // pitfall "Enums not exposed to script"). Expose it the same way makepad exposes
@@ -19,11 +20,11 @@ script_mod! {
         popup_menu_position: mod.widgets.PopupMenuPosition.BelowInput
 
         draw_text +: {
-            color: #x0a0a0a
-            color_hover: #x0a0a0a
-            color_focus: #x0a0a0a
-            color_down: #x0a0a0a
-            color_disabled: #x737373
+            color: TEXT
+            color_hover: TEXT
+            color_focus: TEXT
+            color_down: TEXT
+            color_disabled: TEXT_FAINT
 
             text_style: theme.font_regular{font_size: 14.0}
         }
@@ -33,52 +34,52 @@ script_mod! {
             border_radius: 6.0
             color_dither: 0.0
 
-            color: #xFFFFFF
-            color_hover: #xFAFAFA
-            color_focus: #xFFFFFF
-            color_down: #xF5F5F5
-            color_disabled: #xF5F5F5
+            color: INPUT_BG
+            color_hover: ELEMENT_HOVER
+            color_focus: INPUT_BG
+            color_down: ELEMENT_ACTIVE
+            color_disabled: ELEMENT_ACTIVE
 
-            border_color: #xe5e5e5
-            border_color_hover: #xd4d4d4
-            border_color_focus: #x0284c7
-            border_color_down: #x0284c7
-            border_color_disabled: #xf5f5f5
+            border_color: BORDER
+            border_color_hover: BORDER_STRONG
+            border_color_focus: ACCENT
+            border_color_down: ACCENT
+            border_color_disabled: SURFACE
 
-            border_color_2: #xe5e5e5
-            border_color_2_hover: #xd4d4d4
-            border_color_2_focus: #x0284c7
-            border_color_2_down: #x0284c7
-            border_color_2_disabled: #xf5f5f5
+            border_color_2: BORDER
+            border_color_2_hover: BORDER_STRONG
+            border_color_2_focus: ACCENT
+            border_color_2_down: ACCENT
+            border_color_2_disabled: SURFACE
 
-            arrow_color: #x666666
-            arrow_color_hover: #x333333
-            arrow_color_focus: #x4A90D9
-            arrow_color_down: #x4A90D9
-            arrow_color_disabled: #x9E9E9E
+            arrow_color: TEXT_MUTED
+            arrow_color_hover: TEXT
+            arrow_color_focus: ACCENT
+            arrow_color_down: ACCENT
+            arrow_color_disabled: TEXT_FAINT
         }
 
         popup_menu: mod.widgets.PopupMenuFlat{
             draw_bg +: {
                 color: #xFFFFFFFF
-                border_color: #xd4d4d4
-                border_color_2: #xd4d4d4
+                border_color: BORDER_STRONG
+                border_color_2: BORDER_STRONG
                 border_radius: 6.0
             }
 
             menu_item: mod.widgets.PopupMenuItem{
                 draw_text +: {
                     text_style: theme.font_regular{font_size: 14.0}
-                    color: #x0a0a0a
-                    color_hover: #x0a0a0a
-                    color_active: #x0a0a0a
-                    color_disabled: #x737373
+                    color: TEXT
+                    color_hover: TEXT
+                    color_active: TEXT
+                    color_disabled: TEXT_FAINT
                 }
                 draw_bg +: {
                     color: #xFFFFFFFF
-                    color_hover: #xf5f5f5
+                    color_hover: SURFACE
                     color_active: #xEAEAEA
-                    color_disabled: #xFAFAFA
+                    color_disabled: ELEMENT_HOVER
                 }
             }
         }
@@ -93,11 +94,11 @@ script_mod! {
         popup_menu_position: mod.widgets.PopupMenuPosition.BelowInput
 
         draw_text +: {
-            color: #x0a0a0a
-            color_hover: #x0a0a0a
-            color_focus: #x0a0a0a
-            color_down: #x0a0a0a
-            color_disabled: #x737373
+            color: TEXT
+            color_hover: TEXT
+            color_focus: TEXT
+            color_down: TEXT
+            color_disabled: TEXT_FAINT
 
             text_style: theme.font_regular{font_size: 12.0}
         }
@@ -107,52 +108,52 @@ script_mod! {
             border_radius: 4.0
             color_dither: 0.0
 
-            color: #xFFFFFF
-            color_hover: #xFAFAFA
-            color_focus: #xFFFFFF
-            color_down: #xF5F5F5
-            color_disabled: #xF5F5F5
+            color: INPUT_BG
+            color_hover: ELEMENT_HOVER
+            color_focus: INPUT_BG
+            color_down: ELEMENT_ACTIVE
+            color_disabled: ELEMENT_ACTIVE
 
-            border_color: #xe5e5e5
-            border_color_hover: #xd4d4d4
-            border_color_focus: #x0284c7
-            border_color_down: #x0284c7
-            border_color_disabled: #xf5f5f5
+            border_color: BORDER
+            border_color_hover: BORDER_STRONG
+            border_color_focus: ACCENT
+            border_color_down: ACCENT
+            border_color_disabled: SURFACE
 
-            border_color_2: #xe5e5e5
-            border_color_2_hover: #xd4d4d4
-            border_color_2_focus: #x0284c7
-            border_color_2_down: #x0284c7
-            border_color_2_disabled: #xf5f5f5
+            border_color_2: BORDER
+            border_color_2_hover: BORDER_STRONG
+            border_color_2_focus: ACCENT
+            border_color_2_down: ACCENT
+            border_color_2_disabled: SURFACE
 
-            arrow_color: #x666666
-            arrow_color_hover: #x333333
-            arrow_color_focus: #x4A90D9
-            arrow_color_down: #x4A90D9
-            arrow_color_disabled: #x9E9E9E
+            arrow_color: TEXT_MUTED
+            arrow_color_hover: TEXT
+            arrow_color_focus: ACCENT
+            arrow_color_down: ACCENT
+            arrow_color_disabled: TEXT_FAINT
         }
 
         popup_menu: mod.widgets.PopupMenuFlat{
             draw_bg +: {
                 color: #xFFFFFFFF
-                border_color: #xd4d4d4
-                border_color_2: #xd4d4d4
+                border_color: BORDER_STRONG
+                border_color_2: BORDER_STRONG
                 border_radius: 6.0
             }
 
             menu_item: mod.widgets.PopupMenuItem{
                 draw_text +: {
                     text_style: theme.font_regular{font_size: 12.0}
-                    color: #x0a0a0a
-                    color_hover: #x0a0a0a
-                    color_active: #x0a0a0a
-                    color_disabled: #x737373
+                    color: TEXT
+                    color_hover: TEXT
+                    color_active: TEXT
+                    color_disabled: TEXT_FAINT
                 }
                 draw_bg +: {
                     color: #xFFFFFFFF
-                    color_hover: #xf5f5f5
+                    color_hover: SURFACE
                     color_active: #xEAEAEA
-                    color_disabled: #xFAFAFA
+                    color_disabled: ELEMENT_HOVER
                 }
             }
         }
@@ -167,11 +168,11 @@ script_mod! {
         popup_menu_position: mod.widgets.PopupMenuPosition.BelowInput
 
         draw_text +: {
-            color: #x0a0a0a
-            color_hover: #x0a0a0a
-            color_focus: #x0a0a0a
-            color_down: #x0a0a0a
-            color_disabled: #x737373
+            color: TEXT
+            color_hover: TEXT
+            color_focus: TEXT
+            color_down: TEXT
+            color_disabled: TEXT_FAINT
 
             text_style: theme.font_regular{font_size: 16.0}
         }
@@ -181,52 +182,52 @@ script_mod! {
             border_radius: 8.0
             color_dither: 0.0
 
-            color: #xFFFFFF
-            color_hover: #xFAFAFA
-            color_focus: #xFFFFFF
-            color_down: #xF5F5F5
-            color_disabled: #xF5F5F5
+            color: INPUT_BG
+            color_hover: ELEMENT_HOVER
+            color_focus: INPUT_BG
+            color_down: ELEMENT_ACTIVE
+            color_disabled: ELEMENT_ACTIVE
 
-            border_color: #xe5e5e5
-            border_color_hover: #xd4d4d4
-            border_color_focus: #x0284c7
-            border_color_down: #x0284c7
-            border_color_disabled: #xf5f5f5
+            border_color: BORDER
+            border_color_hover: BORDER_STRONG
+            border_color_focus: ACCENT
+            border_color_down: ACCENT
+            border_color_disabled: SURFACE
 
-            border_color_2: #xe5e5e5
-            border_color_2_hover: #xd4d4d4
-            border_color_2_focus: #x0284c7
-            border_color_2_down: #x0284c7
-            border_color_2_disabled: #xf5f5f5
+            border_color_2: BORDER
+            border_color_2_hover: BORDER_STRONG
+            border_color_2_focus: ACCENT
+            border_color_2_down: ACCENT
+            border_color_2_disabled: SURFACE
 
-            arrow_color: #x666666
-            arrow_color_hover: #x333333
-            arrow_color_focus: #x4A90D9
-            arrow_color_down: #x4A90D9
-            arrow_color_disabled: #x9E9E9E
+            arrow_color: TEXT_MUTED
+            arrow_color_hover: TEXT
+            arrow_color_focus: ACCENT
+            arrow_color_down: ACCENT
+            arrow_color_disabled: TEXT_FAINT
         }
 
         popup_menu: mod.widgets.PopupMenuFlat{
             draw_bg +: {
                 color: #xFFFFFFFF
-                border_color: #xd4d4d4
-                border_color_2: #xd4d4d4
+                border_color: BORDER_STRONG
+                border_color_2: BORDER_STRONG
                 border_radius: 6.0
             }
 
             menu_item: mod.widgets.PopupMenuItem{
                 draw_text +: {
                     text_style: theme.font_regular{font_size: 16.0}
-                    color: #x0a0a0a
-                    color_hover: #x0a0a0a
-                    color_active: #x0a0a0a
-                    color_disabled: #x737373
+                    color: TEXT
+                    color_hover: TEXT
+                    color_active: TEXT
+                    color_disabled: TEXT_FAINT
                 }
                 draw_bg +: {
                     color: #xFFFFFFFF
-                    color_hover: #xf5f5f5
+                    color_hover: SURFACE
                     color_active: #xEAEAEA
-                    color_disabled: #xFAFAFA
+                    color_disabled: ELEMENT_HOVER
                 }
             }
         }
@@ -241,11 +242,11 @@ script_mod! {
         popup_menu_position: mod.widgets.PopupMenuPosition.BelowInput
 
         draw_text +: {
-            color: #x0a0a0a
-            color_hover: #x0a0a0a
-            color_focus: #x0a0a0a
-            color_down: #x0a0a0a
-            color_disabled: #x737373
+            color: TEXT
+            color_hover: TEXT
+            color_focus: TEXT
+            color_down: TEXT
+            color_disabled: TEXT_FAINT
 
             text_style: theme.font_regular{font_size: 14.0}
         }
@@ -273,34 +274,34 @@ script_mod! {
             border_color_2_down: #x00000000
             border_color_2_disabled: #x00000000
 
-            arrow_color: #x666666
-            arrow_color_hover: #x333333
-            arrow_color_focus: #x0284c7
-            arrow_color_down: #x0284c7
-            arrow_color_disabled: #x9E9E9E
+            arrow_color: TEXT_MUTED
+            arrow_color_hover: TEXT
+            arrow_color_focus: ACCENT
+            arrow_color_down: ACCENT
+            arrow_color_disabled: TEXT_FAINT
         }
 
         popup_menu: mod.widgets.PopupMenuFlat{
             draw_bg +: {
                 color: #xFFFFFFFF
-                border_color: #xd4d4d4
-                border_color_2: #xd4d4d4
+                border_color: BORDER_STRONG
+                border_color_2: BORDER_STRONG
                 border_radius: 6.0
             }
 
             menu_item: mod.widgets.PopupMenuItem{
                 draw_text +: {
                     text_style: theme.font_regular{font_size: 14.0}
-                    color: #x0a0a0a
-                    color_hover: #x0a0a0a
-                    color_active: #x0a0a0a
-                    color_disabled: #x737373
+                    color: TEXT
+                    color_hover: TEXT
+                    color_active: TEXT
+                    color_disabled: TEXT_FAINT
                 }
                 draw_bg +: {
                     color: #xFFFFFFFF
-                    color_hover: #xf5f5f5
+                    color_hover: SURFACE
                     color_active: #xEAEAEA
-                    color_disabled: #xFAFAFA
+                    color_disabled: ELEMENT_HOVER
                 }
             }
         }
@@ -315,11 +316,11 @@ script_mod! {
         popup_menu_position: mod.widgets.PopupMenuPosition.BelowInput
 
         draw_text +: {
-            color: #x0a0a0a
-            color_hover: #x0a0a0a
-            color_focus: #x0a0a0a
-            color_down: #x0a0a0a
-            color_disabled: #x737373
+            color: TEXT
+            color_hover: TEXT
+            color_focus: TEXT
+            color_down: TEXT
+            color_disabled: TEXT_FAINT
 
             text_style: theme.font_regular{font_size: 14.0}
         }
@@ -335,46 +336,46 @@ script_mod! {
             color_down: #x0000001A
             color_disabled: #x00000000
 
-            border_color: #xd4d4d4
+            border_color: BORDER_STRONG
             border_color_hover: #xa3a3a3
-            border_color_focus: #x0284c7
-            border_color_down: #x0284c7
-            border_color_disabled: #xe5e5e5
+            border_color_focus: ACCENT
+            border_color_down: ACCENT
+            border_color_disabled: BORDER
 
-            border_color_2: #xd4d4d4
+            border_color_2: BORDER_STRONG
             border_color_2_hover: #xa3a3a3
-            border_color_2_focus: #x0284c7
-            border_color_2_down: #x0284c7
-            border_color_2_disabled: #xe5e5e5
+            border_color_2_focus: ACCENT
+            border_color_2_down: ACCENT
+            border_color_2_disabled: BORDER
 
-            arrow_color: #x666666
-            arrow_color_hover: #x333333
-            arrow_color_focus: #x0284c7
-            arrow_color_down: #x0284c7
-            arrow_color_disabled: #x9E9E9E
+            arrow_color: TEXT_MUTED
+            arrow_color_hover: TEXT
+            arrow_color_focus: ACCENT
+            arrow_color_down: ACCENT
+            arrow_color_disabled: TEXT_FAINT
         }
 
         popup_menu: mod.widgets.PopupMenuFlat{
             draw_bg +: {
                 color: #xFFFFFFFF
-                border_color: #xd4d4d4
-                border_color_2: #xd4d4d4
+                border_color: BORDER_STRONG
+                border_color_2: BORDER_STRONG
                 border_radius: 6.0
             }
 
             menu_item: mod.widgets.PopupMenuItem{
                 draw_text +: {
                     text_style: theme.font_regular{font_size: 14.0}
-                    color: #x0a0a0a
-                    color_hover: #x0a0a0a
-                    color_active: #x0a0a0a
-                    color_disabled: #x737373
+                    color: TEXT
+                    color_hover: TEXT
+                    color_active: TEXT
+                    color_disabled: TEXT_FAINT
                 }
                 draw_bg +: {
                     color: #xFFFFFFFF
-                    color_hover: #xf5f5f5
+                    color_hover: SURFACE
                     color_active: #xEAEAEA
-                    color_disabled: #xFAFAFA
+                    color_disabled: ELEMENT_HOVER
                 }
             }
         }
@@ -389,11 +390,11 @@ script_mod! {
         popup_menu_position: mod.widgets.PopupMenuPosition.BelowInput
 
         draw_text +: {
-            color: #x0a0a0a
-            color_hover: #x0a0a0a
-            color_focus: #x0a0a0a
-            color_down: #x0a0a0a
-            color_disabled: #x737373
+            color: TEXT
+            color_hover: TEXT
+            color_focus: TEXT
+            color_down: TEXT
+            color_disabled: TEXT_FAINT
 
             text_style: theme.font_regular{font_size: 14.0}
         }
@@ -403,52 +404,52 @@ script_mod! {
             border_radius: 6.0
             color_dither: 0.0
 
-            color: #xf5f5f5
-            color_hover: #xe5e5e5
-            color_focus: #xf5f5f5
-            color_down: #xd4d4d4
+            color: SURFACE
+            color_hover: BORDER
+            color_focus: SURFACE
+            color_down: BORDER_STRONG
             color_disabled: #xfafafa
 
             border_color: #x00000000
             border_color_hover: #x00000000
-            border_color_focus: #x0284c7
-            border_color_down: #x0284c7
+            border_color_focus: ACCENT
+            border_color_down: ACCENT
             border_color_disabled: #x00000000
 
             border_color_2: #x00000000
             border_color_2_hover: #x00000000
-            border_color_2_focus: #x0284c7
-            border_color_2_down: #x0284c7
+            border_color_2_focus: ACCENT
+            border_color_2_down: ACCENT
             border_color_2_disabled: #x00000000
 
             arrow_color: #x525252
-            arrow_color_hover: #x333333
-            arrow_color_focus: #x0284c7
-            arrow_color_down: #x0284c7
-            arrow_color_disabled: #x9E9E9E
+            arrow_color_hover: TEXT
+            arrow_color_focus: ACCENT
+            arrow_color_down: ACCENT
+            arrow_color_disabled: TEXT_FAINT
         }
 
         popup_menu: mod.widgets.PopupMenuFlat{
             draw_bg +: {
                 color: #xFFFFFFFF
-                border_color: #xd4d4d4
-                border_color_2: #xd4d4d4
+                border_color: BORDER_STRONG
+                border_color_2: BORDER_STRONG
                 border_radius: 6.0
             }
 
             menu_item: mod.widgets.PopupMenuItem{
                 draw_text +: {
                     text_style: theme.font_regular{font_size: 14.0}
-                    color: #x0a0a0a
-                    color_hover: #x0a0a0a
-                    color_active: #x0a0a0a
-                    color_disabled: #x737373
+                    color: TEXT
+                    color_hover: TEXT
+                    color_active: TEXT
+                    color_disabled: TEXT_FAINT
                 }
                 draw_bg +: {
                     color: #xFFFFFFFF
-                    color_hover: #xf5f5f5
+                    color_hover: SURFACE
                     color_active: #xEAEAEA
-                    color_disabled: #xFAFAFA
+                    color_disabled: ELEMENT_HOVER
                 }
             }
         }
@@ -463,10 +464,10 @@ script_mod! {
         popup_menu_position: mod.widgets.PopupMenuPosition.BelowInput
 
         draw_text +: {
-            color: #xFFFFFF
-            color_hover: #xFFFFFF
-            color_focus: #xFFFFFF
-            color_down: #xFFFFFF
+            color: INPUT_BG
+            color_hover: INPUT_BG
+            color_focus: INPUT_BG
+            color_down: INPUT_BG
             color_disabled: #x94a3b8
 
             text_style: theme.font_regular{font_size: 14.0}
@@ -477,9 +478,9 @@ script_mod! {
             border_radius: 6.0
             color_dither: 0.0
 
-            color: #x0284c7
+            color: ACCENT
             color_hover: #x0369a1
-            color_focus: #x0284c7
+            color_focus: ACCENT
             color_down: #x075985
             color_disabled: #xbae6fd
 
@@ -495,34 +496,34 @@ script_mod! {
             border_color_2_down: #x00000000
             border_color_2_disabled: #x00000000
 
-            arrow_color: #xFFFFFF
-            arrow_color_hover: #xFFFFFF
-            arrow_color_focus: #xFFFFFF
-            arrow_color_down: #xFFFFFF
+            arrow_color: INPUT_BG
+            arrow_color_hover: INPUT_BG
+            arrow_color_focus: INPUT_BG
+            arrow_color_down: INPUT_BG
             arrow_color_disabled: #x94a3b8
         }
 
         popup_menu: mod.widgets.PopupMenuFlat{
             draw_bg +: {
                 color: #xFFFFFFFF
-                border_color: #xd4d4d4
-                border_color_2: #xd4d4d4
+                border_color: BORDER_STRONG
+                border_color_2: BORDER_STRONG
                 border_radius: 6.0
             }
 
             menu_item: mod.widgets.PopupMenuItem{
                 draw_text +: {
                     text_style: theme.font_regular{font_size: 14.0}
-                    color: #x0a0a0a
-                    color_hover: #x0a0a0a
-                    color_active: #x0a0a0a
-                    color_disabled: #x737373
+                    color: TEXT
+                    color_hover: TEXT
+                    color_active: TEXT
+                    color_disabled: TEXT_FAINT
                 }
                 draw_bg +: {
                     color: #xFFFFFFFF
-                    color_hover: #xf5f5f5
+                    color_hover: SURFACE
                     color_active: #xEAEAEA
-                    color_disabled: #xFAFAFA
+                    color_disabled: ELEMENT_HOVER
                 }
             }
         }
@@ -537,10 +538,10 @@ script_mod! {
         popup_menu_position: mod.widgets.PopupMenuPosition.BelowInput
 
         draw_text +: {
-            color: #xFFFFFF
-            color_hover: #xFFFFFF
-            color_focus: #xFFFFFF
-            color_down: #xFFFFFF
+            color: INPUT_BG
+            color_hover: INPUT_BG
+            color_focus: INPUT_BG
+            color_down: INPUT_BG
             color_disabled: #xfca5a5
 
             text_style: theme.font_regular{font_size: 14.0}
@@ -569,34 +570,34 @@ script_mod! {
             border_color_2_down: #x00000000
             border_color_2_disabled: #x00000000
 
-            arrow_color: #xFFFFFF
-            arrow_color_hover: #xFFFFFF
-            arrow_color_focus: #xFFFFFF
-            arrow_color_down: #xFFFFFF
+            arrow_color: INPUT_BG
+            arrow_color_hover: INPUT_BG
+            arrow_color_focus: INPUT_BG
+            arrow_color_down: INPUT_BG
             arrow_color_disabled: #xfca5a5
         }
 
         popup_menu: mod.widgets.PopupMenuFlat{
             draw_bg +: {
                 color: #xFFFFFFFF
-                border_color: #xd4d4d4
-                border_color_2: #xd4d4d4
+                border_color: BORDER_STRONG
+                border_color_2: BORDER_STRONG
                 border_radius: 6.0
             }
 
             menu_item: mod.widgets.PopupMenuItem{
                 draw_text +: {
                     text_style: theme.font_regular{font_size: 14.0}
-                    color: #x0a0a0a
-                    color_hover: #x0a0a0a
-                    color_active: #x0a0a0a
-                    color_disabled: #x737373
+                    color: TEXT
+                    color_hover: TEXT
+                    color_active: TEXT
+                    color_disabled: TEXT_FAINT
                 }
                 draw_bg +: {
                     color: #xFFFFFFFF
-                    color_hover: #xf5f5f5
+                    color_hover: SURFACE
                     color_active: #xEAEAEA
-                    color_disabled: #xFAFAFA
+                    color_disabled: ELEMENT_HOVER
                 }
             }
         }

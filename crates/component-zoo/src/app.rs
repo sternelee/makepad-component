@@ -6,6 +6,7 @@ use makepad_component::widgets::MpButtonWidgetRefExt;
 use makepad_component::widgets::MpCardAction;
 use makepad_component::widgets::MpCheckboxWidgetRefExt;
 use makepad_component::widgets::MpCollapsibleTriggerWidgetRefExt;
+use makepad_component::widgets::MpContextMenuWidgetRefExt;
 use makepad_component::widgets::MpComboboxWidgetRefExt;
 use makepad_component::widgets::MpModalAction;
 use makepad_component::widgets::MpModalWidgetWidgetRefExt;
@@ -4453,6 +4454,59 @@ startup() do #(App::script_component(vm)){
                                 }
                             }
                         }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Context Menu Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Context Menu" }
+
+                            View {
+                                width: 480, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Right-click the area" }
+
+                                demo_context_menu := mod.widgets.MpContextMenu{
+                                    width: Fill
+                                }
+
+                                context_menu_status := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{ font_size: 12.0 }
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Selected: none"
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Kbd Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Kbd" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Right,
+                                spacing: 8,
+
+                                mod.widgets.MpKbd{ text: "⌘" }
+                                mod.widgets.MpKbd{ text: "K" }
+                                mod.widgets.MpKbd{ text: "⇧⌘P" }
+                                mod.widgets.MpKbd{ text: "Esc" }
+                            }
+                        }
                     }
 
                     // ============================================================
@@ -6290,6 +6344,21 @@ impl MatchEvent for App {
                     "Lemon".to_string(),
                 ],
             );
+
+        // Populate context menu demo
+        self.ui
+            .mp_context_menu(cx, ids!(demo_context_menu))
+            .set_items(
+                cx,
+                vec![
+                    "Cut".to_string(),
+                    "Copy".to_string(),
+                    "Paste".to_string(),
+                    "Duplicate".to_string(),
+                    "Delete".to_string(),
+                    "Rename…".to_string(),
+                ],
+            );
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -6953,6 +7022,17 @@ impl MatchEvent for App {
             self.ui
                 .label(cx, ids!(stepper_status))
                 .set_text(cx, &format!("Value: {}", value));
+        }
+
+        // Context menu demo: item selection
+        if let Some(selected) = self
+            .ui
+            .mp_context_menu(cx, ids!(demo_context_menu))
+            .item_selected(actions)
+        {
+            self.ui
+                .label(cx, ids!(context_menu_status))
+                .set_text(cx, &format!("Selected: {}", selected));
         }
     }
 }
