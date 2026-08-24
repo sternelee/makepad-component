@@ -3615,6 +3615,21 @@ impl CanvasPanel {
             pos: screen.pos + Vec2d { x: 2.0, y: 32.0 },
             size: screen.size - Vec2d { x: 4.0, y: 34.0 },
         };
+        // Subtle divider between the browser chrome and the page area.
+        self.draw_item_bg_rect(
+            cx,
+            Rect {
+                pos: Vec2d {
+                    x: screen.pos.x + 6.0,
+                    y: screen.pos.y + 30.0,
+                },
+                size: Vec2d {
+                    x: screen.size.x - 12.0,
+                    y: 1.0,
+                },
+            },
+            [0.20, 0.24, 0.32, 0.8],
+        );
         if page_rect.size.x <= 4.0 || page_rect.size.y <= 4.0 {
             return;
         }
