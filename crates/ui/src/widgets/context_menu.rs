@@ -33,6 +33,11 @@ script_mod! {
             }
         }
 
+        draw_text +: {
+            text_style: theme.font_regular{font_size: 13.0}
+            color: TEXT
+        }
+
         animator: Animator{
             hover: {
                 default: @off

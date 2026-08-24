@@ -7,6 +7,7 @@ use makepad_component::widgets::MpCardAction;
 use makepad_component::widgets::MpCheckboxWidgetRefExt;
 use makepad_component::widgets::MpCollapsibleTriggerWidgetRefExt;
 use makepad_component::widgets::MpContextMenuWidgetRefExt;
+use makepad_component::widgets::MpDropdownMenuWidgetRefExt;
 use makepad_component::widgets::MpComboboxWidgetRefExt;
 use makepad_component::widgets::MpModalAction;
 use makepad_component::widgets::MpModalWidgetWidgetRefExt;
@@ -4507,6 +4508,69 @@ startup() do #(App::script_component(vm)){
                                 mod.widgets.MpKbd{ text: "Esc" }
                             }
                         }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Dropdown Menu Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Dropdown Menu" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                demo_dropdown_menu := mod.widgets.MpDropdownMenu{}
+
+                                dropdown_menu_status := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{ font_size: 12.0 }
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Selected: none"
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Stat Cards Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Stat Cards" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Right,
+                                spacing: 12,
+
+                                mod.widgets.MpStatCard{}
+                                stat_card_2 := mod.widgets.MpStatCard{}
+                                stat_card_3 := mod.widgets.MpStatCard{}
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Empty State Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Empty State" }
+
+                            empty_state_demo := mod.widgets.MpEmptyState{
+                                height: 160
+                            }
+                        }
                     }
 
                     // ============================================================
@@ -6359,6 +6423,20 @@ impl MatchEvent for App {
                     "Rename…".to_string(),
                 ],
             );
+
+        // Populate dropdown menu demo
+        self.ui
+            .mp_dropdown_menu(cx, ids!(demo_dropdown_menu))
+            .set_items(
+                cx,
+                &vec![
+                    "New file".to_string(),
+                    "Open…".to_string(),
+                    "Save".to_string(),
+                    "Save as…".to_string(),
+                    "Export".to_string(),
+                ],
+            );
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -7032,6 +7110,17 @@ impl MatchEvent for App {
         {
             self.ui
                 .label(cx, ids!(context_menu_status))
+                .set_text(cx, &format!("Selected: {}", selected));
+        }
+
+        // Dropdown menu demo: item selection
+        if let Some(selected) = self
+            .ui
+            .mp_dropdown_menu(cx, ids!(demo_dropdown_menu))
+            .item_selected(actions)
+        {
+            self.ui
+                .label(cx, ids!(dropdown_menu_status))
                 .set_text(cx, &format!("Selected: {}", selected));
         }
     }

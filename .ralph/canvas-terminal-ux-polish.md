@@ -61,17 +61,17 @@ capturable were screenshot-confirmed.
 
 ## Commands
 
-- Build (CEF-safe PATH): `PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH" cargo +stable build -p canvas-terminal`
-- Test: `cargo +stable test -p canvas-terminal`
-- Fmt: `cargo +stable fmt -p canvas-terminal -- --check`
++ Build (CEF-safe PATH): `PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH" cargo +stable build -p canvas-terminal`
++ Test: `cargo +stable test -p canvas-terminal`
++ Fmt: `cargo +stable fmt -p canvas-terminal -- --check`
 
 ## Next candidates
 
-- Command bar: placeholder/focus-ring contrast, suggestion-list active highlight.
-- Status bar: dynamic/useful text with subtle accent.
-- Card hover affordances and shadow tuning.
-- Consistent spacing/typography scale across cards, command bar, status.
-- Note/browser card polish (need content to render/verify).
++ Command bar: placeholder/focus-ring contrast, suggestion-list active highlight.
++ Status bar: dynamic/useful text with subtle accent.
++ Card hover affordances and shadow tuning.
++ Consistent spacing/typography scale across cards, command bar, status.
++ Note/browser card polish (need content to render/verify).
 
 ## Reflection (iteration 16)
 
