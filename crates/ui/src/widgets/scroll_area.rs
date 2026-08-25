@@ -28,7 +28,7 @@ script_mod! {
 
                     color: uniform(TEXT_FAINT)
                     color_hover: uniform(TEXT_MUTED)
-                    color_drag: uniform(TEXT_MUTED)
+                    color_drag: uniform(TEXT)
                 }
             }
         }
@@ -53,7 +53,7 @@ script_mod! {
 
                     color: uniform(TEXT_FAINT)
                     color_hover: uniform(TEXT_MUTED)
-                    color_drag: uniform(TEXT_MUTED)
+                    color_drag: uniform(TEXT)
                 }
             }
             scroll_bar_y +: {
@@ -66,7 +66,7 @@ script_mod! {
 
                     color: uniform(TEXT_FAINT)
                     color_hover: uniform(TEXT_MUTED)
-                    color_drag: uniform(TEXT_MUTED)
+                    color_drag: uniform(TEXT)
                 }
             }
         }

@@ -25,7 +25,7 @@ script_mod! {
 
             border_color: BORDER
             border_color_hover: BORDER_STRONG
-            border_color_focus: ACCENT
+            border_color_focus: CARET
             border_color_disabled: BORDER
 
             pixel: fn() {
@@ -195,13 +195,13 @@ script_mod! {
             border_radius: uniform(6.0)
             border_width: uniform(1.0)
 
-            bg_color: uniform(#xFFFFFF)
-            bg_color_hover: uniform(#xFAFAFA)
-            bg_color_focus: uniform(#xFFFFFF)
+            bg_color: uniform(INPUT_BG)
+            bg_color_hover: uniform(INPUT_BG)
+            bg_color_focus: uniform(INPUT_BG)
 
-            border_color: uniform(#xE0E0E0)
-            border_color_hover: uniform(#xBDBDBD)
-            border_color_focus: uniform(#x4A90D9)
+            border_color: uniform(BORDER)
+            border_color_hover: uniform(BORDER_STRONG)
+            border_color_focus: uniform(CARET)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -249,16 +249,21 @@ script_mod! {
 
             draw_text +: {
                 text_style: theme.font_regular{font_size: 14.0}
+                color: instance(TEXT)
+                color_empty: instance(TEXT_FAINT)
+
                 get_color: fn() {
-                    return mix(#x333333, #x9E9E9E, self.empty)
+                    return mix(self.color, self.color_empty, self.empty)
                 }
             }
 
             draw_cursor +: {
+                color: uniform(CARET)
+
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 1.0)
-                    sdf.fill(mix(#x0000, #x4A90D9, self.focus * (1.0 - self.blink)))
+                    sdf.fill(mix(#x0000, self.color, self.focus * (1.0 - self.blink)))
                     return sdf.result
                 }
             }
@@ -267,7 +272,7 @@ script_mod! {
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 2.0)
-                    sdf.fill(#x4A90D920)
+                    sdf.fill(SELECTION)
                     return sdf.result
                 }
             }
@@ -319,11 +324,11 @@ script_mod! {
     mod.widgets.MpInputBorderless = mod.widgets.MpInputBase{
         draw_bg +: {
             bg_color: #x00000000
-            bg_color_hover: #xF5F5F5
+            bg_color_hover: ELEMENT_HOVER
             bg_color_focus: #x00000000
             border_color: #x00000000
             border_color_hover: #x00000000
-            border_color_focus: #x4A90D9
+            border_color_focus: CARET
         }
     }
 
@@ -342,13 +347,13 @@ script_mod! {
             hover: instance(0.0)
             focus: instance(0.0)
 
-            bg_color: uniform(#xE8E8ED)
-            bg_color_hover: uniform(#xD1D1D6)
-            bg_color_focus: uniform(#xFFFFFF)
+            bg_color: uniform(INPUT_BG)
+            bg_color_hover: uniform(ELEMENT_ACTIVE)
+            bg_color_focus: uniform(INPUT_BG)
 
-            border_color: uniform(#xAEAEB2)
-            border_color_hover: uniform(#xAEAEB2)
-            border_color_focus: uniform(#x007AFF)
+            border_color: uniform(BORDER)
+            border_color_hover: uniform(BORDER)
+            border_color_focus: uniform(CARET)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -384,7 +389,7 @@ script_mod! {
             icon_walk: Walk{width: 14.0, height: Fit}
             draw_icon +: {
                 svg: crate_resource("self:resources/icons/search.svg")
-                color: #x86868B
+                color: TEXT_FAINT
             }
         }
 
@@ -402,16 +407,21 @@ script_mod! {
 
             draw_text +: {
                 text_style: theme.font_regular{font_size: 13.0}
+                color: instance(TEXT)
+                color_empty: instance(TEXT_FAINT)
+
                 get_color: fn() {
-                    return mix(#x3D3D3D, #x86868B, self.empty)
+                    return mix(self.color, self.color_empty, self.empty)
                 }
             }
 
             draw_cursor +: {
+                color: uniform(CARET)
+
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 1.0)
-                    sdf.fill(mix(#x0000, #x4A90D9, self.focus * (1.0 - self.blink)))
+                    sdf.fill(mix(#x0000, self.color, self.focus * (1.0 - self.blink)))
                     return sdf.result
                 }
             }
@@ -420,7 +430,7 @@ script_mod! {
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 2.0)
-                    sdf.fill(#x4A90D920)
+                    sdf.fill(SELECTION)
                     return sdf.result
                 }
             }
