@@ -41,12 +41,12 @@ script_mod! {
         }
 
         draw_header_text +: {
-            text_style: theme.font_regular{font_size: 11.0}
+            text_style: theme.font_regular{font_size: 11.5}
             color: TEXT_MUTED
         }
 
         draw_cell_text +: {
-            text_style: theme.font_regular{font_size: 13.0}
+            text_style: theme.font_regular{font_size: 12.5}
             color: TEXT
         }
 

@@ -14,22 +14,22 @@ script_mod! {
         width: Fit
         height: Fit
         flow: Right
-        spacing: 2.0
+        spacing: 4.0
         align: Align{y: 0.5}
     }
 
     // Pagination item (page number button)
     mod.widgets.MpPaginationItemBase = #(MpPaginationItem::register_widget(vm))
     mod.widgets.MpPaginationItem = set_type_default() do mod.widgets.MpPaginationItemBase{
-        width: 36
-        height: 36
+        width: 28
+        height: 28
         padding: Inset{left: 0.0, right: 0.0, top: 0.0, bottom: 0.0}
         align: Align{x: 0.5, y: 0.5}
 
 
 
         draw_bg +: {
-            radius: instance(6.0)
+            radius: instance(7.0)
             bg_color: #x0000
             bg_hover: ELEMENT_HOVER
             bg_active: (ACCENT)
@@ -42,7 +42,7 @@ script_mod! {
                 let bg = mix(self.bg_color, self.bg_hover, self.hover)
                 let final_bg = mix(bg, self.bg_active, self.active)
 
-                sdf.circle(s * 0.5, s * 0.5, s * 0.5)
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, self.radius)
                 sdf.fill(final_bg)
 
                 return sdf.result
@@ -50,7 +50,7 @@ script_mod! {
         }
 
         draw_text +: {
-            text_style: theme.font_regular{font_size: 13.0}
+            text_style: theme.font_regular{font_size: 12.5}
             color: (TEXT)
             color_active: (ON_ACCENT)
             active: instance(0.0)
@@ -93,15 +93,15 @@ script_mod! {
     // Pagination prev button
     mod.widgets.MpPaginationPrevBase = #(MpPaginationPrev::register_widget(vm))
     mod.widgets.MpPaginationPrev = set_type_default() do mod.widgets.MpPaginationPrevBase{
-        width: 36
-        height: 36
+        width: 28
+        height: 28
         padding: Inset{left: 0.0, right: 0.0, top: 0.0, bottom: 0.0}
         align: Align{x: 0.5, y: 0.5}
 
 
 
         draw_bg +: {
-            radius: instance(6.0)
+            radius: instance(7.0)
             bg_color: #x0000
             bg_hover: ELEMENT_HOVER
             hover: instance(0.0)
@@ -112,7 +112,7 @@ script_mod! {
                 let c = vec2(s * 0.5, s * 0.5)
                 let bg = mix(self.bg_color, self.bg_hover, self.hover)
 
-                sdf.circle(c.x, c.y, s * 0.5)
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, self.radius)
                 sdf.fill(bg)
 
                 // Left arrow
@@ -149,7 +149,7 @@ script_mod! {
                 let c = vec2(s * 0.5, s * 0.5)
                 let bg = mix(self.bg_color, self.bg_hover, self.hover)
 
-                sdf.circle(c.x, c.y, s * 0.5)
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, self.radius)
                 sdf.fill(bg)
 
                 // Right arrow
@@ -165,13 +165,13 @@ script_mod! {
 
     // Pagination ellipsis
     mod.widgets.MpPaginationEllipsis = mod.widgets.Label{
-        width: 36
-        height: 36
+        width: 28
+        height: 28
         align: Align{x: 0.5, y: 0.5}
 
 
         draw_text +: {
-            text_style: theme.font_regular{font_size: 13.0}
+            text_style: theme.font_regular{font_size: 12.5}
             color: TEXT_MUTED
         }
         text: "..."

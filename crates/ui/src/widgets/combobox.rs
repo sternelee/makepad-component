@@ -89,6 +89,18 @@ script_mod! {
             opt6 := mod.widgets.MpComboboxOption{}
             opt7 := mod.widgets.MpComboboxOption{}
         }
+
+        empty_label := Label{
+            width: Fill
+            height: Fit
+            padding: Inset{left: 10, right: 10, top: 8, bottom: 8}
+            draw_text +: {
+                text_style: theme.font_regular{font_size: 13.0}
+                color: TEXT_MUTED
+            }
+            text: "No matches"
+            visible: false
+        }
     }
 }
 
@@ -160,9 +172,11 @@ impl MpCombobox {
             }
         }
 
+        let any_match = self.open && !shown.is_empty();
+        self.view.view(cx, ids!(list)).set_visible(cx, any_match);
         self.view
-            .view(cx, ids!(list))
-            .set_visible(cx, self.open && !shown.is_empty());
+            .label(cx, ids!(empty_label))
+            .set_visible(cx, self.open && !any_match);
     }
 }
 

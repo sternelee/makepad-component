@@ -20,7 +20,7 @@ script_mod! {
     // HoverCard content - shown on hover
     mod.widgets.MpHoverCardContentBase = #(MpHoverCardContent::register_widget(vm))
     mod.widgets.MpHoverCardContent = set_type_default() do mod.widgets.MpHoverCardContentBase{
-        width: Fit
+        width: 280.0
         height: Fit
 
 
@@ -32,7 +32,7 @@ script_mod! {
         draw_bg +: {
             bg_color: instance(SURFACE_CARD)
             border_color: instance(BORDER)
-            radius: instance(8.0)
+            radius: instance(12.0)
             hover: instance(0.0)
             popover_opacity: instance(1.0)
 

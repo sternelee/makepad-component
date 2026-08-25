@@ -37,13 +37,13 @@ script_mod! {
         }
 
         draw_label +: {
-            text_style: theme.font_regular{font_size: 13.0}
+            text_style: theme.font_regular{font_size: 12.5}
             color: TEXT
         }
 
         // Chevron glyph (▸ / ▾ swapped by Rust)
         draw_chevron +: {
-            text_style: theme.font_regular{font_size: 9.0}
+            text_style: theme.font_regular{font_size: 10.0}
             color: TEXT_FAINT
         }
     }
@@ -125,7 +125,7 @@ pub struct MpTree {
     row_height: f64,
 
     /// Indentation per depth level (px)
-    #[live(16.0)]
+    #[live(14.0)]
     indent_step: f64,
 
     // Data (set by caller)
