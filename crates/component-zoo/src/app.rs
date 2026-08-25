@@ -4897,6 +4897,33 @@ startup() do #(App::script_component(vm)){
                         }
                     }
 
+                    // ===== Control Bar Section =====
+                    View{
+                        width: Fill, height: Fit,
+                        flow: Down,
+                        spacing: 16,
+
+                        SectionHeader{ text: "Control Bar" }
+
+                        mod.widgets.MpControlBarRounded{
+                            leading := {
+                                mod.widgets.MpButtonGhost{ text: "Back" }
+                                mod.widgets.MpButtonGhost{ text: "Forward" }
+                            }
+                            center := {
+                                mod.widgets.MpButtonProminent{ text: "Play" }
+                                Label{
+                                    draw_text +: { text_style: theme.font_regular{font_size: 12.5} color: TEXT_MUTED }
+                                    text: "0:42 / 3:51"
+                                }
+                            }
+                            trailing := {
+                                mod.widgets.MpButtonGhost{ text: "Shuffle" }
+                                mod.widgets.MpButtonGhost{ text: "Volume" }
+                            }
+                        }
+                    }
+
                     // ============================================================
                     // Shader Page - Shadertoy-style fractal effect
                     // ============================================================
