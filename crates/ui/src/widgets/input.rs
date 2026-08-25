@@ -249,8 +249,8 @@ script_mod! {
 
             draw_text +: {
                 text_style: theme.font_regular{font_size: 14.0}
-                color: instance(TEXT)
-                color_empty: instance(TEXT_FAINT)
+                color: TEXT
+                color_empty: TEXT_FAINT
 
                 get_color: fn() {
                     return mix(self.color, self.color_empty, self.empty)
@@ -269,10 +269,12 @@ script_mod! {
             }
 
             draw_selection +: {
+                selection_color: instance(SELECTION)
+
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 2.0)
-                    sdf.fill(SELECTION)
+                    sdf.fill(self.selection_color)
                     return sdf.result
                 }
             }
@@ -407,8 +409,8 @@ script_mod! {
 
             draw_text +: {
                 text_style: theme.font_regular{font_size: 13.0}
-                color: instance(TEXT)
-                color_empty: instance(TEXT_FAINT)
+                color: TEXT
+                color_empty: TEXT_FAINT
 
                 get_color: fn() {
                     return mix(self.color, self.color_empty, self.empty)
@@ -427,10 +429,12 @@ script_mod! {
             }
 
             draw_selection +: {
+                selection_color: instance(SELECTION)
+
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 2.0)
-                    sdf.fill(SELECTION)
+                    sdf.fill(self.selection_color)
                     return sdf.result
                 }
             }

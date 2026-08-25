@@ -9,52 +9,10 @@ script_mod! {
     // MpToggleGroup - segmented single-select control
     // ============================================================
 
-    mod.widgets.MpToggleGroup = set_type_default() do #(MpToggleGroup::register_widget(vm)){
-        width: Fit
-        height: Fit
-        flow: Right
-        spacing: 4.0
-        padding: Inset{left: 4.0, right: 4.0, top: 4.0, bottom: 4.0}
-
-        draw_bg +: {
-            bg_color: instance(INPUT_BG)
-            border_color: instance(BORDER)
-            border_width: instance(0.0)
-            radius: instance(8.0)
-
-            pixel: fn() {
-                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                sdf.box(
-                    self.border_width,
-                    self.border_width,
-                    self.rect_size.x - self.border_width * 2.0,
-                    self.rect_size.y - self.border_width * 2.0,
-                    self.radius
-                )
-                sdf.fill(self.bg_color)
-                if (self.border_width > 0.0) {
-                    sdf.stroke(self.border_color, self.border_width)
-                }
-                return sdf.result
-            }
-        }
-
-        i0 := mod.widgets.MpToggleGroupItem{text: "One"}
-        i1 := mod.widgets.MpToggleGroupItem{text: "Two"}
-        i2 := mod.widgets.MpToggleGroupItem{text: "Three"}
-        i3 := mod.widgets.MpToggleGroupItem{visible: false}
-        i4 := mod.widgets.MpToggleGroupItem{visible: false}
-        i5 := mod.widgets.MpToggleGroupItem{visible: false}
-        i6 := mod.widgets.MpToggleGroupItem{visible: false}
-        i7 := mod.widgets.MpToggleGroupItem{visible: false}
-    }
-
     mod.widgets.MpToggleGroupItem = set_type_default() do #(MpToggleGroupItem::register_widget(vm)){
         width: Fit
         height: Fit
         padding: Inset{left: 10.0, right: 10.0, top: 4.0, bottom: 4.0}
-
-        cursor: MouseCursor.Hand
 
         draw_bg +: {
             bg_active: instance(SOLID)
@@ -102,6 +60,46 @@ script_mod! {
             }
         }
     }
+
+    mod.widgets.MpToggleGroup = set_type_default() do #(MpToggleGroup::register_widget(vm)){
+        width: Fit
+        height: Fit
+        flow: Right
+        spacing: 4.0
+        padding: Inset{left: 4.0, right: 4.0, top: 4.0, bottom: 4.0}
+
+        draw_bg +: {
+            bg_color: instance(INPUT_BG)
+            border_color: instance(BORDER)
+            border_width: instance(0.0)
+            radius: instance(8.0)
+
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(
+                    self.border_width,
+                    self.border_width,
+                    self.rect_size.x - self.border_width * 2.0,
+                    self.rect_size.y - self.border_width * 2.0,
+                    self.radius
+                )
+                sdf.fill(self.bg_color)
+                if (self.border_width > 0.0) {
+                    sdf.stroke(self.border_color, self.border_width)
+                }
+                return sdf.result
+            }
+        }
+
+        i0 := mod.widgets.MpToggleGroupItem{text: "One"}
+        i1 := mod.widgets.MpToggleGroupItem{text: "Two"}
+        i2 := mod.widgets.MpToggleGroupItem{text: "Three"}
+        i3 := mod.widgets.MpToggleGroupItem{visible: false}
+        i4 := mod.widgets.MpToggleGroupItem{visible: false}
+        i5 := mod.widgets.MpToggleGroupItem{visible: false}
+        i6 := mod.widgets.MpToggleGroupItem{visible: false}
+        i7 := mod.widgets.MpToggleGroupItem{visible: false}
+    }
 }
 
 pub const TOGGLE_GROUP_SLOTS: usize = 8;
@@ -120,7 +118,7 @@ pub enum MpToggleGroupItemAction {
     None,
 }
 
-#[derive(Script, ScriptHook, Widget, Animator)]
+#[derive(Script, Widget, Animator)]
 pub struct MpToggleGroupItem {
     #[uid]
     uid: WidgetUid,
@@ -132,7 +130,7 @@ pub struct MpToggleGroupItem {
     draw_bg: DrawQuad,
     #[live]
     draw_text: DrawText,
-    #[animator]
+    #[apply_default]
     animator: Animator,
 
     #[walk]
@@ -150,6 +148,8 @@ pub struct MpToggleGroupItem {
     #[rust]
     index: usize,
 }
+
+impl ScriptHook for MpToggleGroupItem {}
 
 impl Widget for MpToggleGroupItem {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {

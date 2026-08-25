@@ -2727,6 +2727,28 @@ startup() do #(App::script_component(vm)){
                                     mod.widgets.MpSpinnerWithLabelVertical {}
                                 }
                             }
+
+                            // Orbs (bezel thinking loaders)
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Orbs" }
+
+                                View {
+                                    width: Fit, height: Fit,
+                                    flow: Right,
+                                    spacing: 24,
+                                    align: Align{ y: 0.5 }
+
+                                    mod.widgets.MpOrbCluster {}
+                                    mod.widgets.MpOrbRing {}
+                                    mod.widgets.MpOrbConverge {}
+                                    mod.widgets.MpOrbBloom {}
+                                    mod.widgets.MpLoadingWord {}
+                                }
+                            }
                         }
                     }
 

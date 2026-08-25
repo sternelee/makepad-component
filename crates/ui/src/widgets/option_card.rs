@@ -14,8 +14,6 @@ script_mod! {
         height: Fit
         padding: Inset{left: 12.0, right: 12.0, top: 10.0, bottom: 10.0}
 
-        cursor: MouseCursor.Hand
-
         draw_bg +: {
             bg_color: instance(INPUT_BG)
             bg_selected: instance(SURFACE_CARD)
@@ -87,7 +85,7 @@ pub enum MpOptionCardAction {
     None,
 }
 
-#[derive(Script, ScriptHook, Widget, Animator)]
+#[derive(Script, Widget, Animator)]
 pub struct MpOptionCard {
     #[uid]
     uid: WidgetUid,
@@ -101,7 +99,7 @@ pub struct MpOptionCard {
     draw_title: DrawText,
     #[live]
     draw_meta: DrawText,
-    #[animator]
+    #[apply_default]
     animator: Animator,
 
     #[walk]
@@ -117,6 +115,8 @@ pub struct MpOptionCard {
     #[rust]
     area: Area,
 }
+
+impl ScriptHook for MpOptionCard {}
 
 impl Widget for MpOptionCard {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
