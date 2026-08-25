@@ -19,10 +19,12 @@ script_mod! {
         draw_bg +: {
             on: instance(0.0)
             hover: instance(0.0)
+            focus: instance(0.0)
             track_off: instance(ELEMENT_ACTIVE)
             track_on: instance(SOLID)
             thumb_off: instance(TEXT_FAINT)
             thumb_on: instance(ON_SOLID)
+            focus_color: instance(CARET)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -47,6 +49,14 @@ script_mod! {
                 sdf.circle(knob_x, r, thumb_r)
                 sdf.fill(thumb_color)
 
+                // Focus ring: CARET hairline around the capsule when focused
+                if (self.focus > 0.5) {
+                    sdf.circle(r, r, r + 0.5)
+                    sdf.rect(r, -0.5, sz.x - sz.y, sz.y + 1.0)
+                    sdf.circle(sz.x - r, r, r + 0.5)
+                    sdf.stroke(self.focus_color, 1.5)
+                }
+
                 return sdf.result
             }
         }
@@ -59,7 +69,7 @@ script_mod! {
                     apply: {draw_bg: {hover: 0.0}}
                 }
                 on: AnimatorState{
-                    from: {all: Forward {duration: 0.1}}
+                    from: {all: Forward {duration: 0.15}}
                     apply: {draw_bg: {hover: 1.0}}
                 }
             }
@@ -72,6 +82,17 @@ script_mod! {
                 on: AnimatorState{
                     from: {all: Forward {duration: 0.2}}
                     apply: {draw_bg: {on: 1.0}}
+                }
+            }
+            focus: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_bg: {focus: 0.0}}
+                }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_bg: {focus: 1.0}}
                 }
             }
         }
@@ -102,6 +123,9 @@ pub struct MpSwitch {
 
     #[rust]
     area: Area,
+
+    #[live(false)]
+    focused: bool,
 }
 
 impl ScriptHook for MpSwitch {
@@ -128,6 +152,13 @@ impl Widget for MpSwitch {
             self.redraw(cx);
         }
 
+        // Sync focus state from Cx
+        let has_focus = cx.has_key_focus(self.area);
+        if has_focus != self.focused {
+            self.focused = has_focus;
+            self.animator_toggle(cx, has_focus, Animate::Yes, ids!(focus.on), ids!(focus.off));
+        }
+
         if self.disabled {
             return;
         }
@@ -149,6 +180,20 @@ impl Widget for MpSwitch {
                     self.redraw(cx);
                 }
             _ => {}
+        }
+
+        // Keyboard activation (Space/Enter) when focused
+        if self.focused {
+            if let Event::KeyDown(ke) = event {
+                if ke.key_code == KeyCode::Space || ke.key_code == KeyCode::ReturnKey {
+                    if !ke.is_repeat {
+                        self.on = !self.on;
+                        self.animator_toggle(cx, self.on, Animate::Yes, ids!(on.on), ids!(on.off));
+                        cx.widget_action(uid, MpSwitchAction::Changed(self.on));
+                        self.redraw(cx);
+                    }
+                }
+            }
         }
     }
 

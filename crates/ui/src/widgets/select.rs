@@ -185,20 +185,53 @@ pub struct MpSelectTrigger {
     source: ScriptObjectRef,
     #[deref]
     view: View,
+
+    #[rust]
+    focused: bool,
 }
 
 impl Widget for MpSelectTrigger {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         self.view.handle_event(cx, event, scope);
 
+        // Sync focus state from Cx
+        let has_focus = cx.has_key_focus(self.view.area());
+        if has_focus != self.focused {
+            self.focused = has_focus;
+            self.view.animator_toggle(
+                cx,
+                has_focus,
+                Animate::Yes,
+                ids!(focus.on),
+                ids!(focus.off),
+            );
+        }
+
         match event.hits(cx, self.view.area()) {
             Hit::FingerHoverIn(_) => {
                 cx.set_cursor(MouseCursor::Hand);
+                self.view.animator_play(cx, ids!(hover.on));
+            }
+            Hit::FingerHoverOut(_) => {
+                cx.set_cursor(MouseCursor::Default);
+                self.view.animator_play(cx, ids!(hover.off));
             }
             Hit::FingerDown(_) => {
+                cx.set_key_focus(self.view.area());
                 cx.widget_action(self.widget_uid(), MpSelectAction::Selected("toggle".into()));
             }
             _ => {}
+        }
+
+        // Keyboard activation (Enter/Space) when focused
+        if self.focused {
+            if let Event::KeyDown(ke) = event {
+                if (ke.key_code == KeyCode::ReturnKey || ke.key_code == KeyCode::Space)
+                    && !ke.is_repeat
+                {
+                    cx.widget_action(self.widget_uid(), MpSelectAction::Selected("toggle".into()));
+                }
+            }
         }
     }
 

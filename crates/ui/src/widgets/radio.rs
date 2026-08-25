@@ -28,8 +28,10 @@ script_mod! {
         draw_circle +: {
             checked: instance(0.0)
             hover: instance(0.0)
+            focus: instance(0.0)
             ring_off: instance(BORDER_STRONG)
             ring_on: instance(SOLID)
+            ring_focus: instance(CARET)
             bg_off: instance(INPUT_BG)
             dot_color: instance(SOLID)
 
@@ -44,10 +46,11 @@ script_mod! {
 
                 // Colors
                 let bg = mix(self.bg_off, self.bg_off, self.checked)
-                let border = mix(self.ring_off, self.ring_on, self.checked)
+                let bw = mix(1.5, 2.0, self.focus)
+                let bc = mix(mix(self.ring_off, self.ring_on, self.checked), self.ring_focus, self.focus)
 
                 sdf.fill_keep(bg)
-                sdf.stroke(border, 1.5)
+                sdf.stroke(bc, bw)
 
                 // Inner dot when checked
                 if (self.checked > 0.5) {
@@ -76,7 +79,7 @@ script_mod! {
                     apply: {draw_circle: {hover: 0.0}}
                 }
                 on: AnimatorState{
-                    from: {all: Forward {duration: 0.1}}
+                    from: {all: Forward {duration: 0.15}}
                     apply: {draw_circle: {hover: 1.0}}
                 }
             }
@@ -89,6 +92,17 @@ script_mod! {
                 on: AnimatorState{
                     from: {all: Forward {duration: 0.15}}
                     apply: {draw_circle: {checked: 1.0}}
+                }
+            }
+            focus: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_circle: {focus: 0.0}}
+                }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_circle: {focus: 1.0}}
                 }
             }
         }
@@ -128,6 +142,9 @@ pub struct MpRadio {
 
     #[rust]
     area: Area,
+
+    #[live(false)]
+    focused: bool,
 }
 
 impl ScriptHook for MpRadio {
@@ -160,6 +177,13 @@ impl Widget for MpRadio {
             self.redraw(cx);
         }
 
+        // Sync focus state from Cx
+        let has_focus = cx.has_key_focus(self.area);
+        if has_focus != self.focused {
+            self.focused = has_focus;
+            self.animator_toggle(cx, has_focus, Animate::Yes, ids!(focus.on), ids!(focus.off));
+        }
+
         if self.disabled {
             return;
         }
@@ -178,10 +202,25 @@ impl Widget for MpRadio {
                     // Radio can only be checked, not unchecked by clicking
                     self.checked = true;
                     self.animator_play(cx, ids!(checked.on));
+                    cx.set_key_focus(self.area);
                     cx.widget_action(uid, MpRadioAction::Changed(true));
                     self.redraw(cx);
                 }
             _ => {}
+        }
+
+        // Keyboard activation (Space/Enter) when focused
+        if self.focused {
+            if let Event::KeyDown(ke) = event {
+                if ke.key_code == KeyCode::Space || ke.key_code == KeyCode::ReturnKey {
+                    if !ke.is_repeat && !self.checked {
+                        self.checked = true;
+                        self.animator_play(cx, ids!(checked.on));
+                        cx.widget_action(uid, MpRadioAction::Changed(true));
+                        self.redraw(cx);
+                    }
+                }
+            }
         }
     }
 

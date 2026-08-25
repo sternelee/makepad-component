@@ -65,14 +65,14 @@ script_mod! {
     }
 
     // Stadium variant - radius is half the height (media transport look)
-    mod.widgets.MpControlBarPill = <mod.widgets.MpControlBar>{
+    mod.widgets.MpControlBarPill = mod.widgets.MpControlBar{
         draw_bg +: {
             radius: instance(28.0)
         }
     }
 
     // Rounded variant at BUBBLE_RADIUS - composer/toolbar look
-    mod.widgets.MpControlBarRounded = <mod.widgets.MpControlBar>{
+    mod.widgets.MpControlBarRounded = mod.widgets.MpControlBar{
         draw_bg +: {
             radius: instance(16.0)
         }

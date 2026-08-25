@@ -29,11 +29,13 @@ script_mod! {
         draw_check +: {
             checked: instance(0.0)
             hover: instance(0.0)
+            focus: instance(0.0)
             radius: instance(4.0)
             bg_off: instance(INPUT_BG)
             bg_on: instance(SOLID)
             border_off: instance(BORDER_STRONG)
             border_on: instance(SOLID)
+            border_color_focus: instance(CARET)
             check_color: instance(ON_SOLID)
 
             pixel: fn() {
@@ -48,7 +50,11 @@ script_mod! {
                 let border = mix(self.border_off, self.border_on, self.checked)
 
                 sdf.fill_keep(bg)
-                sdf.stroke(border, 1.5)
+
+                // Focus ring: CARET border at 2px when focused
+                let bw = mix(1.5, 2.0, self.focus)
+                let bc = mix(border, self.border_color_focus, self.focus)
+                sdf.stroke(bc, bw)
 
                 // Draw checkmark when checked
                 if (self.checked > 0.5) {
@@ -82,7 +88,7 @@ script_mod! {
                     apply: {draw_check: {hover: 0.0}}
                 }
                 on: AnimatorState{
-                    from: {all: Forward {duration: 0.1}}
+                    from: {all: Forward {duration: 0.15}}
                     apply: {draw_check: {hover: 1.0}}
                 }
             }
@@ -95,6 +101,17 @@ script_mod! {
                 on: AnimatorState{
                     from: {all: Forward {duration: 0.15}}
                     apply: {draw_check: {checked: 1.0}}
+                }
+            }
+            focus: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_check: {focus: 0.0}}
+                }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_check: {focus: 1.0}}
                 }
             }
         }
@@ -132,6 +149,9 @@ pub struct MpCheckbox {
 
     #[rust]
     area: Area,
+
+    #[live(false)]
+    focused: bool,
 }
 
 impl ScriptHook for MpCheckbox {
@@ -164,6 +184,13 @@ impl Widget for MpCheckbox {
             self.redraw(cx);
         }
 
+        // Sync focus state from Cx
+        let has_focus = cx.has_key_focus(self.area);
+        if has_focus != self.focused {
+            self.focused = has_focus;
+            self.animator_toggle(cx, has_focus, Animate::Yes, ids!(focus.on), ids!(focus.off));
+        }
+
         if self.disabled {
             return;
         }
@@ -178,7 +205,8 @@ impl Widget for MpCheckbox {
                 self.animator_play(cx, ids!(hover.off));
             }
             Hit::FingerDown(_) => {
-                // Finger down - no action yet, wait for FingerUp
+                // Claim key focus on click (bezel focus ring)
+                cx.set_key_focus(self.area);
             }
             Hit::FingerUp(fe)
                 if fe.is_over => {
@@ -194,6 +222,26 @@ impl Widget for MpCheckbox {
                     self.redraw(cx);
                 }
             _ => {}
+        }
+
+        // Keyboard activation (Space/Enter) when focused
+        if self.focused {
+            if let Event::KeyDown(ke) = event {
+                if ke.key_code == KeyCode::Space || ke.key_code == KeyCode::ReturnKey {
+                    if !ke.is_repeat {
+                        self.checked = !self.checked;
+                        self.animator_toggle(
+                            cx,
+                            self.checked,
+                            Animate::Yes,
+                            ids!(checked.on),
+                            ids!(checked.off),
+                        );
+                        cx.widget_action(uid, MpCheckboxAction::Changed(self.checked));
+                        self.redraw(cx);
+                    }
+                }
+            }
         }
     }
 

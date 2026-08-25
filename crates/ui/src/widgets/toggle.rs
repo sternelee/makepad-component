@@ -21,6 +21,8 @@ script_mod! {
             radius: instance(6.0)
             border_width: instance(1.0)
             border_color: instance(BORDER)
+            border_color_focus: instance(CARET)
+            focus: instance(0.0)
             bg_color: instance(#x0000)
             bg_hover: instance(ELEMENT_HOVER)
             bg_active: instance(ELEMENT_ACTIVE)
@@ -48,10 +50,12 @@ script_mod! {
 
                 sdf.fill_keep(final_bg)
 
-                // Border (fade when active)
+                // Border (fade when active); focus ring: CARET at 2px overrides
                 let final_border = mix(self.border_color, self.bg_checked, self.active)
-                if (self.border_width > 0.0 && self.active < 0.5) {
-                    sdf.stroke(final_border, self.border_width)
+                let bw = mix(self.border_width, 2.0, self.focus)
+                let bc = mix(final_border, self.border_color_focus, self.focus)
+                if (bw > 0.0 && (self.active < 0.5 || self.focus > 0.5)) {
+                    sdf.stroke(bc, bw)
                 }
 
                 return sdf.result
@@ -79,7 +83,7 @@ script_mod! {
                     apply: {draw_bg: {hover: 0.0}}
                 }
                 on: AnimatorState{
-                    from: {all: Forward {duration: 0.1}}
+                    from: {all: Forward {duration: 0.15}}
                     apply: {draw_bg: {hover: 1.0}}
                 }
             }
@@ -105,6 +109,17 @@ script_mod! {
                     from: {all: Forward {duration: 0.2}}
                     redraw: true
                     apply: {draw_bg: {active: 1.0} draw_text: {active: 1.0}}
+                }
+            }
+            focus: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_bg: {focus: 0.0}}
+                }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_bg: {focus: 1.0}}
                 }
             }
         }
@@ -176,6 +191,9 @@ pub struct MpToggle {
 
     #[rust]
     area: Area,
+
+    #[live(false)]
+    focused: bool,
 }
 
 impl ScriptHook for MpToggle {
@@ -203,6 +221,13 @@ impl Widget for MpToggle {
             self.redraw(cx);
         }
 
+        // Sync focus state from Cx
+        let has_focus = cx.has_key_focus(self.area);
+        if has_focus != self.focused {
+            self.focused = has_focus;
+            self.animator_toggle(cx, has_focus, Animate::Yes, ids!(focus.on), ids!(focus.off));
+        }
+
         match event.hits(cx, self.area) {
             Hit::FingerHoverIn(_) => {
                 cx.set_cursor(MouseCursor::Hand);
@@ -213,6 +238,8 @@ impl Widget for MpToggle {
             }
             Hit::FingerDown(_) => {
                 self.animator_play(cx, ids!(pressed.on));
+                // Claim key focus on click (bezel focus ring)
+                cx.set_key_focus(self.area);
             }
             Hit::FingerUp(fe) => {
                 self.animator_play(cx, ids!(pressed.off));
@@ -230,6 +257,26 @@ impl Widget for MpToggle {
                 }
             }
             _ => {}
+        }
+
+        // Keyboard activation (Space/Enter) when focused
+        if self.focused {
+            if let Event::KeyDown(ke) = event {
+                if ke.key_code == KeyCode::Space || ke.key_code == KeyCode::ReturnKey {
+                    if !ke.is_repeat {
+                        self.active = !self.active;
+                        self.animator_toggle(
+                            cx,
+                            self.active,
+                            Animate::Yes,
+                            ids!(active.on),
+                            ids!(active.off),
+                        );
+                        cx.widget_action(uid, MpToggleAction::Toggle);
+                        cx.widget_action(uid, MpToggleAction::Active(self.active));
+                    }
+                }
+            }
         }
     }
 

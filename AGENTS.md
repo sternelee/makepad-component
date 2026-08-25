@@ -63,12 +63,21 @@ Crate-specific guidance exists in `crates/raycast-launcher/CLAUDE.md` and `crate
 - `makepad-widgets` / `makepad-script` are pulled from the Makepad git repo (`https://github.com/makepad/makepad`, no branch/rev pinned in `Cargo.toml`; `Cargo.lock` currently pins commit `4f9ce7a8`).
 - Two API generations used to coexist in this workspace; the Makepad 2.0 migration (July 2026) moved every crate to `script_mod!`. The App entry pattern is: `impl AppMain for App { fn script_mod(vm) -> ScriptValue { ...; self::script_mod(vm) } }` with the `ui: Root{...}` tree inside a `startup() do #(App::script_component(vm)){...}` block as the last expression of the `script_mod!` block.
 
-### ⚠️ Current build status (verified 2026-07-15, updated after the Makepad 2.0 migration)
+### ⚠️ Current build status (verified 2026-08-25, after the Makepad 2.0 migration)
 
 The workspace has been migrated to the Makepad 2.0 `script_mod!` API. Everything compiles against the currently locked makepad commit except `gemini-talker`:
 
 - `cargo check -p makepad-component` / `-p makepad-plot` / `-p component-zoo` / `-p a2ui-demo` / `-p makepad-clipboard` / `-p raycast-launcher` — **pass**. The legacy `live_design!` API is gone from these crates; all widget/shader registration now happens through `script_mod!` blocks wired into each crate's `script_mod(vm)` function.
-- `cargo check -p gemini-talker` — **fails** (4 pre-existing errors: unresolved `gemini_live::prelude` import, type annotation errors). Unrelated to the script_mod migration.
+- `cargo test -p makepad-component` — **pass** (28 unit tests, 4 doc-tests ignored).
+- `cargo check -p gemini-talker` — **fails** (pre-existing: unresolved `gemini_live::prelude` import). Unrelated to the script_mod migration.
+
+### Interaction alignment (bezel port, 2026-08-25)
+
+Interactive widgets (`MpButton`, `MpCheckbox`, `MpToggle`, `MpSwitch`, `MpRadio`, `MpSlider`, `MpSelectTrigger`) now claim keyboard focus on click (`cx.set_key_focus`), sync their focus ring from Cx (`cx.has_key_focus`), and respond to keyboard: Enter/Space activates buttons/checkboxes/toggles/switches/radios/selects, and arrow keys step the slider value. The focus ring uses the `CARET` token at 2px, matching the bezel focus spec. Motion timing standardized to bezel `HOVER_FADE` (150ms both directions).
+
+**Shader gotcha:** theme tokens (e.g. `CARET`, `SOLID`) cannot be referenced as bare identifiers inside a shader `pixel: fn()` body — bind them as an instance field (`focus_color: instance(CARET)`) and read via `self.focus_color`. The `script_mod!` macro does NOT catch this; it only fails at runtime when the shader first compiles. Always verify with `grep -c '\[E\]'` on the app's runtime log.
+
+**Inheritance gotcha:** the old `live_design!` `<Base>{...}` angle-bracket inheritance is NOT valid in `script_mod!`. Use `mod.widgets.Variant = mod.widgets.Base{...}`. The just-landed `MpControlBar` variants used the old syntax and were fixed (parse errors only surfaced at runtime in a2ui-demo).
 
 Before assuming a change broke something, check whether the failure pre-exists. When fixing builds, prefer pinning/updating the dependency deliberately over speculative edits, and record what you did.
 

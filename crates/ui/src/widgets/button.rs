@@ -17,6 +17,8 @@ script_mod! {
             radius: instance(8.0)
             border_width: instance(0.0)
             border_color: instance(#x0000)
+            border_color_focus: instance(CARET)
+            focus: instance(0.0)
             hover: instance(0.0)
             pressed: instance(0.0)
             disabled: instance(0.0)
@@ -43,8 +45,11 @@ script_mod! {
 
                 sdf.fill_keep(final_color)
 
-                if (self.border_width > 0.0) {
-                    sdf.stroke(self.border_color, self.border_width)
+                // Focus ring: CARET border at 2px when focused (overrides any existing border)
+                let bw = mix(self.border_width, 2.0, self.focus)
+                let bc = mix(self.border_color, self.border_color_focus, self.focus)
+                if (bw > 0.0) {
+                    sdf.stroke(bc, bw)
                 }
 
                 return sdf.result
@@ -95,6 +100,17 @@ script_mod! {
                 on: AnimatorState{
                     from: {all: Forward {duration: 0.0}}
                     apply: {draw_bg: {disabled: 1.0} draw_text: {disabled: 1.0}}
+                }
+            }
+            focus: {
+                default: @off
+                off: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_bg: {focus: 0.0}}
+                }
+                on: AnimatorState{
+                    from: {all: Forward {duration: 0.15}}
+                    apply: {draw_bg: {focus: 1.0}}
                 }
             }
         }
@@ -197,6 +213,9 @@ pub struct MpButton {
 
     #[rust]
     area: Area,
+
+    #[live(false)]
+    focused: bool,
 }
 
 impl ScriptHook for MpButton {
@@ -232,6 +251,13 @@ impl Widget for MpButton {
             self.redraw(cx);
         }
 
+        // Sync focus state from Cx
+        let has_focus = cx.has_key_focus(self.area);
+        if has_focus != self.focused {
+            self.focused = has_focus;
+            self.animator_toggle(cx, has_focus, Animate::Yes, ids!(focus.on), ids!(focus.off));
+        }
+
         if self.disabled {
             return;
         }
@@ -248,6 +274,8 @@ impl Widget for MpButton {
             Hit::FingerDown(_) => {
                 self.animator_play(cx, ids!(pressed.on));
                 cx.widget_action(uid, MpButtonAction::Pressed);
+                // Claim key focus on click (bezel focus ring)
+                cx.set_key_focus(self.area);
             }
             Hit::FingerUp(fe) => {
                 self.animator_play(cx, ids!(pressed.off));
@@ -257,6 +285,17 @@ impl Widget for MpButton {
                 cx.widget_action(uid, MpButtonAction::Released);
             }
             _ => {}
+        }
+
+        // Keyboard activation (Enter/Space) when this widget has key focus
+        if self.focused {
+            if let Event::KeyDown(ke) = event {
+                if ke.key_code == KeyCode::ReturnKey || ke.key_code == KeyCode::Space {
+                    if !ke.is_repeat {
+                        cx.widget_action(uid, MpButtonAction::Clicked);
+                    }
+                }
+            }
         }
     }
 

@@ -14,6 +14,8 @@ script_mod! {
         progress_end: 0.0
         disabled: 0.0
         vertical: 0.0
+        focus: 0.0
+        focus_color: CARET
         track_color: SURFACE_RAISED
         fill_color: ACCENT
         disabled_track_color: SURFACE
@@ -48,8 +50,13 @@ script_mod! {
                 let sdf2 = Sdf2d.viewport(self.pos * self.rect_size)
                 sdf2.box(track_x, 0.0, visual_thickness, sz.y, r)
                 sdf2.fill(fill_col)
-                let result = mix(sdf.result, sdf2.result, in_fill * sdf2.result.w)
-                return result
+                let base = mix(sdf.result, sdf2.result, in_fill * sdf2.result.w)
+
+                // Focus ring: CARET border around the full rect when focused
+                let sdf3 = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf3.box(0.5, 0.5, sz.x - 1.0, sz.y - 1.0, 4.0)
+                sdf3.stroke(self.focus_color, 1.5)
+                return mix(base, sdf3.result, sdf3.result.w * step(0.5, self.focus))
             } else {
                 // Horizontal: thin track centered vertically
                 let track_y = (sz.y - visual_thickness) * 0.5
@@ -66,8 +73,13 @@ script_mod! {
                 let sdf2 = Sdf2d.viewport(self.pos * self.rect_size)
                 sdf2.box(0.0, track_y, sz.x, visual_thickness, r)
                 sdf2.fill(fill_col)
-                let result = mix(sdf.result, sdf2.result, in_fill * sdf2.result.w)
-                return result
+                let base = mix(sdf.result, sdf2.result, in_fill * sdf2.result.w)
+
+                // Focus ring: CARET border around the full rect when focused
+                let sdf3 = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf3.box(0.5, 0.5, sz.x - 1.0, sz.y - 1.0, 4.0)
+                sdf3.stroke(self.focus_color, 1.5)
+                return mix(base, sdf3.result, sdf3.result.w * step(0.5, self.focus))
             }
         }
     }
@@ -130,7 +142,7 @@ script_mod! {
                     apply: {draw_thumb: {hover: 0.0} draw_thumb_start: {hover: 0.0}}
                 }
                 on: AnimatorState{
-                    from: {all: Forward {duration: 0.1}}
+                    from: {all: Forward {duration: 0.15}}
                     apply: {draw_thumb: {hover: 1.0} draw_thumb_start: {hover: 1.0}}
                 }
             }
@@ -261,6 +273,10 @@ pub struct DrawSliderTrack {
     #[live]
     vertical: f32,
     #[live]
+    focus: f32,
+    #[live]
+    focus_color: Vec4f,
+    #[live]
     track_color: Vec4f,
     #[live]
     fill_color: Vec4f,
@@ -352,6 +368,9 @@ pub struct MpSlider {
 
     #[rust]
     thumb_start_area: Area,
+
+    #[live(false)]
+    focused: bool,
 }
 
 impl Widget for MpSlider {
@@ -361,6 +380,13 @@ impl Widget for MpSlider {
         }
 
         if self.animator_handle_event(cx, event).must_redraw() {
+            self.redraw(cx);
+        }
+
+        // Sync focus state from Cx
+        let has_focus = cx.has_key_focus(self.track_area);
+        if has_focus != self.focused {
+            self.focused = has_focus;
             self.redraw(cx);
         }
 
@@ -387,6 +413,8 @@ impl Widget for MpSlider {
                 }
                 self.animator_play(cx, ids!(pressed.on));
                 self.update_value_from_position(cx, fe.abs);
+                // Claim key focus on click (bezel focus ring)
+                cx.set_key_focus(self.track_area);
             }
             Hit::FingerMove(fe) => {
                 if self.dragging {
@@ -401,6 +429,45 @@ impl Widget for MpSlider {
             }
             _ => {}
         }
+
+        // Keyboard activation (arrow keys step the value) when focused
+        if self.focused {
+            if let Event::KeyDown(ke) = event {
+                if !ke.is_repeat {
+                    // Step is at least one config step, and coarser for long ranges
+                    let step = ((self.max - self.min) / 20.0).max(self.step);
+                    match ke.key_code {
+                        KeyCode::ArrowRight | KeyCode::ArrowUp => {
+                            let new_val = (self.value + step).min(self.max);
+                            if (new_val - self.value).abs() > f64::EPSILON {
+                                self.value = new_val;
+                                let changed = if self.range_mode {
+                                    SliderValue::Range(self.value_start, self.value)
+                                } else {
+                                    SliderValue::Single(self.value)
+                                };
+                                cx.widget_action(self.widget_uid(), MpSliderAction::Changed(changed));
+                                self.redraw(cx);
+                            }
+                        }
+                        KeyCode::ArrowLeft | KeyCode::ArrowDown => {
+                            let new_val = (self.value - step).max(self.min);
+                            if (new_val - self.value).abs() > f64::EPSILON {
+                                self.value = new_val;
+                                let changed = if self.range_mode {
+                                    SliderValue::Range(self.value_start, self.value)
+                                } else {
+                                    SliderValue::Single(self.value)
+                                };
+                                cx.widget_action(self.widget_uid(), MpSliderAction::Changed(changed));
+                                self.redraw(cx);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
@@ -414,12 +481,14 @@ impl Widget for MpSlider {
 
         let disabled_f = if self.disabled { 1.0 } else { 0.0 };
         let vertical_f = if self.vertical { 1.0 } else { 0.0 };
+        let focus_f = if self.focused { 1.0 } else { 0.0 };
 
         // Update track + thumb shader instances
         self.draw_track.progress_start = progress_start as f32;
         self.draw_track.progress_end = progress_end as f32;
         self.draw_track.disabled = disabled_f;
         self.draw_track.vertical = vertical_f;
+        self.draw_track.focus = focus_f;
         self.draw_thumb.disabled = disabled_f;
         self.draw_thumb_start.disabled = disabled_f;
 
