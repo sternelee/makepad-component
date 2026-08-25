@@ -10,6 +10,20 @@ script_mod! {
     // MpMenuBar - horizontal menu bar with dropdown panels
     // ============================================================
 
+    // Menu title on the strip (bezel menubar_title: px8/py3, r6, t13,
+    // muted -> text on hover)
+    mod.widgets.MpMenuTitle = mod.widgets.MpButtonGhost{
+        height: 24
+        padding: Inset{left: 8, right: 8, top: 3, bottom: 3}
+        draw_bg +: {
+            radius: instance(6.0)
+        }
+        draw_text +: {
+            text_style: theme.font_regular{font_size: 13.0}
+            color: TEXT_MUTED
+        }
+    }
+
     mod.widgets.MpMenuBar = set_type_default() do #(MpMenuBar::register_widget(vm)){
         width: Fill
         height: Fit
@@ -40,24 +54,24 @@ script_mod! {
                 }
             }
 
-            t0 := mod.widgets.MpButtonGhost{ width: Fit, text: "File" }
-            t1 := mod.widgets.MpButtonGhost{ width: Fit, text: "Edit" }
-            t2 := mod.widgets.MpButtonGhost{ width: Fit, text: "View" }
+            t0 := mod.widgets.MpMenuTitle{ width: Fit, text: "File" }
+            t1 := mod.widgets.MpMenuTitle{ width: Fit, text: "Edit" }
+            t2 := mod.widgets.MpMenuTitle{ width: Fit, text: "View" }
         }
 
         panel := View{
             width: 180
             height: Fit
             flow: Down
-            spacing: 2
+            spacing: 0
             padding: Inset{top: 4, right: 4, bottom: 4, left: 4}
             visible: false
 
             show_bg: true
             draw_bg +: {
-                bg_color: instance(SURFACE_CARD)
+                bg_color: instance(SURFACE_OVERLAY)
                 border_color: instance(BORDER)
-                radius: instance(8.0)
+                radius: instance(12.0)
 
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)

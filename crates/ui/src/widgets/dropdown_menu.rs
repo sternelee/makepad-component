@@ -24,15 +24,15 @@ script_mod! {
             width: 180
             height: Fit
             flow: Down
-            spacing: 2
+            spacing: 0
             padding: Inset{top: 4, right: 4, bottom: 4, left: 4}
             visible: false
 
             show_bg: true
             draw_bg +: {
-                bg_color: instance(SURFACE_CARD)
+                bg_color: instance(SURFACE_OVERLAY)
                 border_color: instance(BORDER)
-                radius: instance(8.0)
+                radius: instance(12.0)
 
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)

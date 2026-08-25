@@ -15,7 +15,7 @@ script_mod! {
         width: Fill
         height: 28
         visible: true
-        padding: Inset{left: 10, right: 10, top: 0, bottom: 0}
+        padding: Inset{left: 8, right: 8, top: 0, bottom: 0}
         align: Align{x: 0.0, y: 0.5}
 
         draw_bg +: {
@@ -26,7 +26,7 @@ script_mod! {
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 4.0)
+                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 8.0)
                 let bg = mix(self.bg_color, self.bg_hover, self.hover)
                 sdf.fill(bg)
                 return sdf.result
@@ -87,15 +87,15 @@ script_mod! {
             width: 180
             height: Fit
             flow: Down
-            spacing: 2
+            spacing: 0
             padding: Inset{top: 4, right: 4, bottom: 4, left: 4}
             visible: false
 
             show_bg: true
             draw_bg +: {
-                bg_color: instance(SURFACE_CARD)
+                bg_color: instance(SURFACE_OVERLAY)
                 border_color: instance(BORDER)
-                radius: instance(8.0)
+                radius: instance(12.0)
 
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
