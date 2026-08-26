@@ -1492,6 +1492,9 @@ impl AppMain for App {
             }
         }
 
+        // Tab / Shift-Tab keyboard focus traversal (bezel focus port)
+        makepad_component::widgets::focus::handle_key(cx, event);
+
         // Capture actions from UI event handling (must run for ALL events)
         let actions = cx.capture_actions(|cx| {
             self.ui.handle_event(cx, event, &mut Scope::empty());

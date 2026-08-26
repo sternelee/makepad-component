@@ -7791,6 +7791,8 @@ impl AppMain for App {
 
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
         self.match_event(cx, event);
+        // Tab / Shift-Tab keyboard focus traversal (bezel focus port)
+        makepad_component::widgets::focus::handle_key(cx, event);
         self.ui.handle_event(cx, event, &mut Scope::empty());
     }
 }

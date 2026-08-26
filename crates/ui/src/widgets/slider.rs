@@ -602,6 +602,10 @@ impl Widget for MpSlider {
             }
         }
 
+        if !self.disabled {
+            crate::widgets::focus::register(cx, self.widget_uid(), self.track_area);
+        }
+
         DrawStep::done()
     }
 }

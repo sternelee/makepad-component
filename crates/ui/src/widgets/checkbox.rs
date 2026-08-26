@@ -260,6 +260,9 @@ impl Widget for MpCheckbox {
 
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
+        if !self.disabled {
+            crate::widgets::focus::register(cx, self.widget_uid(), self.area);
+        }
 
         DrawStep::done()
     }
