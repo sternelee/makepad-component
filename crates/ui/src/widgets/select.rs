@@ -124,10 +124,11 @@ script_mod! {
             bg_selected: instance(ELEMENT_ACTIVE)
             hover: instance(0.0)
             selected: instance(0.0)
+            highlighted: instance(0.0)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                let bg = mix(self.bg_color, self.bg_hover, self.hover)
+                let bg = mix(self.bg_color, self.bg_hover, max(self.hover, self.highlighted))
                 let final_bg = mix(bg, self.bg_selected, self.selected)
                 sdf.rect(0.0, 0.0, self.rect_size.x, self.rect_size.y)
                 sdf.fill(final_bg)
@@ -158,7 +159,7 @@ script_mod! {
     }
 
     // Select (container)
-    mod.widgets.MpSelect = View{
+    mod.widgets.MpSelect = set_type_default() do #(MpSelect::register_widget(vm)){
         width: Fill
         height: Fit
         flow: Overlay
@@ -198,13 +199,8 @@ impl Widget for MpSelectTrigger {
         let has_focus = cx.has_key_focus(self.view.area());
         if has_focus != self.focused {
             self.focused = has_focus;
-            self.view.animator_toggle(
-                cx,
-                has_focus,
-                Animate::Yes,
-                ids!(focus.on),
-                ids!(focus.off),
-            );
+            self.view
+                .animator_toggle(cx, has_focus, Animate::Yes, ids!(focus.on), ids!(focus.off));
         }
 
         match event.hits(cx, self.view.area()) {
@@ -280,6 +276,8 @@ pub struct MpSelectOption {
     value: ArcStringMut,
     #[live]
     selected: bool,
+    #[live]
+    highlighted: bool,
 
     #[rust]
     area: Area,
@@ -328,6 +326,13 @@ impl MpSelectOption {
         self.redraw(cx);
     }
 
+    pub fn set_highlighted(&mut self, cx: &mut Cx, highlighted: bool) {
+        if self.highlighted != highlighted {
+            self.highlighted = highlighted;
+            self.redraw(cx);
+        }
+    }
+
     pub fn set_value(&mut self, text: &str) {
         self.value.as_mut_empty().push_str(text);
     }
@@ -341,6 +346,12 @@ impl MpSelectOptionRef {
             }
         }
         None
+    }
+
+    pub fn set_highlighted(&self, cx: &mut Cx, highlighted: bool) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_highlighted(cx, highlighted);
+        }
     }
 }
 
@@ -359,5 +370,200 @@ impl Widget for MpSelectDropdown {
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         self.view.draw_walk(cx, scope, walk)
+    }
+}
+
+// ============================================================
+// MpSelect — trigger + dropdown container with keyboard navigation
+// ============================================================
+
+#[derive(Script, ScriptHook, Widget)]
+pub struct MpSelect {
+    #[source]
+    source: ScriptObjectRef,
+    #[deref]
+    view: View,
+
+    /// Whether the dropdown is open.
+    #[rust]
+    open: bool,
+
+    /// Keyboard-highlighted option index (None = no keyboard highlight).
+    #[rust]
+    highlighted: Option<usize>,
+}
+
+impl Widget for MpSelect {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        // Keyboard navigation while the dropdown is open (before child dispatch).
+        if self.open {
+            if let Event::KeyDown(ke) = event {
+                if !ke.is_repeat {
+                    match ke.key_code {
+                        KeyCode::ArrowDown => {
+                            self.move_highlight(cx, 1);
+                            return;
+                        }
+                        KeyCode::ArrowUp => {
+                            self.move_highlight(cx, -1);
+                            return;
+                        }
+                        KeyCode::Escape => {
+                            self.set_open(cx, false);
+                            return;
+                        }
+                        KeyCode::ReturnKey | KeyCode::Space => {
+                            if let Some(idx) = self.highlighted {
+                                if let Some(value) = self.option_value(cx, idx) {
+                                    self.commit(cx, &value);
+                                    return;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        self.view.handle_event(cx, event, scope);
+        self.widget_match_event(cx, event, scope);
+    }
+
+    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        self.view.draw_walk(cx, scope, walk)
+    }
+}
+
+impl WidgetMatchEvent for MpSelect {
+    fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions, _scope: &mut Scope) {
+        // Trigger toggle (mouse down or Enter/Space on the focused trigger).
+        if let Some(action) = actions.find_widget_action(self.trigger_uid(cx)) {
+            if let MpSelectAction::Selected(v) = action.cast() {
+                if v == "toggle" {
+                    self.toggle(cx);
+                }
+            }
+        }
+
+        // Option click -> commit.
+        let count = self.option_count();
+        for i in 0..count {
+            if let Some(value) = self.option_selected_at(cx, i, actions) {
+                self.commit(cx, &value);
+                return;
+            }
+        }
+    }
+}
+
+impl MpSelect {
+    fn trigger_uid(&self, cx: &mut Cx) -> WidgetUid {
+        self.view.mp_select_trigger(cx, ids!(trigger)).widget_uid()
+    }
+
+    /// Collect the dropdown's `MpSelectOption` child refs (in tree order).
+    fn option_refs(&self) -> Vec<WidgetRef> {
+        let mut opts = Vec::new();
+        let dropdown = self.view.child(id!(dropdown));
+        dropdown.children(&mut |_id, child| {
+            if child.borrow::<MpSelectOption>().is_some() {
+                opts.push(child);
+            }
+        });
+        opts
+    }
+
+    /// Number of option children in the dropdown.
+    fn option_count(&self) -> usize {
+        self.option_refs().len()
+    }
+
+    /// The value of option `idx` (by child index in the dropdown view).
+    fn option_value(&self, cx: &mut Cx, idx: usize) -> Option<String> {
+        let child = self.option_refs().into_iter().nth(idx)?;
+        child
+            .borrow::<MpSelectOption>()
+            .map(|o| o.value.as_ref().to_string())
+    }
+
+    fn option_selected_at(&self, cx: &mut Cx, idx: usize, actions: &Actions) -> Option<String> {
+        let child = self.option_refs().into_iter().nth(idx)?;
+        let uid = child.widget_uid();
+        if let Some(item) = actions.find_widget_action(uid) {
+            if let MpSelectAction::Selected(v) = item.cast() {
+                return Some(v);
+            }
+        }
+        None
+    }
+
+    /// Move the keyboard highlight by `delta` (wraps around).
+    fn move_highlight(&mut self, cx: &mut Cx, delta: isize) {
+        let count = self.option_count();
+        if count == 0 {
+            self.highlighted = None;
+            return;
+        }
+        let next = match self.highlighted {
+            Some(cur) => ((cur as isize + delta).rem_euclid(count as isize)) as usize,
+            None if delta > 0 => 0,
+            None => count - 1,
+        };
+        self.highlighted = Some(next);
+        self.apply_highlight(cx);
+    }
+
+    fn apply_highlight(&mut self, cx: &mut Cx) {
+        let opts = self.option_refs();
+        for (i, child) in opts.into_iter().enumerate() {
+            let on = self.highlighted == Some(i);
+            if let Some(mut opt) = child.borrow_mut::<MpSelectOption>() {
+                opt.set_highlighted(cx, on);
+            }
+        }
+    }
+
+    fn set_open(&mut self, cx: &mut Cx, open: bool) {
+        self.open = open;
+        if !open {
+            self.highlighted = None;
+        }
+        self.view.view(cx, ids!(dropdown)).set_visible(cx, open);
+        self.redraw(cx);
+    }
+
+    fn toggle(&mut self, cx: &mut Cx) {
+        self.set_open(cx, !self.open);
+    }
+
+    fn commit(&mut self, cx: &mut Cx, value: &str) {
+        self.view
+            .mp_select_trigger(cx, ids!(trigger))
+            .set_text(cx, value);
+        self.set_open(cx, false);
+        cx.widget_action(
+            self.widget_uid(),
+            MpSelectAction::Selected(value.to_string()),
+        );
+    }
+}
+
+impl MpSelectRef {
+    pub fn set_open(&self, cx: &mut Cx, open: bool) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_open(cx, open);
+        }
+    }
+
+    pub fn selected(&self, actions: &Actions) -> Option<String> {
+        if let Some(inner) = self.borrow() {
+            if let Some(action) = actions.find_widget_action(inner.widget_uid()) {
+                if let MpSelectAction::Selected(s) = action.cast() {
+                    return Some(s);
+                }
+            }
+        }
+        None
     }
 }

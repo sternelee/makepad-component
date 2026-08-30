@@ -423,6 +423,10 @@ pub struct A2uiSurface {
     #[rust]
     mp_labels: Vec<MpLabel>,
 
+    /// Pool of Markdown instances (rendered from the MpMarkdown template)
+    #[rust]
+    mp_markdowns: Vec<Markdown>,
+
     /// Pool of TextInput instances
     #[rust]
     mp_text_inputs: Vec<TextInput>,
@@ -750,6 +754,15 @@ impl A2uiSurface {
             self.mp_labels.push(new_lb);
         }
         &mut self.mp_labels[idx]
+    }
+
+    /// Get or grow a markdown renderer from the pool (MpMarkdown template)
+    fn pool_markdown(&mut self, cx: &mut Cx, idx: usize) -> &mut Markdown {
+        while self.mp_markdowns.len() <= idx {
+            let new_md = Self::new_from_mod::<Markdown>(cx, id!(MpMarkdown));
+            self.mp_markdowns.push(new_md);
+        }
+        &mut self.mp_markdowns[idx]
     }
 
     /// Get or grow a text input from the pool

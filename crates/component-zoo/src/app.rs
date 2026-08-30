@@ -2040,6 +2040,30 @@ startup() do #(App::script_component(vm)){
 
                         mod.widgets.MpDivider {}
 
+                        // ===== Markdown Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Markdown" }
+
+                            View {
+                                width: 460, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+                                padding: 16,
+                                show_bg: true,
+                                draw_bg +: { color: #xffffffff }
+
+                                demo_markdown := mod.widgets.MpMarkdown{
+                                    body: ""
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
                         // ===== Badge Section =====
                         View {
                             width: Fill, height: Fit,
@@ -6759,6 +6783,12 @@ impl MatchEvent for App {
                     "Lemon".to_string(),
                 ],
             );
+
+        // Populate markdown demo
+        self.ui.markdown(cx, ids!(demo_markdown)).set_text(
+            cx,
+            "# Markdown rendering\n\nA **bold** word, an *italic* one, and `inline code`.\n\n## Lists\n\n- One\n- Two\n- Three\n\n1. First\n2. Second\n3. Third\n\n## Code block\n\n```rust\nfn main() {\n    println!(\"hello\");\n}\n```\n\n## Quote\n\n> A blockquote with a border.\n\n## Table\n\n| Name | Type |\n| ---- | ---- |\n| a    | b    |\n\n---\n\n[Open makepad](https://github.com/makepad/makepad)",
+        );
 
         // Populate context menu demo
         self.ui

@@ -695,10 +695,14 @@ impl Widget for MpPopoverWidget {
                     }
                 }
 
-                // Apply opacity to content's draw_bg via script_apply_eval
+                // Apply opacity to content's draw_bg via script_apply_eval.
+                // `opacity` is a custom shader instance on draw_bg, not a
+                // DrawQuad field, so it must be MERGED (`+:`), not assigned
+                // (`:`) — an assign would build a whole DrawQuad from the
+                // object and fail with "type mismatch ... expected DrawQuad".
                 let mut content_view = self.view(cx, ids!(content));
                 script_apply_eval!(cx, content_view, {
-                    draw_bg: { opacity: #(self.opacity as f32) }
+                    draw_bg +: { opacity: #(self.opacity as f32) }
                 });
 
                 self.redraw(cx);
@@ -766,7 +770,7 @@ impl MpPopoverWidget {
             self.opacity = 1.0;
             let mut content_view = self.view(cx, ids!(content));
             script_apply_eval!(cx, content_view, {
-                draw_bg: { opacity: 1.0 }
+                draw_bg +: { opacity: 1.0 }
             });
         }
         self.redraw(cx);

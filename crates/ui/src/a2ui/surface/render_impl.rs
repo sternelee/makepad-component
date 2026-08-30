@@ -803,8 +803,12 @@ impl A2uiSurface {
                 data_model,
                 self.current_scope.as_deref(),
             );
-            // For now, render as plain text (markdown rendering would need additional implementation)
-            self.draw_card_text.draw_walk(cx, Walk::fit(), Align::default(), &content);
+            // Full markdown rendering via the pooled MpMarkdown widget.
+            let md_idx = self.label_count;
+            self.label_count += 1;
+            let md = self.pool_markdown(cx, md_idx);
+            md.set_text(cx, &content);
+            let _ = md.draw_walk(cx, &mut Scope::empty(), Walk::fit());
         }
 
         // Render metadata if present

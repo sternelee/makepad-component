@@ -1,5 +1,5 @@
-use makepad_widgets::*;
 use crate::widgets::MpInputAction;
+use makepad_widgets::*;
 
 script_mod! {
     use mod.prelude.widgets_internal.*
@@ -22,10 +22,11 @@ script_mod! {
             bg_color: instance(#x0000)
             bg_hover: instance(ELEMENT_HOVER)
             hover: instance(0.0)
+            highlighted: instance(0.0)
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                let bg = mix(self.bg_color, self.bg_hover, self.hover)
+                let bg = mix(self.bg_color, self.bg_hover, max(self.hover, self.highlighted))
                 sdf.rect(0.0, 0.0, self.rect_size.x, self.rect_size.y)
                 sdf.fill(bg)
                 return sdf.result
@@ -125,10 +126,48 @@ pub struct MpCombobox {
 
     #[rust]
     open: bool,
+
+    /// Keyboard-highlighted option index (None = no keyboard highlight).
+    #[rust]
+    highlighted: Option<usize>,
 }
 
 impl Widget for MpCombobox {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        // Keyboard navigation while the list is open (before child dispatch, so
+        // arrow keys move the highlight even while the input holds key focus).
+        if self.open {
+            if let Event::KeyDown(ke) = event {
+                if !ke.is_repeat {
+                    match ke.key_code {
+                        KeyCode::ArrowDown => {
+                            self.move_highlight(cx, 1);
+                            return;
+                        }
+                        KeyCode::ArrowUp => {
+                            self.move_highlight(cx, -1);
+                            return;
+                        }
+                        KeyCode::Escape => {
+                            self.open = false;
+                            self.apply_filter(cx);
+                            self.redraw(cx);
+                            return;
+                        }
+                        KeyCode::ReturnKey | KeyCode::Space => {
+                            if let Some(idx) = self.highlighted {
+                                if let Some(label) = self.shown_labels().get(idx) {
+                                    self.commit(cx, label.clone());
+                                    return;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
         self.view.handle_event(cx, event, scope);
         self.widget_match_event(cx, event, scope);
     }
@@ -140,26 +179,68 @@ impl Widget for MpCombobox {
 
 impl MpCombobox {
     fn input_text(&self) -> String {
-        self.view
-            .child(id!(input))
-            .as_text_input()
-            .text()
+        self.view.child(id!(input)).as_text_input().text()
     }
 
-    fn apply_filter(&mut self, cx: &mut Cx) {
+    /// The filtered labels currently visible (in slot order).
+    fn shown_labels(&self) -> Vec<String> {
         let query = self.input_text().to_lowercase();
-        let mut shown: Vec<&String> = Vec::new();
-
+        let mut shown = Vec::new();
         if self.open {
             for item in &self.items {
                 if query.is_empty() || item.to_lowercase().contains(&query) {
-                    shown.push(item);
+                    shown.push(item.clone());
                     if shown.len() >= COMBOBOX_SLOTS {
                         break;
                     }
                 }
             }
         }
+        shown
+    }
+
+    /// Move the keyboard highlight by `delta` (wraps around), clamping to the
+    /// visible option count.
+    fn move_highlight(&mut self, cx: &mut Cx, delta: isize) {
+        let count = self.shown_labels().len();
+        if count == 0 {
+            self.highlighted = None;
+            return;
+        }
+        let next = match self.highlighted {
+            Some(cur) => {
+                let signed = (cur as isize + delta).rem_euclid(count as isize);
+                signed as usize
+            }
+            None if delta > 0 => 0,
+            None => count - 1,
+        };
+        self.highlighted = Some(next);
+        self.redraw(cx);
+    }
+
+    /// Apply the highlight state to the visible option slots.
+    fn apply_highlight(&mut self, cx: &mut Cx) {
+        let count = self.shown_labels().len();
+        for i in 0..COMBOBOX_SLOTS {
+            let key = [LiveId::from_str(&format!("opt{}", i))];
+            let on = self.highlighted == Some(i) && i < count;
+            self.view
+                .mp_combobox_option(cx, &key)
+                .set_highlighted(cx, on);
+        }
+    }
+
+    fn commit(&mut self, cx: &mut Cx, label: String) {
+        self.view.text_input(cx, ids!(input)).set_text(cx, &label);
+        self.open = false;
+        self.highlighted = None;
+        self.apply_filter(cx);
+        cx.widget_action(self.widget_uid(), MpComboboxAction::Selected(label));
+    }
+
+    fn apply_filter(&mut self, cx: &mut Cx) {
+        let shown = self.shown_labels();
 
         for i in 0..COMBOBOX_SLOTS {
             let key = [LiveId::from_str(&format!("opt{}", i))];
@@ -177,6 +258,14 @@ impl MpCombobox {
         self.view
             .label(cx, ids!(empty_label))
             .set_visible(cx, self.open && !any_match);
+
+        // Keep the keyboard highlight within range and paint it.
+        if let Some(h) = self.highlighted {
+            if h >= shown.len() {
+                self.highlighted = None;
+            }
+        }
+        self.apply_highlight(cx);
     }
 }
 
@@ -209,6 +298,8 @@ pub struct MpComboboxOption {
     label: ArcStringMut,
     #[live(true)]
     visible: bool,
+    #[live]
+    highlighted: bool,
 
     #[rust]
     area: Area,
@@ -265,6 +356,13 @@ impl MpComboboxOption {
             self.redraw(cx);
         }
     }
+
+    pub fn set_highlighted(&mut self, cx: &mut Cx, highlighted: bool) {
+        if self.highlighted != highlighted {
+            self.highlighted = highlighted;
+            self.redraw(cx);
+        }
+    }
 }
 
 impl MpComboboxOptionRef {
@@ -288,6 +386,12 @@ impl MpComboboxOptionRef {
             inner.set_visible(cx, visible);
         }
     }
+
+    pub fn set_highlighted(&self, cx: &mut Cx, highlighted: bool) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_highlighted(cx, highlighted);
+        }
+    }
 }
 
 impl WidgetMatchEvent for MpCombobox {
@@ -304,15 +408,12 @@ impl WidgetMatchEvent for MpCombobox {
         // Option click -> commit selection
         for i in 0..COMBOBOX_SLOTS {
             let key = [LiveId::from_str(&format!("opt{}", i))];
-            if let Some(selected) =
-                self.view.mp_combobox_option(cx, &key).option_selected(actions)
+            if let Some(selected) = self
+                .view
+                .mp_combobox_option(cx, &key)
+                .option_selected(actions)
             {
-                self.view
-                    .text_input(cx, ids!(input))
-                    .set_text(cx, &selected);
-                self.open = false;
-                self.apply_filter(cx);
-                cx.widget_action(self.widget_uid(), MpComboboxAction::Selected(selected));
+                self.commit(cx, selected);
                 return;
             }
         }
