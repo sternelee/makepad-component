@@ -6,7 +6,6 @@ script_mod! {
     use mod.mpc_theme.*
 
     // Badge indicator constants
-    let BADGE_HEIGHT = 20.0
     let BADGE_FONT_SIZE = 10.0
     let BADGE_PADDING_H = 7.0
     let BADGE_PADDING_V = 2.0
@@ -17,7 +16,7 @@ script_mod! {
     // Uses SDF capsule: two circles + middle rect for perfect rounded ends
     mod.widgets.MpBadgeIndicator = mod.widgets.View{
         width: Fit
-        height: BADGE_HEIGHT
+        height: Fit
         padding: Inset{left: BADGE_PADDING_H, right: BADGE_PADDING_H, top: BADGE_PADDING_V, bottom: BADGE_PADDING_V}
         align: Align{x: 0.5, y: 0.5}
 
@@ -44,6 +43,12 @@ script_mod! {
         label := Label{
             width: Fit
             height: Fit
+            // Override makepad Label's default `padding: theme.mspace_1` (3px
+            // all sides). The indicator is Fit-height (pill wraps the text), so
+            // any extra label padding would offset the number from the capsule's
+            // vertical center.
+            padding: 0
+
             draw_text +: {
                 text_style: theme.font_bold{font_size: BADGE_FONT_SIZE}
                 color: ON_SOLID
