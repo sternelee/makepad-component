@@ -161,6 +161,37 @@ impl Sizable for crate::widgets::toggle::MpToggle {
     }
 }
 
+// ---------- MpSlider ----------
+
+impl Disableable for crate::widgets::slider::MpSlider {
+    fn is_disabled(&self) -> bool {
+        crate::widgets::slider::MpSlider::is_disabled(self)
+    }
+    fn set_disabled(&mut self, cx: &mut Cx, disabled: bool) {
+        crate::widgets::slider::MpSlider::set_disabled(self, cx, disabled);
+    }
+}
+
+impl Sizable for crate::widgets::slider::MpSlider {
+    fn size(&self) -> MpSize {
+        crate::widgets::slider::MpSlider::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::slider::MpSlider::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpTextArea ----------
+
+impl Sizable for crate::widgets::textarea::MpTextArea {
+    fn size(&self) -> MpSize {
+        crate::widgets::textarea::MpTextArea::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::textarea::MpTextArea::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpTab ----------
 
 impl Selectable for crate::widgets::tab::MpTab {

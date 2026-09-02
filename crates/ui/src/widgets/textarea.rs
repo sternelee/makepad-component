@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -77,19 +79,13 @@ script_mod! {
         }
     }
 
-    // Variants
+    // Variants (size system drives the metrics now)
     mod.widgets.MpTextAreaSmall = mod.widgets.MpTextArea{
-        padding: Inset{left: 10.0, right: 10.0, top: 6.0, bottom: 6.0}
-        draw_text +: {
-            text_style: theme.font_regular{font_size: 12.0}
-        }
+        size: MpSize.Small
     }
 
     mod.widgets.MpTextAreaLarge = mod.widgets.MpTextArea{
-        padding: Inset{left: 14.0, right: 14.0, top: 12.0, bottom: 12.0}
-        draw_text +: {
-            text_style: theme.font_regular{font_size: 15.0}
-        }
+        size: MpSize.Large
     }
 }
 
@@ -116,6 +112,9 @@ pub struct MpTextArea {
     walk: Walk,
     #[layout]
     layout: Layout,
+
+    #[live]
+    size: MpSize,
 
     #[live]
     text: ArcStringMut,
@@ -156,6 +155,15 @@ impl Widget for MpTextArea {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Metrics per size (default Medium = 12/10 padding, 13px font)
+        self.layout.padding = Inset {
+            left: self.size.padding_h(),
+            right: self.size.padding_h(),
+            top: self.size.padding_v() + 4.0,
+            bottom: self.size.padding_v() + 4.0,
+        };
+        self.draw_text.text_style.font_size = self.size.font_size();
+
         self.draw_bg.begin(cx, walk, self.layout);
         // Draw placeholder if no text
         let display_text = if self.text.as_ref().is_empty() {
@@ -172,6 +180,17 @@ impl Widget for MpTextArea {
 }
 
 impl MpTextArea {
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
+    }
+
     pub fn set_text(&mut self, text: &str) {
         self.text.as_mut_empty().push_str(text);
     }
@@ -187,6 +206,16 @@ impl MpTextAreaRef {
             matches!(item.cast(), MpTextAreaAction::Changed)
         } else {
             false
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        self.borrow().map_or(MpSize::default(), |inner| inner.size())
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 

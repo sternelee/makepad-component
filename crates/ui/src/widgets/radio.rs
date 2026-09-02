@@ -27,15 +27,25 @@ script_mod! {
         // Aligned with gpui-bezel Controls::radio_button: a 16px ring; the
         // selected ring and inner dot take the max-contrast plate (SOLID),
         // unselected is a quiet BORDER_STRONG ring over INPUT_BG.
-        draw_circle +: {
-            checked: instance(0.0)
-            hover: instance(0.0)
-            focus: instance(0.0)
-            ring_off: instance(BORDER_STRONG)
-            ring_on: instance(SOLID)
-            ring_focus: instance(CARET)
-            bg_off: instance(INPUT_BG)
-            dot_color: instance(SOLID)
+        // Disabled fades the whole circle to half opacity (gpui grouped fade)
+        // and mutes the label toward TEXT_FAINT (written from Rust).
+        set_type_default() do #(DrawMpRadio::script_shader(vm)){
+            ..mod.draw.DrawQuad
+
+            checked: 0.0
+            hover: 0.0
+            focus: 0.0
+            disabled: 0.0
+
+            ring_off: BORDER_STRONG
+            ring_on: SOLID
+            ring_focus: CARET
+            bg_off: INPUT_BG
+            dot_color: SOLID
+
+            // Theme palette (read from Rust to resolve the disabled label)
+            c_text: TEXT
+            c_text_faint: TEXT_FAINT
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -61,7 +71,10 @@ script_mod! {
                     sdf.fill(self.dot_color)
                 }
 
-                return sdf.result
+                // Disabled: fade the whole circle to half opacity
+                let fade = mix(1.0, 0.5, self.disabled)
+                let res = sdf.result
+                return vec4(res.x, res.y, res.z, res.w * fade)
             }
         }
 
@@ -111,6 +124,44 @@ script_mod! {
     }
 }
 
+/// SDF paint for the radio ring + dot; instances are written from Rust in
+/// draw_walk (the 2.0 replacement for apply_over).
+#[derive(Script, ScriptHook)]
+#[repr(C)]
+pub struct DrawMpRadio {
+    #[deref]
+    draw_super: DrawQuad,
+
+    // Animator-driven state
+    #[live]
+    checked: f32,
+    #[live]
+    hover: f32,
+    #[live]
+    focus: f32,
+    // Written from Rust each draw (1.0 = disabled)
+    #[live]
+    disabled: f32,
+
+    // Paint
+    #[live]
+    ring_off: Vec4f,
+    #[live]
+    ring_on: Vec4f,
+    #[live]
+    ring_focus: Vec4f,
+    #[live]
+    bg_off: Vec4f,
+    #[live]
+    dot_color: Vec4f,
+
+    // Theme palette (baked at apply time; read from Rust)
+    #[live]
+    c_text: Vec4f,
+    #[live]
+    c_text_faint: Vec4f,
+}
+
 #[derive(Script, Widget, Animator)]
 pub struct MpRadio {
     #[uid]
@@ -124,7 +175,7 @@ pub struct MpRadio {
     #[live]
     draw_bg: DrawQuad,
     #[live]
-    draw_circle: DrawQuad,
+    draw_circle: DrawMpRadio,
     #[live]
     draw_label: DrawText,
 
@@ -237,6 +288,19 @@ impl Widget for MpRadio {
             MpSize::Medium => 16.0,
             MpSize::Large => 19.0,
             MpSize::XLarge => 22.0,
+        };
+
+        // Disabled fades the ring in the shader and mutes the label.
+        let disabled = if self.disabled { 1.0f32 } else { 0.0 };
+        self.draw_circle.disabled = disabled;
+
+        let text = self.draw_circle.c_text;
+        let faint = self.draw_circle.c_text_faint;
+        self.draw_label.color = Vec4f {
+            x: text.x + (faint.x - text.x) * disabled,
+            y: text.y + (faint.y - text.y) * disabled,
+            z: text.z + (faint.z - text.z) * disabled,
+            w: text.w + (faint.w - text.w) * disabled,
         };
 
         // Begin outer container (provides hit testing area)

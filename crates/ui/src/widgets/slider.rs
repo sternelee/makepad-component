@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -20,6 +22,8 @@ script_mod! {
         fill_color: ACCENT
         disabled_track_color: SURFACE
         disabled_fill_color: TEXT_FAINT
+        // Written from Rust per size (thin strip centered in the full rect)
+        thickness: 4.0
 
         pixel: fn() {
             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -32,7 +36,7 @@ script_mod! {
             let is_vert = self.vertical
 
             // Visual track thickness (thin strip centered in the full rect)
-            let visual_thickness = 4.0
+            let visual_thickness = self.thickness
 
             if (is_vert > 0.5) {
                 // Vertical: thin track centered horizontally
@@ -284,6 +288,9 @@ pub struct DrawSliderTrack {
     disabled_track_color: Vec4f,
     #[live]
     disabled_fill_color: Vec4f,
+    // Written from Rust per size (thin strip centered in the full rect)
+    #[live]
+    thickness: f32,
 }
 
 /// Thumb shader for MpSlider (shared by both thumbs in range mode).
@@ -353,6 +360,9 @@ pub struct MpSlider {
 
     #[live(false)]
     disabled: bool,
+
+    #[live]
+    size: MpSize,
 
     #[rust]
     dragging: bool,
@@ -483,18 +493,34 @@ impl Widget for MpSlider {
         let vertical_f = if self.vertical { 1.0 } else { 0.0 };
         let focus_f = if self.focused { 1.0 } else { 0.0 };
 
+        // Metrics per size (default Medium = 24-high widget, 14px thumb)
+        let (widget_extent, thumb_size, track_thickness) = match self.size {
+            MpSize::XSmall => (16.0, 10.0, 3.0),
+            MpSize::Small => (20.0, 12.0, 4.0),
+            MpSize::Medium => (24.0, 14.0, 4.0),
+            MpSize::Large => (30.0, 18.0, 6.0),
+            MpSize::XLarge => (34.0, 22.0, 7.0),
+        };
+
         // Update track + thumb shader instances
         self.draw_track.progress_start = progress_start as f32;
         self.draw_track.progress_end = progress_end as f32;
         self.draw_track.disabled = disabled_f;
         self.draw_track.vertical = vertical_f;
         self.draw_track.focus = focus_f;
+        self.draw_track.thickness = track_thickness;
         self.draw_thumb.disabled = disabled_f;
         self.draw_thumb_start.disabled = disabled_f;
 
-        // Get the rect for drawing
+        // Get the rect for drawing; the widget extent scales with the size
+        // system (height when horizontal, width when vertical)
+        let mut walk = walk;
+        if self.vertical {
+            walk.width = Size::Fixed(widget_extent);
+        } else {
+            walk.height = Size::Fixed(widget_extent);
+        }
         let rect = cx.walk_turtle(walk);
-        let thumb_size = 14.0;
 
         if self.vertical {
             // Vertical layout - draw track at full rect size for hit testing
@@ -752,9 +778,24 @@ impl MpSlider {
         self.value_start = self.value_start.clamp(min, max);
     }
 
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
     pub fn set_disabled(&mut self, cx: &mut Cx, disabled: bool) {
         self.disabled = disabled;
         self.redraw(cx);
+    }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
     }
 }
 
@@ -782,6 +823,16 @@ impl MpSliderRef {
     pub fn set_disabled(&self, cx: &mut Cx, disabled: bool) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.set_disabled(cx, disabled);
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        self.borrow().map_or(MpSize::default(), |inner| inner.size())
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 

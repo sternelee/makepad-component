@@ -1262,6 +1262,9 @@ startup() do #(App::script_component(vm)){
                                 checkbox1 := mod.widgets.MpCheckbox{ text: "Option 1" }
                                 checkbox2 := mod.widgets.MpCheckbox{ text: "Option 2", checked: true }
                                 checkbox3 := mod.widgets.MpCheckbox{ text: "Option 3" }
+                                mod.widgets.MpCheckbox{ text: "Disabled", disabled: true }
+                                mod.widgets.MpCheckbox{ text: "Disabled on", checked: true, disabled: true }
+                                mod.widgets.MpCheckbox{ size: MpSize.Large, text: "Large" }
                             }
 
                             checkbox_status := Label{
@@ -1350,6 +1353,8 @@ startup() do #(App::script_component(vm)){
                                 radio_small := mod.widgets.MpRadio{ text: "Small" }
                                 radio_medium := mod.widgets.MpRadio{ text: "Medium", checked: true }
                                 radio_large := mod.widgets.MpRadio{ text: "Large" }
+                                mod.widgets.MpRadio{ text: "Disabled", disabled: true }
+                                mod.widgets.MpRadio{ text: "Disabled on", checked: true, disabled: true }
                             }
 
                             radio_status := Label{
@@ -1532,6 +1537,37 @@ startup() do #(App::script_component(vm)){
                                     mod.widgets.MpSliderDanger {
                                         width: 300,
                                         min: 0.0, max: 100.0, value: 20.0, step: 1.0,
+                                    }
+                                }
+                            }
+
+                            // Slider Sizes
+                            View {
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Sizes" }
+
+                                View {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 10,
+
+                                    mod.widgets.MpSlider {
+                                        width: 300,
+                                        size: MpSize.XSmall,
+                                        min: 0.0, max: 100.0, value: 20.0, step: 1.0,
+                                    }
+                                    mod.widgets.MpSlider {
+                                        width: 300,
+                                        size: MpSize.Medium,
+                                        min: 0.0, max: 100.0, value: 50.0, step: 1.0,
+                                    }
+                                    mod.widgets.MpSlider {
+                                        width: 300,
+                                        size: MpSize.XLarge,
+                                        min: 0.0, max: 100.0, value: 80.0, step: 1.0,
                                     }
                                 }
                             }
@@ -5346,11 +5382,13 @@ startup() do #(App::script_component(vm)){
                             Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Default:" }
                             demo_textarea := mod.widgets.MpTextArea{ placeholder: "Type your message here..." }
 
-                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Small:" }
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Small / Medium / Large:" }
                             mod.widgets.MpTextAreaSmall{ placeholder: "Small textarea" }
-
-                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Large:" }
+                            mod.widgets.MpTextArea{ placeholder: "Medium textarea" }
                             mod.widgets.MpTextAreaLarge{ placeholder: "Large textarea" }
+
+                            Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "XLarge:" }
+                            mod.widgets.MpTextArea{ size: MpSize.XLarge, placeholder: "Extra large textarea" }
                         }
 
                         // ============================================================

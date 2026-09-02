@@ -28,17 +28,27 @@ script_mod! {
         // Aligned with gpui-bezel Controls::checkbox: unchecked is a quiet
         // INPUT_BG square with a BORDER_STRONG outline; checked fills with the
         // max-contrast plate (SOLID) and paints the tick in ON_SOLID.
-        draw_check +: {
-            checked: instance(0.0)
-            hover: instance(0.0)
-            focus: instance(0.0)
-            radius: instance(4.0)
-            bg_off: instance(INPUT_BG)
-            bg_on: instance(SOLID)
-            border_off: instance(BORDER_STRONG)
-            border_on: instance(SOLID)
-            border_color_focus: instance(CARET)
-            check_color: instance(ON_SOLID)
+        // Disabled fades the whole box to half opacity (gpui grouped fade)
+        // and mutes the label toward TEXT_FAINT (written from Rust).
+        set_type_default() do #(DrawMpCheckbox::script_shader(vm)){
+            ..mod.draw.DrawQuad
+
+            checked: 0.0
+            hover: 0.0
+            focus: 0.0
+            disabled: 0.0
+
+            radius: 4.0
+            bg_off: INPUT_BG
+            bg_on: SOLID
+            border_off: BORDER_STRONG
+            border_on: SOLID
+            border_color_focus: CARET
+            check_color: ON_SOLID
+
+            // Theme palette (read from Rust to resolve the disabled label)
+            c_text: TEXT
+            c_text_faint: TEXT_FAINT
 
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
@@ -70,7 +80,10 @@ script_mod! {
                     sdf.stroke(self.check_color, 2.0)
                 }
 
-                return sdf.result
+                // Disabled: fade the whole box to half opacity
+                let fade = mix(1.0, 0.5, self.disabled)
+                let res = sdf.result
+                return vec4(res.x, res.y, res.z, res.w * fade)
             }
         }
 
@@ -120,6 +133,48 @@ script_mod! {
     }
 }
 
+/// SDF paint for the checkbox box + tick; instances are written from Rust
+/// in draw_walk (the 2.0 replacement for apply_over).
+#[derive(Script, ScriptHook)]
+#[repr(C)]
+pub struct DrawMpCheckbox {
+    #[deref]
+    draw_super: DrawQuad,
+
+    // Animator-driven state
+    #[live]
+    checked: f32,
+    #[live]
+    hover: f32,
+    #[live]
+    focus: f32,
+    // Written from Rust each draw (1.0 = disabled)
+    #[live]
+    disabled: f32,
+
+    // Paint
+    #[live]
+    radius: f32,
+    #[live]
+    bg_off: Vec4f,
+    #[live]
+    bg_on: Vec4f,
+    #[live]
+    border_off: Vec4f,
+    #[live]
+    border_on: Vec4f,
+    #[live]
+    border_color_focus: Vec4f,
+    #[live]
+    check_color: Vec4f,
+
+    // Theme palette (baked at apply time; read from Rust)
+    #[live]
+    c_text: Vec4f,
+    #[live]
+    c_text_faint: Vec4f,
+}
+
 #[derive(Script, Widget, Animator)]
 pub struct MpCheckbox {
     #[uid]
@@ -133,7 +188,7 @@ pub struct MpCheckbox {
     #[live]
     draw_bg: DrawQuad,
     #[live]
-    draw_check: DrawQuad,
+    draw_check: DrawMpCheckbox,
     #[live]
     draw_label: DrawText,
 
@@ -258,6 +313,19 @@ impl Widget for MpCheckbox {
             MpSize::Medium => 16.0,
             MpSize::Large => 19.0,
             MpSize::XLarge => 22.0,
+        };
+
+        // Disabled fades the box in the shader and mutes the label.
+        let disabled = if self.disabled { 1.0f32 } else { 0.0 };
+        self.draw_check.disabled = disabled;
+
+        let text = self.draw_check.c_text;
+        let faint = self.draw_check.c_text_faint;
+        self.draw_label.color = Vec4f {
+            x: text.x + (faint.x - text.x) * disabled,
+            y: text.y + (faint.y - text.y) * disabled,
+            z: text.z + (faint.z - text.z) * disabled,
+            w: text.w + (faint.w - text.w) * disabled,
         };
 
         // Begin outer container (provides hit testing area)
