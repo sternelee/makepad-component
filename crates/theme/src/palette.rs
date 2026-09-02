@@ -37,7 +37,13 @@ pub struct Tokens {
     // Accent, neutral by default (brandable)
     pub accent: Vec4f,
     pub accent_hover: Vec4f,
+    pub accent_muted: Vec4f,
     pub on_accent: Vec4f,
+
+    // Secondary plate (subdued filled control)
+    pub secondary: Vec4f,
+    pub secondary_hover: Vec4f,
+    pub on_secondary: Vec4f,
 
     // Status colors (+ muted companions for large fills / badges)
     pub danger: Vec4f,
@@ -90,7 +96,12 @@ pub fn dark() -> Tokens {
 
         accent: neutral(0.80),
         accent_hover: flatten(neutral(0.80), bg, 0.88),
+        accent_muted: flatten(neutral(0.80), bg, 0.25),
         on_accent: neutral(0.14),
+
+        secondary: flatten(white, surface, 0.10),
+        secondary_hover: flatten(white, surface, 0.16),
+        on_secondary: neutral(0.92),
 
         danger: oklch(0.70, 0.19, 25.0),
         danger_hover: flatten(oklch(0.70, 0.19, 25.0), bg, 0.88),
@@ -140,7 +151,12 @@ pub fn light() -> Tokens {
 
         accent: neutral(0.38),
         accent_hover: flatten(neutral(0.38), bg, 0.88),
+        accent_muted: flatten(neutral(0.38), bg, 0.15),
         on_accent: grey(1.0),
+
+        secondary: flatten(black, bg, 0.06),
+        secondary_hover: flatten(black, bg, 0.10),
+        on_secondary: neutral(0.26),
 
         // 600-level step of the same hue as dark's 400s, for AA on white.
         danger: oklch(0.56, 0.21, 25.0),

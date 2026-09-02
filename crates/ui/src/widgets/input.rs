@@ -334,8 +334,9 @@ script_mod! {
         }
     }
 
-    // Search input with icon (capsule/pill shape)
-    mod.widgets.MpInputSearch = mod.widgets.View{
+    // Search input with icon (capsule/pill shape) + clear button
+    mod.widgets.MpInputSearchBase = #(MpInputSearch::register_widget(vm))
+    mod.widgets.MpInputSearch = set_type_default() do mod.widgets.MpInputSearchBase{
         width: Fill
         height: Fit
 
@@ -439,6 +440,17 @@ script_mod! {
                 }
             }
         }
+
+        // Clear button (visible only when the input has text)
+        clear_btn := mod.widgets.MpButtonGhost{
+            width: 18
+            height: 18
+            text: "✕"
+            draw_text +: {
+                text_style: theme.font_regular{font_size: 11.0}
+                color: TEXT_FAINT
+            }
+        }
     }
 }
 
@@ -495,6 +507,76 @@ impl MpInputPasswordRef {
     pub fn set_text(&self, cx: &mut Cx, text: &str) {
         if let Some(inner) = self.borrow() {
             inner.view.text_input(cx, ids!(input)).set_text(cx, text);
+        }
+    }
+}
+
+// Search input widget: capsule with search icon, text input and a clear
+// button that is only visible while the field has text.
+#[derive(Script, ScriptHook, Widget)]
+pub struct MpInputSearch {
+    #[source]
+    source: ScriptObjectRef,
+    #[deref]
+    view: View,
+}
+
+impl Widget for MpInputSearch {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        self.view.handle_event(cx, event, scope);
+        self.widget_match_event(cx, event, scope);
+    }
+
+    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        self.view.draw_walk(cx, scope, walk)
+    }
+}
+
+impl WidgetMatchEvent for MpInputSearch {
+    fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions, _scope: &mut Scope) {
+        // Clear button click -> empty the field.
+        if self.view.button(cx, ids!(clear_btn)).clicked(actions) {
+            let input = self.view.text_input(cx, ids!(input));
+            input.set_text(cx, "");
+            self.sync_clear_visible(cx);
+            self.view.redraw(cx);
+        }
+
+        // Keep the clear button in sync with the text contents.
+        if self
+            .view
+            .text_input(cx, ids!(input))
+            .changed(actions)
+            .is_some()
+        {
+            self.sync_clear_visible(cx);
+        }
+    }
+}
+
+impl MpInputSearch {
+    fn sync_clear_visible(&mut self, cx: &mut Cx) {
+        let non_empty = !self.view.text_input(cx, ids!(input)).text().is_empty();
+        self.view.button(cx, ids!(clear_btn)).set_visible(cx, non_empty);
+    }
+}
+
+impl MpInputSearchRef {
+    /// Get the current search text.
+    pub fn text(&self) -> String {
+        if let Some(inner) = self.borrow() {
+            inner.view.child(id!(input)).as_text_input().text()
+        } else {
+            String::new()
+        }
+    }
+
+    /// Set the search text.
+    pub fn set_text(&self, cx: &mut Cx, text: &str) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.view.text_input(cx, ids!(input)).set_text(cx, text);
+            inner.sync_clear_visible(cx);
+            inner.view.redraw(cx);
         }
     }
 }

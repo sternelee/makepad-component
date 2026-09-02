@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -332,6 +334,9 @@ pub struct MpTab {
     layout: Layout,
 
     #[live]
+    size: MpSize,
+
+    #[live]
     text: ArcStringMut,
 
     #[rust]
@@ -372,6 +377,22 @@ impl Widget for MpTab {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Metrics per MpSize (default Medium = 16/8 padding, 14px font).
+        let (pad_h, pad_v) = match self.size {
+            MpSize::XSmall => (10.0, 5.0),
+            MpSize::Small => (13.0, 6.5),
+            MpSize::Medium => (16.0, 8.0),
+            MpSize::Large => (18.0, 10.0),
+            MpSize::XLarge => (20.0, 12.0),
+        };
+        self.layout.padding = Inset {
+            left: pad_h,
+            right: pad_h,
+            top: pad_v,
+            bottom: pad_v,
+        };
+        self.draw_text.text_style.font_size = self.size.font_size() + 1.0;
+
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_text
             .draw_walk(cx, Walk::fit(), Align::default(), self.text.as_ref());
@@ -410,6 +431,17 @@ impl MpTab {
     pub fn is_selected(&self) -> bool {
         self.selected
     }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
+    }
 }
 
 impl MpTabRef {
@@ -433,6 +465,17 @@ impl MpTabRef {
             inner.is_selected()
         } else {
             false
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        self.borrow()
+            .map_or(MpSize::default(), |inner| inner.size())
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 }

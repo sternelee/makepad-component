@@ -42,6 +42,7 @@ pub mod rating;
 pub mod select;
 pub mod separator;
 pub mod scroll_area;
+pub mod sizing;
 pub mod sheet;
 pub mod skeleton;
 pub mod option_card;
@@ -62,6 +63,7 @@ pub mod status;
 pub mod toggle_group;
 pub mod tooltip;
 pub mod tree;
+pub mod traits;
 
 pub use accordion::*;
 pub use alert::*;
@@ -102,6 +104,7 @@ pub use radio::*;
 pub use rating::*;
 pub use select::*;
 pub use scroll_area::*;
+pub use sizing::*;
 pub use sheet::*;
 pub use skeleton::*;
 pub use option_card::*;
@@ -122,11 +125,13 @@ pub use toggle::*;
 pub use toggle_group::*;
 pub use tooltip::*;
 pub use tree::*;
+pub use traits::*;
 // dropdown, list are style-only (pure script_mod!, no Rust struct)
 
 use makepad_widgets::*;
 
 pub fn script_mod(vm: &mut ScriptVm) {
+    crate::widgets::sizing::script_mod(vm);
     crate::widgets::accordion::script_mod(vm);
     crate::widgets::alert::script_mod(vm);
     crate::widgets::calendar::script_mod(vm);

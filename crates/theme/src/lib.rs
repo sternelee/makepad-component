@@ -48,7 +48,11 @@ pub const TOKEN_NAMES: &[&str] = &[
     "ON_SOLID",
     "ACCENT",
     "ACCENT_HOVER",
+    "ACCENT_MUTED",
     "ON_ACCENT",
+    "SECONDARY",
+    "SECONDARY_HOVER",
+    "ON_SECONDARY",
     "DANGER",
     "DANGER_HOVER",
     "DANGER_MUTED",
@@ -93,6 +97,10 @@ script_mod! {
         ACCENT: #(crate::palette::dark().accent)
         ACCENT_HOVER: #(crate::palette::dark().accent_hover)
         ON_ACCENT: #(crate::palette::dark().on_accent)
+        ACCENT_MUTED: #(crate::palette::dark().accent_muted)
+        SECONDARY: #(crate::palette::dark().secondary)
+        SECONDARY_HOVER: #(crate::palette::dark().secondary_hover)
+        ON_SECONDARY: #(crate::palette::dark().on_secondary)
         DANGER: #(crate::palette::dark().danger)
         DANGER_HOVER: #(crate::palette::dark().danger_hover)
         DANGER_MUTED: #(crate::palette::dark().danger_muted)
@@ -134,6 +142,10 @@ script_mod! {
         ACCENT: #(crate::palette::light().accent)
         ACCENT_HOVER: #(crate::palette::light().accent_hover)
         ON_ACCENT: #(crate::palette::light().on_accent)
+        ACCENT_MUTED: #(crate::palette::light().accent_muted)
+        SECONDARY: #(crate::palette::light().secondary)
+        SECONDARY_HOVER: #(crate::palette::light().secondary_hover)
+        ON_SECONDARY: #(crate::palette::light().on_secondary)
         DANGER: #(crate::palette::light().danger)
         DANGER_HOVER: #(crate::palette::light().danger_hover)
         DANGER_MUTED: #(crate::palette::light().danger_muted)
@@ -176,6 +188,10 @@ script_mod! {
         ACCENT: #(crate::palette::dark().accent)
         ACCENT_HOVER: #(crate::palette::dark().accent_hover)
         ON_ACCENT: #(crate::palette::dark().on_accent)
+        ACCENT_MUTED: #(crate::palette::dark().accent_muted)
+        SECONDARY: #(crate::palette::dark().secondary)
+        SECONDARY_HOVER: #(crate::palette::dark().secondary_hover)
+        ON_SECONDARY: #(crate::palette::dark().on_secondary)
         DANGER: #(crate::palette::dark().danger)
         DANGER_HOVER: #(crate::palette::dark().danger_hover)
         DANGER_MUTED: #(crate::palette::dark().danger_muted)
@@ -222,7 +238,11 @@ impl Tokens {
             "ON_SOLID" => self.on_solid,
             "ACCENT" => self.accent,
             "ACCENT_HOVER" => self.accent_hover,
+            "ACCENT_MUTED" => self.accent_muted,
             "ON_ACCENT" => self.on_accent,
+            "SECONDARY" => self.secondary,
+            "SECONDARY_HOVER" => self.secondary_hover,
+            "ON_SECONDARY" => self.on_secondary,
             "DANGER" => self.danger,
             "DANGER_HOVER" => self.danger_hover,
             "DANGER_MUTED" => self.danger_muted,

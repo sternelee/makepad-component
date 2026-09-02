@@ -408,6 +408,25 @@ impl Widget for MpSelect {
                             self.move_highlight(cx, -1);
                             return;
                         }
+                        KeyCode::Home => {
+                            self.set_highlight_index(cx, 0);
+                            return;
+                        }
+                        KeyCode::End => {
+                            let count = self.option_count();
+                            if count > 0 {
+                                self.set_highlight_index(cx, count - 1);
+                            }
+                            return;
+                        }
+                        KeyCode::PageDown => {
+                            self.move_highlight(cx, 5);
+                            return;
+                        }
+                        KeyCode::PageUp => {
+                            self.move_highlight(cx, -5);
+                            return;
+                        }
                         KeyCode::Escape => {
                             self.set_open(cx, false);
                             return;
@@ -511,6 +530,17 @@ impl MpSelect {
             None => count - 1,
         };
         self.highlighted = Some(next);
+        self.apply_highlight(cx);
+    }
+
+    /// Set the keyboard highlight to an absolute index (clamped).
+    fn set_highlight_index(&mut self, cx: &mut Cx, idx: usize) {
+        let count = self.option_count();
+        if count == 0 {
+            self.highlighted = None;
+            return;
+        }
+        self.highlighted = Some(idx.min(count - 1));
         self.apply_highlight(cx);
     }
 

@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -132,6 +134,9 @@ pub struct MpRadio {
     layout: Layout,
 
     #[live]
+    size: MpSize,
+
+    #[live]
     text: ArcStringMut,
     #[live]
     checked: bool,
@@ -225,11 +230,20 @@ impl Widget for MpRadio {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Radio circle size per MpSize (default Medium = 16).
+        let circle_size = match self.size {
+            MpSize::XSmall => 12.0,
+            MpSize::Small => 14.0,
+            MpSize::Medium => 16.0,
+            MpSize::Large => 19.0,
+            MpSize::XLarge => 22.0,
+        };
+
         // Begin outer container (provides hit testing area)
         self.draw_bg.begin(cx, walk, self.layout);
 
-        // Draw radio circle (18x18)
-        self.draw_circle.draw_walk(cx, Walk::fixed(16.0, 16.0));
+        // Draw radio circle
+        self.draw_circle.draw_walk(cx, Walk::fixed(circle_size, circle_size));
 
         // Draw label text
         if !self.text.as_ref().is_empty() {
@@ -250,6 +264,28 @@ impl Widget for MpRadio {
 impl MpRadio {
     pub fn is_checked(&self) -> bool {
         self.checked
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.disabled
+    }
+
+    pub fn set_disabled(&mut self, cx: &mut Cx, disabled: bool) {
+        if self.disabled != disabled {
+            self.disabled = disabled;
+            self.redraw(cx);
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
     }
 
     pub fn value(&self) -> &str {
@@ -298,6 +334,22 @@ impl MpRadioRef {
     pub fn set_checked(&self, cx: &mut Cx, checked: bool) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.set_checked(cx, checked);
+        }
+    }
+
+    pub fn set_disabled(&self, cx: &mut Cx, disabled: bool) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_disabled(cx, disabled);
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        self.borrow().map_or(MpSize::default(), |inner| inner.size())
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 

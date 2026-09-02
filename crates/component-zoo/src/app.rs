@@ -1286,52 +1286,29 @@ startup() do #(App::script_component(vm)){
                             View {
                                 width: Fit, height: Fit,
                                 flow: Down,
-                                spacing: 16,
+                                spacing: 12,
 
-                                View {
-                                    width: Fit, height: Fit,
-                                    flow: Right,
-                                    spacing: 12,
-                                    align: Align{ y: 0.5 }
-                                    switch_wifi := mod.widgets.MpSwitch{}
-                                    Label {
-                                        draw_text +: {
-                                            text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: TEXT
-                                        }
-                                        text: "Wi-Fi"
-                                    }
-                                }
+                                // Built-in labels: text + label_side, like the
+                                // gpui-component Switch label
+                                switch_wifi := mod.widgets.MpSwitch{ text: "Wi-Fi" }
+                                switch_bluetooth := mod.widgets.MpSwitch{ on: true, text: "Bluetooth" }
+                                switch_notifications := mod.widgets.MpSwitch{ text: "Notifications", label_side: MpLabelSide.Left }
+                                mod.widgets.MpSwitch{ disabled: true, text: "Disabled" }
+                                mod.widgets.MpSwitch{ on: true, disabled: true, text: "Disabled on" }
+                            }
 
-                                View {
-                                    width: Fit, height: Fit,
-                                    flow: Right,
-                                    spacing: 12,
-                                    align: Align{ y: 0.5 }
-                                    switch_bluetooth := mod.widgets.MpSwitch{ on: true }
-                                    Label {
-                                        draw_text +: {
-                                            text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: TEXT
-                                        }
-                                        text: "Bluetooth"
-                                    }
-                                }
+                            // Size system (track height 14..26)
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Right,
+                                spacing: 12,
+                                align: Align{ y: 0.5 }
 
-                                View {
-                                    width: Fit, height: Fit,
-                                    flow: Right,
-                                    spacing: 12,
-                                    align: Align{ y: 0.5 }
-                                    switch_notifications := mod.widgets.MpSwitch{}
-                                    Label {
-                                        draw_text +: {
-                                            text_style: theme.font_regular{ font_size: 14.0 }
-                                            color: TEXT
-                                        }
-                                        text: "Notifications"
-                                    }
-                                }
+                                mod.widgets.MpSwitch{ size: MpSize.XSmall, text: "XS" }
+                                mod.widgets.MpSwitch{ size: MpSize.Small, text: "S" }
+                                mod.widgets.MpSwitch{ size: MpSize.Medium, text: "M" }
+                                mod.widgets.MpSwitch{ size: MpSize.Large, text: "L" }
+                                mod.widgets.MpSwitch{ size: MpSize.XLarge, text: "XL" }
                             }
 
                             // Multiple switches
@@ -5567,7 +5544,20 @@ startup() do #(App::script_component(vm)){
                                 align: Align{y: 0.5}
                                 Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Sizes:" }
                                 demo_toggle_sm := mod.widgets.MpToggleSmall{ text: "Small" }
+                                mod.widgets.MpToggle{ text: "Medium" }
                                 demo_toggle_lg := mod.widgets.MpToggleLarge{ text: "Large" }
+                                mod.widgets.MpToggle{ size: MpSize.XSmall, text: "XS" }
+                                mod.widgets.MpToggle{ size: MpSize.XLarge, text: "XL" }
+                            }
+                            View{
+                                width: Fill, height: Fit,
+                                flow: Right,
+                                spacing: 8.0,
+                                align: Align{y: 0.5}
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "States:" }
+                                mod.widgets.MpToggle{ text: "Active", active: true }
+                                mod.widgets.MpToggle{ text: "Disabled", disabled: true }
+                                mod.widgets.MpToggleGhost{ text: "Ghost off", disabled: true }
                             }
                         }
 

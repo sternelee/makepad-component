@@ -16,7 +16,7 @@ script_mod! {
         height: 24
         padding: Inset{left: 8, right: 8, top: 3, bottom: 3}
         draw_bg +: {
-            radius: instance(6.0)
+            radius: 6.0
         }
         draw_text +: {
             text_style: theme.font_regular{font_size: 13.0}
