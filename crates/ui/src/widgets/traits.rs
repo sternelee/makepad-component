@@ -25,6 +25,12 @@ pub trait Sizable {
     fn set_size(&mut self, cx: &mut Cx, size: MpSize);
 }
 
+/// Widgets with a collapsed/expanded state (gpui `Collapsible`).
+pub trait Collapsible {
+    fn is_collapsed(&self) -> bool;
+    fn set_collapsed(&mut self, cx: &mut Cx, collapsed: bool);
+}
+
 // ---------- MpButton ----------
 
 impl Disableable for crate::widgets::button::MpButton {
@@ -209,5 +215,27 @@ impl Sizable for crate::widgets::tab::MpTab {
     }
     fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
         crate::widgets::tab::MpTab::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpStepper ----------
+
+impl Sizable for crate::widgets::stepper::MpStepper {
+    fn size(&self) -> MpSize {
+        crate::widgets::stepper::MpStepper::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::stepper::MpStepper::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpCollapsibleTrigger ----------
+
+impl Collapsible for crate::widgets::collapsible::MpCollapsibleTrigger {
+    fn is_collapsed(&self) -> bool {
+        !crate::widgets::collapsible::MpCollapsibleTrigger::is_expanded(self)
+    }
+    fn set_collapsed(&mut self, cx: &mut Cx, collapsed: bool) {
+        crate::widgets::collapsible::MpCollapsibleTrigger::set_expanded(self, cx, !collapsed);
     }
 }

@@ -1,5 +1,8 @@
 use makepad_widgets::*;
 
+use crate::widgets::button::MpButtonWidgetRefExt;
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -39,6 +42,15 @@ script_mod! {
             text: "+"
         }
     }
+
+    // Size variants (metrics propagate to the -/+ buttons and value label)
+    mod.widgets.MpStepperSmall = mod.widgets.MpStepper{
+        size: MpSize.Small
+    }
+
+    mod.widgets.MpStepperLarge = mod.widgets.MpStepper{
+        size: MpSize.Large
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -69,6 +81,15 @@ pub struct MpStepper {
 
     #[live(0usize)]
     precision: usize,
+
+    /// Five-step size system driving the stepper height, -/+ buttons and
+    /// value label font.
+    #[live]
+    size: MpSize,
+
+    /// Last size applied to the children (avoid re-applying every draw).
+    #[rust]
+    applied_size: Option<MpSize>,
 }
 
 impl Widget for MpStepper {
@@ -78,6 +99,23 @@ impl Widget for MpStepper {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        let size = self.size;
+
+        // The control extent scales with the size system (Medium = the DSL 32).
+        let mut walk = walk;
+        walk.height = Size::Fixed(size.min_height());
+
+        // Propagate the size to the child buttons and value label once per
+        // size change (child setters may request redraws, so guard them).
+        if self.applied_size != Some(size) {
+            self.applied_size = Some(size);
+            self.view.child(id!(dec)).as_mp_button().set_size(cx, size);
+            self.view.child(id!(inc)).as_mp_button().set_size(cx, size);
+            if let Some(mut label) = self.view.label(cx, ids!(value_label)).borrow_mut() {
+                label.draw_text.text_style.font_size = size.font_size();
+            }
+        }
+
         self.view.draw_walk(cx, scope, walk)
     }
 }
@@ -119,6 +157,19 @@ impl MpStepper {
     pub fn value(&self) -> f64 {
         self.value
     }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            // Children re-sync on the next draw_walk.
+            self.applied_size = None;
+            self.redraw(cx);
+        }
+    }
 }
 
 impl WidgetMatchEvent for MpStepper {
@@ -156,5 +207,19 @@ impl MpStepperRef {
             }
         }
         None
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
+        }
     }
 }

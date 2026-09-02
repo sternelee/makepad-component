@@ -4520,6 +4520,30 @@ startup() do #(App::script_component(vm)){
                                     }
                                     text: "Value: 10"
                                 }
+
+                                SubsectionLabel{ text: "Sizes" }
+
+                                View {
+                                    width: Fill, height: Fit,
+                                    flow: Right, spacing: 16,
+                                    align: Align{y: 0.5},
+
+                                    View {
+                                        width: Fit, height: Fit, flow: Down, spacing: 4,
+                                        mod.widgets.MpStepperSmall{ value: 5.0, step: 1.0, min: 0.0, max: 10.0 }
+                                        Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Small" }
+                                    }
+                                    View {
+                                        width: Fit, height: Fit, flow: Down, spacing: 4,
+                                        mod.widgets.MpStepper{ value: 5.0, step: 1.0, min: 0.0, max: 10.0 }
+                                        Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Medium" }
+                                    }
+                                    View {
+                                        width: Fit, height: Fit, flow: Down, spacing: 4,
+                                        mod.widgets.MpStepperLarge{ value: 5.0, step: 1.0, min: 0.0, max: 10.0 }
+                                        Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Large" }
+                                    }
+                                }
                             }
                         }
 

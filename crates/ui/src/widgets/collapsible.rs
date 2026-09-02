@@ -177,6 +177,10 @@ impl Widget for MpCollapsibleTrigger {
 }
 
 impl MpCollapsibleTrigger {
+    pub fn is_expanded(&self) -> bool {
+        self.expanded
+    }
+
     pub fn set_expanded(&mut self, cx: &mut Cx, expanded: bool) {
         if self.expanded != expanded {
             self.expanded = expanded;
@@ -198,6 +202,20 @@ impl MpCollapsibleTriggerRef {
             matches!(item.cast(), MpCollapsibleAction::Toggle)
         } else {
             false
+        }
+    }
+
+    pub fn is_expanded(&self) -> bool {
+        if let Some(inner) = self.borrow() {
+            inner.expanded
+        } else {
+            false
+        }
+    }
+
+    pub fn set_expanded(&self, cx: &mut Cx, expanded: bool) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_expanded(cx, expanded);
         }
     }
 }
