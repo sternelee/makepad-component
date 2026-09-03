@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -52,66 +54,22 @@ script_mod! {
 
     // Extra small avatar
     mod.widgets.MpAvatarXSmall = mod.widgets.MpAvatar{
-        width: AVATAR_SIZE_XS
-        height: AVATAR_SIZE_XS
-
-        label := Label{
-            width: Fit
-            height: Fit
-            draw_text +: {
-                text_style: theme.font_bold{font_size: 10.0}
-                color: TEXT_MUTED
-            }
-            text: ""
-        }
+        size: MpSize.XSmall
     }
 
     // Small avatar
     mod.widgets.MpAvatarSmall = mod.widgets.MpAvatar{
-        width: AVATAR_SIZE_SM
-        height: AVATAR_SIZE_SM
-
-        label := Label{
-            width: Fit
-            height: Fit
-            draw_text +: {
-                text_style: theme.font_bold{font_size: 12.0}
-                color: TEXT_MUTED
-            }
-            text: ""
-        }
+        size: MpSize.Small
     }
 
     // Large avatar
     mod.widgets.MpAvatarLarge = mod.widgets.MpAvatar{
-        width: AVATAR_SIZE_LG
-        height: AVATAR_SIZE_LG
-
-        label := Label{
-            width: Fit
-            height: Fit
-            draw_text +: {
-                text_style: theme.font_bold{font_size: 20.0}
-                color: TEXT_MUTED
-            }
-            text: ""
-        }
+        size: MpSize.Large
     }
 
     // Extra large avatar
     mod.widgets.MpAvatarXLarge = mod.widgets.MpAvatar{
-        width: AVATAR_SIZE_XL
-        height: AVATAR_SIZE_XL
-
-        label := Label{
-            width: Fit
-            height: Fit
-            draw_text +: {
-                text_style: theme.font_bold{font_size: 28.0}
-                color: TEXT_MUTED
-            }
-            text: ""
-        }
+        size: MpSize.XLarge
     }
 
     // ============================================================
@@ -142,40 +100,18 @@ script_mod! {
     mod.widgets.MpAvatarSquare = mod.widgets.MpAvatarSquareBase{}
 
     mod.widgets.MpAvatarSquareSmall = mod.widgets.MpAvatarSquareBase{
-        width: AVATAR_SIZE_SM
-        height: AVATAR_SIZE_SM
+        size: MpSize.Small
 
         draw_bg +: {
             radius: instance(4.0)
         }
-
-        label := Label{
-            width: Fit
-            height: Fit
-            draw_text +: {
-                text_style: theme.font_bold{font_size: 12.0}
-                color: TEXT_MUTED
-            }
-            text: ""
-        }
     }
 
     mod.widgets.MpAvatarSquareLarge = mod.widgets.MpAvatarSquareBase{
-        width: AVATAR_SIZE_LG
-        height: AVATAR_SIZE_LG
+        size: MpSize.Large
 
         draw_bg +: {
             radius: instance(8.0)
-        }
-
-        label := Label{
-            width: Fit
-            height: Fit
-            draw_text +: {
-                text_style: theme.font_bold{font_size: 20.0}
-                color: TEXT_MUTED
-            }
-            text: ""
         }
     }
 
@@ -267,6 +203,36 @@ pub struct MpAvatar {
     source: ScriptObjectRef,
     #[deref]
     view: View,
+
+    /// Five-step size driving the avatar diameter and label font.
+    #[live]
+    size: MpSize,
+
+    /// Last size applied to the label (avoids re-applying every draw).
+    #[rust]
+    applied_size: Option<MpSize>,
+}
+
+/// Avatar diameter for a size step (MpSize-aware metric table).
+fn avatar_diameter(size: MpSize) -> f64 {
+    match size {
+        MpSize::XSmall => 24.0,
+        MpSize::Small => 32.0,
+        MpSize::Medium => 40.0,
+        MpSize::Large => 56.0,
+        MpSize::XLarge => 80.0,
+    }
+}
+
+/// Initials font size for a size step.
+fn avatar_font(size: MpSize) -> f32 {
+    match size {
+        MpSize::XSmall => 10.0,
+        MpSize::Small => 12.0,
+        MpSize::Medium => 14.0,
+        MpSize::Large => 20.0,
+        MpSize::XLarge => 28.0,
+    }
 }
 
 impl Widget for MpAvatar {
@@ -275,6 +241,19 @@ impl Widget for MpAvatar {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        // The avatar extent scales with the size system (square).
+        let diameter = avatar_diameter(self.size);
+        let mut walk = walk;
+        walk.width = Size::Fixed(diameter);
+        walk.height = Size::Fixed(diameter);
+
+        if self.applied_size != Some(self.size) {
+            self.applied_size = Some(self.size);
+            if let Some(mut label) = self.view.label(cx, ids!(label)).borrow_mut() {
+                label.draw_text.text_style.font_size = avatar_font(self.size);
+            }
+        }
+
         self.view.draw_walk(cx, scope, walk)
     }
 }
@@ -295,6 +274,19 @@ impl MpAvatar {
             .to_uppercase();
         self.set_text(cx, &initials);
     }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            // Label re-syncs on the next draw_walk.
+            self.applied_size = None;
+            self.redraw(cx);
+        }
+    }
 }
 
 impl MpAvatarRef {
@@ -309,6 +301,20 @@ impl MpAvatarRef {
     pub fn set_initials_from_name(&self, cx: &mut Cx, name: &str) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.set_initials_from_name(cx, name);
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 }

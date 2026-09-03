@@ -4608,6 +4608,21 @@ startup() do #(App::script_component(vm)){
                                 mod.widgets.MpKbd{ text: "⇧⌘P" }
                                 mod.widgets.MpKbd{ text: "Esc" }
                             }
+
+                            SubsectionLabel{ text: "Sizes" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Right,
+                                spacing: 12,
+                                align: Align{y: 0.5},
+
+                                mod.widgets.MpKbd{ text: "⌘K", size: MpSize.XSmall }
+                                mod.widgets.MpKbd{ text: "⌘K", size: MpSize.Small }
+                                mod.widgets.MpKbd{ text: "⌘K", size: MpSize.Medium }
+                                mod.widgets.MpKbd{ text: "⌘K", size: MpSize.Large }
+                                mod.widgets.MpKbd{ text: "⌘K", size: MpSize.XLarge }
+                            }
                         }
 
                         mod.widgets.MpDivider {}
@@ -4800,6 +4815,21 @@ startup() do #(App::script_component(vm)){
                                 demo_chip1 := mod.widgets.MpChip{ text: "Rust" }
                                 demo_chip2 := mod.widgets.MpChip{ text: "Makepad" }
                                 demo_chip3 := mod.widgets.MpChip{ text: "GPU" }
+                            }
+
+                            SubsectionLabel{ text: "Sizes" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Right,
+                                spacing: 12,
+                                align: Align{y: 0.5},
+
+                                mod.widgets.MpChip{ text: "XS", size: MpSize.XSmall }
+                                mod.widgets.MpChip{ text: "Small", size: MpSize.Small }
+                                mod.widgets.MpChip{ text: "Medium", size: MpSize.Medium }
+                                mod.widgets.MpChip{ text: "Large", size: MpSize.Large }
+                                mod.widgets.MpChip{ text: "XLarge", size: MpSize.XLarge }
                             }
 
                             chips_status := Label{

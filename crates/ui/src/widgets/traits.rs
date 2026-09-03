@@ -240,6 +240,39 @@ impl Sizable for crate::widgets::toggle_group::MpToggleGroup {
     }
 }
 
+// ---------- MpAvatar ----------
+
+impl Sizable for crate::widgets::avatar::MpAvatar {
+    fn size(&self) -> MpSize {
+        crate::widgets::avatar::MpAvatar::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::avatar::MpAvatar::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpChip ----------
+
+impl Sizable for crate::widgets::chip::MpChip {
+    fn size(&self) -> MpSize {
+        crate::widgets::chip::MpChip::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::chip::MpChip::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpKbd ----------
+
+impl Sizable for crate::widgets::kbd::MpKbd {
+    fn size(&self) -> MpSize {
+        crate::widgets::kbd::MpKbd::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::kbd::MpKbd::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpCollapsibleTrigger ----------
 
 impl Collapsible for crate::widgets::collapsible::MpCollapsibleTrigger {
