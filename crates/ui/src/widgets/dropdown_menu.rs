@@ -1,5 +1,8 @@
 use makepad_widgets::*;
+
+use crate::widgets::button::MpButtonWidgetRefExt;
 use crate::widgets::MpContextMenuItemWidgetExt;
+use crate::widgets::sizing::MpSize;
 
 script_mod! {
     use mod.prelude.widgets_internal.*
@@ -73,6 +76,14 @@ pub struct MpDropdownMenu {
 
     #[rust]
     open: bool,
+
+    /// Five-step size propagated to the trigger button and item slots.
+    #[live]
+    size: MpSize,
+
+    /// Last size applied to the children (avoids re-applying every draw).
+    #[rust]
+    applied_size: Option<MpSize>,
 }
 
 impl Widget for MpDropdownMenu {
@@ -90,6 +101,18 @@ impl Widget for MpDropdownMenu {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Propagate the size to the trigger button and item slots once per
+        // size change (child setters request redraws, so guard them).
+        if self.applied_size != Some(self.size) {
+            self.applied_size = Some(self.size);
+            self.view.child(id!(trigger)).as_mp_button().set_size(cx, self.size);
+            for i in 0..DROPDOWN_MENU_SLOTS {
+                let key = [LiveId::from_str(&format!("item{}", i))];
+                if let Some(mut item) = self.view.mp_context_menu_item(cx, &key).borrow_mut() {
+                    item.set_size(cx, self.size);
+                }
+            }
+        }
         self.view.draw_walk(cx, scope, walk)
     }
 }
@@ -117,6 +140,19 @@ impl MpDropdownMenu {
 
     pub fn set_trigger_label(&mut self, cx: &mut Cx, text: &str) {
         self.view.button(cx, ids!(trigger)).set_text(cx, text);
+    }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            // Children re-sync on the next draw_walk.
+            self.applied_size = None;
+            self.redraw(cx);
+        }
     }
 }
 
@@ -161,5 +197,19 @@ impl MpDropdownMenuRef {
             }
         }
         None
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
+        }
     }
 }

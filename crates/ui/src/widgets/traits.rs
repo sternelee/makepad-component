@@ -350,6 +350,50 @@ impl Sizable for crate::widgets::notification::MpNotificationWidget {
     }
 }
 
+// ---------- MpDropdownMenu ----------
+
+impl Sizable for crate::widgets::dropdown_menu::MpDropdownMenu {
+    fn size(&self) -> MpSize {
+        crate::widgets::dropdown_menu::MpDropdownMenu::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::dropdown_menu::MpDropdownMenu::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpContextMenu ----------
+
+impl Sizable for crate::widgets::context_menu::MpContextMenu {
+    fn size(&self) -> MpSize {
+        crate::widgets::context_menu::MpContextMenu::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::context_menu::MpContextMenu::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpMenuBar ----------
+
+impl Sizable for crate::widgets::menu_bar::MpMenuBar {
+    fn size(&self) -> MpSize {
+        crate::widgets::menu_bar::MpMenuBar::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::menu_bar::MpMenuBar::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpCommandItem ----------
+
+impl Sizable for crate::widgets::command::MpCommandItem {
+    fn size(&self) -> MpSize {
+        crate::widgets::command::MpCommandItem::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::command::MpCommandItem::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpCollapsibleTrigger ----------
 
 impl Collapsible for crate::widgets::collapsible::MpCollapsibleTrigger {

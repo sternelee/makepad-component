@@ -4686,6 +4686,24 @@ startup() do #(App::script_component(vm)){
                                     }
                                     text: "Selected: none"
                                 }
+
+                                SubsectionLabel{ text: "Sizes" }
+
+                                View {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    demo_context_menu_sm := mod.widgets.MpContextMenu{
+                                        width: Fill
+                                        size: MpSize.Small
+                                    }
+
+                                    demo_context_menu_lg := mod.widgets.MpContextMenu{
+                                        width: Fill
+                                        size: MpSize.Large
+                                    }
+                                }
                             }
                         }
 
@@ -4749,6 +4767,26 @@ startup() do #(App::script_component(vm)){
                                         color: TEXT_MUTED
                                     }
                                     text: "Selected: none"
+                                }
+
+                                SubsectionLabel{ text: "Sizes" }
+
+                                View {
+                                    width: Fit, height: Fit,
+                                    flow: Right,
+                                    spacing: 16,
+                                    align: Align{y: 0.5},
+
+                                    View {
+                                        width: Fit, height: Fit, flow: Down, spacing: 4,
+                                        demo_dropdown_menu_sm := mod.widgets.MpDropdownMenu{ size: MpSize.Small }
+                                        Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Small" }
+                                    }
+                                    View {
+                                        width: Fit, height: Fit, flow: Down, spacing: 4,
+                                        demo_dropdown_menu_lg := mod.widgets.MpDropdownMenu{ size: MpSize.Large }
+                                        Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Large" }
+                                    }
                                 }
                             }
                         }
@@ -4816,6 +4854,24 @@ startup() do #(App::script_component(vm)){
                                         color: TEXT_MUTED
                                     }
                                     text: "Selected: none"
+                                }
+
+                                SubsectionLabel{ text: "Sizes" }
+
+                                View {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    demo_menu_bar_sm := mod.widgets.MpMenuBar{
+                                        width: Fill
+                                        size: MpSize.Small
+                                    }
+
+                                    demo_menu_bar_lg := mod.widgets.MpMenuBar{
+                                        width: Fill
+                                        size: MpSize.Large
+                                    }
                                 }
                             }
                         }
@@ -7109,6 +7165,23 @@ impl MatchEvent for App {
                 ],
             );
 
+        // Populate context menu size demos (same action list)
+        for context_menu_id in [ids!(demo_context_menu_sm), ids!(demo_context_menu_lg)] {
+            self.ui
+                .mp_context_menu(cx, context_menu_id)
+                .set_items(
+                    cx,
+                    vec![
+                        "Cut".to_string(),
+                        "Copy".to_string(),
+                        "Paste".to_string(),
+                        "Duplicate".to_string(),
+                        "Delete".to_string(),
+                        "Rename…".to_string(),
+                    ],
+                );
+        }
+
         // Populate dropdown menu demo
         self.ui
             .mp_dropdown_menu(cx, ids!(demo_dropdown_menu))
@@ -7123,6 +7196,22 @@ impl MatchEvent for App {
                 ],
             );
 
+        // Populate dropdown menu size demos (same action list)
+        for dropdown_menu_id in [ids!(demo_dropdown_menu_sm), ids!(demo_dropdown_menu_lg)] {
+            self.ui
+                .mp_dropdown_menu(cx, dropdown_menu_id)
+                .set_items(
+                    cx,
+                    &vec![
+                        "New file".to_string(),
+                        "Open…".to_string(),
+                        "Save".to_string(),
+                        "Save as…".to_string(),
+                        "Export".to_string(),
+                    ],
+                );
+        }
+
         // Populate menu bar demo
         self.ui
             .mp_menu_bar(cx, ids!(demo_menu_bar))
@@ -7136,6 +7225,22 @@ impl MatchEvent for App {
         self.ui
             .mp_menu_bar(cx, ids!(demo_menu_bar))
             .set_items(cx, 2, &["Zoom In".to_string(), "Zoom Out".to_string()]);
+
+        // Populate menu bar size demos (same menu structure)
+        for menu_bar_id in [ids!(demo_menu_bar_sm), ids!(demo_menu_bar_lg)] {
+            self.ui
+                .mp_menu_bar(cx, menu_bar_id)
+                .set_trigger_labels(cx, &["File".to_string(), "Edit".to_string(), "View".to_string()]);
+            self.ui
+                .mp_menu_bar(cx, menu_bar_id)
+                .set_items(cx, 0, &["New File".to_string(), "Open…".to_string(), "Save".to_string()]);
+            self.ui
+                .mp_menu_bar(cx, menu_bar_id)
+                .set_items(cx, 1, &["Undo".to_string(), "Redo".to_string(), "Cut".to_string()]);
+            self.ui
+                .mp_menu_bar(cx, menu_bar_id)
+                .set_items(cx, 2, &["Zoom In".to_string(), "Zoom Out".to_string()]);
+        }
 
         // Rating demo: initial value
         self.ui.mp_rating(cx, ids!(demo_rating)).set_value(cx, 3);

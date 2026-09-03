@@ -1,5 +1,7 @@
 use makepad_widgets::*;
+use crate::widgets::button::MpButtonWidgetRefExt;
 use crate::widgets::MpContextMenuItemWidgetExt;
+use crate::widgets::sizing::MpSize;
 
 script_mod! {
     use mod.prelude.widgets_internal.*
@@ -113,6 +115,14 @@ pub struct MpMenuBar {
 
     #[rust]
     open_menu: Option<usize>,
+
+    /// Five-step size propagated to the bar, titles and item slots.
+    #[live]
+    size: MpSize,
+
+    /// Last size applied to the children (avoids re-applying every draw).
+    #[rust]
+    applied_size: Option<MpSize>,
 }
 
 impl Widget for MpMenuBar {
@@ -122,6 +132,23 @@ impl Widget for MpMenuBar {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Propagate the size to the bar, title buttons and item slots once
+        // per size change (child setters request redraws, so guard them).
+        if self.applied_size != Some(self.size) {
+            self.applied_size = Some(self.size);
+            if let Some(mut bar) = self.view.view(cx, ids!(bar)).borrow_mut() {
+                bar.walk.height = Size::Fixed(self.size.min_height());
+            }
+            for t in [ids!(t0), ids!(t1), ids!(t2)] {
+                self.view.child(t[0]).as_mp_button().set_size(cx, self.size);
+            }
+            for i in 0..MENUBAR_SLOTS {
+                let key = [LiveId::from_str(&format!("i{}", i))];
+                if let Some(mut item) = self.view.mp_context_menu_item(cx, &key).borrow_mut() {
+                    item.set_size(cx, self.size);
+                }
+            }
+        }
         self.view.draw_walk(cx, scope, walk)
     }
 }
@@ -165,6 +192,19 @@ impl WidgetMatchEvent for MpMenuBar {
 }
 
 impl MpMenuBar {
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            // Children re-sync on the next draw_walk.
+            self.applied_size = None;
+            self.redraw(cx);
+        }
+    }
+
     pub fn set_trigger_labels(&mut self, cx: &mut Cx, labels: &[String]) {
         for (i, label) in labels.iter().enumerate() {
             if i >= MENUBAR_TRIGGERS {
@@ -176,6 +216,7 @@ impl MpMenuBar {
     }
 
     pub fn set_items(&mut self, cx: &mut Cx, menu_index: usize, items: &[String]) {
+
         // Set the item labels for the given menu index.
         // This demo uses a single shared panel; the caller supplies labels.
         let mut shown = 0;
@@ -221,5 +262,19 @@ impl MpMenuBarRef {
             }
         }
         None
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
+        }
     }
 }
