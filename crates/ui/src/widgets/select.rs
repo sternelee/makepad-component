@@ -1,3 +1,4 @@
+use crate::widgets::sizing::MpSize;
 use makepad_widgets::*;
 
 script_mod! {
@@ -189,6 +190,14 @@ pub struct MpSelectTrigger {
 
     #[rust]
     focused: bool,
+
+    /// Five-step size driving the trigger height and label font.
+    #[live]
+    size: MpSize,
+
+    /// Last size applied to the label (avoids re-applying every draw).
+    #[rust]
+    applied_size: Option<MpSize>,
 }
 
 impl Widget for MpSelectTrigger {
@@ -232,9 +241,34 @@ impl Widget for MpSelectTrigger {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        // The trigger extent scales with the size system (Medium = the DSL 32).
+        let mut walk = walk;
+        walk.height = Size::Fixed(self.size.min_height());
+
+        if self.applied_size != Some(self.size) {
+            self.applied_size = Some(self.size);
+            if let Some(mut label) = self.view.label(cx, ids!(label)).borrow_mut() {
+                label.draw_text.text_style.font_size = self.size.font_size();
+            }
+        }
+
         let step = self.view.draw_walk(cx, scope, walk);
         crate::widgets::focus::register(cx, self.widget_uid(), self.view.area());
         step
+    }
+}
+
+impl MpSelectTrigger {
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.applied_size = None;
+            self.redraw(cx);
+        }
     }
 }
 
@@ -279,6 +313,10 @@ pub struct MpSelectOption {
     #[live]
     highlighted: bool,
 
+    /// Five-step size driving the option row height, padding and font.
+    #[live]
+    size: MpSize,
+
     #[rust]
     area: Area,
 }
@@ -311,6 +349,17 @@ impl Widget for MpSelectOption {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Metrics from the size system (Medium = the DSL 32)
+        let mut walk = walk;
+        walk.height = Size::Fixed(self.size.min_height());
+        self.layout.padding = Inset {
+            left: self.size.padding_h(),
+            right: self.size.padding_h(),
+            top: 0.0,
+            bottom: 0.0,
+        };
+        self.draw_text.text_style.font_size = self.size.font_size();
+
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_text
             .draw_walk(cx, Walk::fit(), Align::default(), self.value.as_ref());
@@ -321,6 +370,17 @@ impl Widget for MpSelectOption {
 }
 
 impl MpSelectOption {
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
+    }
+
     pub fn set_selected(&mut self, cx: &mut Cx, selected: bool) {
         self.selected = selected;
         self.redraw(cx);
@@ -391,6 +451,14 @@ pub struct MpSelect {
     /// Keyboard-highlighted option index (None = no keyboard highlight).
     #[rust]
     highlighted: Option<usize>,
+
+    /// Five-step size propagated to the trigger and option rows.
+    #[live]
+    size: MpSize,
+
+    /// Last size applied to the children (avoids re-applying every draw).
+    #[rust]
+    applied_size: Option<MpSize>,
 }
 
 impl Widget for MpSelect {
@@ -450,6 +518,19 @@ impl Widget for MpSelect {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Propagate the size to the trigger and option rows once per size
+        // change (child setters request redraws, so guard them).
+        if self.applied_size != Some(self.size) {
+            self.applied_size = Some(self.size);
+            if let Some(mut trigger) = self.view.mp_select_trigger(cx, ids!(trigger)).borrow_mut() {
+                trigger.set_size(cx, self.size);
+            }
+            for child in self.option_refs() {
+                if let Some(mut opt) = child.borrow_mut::<MpSelectOption>() {
+                    opt.set_size(cx, self.size);
+                }
+            }
+        }
         self.view.draw_walk(cx, scope, walk)
     }
 }
@@ -577,6 +658,19 @@ impl MpSelect {
             MpSelectAction::Selected(value.to_string()),
         );
     }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            // Trigger and options re-sync on the next draw_walk.
+            self.applied_size = None;
+            self.redraw(cx);
+        }
+    }
 }
 
 impl MpSelectRef {
@@ -595,5 +689,19 @@ impl MpSelectRef {
             }
         }
         None
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
+        }
     }
 }

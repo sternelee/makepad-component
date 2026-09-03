@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -9,8 +11,10 @@ script_mod! {
     // MpPagination - shadcn-style page navigation
     // ============================================================
 
-    // Pagination container
-    mod.widgets.MpPagination = mod.widgets.View{
+    // Pagination container (custom widget so it can propagate its size
+    // to the item children declared by the app)
+    mod.widgets.MpPaginationBase = #(MpPagination::register_widget(vm))
+    mod.widgets.MpPagination = set_type_default() do mod.widgets.MpPaginationBase{
         width: Fit
         height: Fit
         flow: Right
@@ -217,6 +221,10 @@ pub struct MpPaginationItem {
     #[live]
     active: bool,
 
+    /// Five-step size driving the option row height, padding and font.
+    #[live]
+    size: MpSize,
+
     #[rust]
     area: Area,
 
@@ -253,6 +261,12 @@ impl Widget for MpPaginationItem {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Metrics from the size system (Medium = the DSL 28x28)
+        let mut walk = walk;
+        walk.width = Size::Fixed(pagination_box(self.size));
+        walk.height = Size::Fixed(pagination_box(self.size));
+        self.draw_text.text_style.font_size = self.size.font_size();
+
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_text
             .draw_walk(cx, Walk::fit(), Align::default(), self.text.as_ref());
@@ -277,6 +291,17 @@ impl MpPaginationItem {
 
     pub fn set_text(&mut self, text: &str) {
         self.text.as_mut_empty().push_str(text);
+    }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
     }
 }
 
@@ -310,6 +335,10 @@ pub struct MpPaginationPrev {
     #[layout]
     layout: Layout,
 
+    /// Five-step size driving the button box size.
+    #[live]
+    size: MpSize,
+
     #[rust]
     area: Area,
 }
@@ -339,10 +368,26 @@ impl Widget for MpPaginationPrev {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        let mut walk = walk;
+        walk.width = Size::Fixed(pagination_box(self.size));
+        walk.height = Size::Fixed(pagination_box(self.size));
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
         DrawStep::done()
+    }
+}
+
+impl MpPaginationPrev {
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
     }
 }
 
@@ -352,6 +397,92 @@ impl MpPaginationPrevRef {
             matches!(item.cast::<MpPaginationAction>(), MpPaginationAction::Prev)
         } else {
             false
+        }
+    }
+}
+
+// ============================================================
+// MpPagination container
+// ============================================================
+
+/// Page-number box edge for a size step (Medium = the original 28).
+fn pagination_box(size: MpSize) -> f64 {
+    match size {
+        MpSize::XSmall => 22.0,
+        MpSize::Small => 24.0,
+        MpSize::Medium => 28.0,
+        MpSize::Large => 34.0,
+        MpSize::XLarge => 40.0,
+    }
+}
+
+/// Pagination container: propagates its size to the item/prev/next children
+/// the app declares inside it.
+#[derive(Script, ScriptHook, Widget)]
+pub struct MpPagination {
+    #[source]
+    source: ScriptObjectRef,
+    #[deref]
+    view: View,
+
+    /// Five-step size propagated to the item children.
+    #[live]
+    size: MpSize,
+
+    /// Last size applied to the children (avoids re-applying every draw).
+    #[rust]
+    applied_size: Option<MpSize>,
+}
+
+impl Widget for MpPagination {
+    fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        self.view.handle_event(cx, event, scope);
+    }
+
+    fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Propagate the size to the item children once per size change
+        // (child setters request redraws, so guard them).
+        if self.applied_size != Some(self.size) {
+            self.applied_size = Some(self.size);
+            self.view.children(&mut |_id, child| {
+                if let Some(mut item) = child.borrow_mut::<MpPaginationItem>() {
+                    item.set_size(cx, self.size);
+                } else if let Some(mut prev) = child.borrow_mut::<MpPaginationPrev>() {
+                    prev.set_size(cx, self.size);
+                }
+            });
+        }
+        self.view.draw_walk(cx, scope, walk)
+    }
+}
+
+impl MpPagination {
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            // Children re-sync on the next draw_walk.
+            self.applied_size = None;
+            self.redraw(cx);
+        }
+    }
+}
+
+impl MpPaginationRef {
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 }

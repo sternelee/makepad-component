@@ -5560,6 +5560,30 @@ startup() do #(App::script_component(vm)){
                                     }
                                 }
                             }
+
+                            SubsectionLabel{ text: "Sizes" }
+
+                            View{
+                                width: Fill, height: Fit, flow: Down, spacing: 8.0,
+
+                                mod.widgets.MpSelect{
+                                    size: MpSize.Small
+                                    trigger +: { label: { text: "Small select" } }
+                                    dropdown +: {
+                                        mod.widgets.MpSelectOption{ value: "A", label: { text: "Option A" } }
+                                        mod.widgets.MpSelectOption{ value: "B", label: { text: "Option B" } }
+                                    }
+                                }
+
+                                mod.widgets.MpSelect{
+                                    size: MpSize.Large
+                                    trigger +: { label: { text: "Large select" } }
+                                    dropdown +: {
+                                        mod.widgets.MpSelectOption{ value: "A", label: { text: "Option A" } }
+                                        mod.widgets.MpSelectOption{ value: "B", label: { text: "Option B" } }
+                                    }
+                                }
+                            }
                         }
                         // Dialog overlay (hidden unless opened)
                         demo_dialog := mod.widgets.MpDialog{
@@ -5714,6 +5738,33 @@ startup() do #(App::script_component(vm)){
                                     mod.widgets.MpPaginationEllipsis{}
                                     demo_page10 := mod.widgets.MpPaginationItem{ text: "10" }
                                     demo_next := mod.widgets.MpPaginationNext{}
+                                }
+                            }
+
+                            SubsectionLabel{ text: "Sizes" }
+
+                            View{
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+                                align: Align{x: 0.5},
+
+                                mod.widgets.MpPagination{
+                                    size: MpSize.Small
+                                    mod.widgets.MpPaginationPrev{}
+                                    mod.widgets.MpPaginationItem{ text: "1", active: true }
+                                    mod.widgets.MpPaginationItem{ text: "2" }
+                                    mod.widgets.MpPaginationItem{ text: "3" }
+                                    mod.widgets.MpPaginationNext{}
+                                }
+
+                                mod.widgets.MpPagination{
+                                    size: MpSize.Large
+                                    mod.widgets.MpPaginationPrev{}
+                                    mod.widgets.MpPaginationItem{ text: "1", active: true }
+                                    mod.widgets.MpPaginationItem{ text: "2" }
+                                    mod.widgets.MpPaginationItem{ text: "3" }
+                                    mod.widgets.MpPaginationNext{}
                                 }
                             }
 

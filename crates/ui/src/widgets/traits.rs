@@ -273,6 +273,28 @@ impl Sizable for crate::widgets::kbd::MpKbd {
     }
 }
 
+// ---------- MpSelect ----------
+
+impl Sizable for crate::widgets::select::MpSelect {
+    fn size(&self) -> MpSize {
+        crate::widgets::select::MpSelect::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::select::MpSelect::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpPagination ----------
+
+impl Sizable for crate::widgets::pagination::MpPagination {
+    fn size(&self) -> MpSize {
+        crate::widgets::pagination::MpPagination::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::pagination::MpPagination::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpCollapsibleTrigger ----------
 
 impl Collapsible for crate::widgets::collapsible::MpCollapsibleTrigger {
