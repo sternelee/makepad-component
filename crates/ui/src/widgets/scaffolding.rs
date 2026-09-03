@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -116,7 +118,15 @@ pub struct MpGroupBox {
     view: View,
 
     #[live]
-    title: ArcStringMut,
+    title_text: ArcStringMut,
+
+    /// Five-step size driving padding and title font.
+    #[live]
+    size: MpSize,
+
+    /// Last size applied to the title (avoids re-applying every draw).
+    #[rust]
+    applied_size: Option<MpSize>,
 }
 
 impl Widget for MpGroupBox {
@@ -125,16 +135,44 @@ impl Widget for MpGroupBox {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Metrics from the size system (Medium = the DSL 16/12 look)
+        self.view.layout.padding = Inset {
+            left: self.size.padding_h() + 4.0,
+            right: self.size.padding_h() + 4.0,
+            top: self.size.padding_v() + 6.0,
+            bottom: self.size.padding_v() + 6.0,
+        };
+
+        if self.applied_size != Some(self.size) {
+            self.applied_size = Some(self.size);
+            if let Some(mut title_label) = self.view.label(cx, ids!(title)).borrow_mut() {
+                title_label.draw_text.text_style.font_size = self.size.font_size();
+            }
+        }
+
         self.view.draw_walk(cx, scope, walk)
     }
 }
 
 impl MpGroupBox {
     pub fn set_title(&mut self, cx: &mut Cx, title: &str) {
-        self.title.as_mut_empty().push_str(title);
+        self.title_text.as_mut_empty().push_str(title);
         self.view
             .label(cx, ids!(title))
             .set_text(cx, title);
+    }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            // Title re-syncs on the next draw_walk.
+            self.applied_size = None;
+            self.redraw(cx);
+        }
     }
 }
 
@@ -142,6 +180,20 @@ impl MpGroupBoxRef {
     pub fn set_title(&self, cx: &mut Cx, title: &str) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.set_title(cx, title);
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 }

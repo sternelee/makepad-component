@@ -405,6 +405,48 @@ impl Sizable for crate::widgets::card::MpCardClickable {
     }
 }
 
+// ---------- MpDescriptionList ----------
+
+impl Sizable for crate::widgets::description_list::MpDescriptionList {
+    fn size(&self) -> MpSize {
+        crate::widgets::description_list::MpDescriptionList::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::description_list::MpDescriptionList::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpGroupBox (scaffolding) ----------
+
+impl Sizable for crate::widgets::scaffolding::MpGroupBox {
+    fn size(&self) -> MpSize {
+        crate::widgets::scaffolding::MpGroupBox::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::scaffolding::MpGroupBox::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpStepIndicator ----------
+
+impl Sizable for crate::widgets::step_indicator::MpStepIndicator {
+    fn size(&self) -> MpSize {
+        crate::widgets::step_indicator::MpStepIndicator::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::step_indicator::MpStepIndicator::set_size(self, cx, size);
+    }
+}
+
+impl Disableable for crate::widgets::step_indicator::MpStepIndicator {
+    fn is_disabled(&self) -> bool {
+        crate::widgets::step_indicator::MpStepIndicator::is_disabled(self)
+    }
+    fn set_disabled(&mut self, cx: &mut Cx, disabled: bool) {
+        crate::widgets::step_indicator::MpStepIndicator::set_disabled(self, cx, disabled);
+    }
+}
+
 // ---------- MpCollapsibleTrigger ----------
 
 impl Collapsible for crate::widgets::collapsible::MpCollapsibleTrigger {

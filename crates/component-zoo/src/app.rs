@@ -1,4 +1,6 @@
 use makepad_component::widgets::MpThemeState;
+use makepad_component::widgets::MpDescriptionItem;
+use makepad_component::widgets::MpDescriptionListWidgetRefExt;
 use makepad_component::widgets::MpAvatarWidgetRefExt;
 use makepad_component::widgets::MpBadgeWidgetRefExt;
 use makepad_component::widgets::MpButtonWidgetExt;
@@ -23,6 +25,7 @@ use makepad_component::widgets::MpSheetTriggerWidgetRefExt;
 use makepad_component::widgets::MpSheetWidgetRefExt;
 use makepad_component::widgets::MpSkeletonWidgetWidgetRefExt;
 use makepad_component::widgets::MpSliderWidgetRefExt;
+use makepad_component::widgets::MpStepIndicatorWidgetRefExt;
 use makepad_component::widgets::MpStepperWidgetRefExt;
 use makepad_component::widgets::MpSplitPaneWidgetRefExt;
 use makepad_component::widgets::MpStepRowWidgetRefExt;
@@ -4793,6 +4796,98 @@ startup() do #(App::script_component(vm)){
 
                         mod.widgets.MpDivider {}
 
+                        // ===== Description List Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Description List" }
+
+                            View {
+                                width: 420, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Bordered" }
+
+                                demo_description_list := mod.widgets.MpDescriptionList{}
+
+                                SubsectionLabel{ text: "Plain (unbordered)" }
+
+                                demo_description_list_plain := mod.widgets.MpDescriptionList{
+                                    bordered: false
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Group Box Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Group Box" }
+
+                            View {
+                                width: 420, height: Fit,
+                                flow: Down,
+                                spacing: 12,
+
+                                SubsectionLabel{ text: "Variants" }
+
+                                mod.widgets.MpGroupBox{
+                                    title +: { text: "Normal" }
+                                    content +: {
+                                        Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0}, color: TEXT_MUTED } text: "Card background with a border." }
+                                    }
+                                }
+
+                                mod.widgets.MpGroupBox{
+                                    title +: { text: "With Size (Large)" }
+                                    size: MpSize.Large
+                                    content +: {
+                                        Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0}, color: TEXT_MUTED } text: "Padding and title font scale with the size system." }
+                                    }
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Step Indicator Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Step Indicator" }
+
+                            View {
+                                width: 520, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Click a step to jump" }
+
+                                demo_step_indicator := mod.widgets.MpStepIndicator{
+                                    step: 1
+                                }
+
+                                step_status := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{ font_size: 12.0 }
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Step: 2"
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
                         // ===== Stat Cards Section =====
                         View {
                             width: Fill, height: Fit,
@@ -7242,6 +7337,33 @@ impl MatchEvent for App {
                 .set_items(cx, 2, &["Zoom In".to_string(), "Zoom Out".to_string()]);
         }
 
+        // Populate description list demos
+        let project_info = vec![
+            MpDescriptionItem::new("Name", "makepad-component"),
+            MpDescriptionItem::new("Language", "Rust"),
+            MpDescriptionItem::new("Framework", "Makepad"),
+            MpDescriptionItem::new("License", "MIT OR Apache-2.0"),
+        ];
+        self.ui
+            .mp_description_list(cx, ids!(demo_description_list))
+            .set_items(cx, &project_info);
+        self.ui
+            .mp_description_list(cx, ids!(demo_description_list_plain))
+            .set_items(cx, &project_info);
+
+        // Populate step indicator demo
+        self.ui
+            .mp_step_indicator(cx, ids!(demo_step_indicator))
+            .set_items(
+                cx,
+                vec![
+                    "Cart".to_string(),
+                    "Shipping".to_string(),
+                    "Payment".to_string(),
+                    "Review".to_string(),
+                ],
+            );
+
         // Rating demo: initial value
         self.ui.mp_rating(cx, ids!(demo_rating)).set_value(cx, 3);
 
@@ -7943,6 +8065,17 @@ impl MatchEvent for App {
             self.ui
                 .label(cx, ids!(stepper_status))
                 .set_text(cx, &format!("Value: {}", value));
+        }
+
+        // Step indicator demo: step selection
+        if let Some(step) = self
+            .ui
+            .mp_step_indicator(cx, ids!(demo_step_indicator))
+            .selected(actions)
+        {
+            self.ui
+                .label(cx, ids!(step_status))
+                .set_text(cx, &format!("Step: {}", step + 1));
         }
 
         // Context menu demo: item selection
