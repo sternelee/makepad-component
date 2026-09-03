@@ -103,4 +103,15 @@ impl MpSize {
             Self::XLarge => 10.0,
         }
     }
+
+    /// Thickness of a linear progress/bar element (display components).
+    pub fn bar_thickness(self) -> f64 {
+        match self {
+            Self::XSmall => 3.0,
+            Self::Small => 4.0,
+            Self::Medium => 4.0,
+            Self::Large => 6.0,
+            Self::XLarge => 8.0,
+        }
+    }
 }

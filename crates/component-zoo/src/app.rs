@@ -3299,6 +3299,27 @@ startup() do #(App::script_component(vm)){
                                 }
                             }
 
+                            // Progress sizes
+                            View {
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Sizes" }
+
+                                View {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 10,
+
+                                    mod.widgets.MpProgress { width: 300, value: 60.0, size: MpSize.XSmall }
+                                    mod.widgets.MpProgress { width: 300, value: 60.0, size: MpSize.Small }
+                                    mod.widgets.MpProgress { width: 300, value: 60.0, size: MpSize.Medium }
+                                    mod.widgets.MpProgress { width: 300, value: 60.0, size: MpSize.Large }
+                                    mod.widgets.MpProgress { width: 300, value: 60.0, size: MpSize.XLarge }
+                                }
+                            }
+
                             // Progress widths
                             View {
                                 width: Fill, height: Fit,
@@ -4949,6 +4970,21 @@ startup() do #(App::script_component(vm)){
                                     color: TEXT_MUTED
                                 }
                                 text: "Progress: 65%"
+                            }
+
+                            SubsectionLabel{ text: "Sizes" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Right,
+                                spacing: 16,
+                                align: Align{y: 0.5},
+
+                                mod.widgets.MpProgressRing{ progress: 0.65, size: MpSize.XSmall }
+                                mod.widgets.MpProgressRing{ progress: 0.65, size: MpSize.Small }
+                                mod.widgets.MpProgressRing{ progress: 0.65, size: MpSize.Medium }
+                                mod.widgets.MpProgressRing{ progress: 0.65, size: MpSize.Large }
+                                mod.widgets.MpProgressRing{ progress: 0.65, size: MpSize.XLarge }
                             }
                         }
                     }

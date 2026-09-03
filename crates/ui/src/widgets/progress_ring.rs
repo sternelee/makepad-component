@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -69,14 +71,55 @@ pub struct MpProgressRing {
     #[live(5.0)]
     thickness: f32,
 
+    /// Five-step size driving the ring diameter (Medium = the DSL 64) and
+    /// scaling the stroke thickness proportionally.
+    #[live]
+    size: MpSize,
+
+    /// The user-declared thickness (captured on first draw) that the size
+    /// system scales proportionally.
+    #[rust]
+    base_thickness: f32,
+
+    /// Last size applied (avoids recomputing every draw).
+    #[rust]
+    applied_size: Option<MpSize>,
+
     #[rust]
     area: Area,
+}
+
+/// Ring diameter for a size step (Medium = the DSL 64).
+fn ring_diameter(size: MpSize) -> f64 {
+    match size {
+        MpSize::XSmall => 40.0,
+        MpSize::Small => 48.0,
+        MpSize::Medium => 64.0,
+        MpSize::Large => 80.0,
+        MpSize::XLarge => 96.0,
+    }
 }
 
 impl Widget for MpProgressRing {
     fn handle_event(&mut self, _cx: &mut Cx, _event: &Event, _scope: &mut Scope) {}
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Capture the user-declared thickness once, then scale it
+        // proportionally to the ring diameter.
+        if self.base_thickness == 0.0 {
+            self.base_thickness = self.thickness;
+        }
+        if self.applied_size != Some(self.size) {
+            self.applied_size = Some(self.size);
+            let diameter = ring_diameter(self.size);
+            self.thickness = self.base_thickness * (diameter / 64.0) as f32;
+        }
+
+        let diameter = ring_diameter(self.size);
+        let mut walk = walk;
+        walk.width = Size::Fixed(diameter);
+        walk.height = Size::Fixed(diameter);
+
         self.draw_ring.begin(cx, walk, self.layout);
         self.draw_ring.end(cx);
         self.area = self.draw_ring.area();
@@ -96,6 +139,17 @@ impl MpProgressRing {
     pub fn progress(&self) -> f32 {
         self.progress
     }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
+    }
 }
 
 impl MpProgressRingRef {
@@ -110,6 +164,20 @@ impl MpProgressRingRef {
             inner.progress()
         } else {
             0.0
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 }

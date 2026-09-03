@@ -317,6 +317,39 @@ impl Sizable for crate::widgets::badge::MpBadge {
     }
 }
 
+// ---------- MpProgress ----------
+
+impl Sizable for crate::widgets::progress::MpProgress {
+    fn size(&self) -> MpSize {
+        crate::widgets::progress::MpProgress::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::progress::MpProgress::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpProgressRing ----------
+
+impl Sizable for crate::widgets::progress_ring::MpProgressRing {
+    fn size(&self) -> MpSize {
+        crate::widgets::progress_ring::MpProgressRing::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::progress_ring::MpProgressRing::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpNotificationWidget ----------
+
+impl Sizable for crate::widgets::notification::MpNotificationWidget {
+    fn size(&self) -> MpSize {
+        crate::widgets::notification::MpNotificationWidget::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::notification::MpNotificationWidget::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpCollapsibleTrigger ----------
 
 impl Collapsible for crate::widgets::collapsible::MpCollapsibleTrigger {

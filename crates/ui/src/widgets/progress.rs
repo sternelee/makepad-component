@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -96,6 +98,10 @@ pub struct MpProgress {
 
     #[live(0.0)]
     value: f64,
+
+    /// Five-step size driving the bar thickness (Medium = the DSL 4.0).
+    #[live]
+    size: MpSize,
 }
 
 impl Widget for MpProgress {
@@ -105,6 +111,10 @@ impl Widget for MpProgress {
         // Set progress by writing the shader instance field directly
         let progress = (self.value / 100.0).clamp(0.0, 1.0);
         self.draw_bg.progress = progress as f32;
+
+        // Bar thickness scales with the size system
+        let mut walk = walk;
+        walk.height = Size::Fixed(self.size.bar_thickness());
 
         self.draw_bg.draw_walk(cx, walk);
         DrawStep::done()
@@ -120,6 +130,17 @@ impl MpProgress {
         self.value = value.clamp(0.0, 100.0);
         self.redraw(cx);
     }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
+    }
 }
 
 impl MpProgressRef {
@@ -134,6 +155,20 @@ impl MpProgressRef {
     pub fn set_value(&self, cx: &mut Cx, value: f64) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.set_value(cx, value);
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 }
