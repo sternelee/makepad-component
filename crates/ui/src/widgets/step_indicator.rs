@@ -150,42 +150,42 @@ script_mod! {
         spacing: 8.0
 
         slot0 := View{
-            width: Fit, height: Fit, flow: Right, spacing: 8.0
+            width: Fill, height: Fit, flow: Right, spacing: 8.0
             connector0 := mod.widgets.MpStepConnector{visible: false}
             item0 := mod.widgets.MpStepItem{}
         }
         slot1 := View{
-            width: Fit, height: Fit, flow: Right, spacing: 8.0
+            width: Fill, height: Fit, flow: Right, spacing: 8.0
             connector1 := mod.widgets.MpStepConnector{}
             item1 := mod.widgets.MpStepItem{}
         }
         slot2 := View{
-            width: Fit, height: Fit, flow: Right, spacing: 8.0
+            width: Fill, height: Fit, flow: Right, spacing: 8.0
             connector2 := mod.widgets.MpStepConnector{}
             item2 := mod.widgets.MpStepItem{}
         }
         slot3 := View{
-            width: Fit, height: Fit, flow: Right, spacing: 8.0
+            width: Fill, height: Fit, flow: Right, spacing: 8.0
             connector3 := mod.widgets.MpStepConnector{}
             item3 := mod.widgets.MpStepItem{}
         }
         slot4 := View{
-            width: Fit, height: Fit, flow: Right, spacing: 8.0
+            width: Fill, height: Fit, flow: Right, spacing: 8.0
             connector4 := mod.widgets.MpStepConnector{}
             item4 := mod.widgets.MpStepItem{}
         }
         slot5 := View{
-            width: Fit, height: Fit, flow: Right, spacing: 8.0
+            width: Fill, height: Fit, flow: Right, spacing: 8.0
             connector5 := mod.widgets.MpStepConnector{}
             item5 := mod.widgets.MpStepItem{}
         }
         slot6 := View{
-            width: Fit, height: Fit, flow: Right, spacing: 8.0
+            width: Fill, height: Fit, flow: Right, spacing: 8.0
             connector6 := mod.widgets.MpStepConnector{}
             item6 := mod.widgets.MpStepItem{}
         }
         slot7 := View{
-            width: Fit, height: Fit, flow: Right, spacing: 8.0
+            width: Fill, height: Fit, flow: Right, spacing: 8.0
             connector7 := mod.widgets.MpStepConnector{}
             item7 := mod.widgets.MpStepItem{}
         }
