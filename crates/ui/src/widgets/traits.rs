@@ -394,6 +394,17 @@ impl Sizable for crate::widgets::command::MpCommandItem {
     }
 }
 
+// ---------- MpCardClickable ----------
+
+impl Sizable for crate::widgets::card::MpCardClickable {
+    fn size(&self) -> MpSize {
+        crate::widgets::card::MpCardClickable::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::card::MpCardClickable::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpCollapsibleTrigger ----------
 
 impl Collapsible for crate::widgets::collapsible::MpCollapsibleTrigger {

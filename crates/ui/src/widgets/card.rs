@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -337,6 +339,10 @@ pub struct MpCardClickable {
     source: ScriptObjectRef,
     #[deref]
     view: View,
+
+    /// Five-step size driving the card padding (Medium = the DSL 16).
+    #[live]
+    size: MpSize,
 }
 
 impl Widget for MpCardClickable {
@@ -351,6 +357,15 @@ impl Widget for MpCardClickable {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Padding scales with the size system (Medium = the DSL 16 uniform;
+        // cards are roomy display containers so padding is scaled up).
+        let pad = self.size.padding_h() + 4.0;
+        self.view.layout.padding = Inset {
+            left: pad,
+            right: pad,
+            top: pad,
+            bottom: pad,
+        };
         self.view.draw_walk(cx, scope, walk)
     }
 }
@@ -364,6 +379,17 @@ impl MpCardClickable {
             false
         }
     }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
+    }
 }
 
 impl MpCardClickableRef {
@@ -373,6 +399,20 @@ impl MpCardClickableRef {
             inner.clicked(actions)
         } else {
             false
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 }
