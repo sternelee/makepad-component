@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -214,6 +216,12 @@ pub struct MpLabel {
     #[live]
     highlight_color: Option<Vec4f>,
 
+    /// Five-step size driving the font. The default Medium defers to the
+    /// DSL (so the seven-step MpLabel* variants keep their fonts); any
+    /// other step overrides both text layers.
+    #[live]
+    size: MpSize,
+
     #[rust]
     area: Area,
 }
@@ -224,6 +232,20 @@ impl Widget for MpLabel {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Size system: Medium defers to the DSL text_style (the MpLabel*
+        // variants set their own fonts); other steps override both layers.
+        if self.size != MpSize::Medium {
+            let font = match self.size {
+                MpSize::XSmall => 10.0,
+                MpSize::Small => 12.0,
+                MpSize::Large => 16.0,
+                MpSize::XLarge => 18.0,
+                MpSize::Medium => 14.0,
+            };
+            self.draw_text.text_style.font_size = font;
+            self.draw_secondary.text_style.font_size = font;
+        }
+
         let main_text = self.get_display_text();
         let secondary_text = self.secondary.as_ref().to_string();
         let highlight_str = self.highlight.as_ref().to_string();
@@ -349,6 +371,17 @@ impl MpLabel {
         self.masked = masked;
     }
 
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
+    }
+
     /// Check if the text is masked
     pub fn is_masked(&self) -> bool {
         self.masked
@@ -412,6 +445,20 @@ impl MpLabelRef {
     pub fn clear_highlight(&self) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.clear_highlight();
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 }

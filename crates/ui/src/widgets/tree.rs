@@ -1,6 +1,8 @@
 use makepad_widgets::*;
 use std::collections::HashSet;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -128,6 +130,11 @@ pub struct MpTree {
     #[live(14.0)]
     indent_step: f64,
 
+    /// Five-step size driving the row height and fonts. The default Medium
+    /// defers to the DSL heights/fonts; other steps override.
+    #[live]
+    size: MpSize,
+
     // Data (set by caller)
     #[rust]
     items: Vec<TreeItem>,
@@ -155,6 +162,17 @@ pub struct MpTree {
 }
 
 impl MpTree {
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
+    }
+
     pub fn set_items(&mut self, cx: &mut Cx, items: Vec<TreeItem>) {
         self.items = items;
         self.expanded.clear();
@@ -280,6 +298,27 @@ impl Widget for MpTree {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Size system: Medium defers to the DSL heights/fonts; other steps
+        // override.
+        if self.size != MpSize::Medium {
+            self.row_height = match self.size {
+                MpSize::XSmall => 24.0,
+                MpSize::Small => 27.0,
+                MpSize::Large => 36.0,
+                MpSize::XLarge => 42.0,
+                MpSize::Medium => 30.0,
+            };
+            let font = match self.size {
+                MpSize::XSmall => 10.5,
+                MpSize::Small => 11.5,
+                MpSize::Large => 13.5,
+                MpSize::XLarge => 15.5,
+                MpSize::Medium => 12.5,
+            };
+            self.draw_label.text_style.font_size = font;
+            self.draw_chevron.text_style.font_size = font - 2.0;
+        }
+
         let visible = self.visible_items();
 
         self.row_areas.clear();
@@ -382,6 +421,20 @@ impl MpTreeRef {
             inner.item_selected(actions)
         } else {
             None
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 }

@@ -4530,6 +4530,24 @@ startup() do #(App::script_component(vm)){
                                     }
                                     text: "Selected row: none"
                                 }
+
+                                SubsectionLabel{ text: "Sizes" }
+
+                                View {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    demo_table_sm := mod.widgets.MpTable{
+                                        width: 640, height: 130
+                                        size: MpSize.Small
+                                    }
+
+                                    demo_table_lg := mod.widgets.MpTable{
+                                        width: 640, height: 170
+                                        size: MpSize.Large
+                                    }
+                                }
                             }
                         }
 
@@ -4560,6 +4578,24 @@ startup() do #(App::script_component(vm)){
                                         color: TEXT_MUTED
                                     }
                                     text: "Selected item: none"
+                                }
+
+                                SubsectionLabel{ text: "Sizes" }
+
+                                View {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    spacing: 8,
+
+                                    demo_tree_sm := mod.widgets.MpTree{
+                                        width: 360, height: 110
+                                        size: MpSize.Small
+                                    }
+
+                                    demo_tree_lg := mod.widgets.MpTree{
+                                        width: 360, height: 140
+                                        size: MpSize.Large
+                                    }
                                 }
                             }
                         }
@@ -5156,6 +5192,31 @@ startup() do #(App::script_component(vm)){
                                         color: TEXT_MUTED
                                     }
                                     text: "Rating: 3"
+                                }
+
+                                SubsectionLabel{ text: "Sizes" }
+
+                                View {
+                                    width: Fit, height: Fit,
+                                    flow: Right,
+                                    spacing: 20,
+                                    align: Align{y: 0.5},
+
+                                    View {
+                                        width: Fit, height: Fit, flow: Down, spacing: 4,
+                                        mod.widgets.MpRating{ value: 3, size: MpSize.Small }
+                                        Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Small" }
+                                    }
+                                    View {
+                                        width: Fit, height: Fit, flow: Down, spacing: 4,
+                                        mod.widgets.MpRating{ value: 3 }
+                                        Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Medium" }
+                                    }
+                                    View {
+                                        width: Fit, height: Fit, flow: Down, spacing: 4,
+                                        mod.widgets.MpRating{ value: 3, size: MpSize.Large }
+                                        Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Large" }
+                                    }
                                 }
                             }
                         }
@@ -7290,25 +7351,43 @@ impl MatchEvent for App {
         );
 
         // Populate tree demo
-        self.ui.mp_tree(cx, ids!(demo_tree)).set_items(
-            cx,
-            vec![
-                TreeItem::new("crates", 0),
-                TreeItem::new("ui", 1),
-                TreeItem::new("widgets", 2),
-                TreeItem::new("button.rs", 3),
-                TreeItem::new("table.rs", 3),
-                TreeItem::new("tree.rs", 3),
-                TreeItem::new("a2ui", 2),
-                TreeItem::new("processor.rs", 3),
-                TreeItem::new("theme", 1),
-                TreeItem::new("palette.rs", 2),
-                TreeItem::new("color.rs", 2),
-                TreeItem::new("motion", 1),
-                TreeItem::new("lib.rs", 2),
-                TreeItem::new("Cargo.toml", 0),
-            ],
-        );
+        let tree_items = vec![
+            TreeItem::new("crates", 0),
+            TreeItem::new("ui", 1),
+            TreeItem::new("widgets", 2),
+            TreeItem::new("button.rs", 3),
+            TreeItem::new("table.rs", 3),
+            TreeItem::new("tree.rs", 3),
+            TreeItem::new("a2ui", 2),
+            TreeItem::new("processor.rs", 3),
+            TreeItem::new("theme", 1),
+            TreeItem::new("palette.rs", 2),
+            TreeItem::new("color.rs", 2),
+            TreeItem::new("motion", 1),
+            TreeItem::new("lib.rs", 2),
+            TreeItem::new("Cargo.toml", 0),
+        ];
+        self.ui.mp_tree(cx, ids!(demo_tree)).set_items(cx, tree_items.clone());
+
+        // Populate tree size demos (same structure, fewer rows fit)
+        for tree_id in [ids!(demo_tree_sm), ids!(demo_tree_lg)] {
+            self.ui.mp_tree(cx, tree_id).set_items(cx, tree_items.clone());
+        }
+
+        // Populate table size demos (same columns/rows as the main demo)
+        let size_demo_columns = vec![
+            TableColumn::new("Name", 160.0, false),
+            TableColumn::new("Language", 120.0, false),
+        ];
+        let size_demo_rows = vec![
+            vec!["makepad".to_string(), "Rust".to_string()],
+            vec!["tokio".to_string(), "Rust".to_string()],
+            vec!["serde".to_string(), "Rust".to_string()],
+        ];
+        for table_id in [ids!(demo_table_sm), ids!(demo_table_lg)] {
+            self.ui.mp_table(cx, table_id).set_columns(size_demo_columns.clone());
+            self.ui.mp_table(cx, table_id).set_rows(cx, size_demo_rows.clone());
+        }
 
         // Populate combobox demo
         self.ui

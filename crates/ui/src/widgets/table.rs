@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -151,6 +153,11 @@ pub struct MpTable {
     #[live(36.0)]
     header_height: f64,
 
+    /// Five-step size driving row/header heights and fonts. The default
+    /// Medium defers to the DSL heights (32/36); other steps override.
+    #[live]
+    size: MpSize,
+
     // Data (set by caller)
     #[rust]
     columns: Vec<TableColumn>,
@@ -192,6 +199,17 @@ impl MpTable {
         self.rows = rows;
         self.selected_row = None;
         self.redraw(cx);
+    }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
     }
 
     /// Indices of rows in current display (sort) order.
@@ -301,6 +319,29 @@ impl Widget for MpTable {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Size system: Medium defers to the DSL heights/fonts; other steps
+        // override row/header heights and text sizes.
+        if self.size != MpSize::Medium {
+            let (row_h, header_h) = match self.size {
+                MpSize::XSmall => (26.0, 30.0),
+                MpSize::Small => (29.0, 33.0),
+                MpSize::Large => (38.0, 42.0),
+                MpSize::XLarge => (44.0, 48.0),
+                MpSize::Medium => (32.0, 36.0),
+            };
+            self.row_height = row_h;
+            self.header_height = header_h;
+            let cell_font = match self.size {
+                MpSize::XSmall => 10.5,
+                MpSize::Small => 11.5,
+                MpSize::Large => 13.5,
+                MpSize::XLarge => 15.5,
+                MpSize::Medium => 12.5,
+            };
+            self.draw_header_text.text_style.font_size = cell_font;
+            self.draw_cell_text.text_style.font_size = cell_font;
+        }
+
         let total_width = self.total_width();
         let order = self.display_order();
         let num_cols = self.columns.len();
@@ -469,6 +510,20 @@ impl MpTableRef {
             inner.sorted_column(actions)
         } else {
             None
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 }

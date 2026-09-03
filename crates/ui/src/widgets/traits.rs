@@ -469,6 +469,50 @@ impl Sizable for crate::widgets::attachment::MpAttachment {
     }
 }
 
+// ---------- MpLabel ----------
+
+impl Sizable for crate::widgets::label::MpLabel {
+    fn size(&self) -> MpSize {
+        crate::widgets::label::MpLabel::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::label::MpLabel::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpRating ----------
+
+impl Sizable for crate::widgets::rating::MpRating {
+    fn size(&self) -> MpSize {
+        crate::widgets::rating::MpRating::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::rating::MpRating::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpTable ----------
+
+impl Sizable for crate::widgets::table::MpTable {
+    fn size(&self) -> MpSize {
+        crate::widgets::table::MpTable::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::table::MpTable::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpTree ----------
+
+impl Sizable for crate::widgets::tree::MpTree {
+    fn size(&self) -> MpSize {
+        crate::widgets::tree::MpTree::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::tree::MpTree::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpCollapsibleTrigger ----------
 
 impl Collapsible for crate::widgets::collapsible::MpCollapsibleTrigger {

@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -85,6 +87,11 @@ pub struct MpRating {
     #[live]
     star_color_empty: Vec4f,
 
+    /// Five-step size driving the star font and advance width
+    /// (Medium = the DSL 20px star).
+    #[live]
+    size: MpSize,
+
     #[rust]
     area: Area,
     #[rust]
@@ -110,7 +117,15 @@ impl Widget for MpRating {
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
         self.draw_bg.begin(cx, walk, self.layout);
 
-        let star_w = 24.0;
+        // Star metrics from the size system (Medium = the DSL 20px star)
+        let star_font = match self.size {
+            MpSize::XSmall => 16.0,
+            MpSize::Small => 18.0,
+            MpSize::Medium => 20.0,
+            MpSize::Large => 22.0,
+            MpSize::XLarge => 24.0,
+        };
+        let cell = (star_font + 4.0) as f64;
         for i in 0..RATING_MAX {
             let text = if i < self.value {
                 self.star_color
@@ -125,9 +140,10 @@ impl Widget for MpRating {
                 _ => &mut self.draw_text4,
             };
             dt.color = text;
+            dt.text_style.font_size = star_font;
             let rect = dt.draw_walk(
                 cx,
-                Walk::fixed(star_w, 24.0),
+                Walk::fixed(cell, cell),
                 Align::default(),
                 "★",
             );
@@ -152,6 +168,17 @@ impl MpRating {
 
     pub fn value(&self) -> usize {
         self.value
+    }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
     }
 }
 
@@ -179,5 +206,19 @@ impl MpRatingRef {
             }
         }
         None
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
+        }
     }
 }
