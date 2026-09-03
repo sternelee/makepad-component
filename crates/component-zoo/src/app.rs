@@ -2196,6 +2196,62 @@ startup() do #(App::script_component(vm)){
                                 }
                             }
 
+                            // Badge sizes
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Sizes" }
+
+                                View {
+                                    width: Fit, height: Fit,
+                                    flow: Right,
+                                    spacing: 24,
+                                    align: Align{ y: 0.5 }
+
+                                    mod.widgets.MpBadge {
+                                        count: 5
+                                        size: MpSize.XSmall
+                                        content +: {
+                                            mod.widgets.MpButtonGhost { text: "XS" }
+                                        }
+                                    }
+
+                                    mod.widgets.MpBadge {
+                                        count: 5
+                                        size: MpSize.Small
+                                        content +: {
+                                            mod.widgets.MpButtonGhost { text: "Small" }
+                                        }
+                                    }
+
+                                    mod.widgets.MpBadge {
+                                        count: 5
+                                        size: MpSize.Medium
+                                        content +: {
+                                            mod.widgets.MpButtonGhost { text: "Medium" }
+                                        }
+                                    }
+
+                                    mod.widgets.MpBadge {
+                                        count: 5
+                                        size: MpSize.Large
+                                        content +: {
+                                            mod.widgets.MpButtonGhost { text: "Large" }
+                                        }
+                                    }
+
+                                    mod.widgets.MpBadge {
+                                        count: 5
+                                        size: MpSize.XLarge
+                                        content +: {
+                                            mod.widgets.MpButtonGhost { text: "XL" }
+                                        }
+                                    }
+                                }
+                            }
+
                             // Standalone badges
                             View {
                                 width: Fit, height: Fit,
@@ -3341,6 +3397,30 @@ startup() do #(App::script_component(vm)){
                                     mod.widgets.MpAlertError {
                                         content +: {
                                             message +: { text: "Something went wrong. Please try again." }
+                                        }
+                                    }
+
+                                    mod.widgets.MpAlert {
+                                        size: MpSize.Small
+                                        content +: {
+                                            title_wrapper +: { title +: { text: "Small" } }
+                                            message +: { text: "Small alert with compact padding and fonts." }
+                                        }
+                                    }
+
+                                    mod.widgets.MpAlert {
+                                        size: MpSize.Medium
+                                        content +: {
+                                            title_wrapper +: { title +: { text: "Medium" } }
+                                            message +: { text: "Medium alert (the default look)." }
+                                        }
+                                    }
+
+                                    mod.widgets.MpAlert {
+                                        size: MpSize.Large
+                                        content +: {
+                                            title_wrapper +: { title +: { text: "Large" } }
+                                            message +: { text: "Large alert with roomier padding and fonts." }
                                         }
                                     }
                                 }

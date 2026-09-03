@@ -295,6 +295,28 @@ impl Sizable for crate::widgets::pagination::MpPagination {
     }
 }
 
+// ---------- MpAlert ----------
+
+impl Sizable for crate::widgets::alert::MpAlert {
+    fn size(&self) -> MpSize {
+        crate::widgets::alert::MpAlert::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::alert::MpAlert::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpBadge ----------
+
+impl Sizable for crate::widgets::badge::MpBadge {
+    fn size(&self) -> MpSize {
+        crate::widgets::badge::MpBadge::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::badge::MpBadge::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpCollapsibleTrigger ----------
 
 impl Collapsible for crate::widgets::collapsible::MpCollapsibleTrigger {

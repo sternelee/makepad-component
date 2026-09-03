@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -221,9 +223,19 @@ pub struct MpBadge {
     #[live]
     badge_offset: DVec2,
 
+    /// Five-step size driving the indicator font, capsule padding and dot
+    /// diameter. Badges are tiny indicators: the font is scaled down from
+    /// the control metrics (Medium = the original 10px look).
+    #[live]
+    size: MpSize,
+
     /// Track if display needs update
     #[rust]
     display_dirty: bool,
+
+    /// Last size applied to the indicator (avoids re-applying every draw).
+    #[rust]
+    applied_size: Option<MpSize>,
 }
 
 impl ScriptHook for MpBadge {
@@ -252,6 +264,33 @@ impl Widget for MpBadge {
             self.apply_badge_offset(cx);
             self.sync_badge_display(cx);
             self.display_dirty = false;
+        }
+
+        // Metrics from the size system (Medium = the original 10px look).
+        let font = (self.size.font_size() - 3.0) as f64;
+        if self.applied_size != Some(self.size) {
+            self.applied_size = Some(self.size);
+            let indicator = self.view.view(cx, ids!(badge_wrapper.indicator));
+            if let Some(mut inner) = indicator.borrow_mut() {
+                inner.layout.padding = Inset {
+                    left: font * 0.7,
+                    right: font * 0.7,
+                    top: font * 0.2,
+                    bottom: font * 0.2,
+                };
+                if self.dot_mode {
+                    // Dot badge: scale the circle diameter instead.
+                    inner.walk.width = Size::Fixed(font * 0.8);
+                    inner.walk.height = Size::Fixed(font * 0.8);
+                }
+            }
+            if let Some(mut label) = self
+                .view
+                .label(cx, ids!(badge_wrapper.indicator.label))
+                .borrow_mut()
+            {
+                label.draw_text.text_style.font_size = font as f32;
+            }
         }
 
         self.view.draw_walk(cx, scope, walk)
@@ -334,6 +373,19 @@ impl MpBadge {
         self.display_dirty = true;
         self.redraw(cx);
     }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            // Indicator re-syncs on the next draw_walk.
+            self.applied_size = None;
+            self.redraw(cx);
+        }
+    }
 }
 
 impl MpBadgeRef {
@@ -371,6 +423,20 @@ impl MpBadgeRef {
     pub fn set_badge_offset(&self, cx: &mut Cx, offset: DVec2) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.set_badge_offset(cx, offset);
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 }

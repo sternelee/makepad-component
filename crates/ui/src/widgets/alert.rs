@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -553,6 +555,14 @@ pub struct MpAlert {
     /// Whether to show the close button
     #[live(false)]
     closable: bool,
+
+    /// Five-step size driving padding and title/message font.
+    #[live]
+    size: MpSize,
+
+    /// Last size applied to the labels (avoids re-applying every draw).
+    #[rust]
+    applied_size: Option<MpSize>,
 }
 
 impl ScriptHook for MpAlert {
@@ -599,6 +609,31 @@ impl Widget for MpAlert {
         if !self.visible {
             return DrawStep::done();
         }
+
+        // Metrics from the size system (Medium = the original 16/12 look).
+        // Alerts are roomy display containers: padding scaled up from the
+        // control metrics.
+        self.view.layout.padding = Inset {
+            left: self.size.padding_h() + 4.0,
+            right: self.size.padding_h() + 4.0,
+            top: self.size.padding_v() + 6.0,
+            bottom: self.size.padding_v() + 6.0,
+        };
+
+        if self.applied_size != Some(self.size) {
+            self.applied_size = Some(self.size);
+            if let Some(mut title) = self
+                .view
+                .label(cx, ids!(content.title_wrapper.title))
+                .borrow_mut()
+            {
+                title.draw_text.text_style.font_size = self.size.font_size() + 1.0;
+            }
+            if let Some(mut message) = self.view.label(cx, ids!(content.message)).borrow_mut() {
+                message.draw_text.text_style.font_size = self.size.font_size();
+            }
+        }
+
         self.view.draw_walk(cx, scope, walk)
     }
 }
@@ -646,6 +681,19 @@ impl MpAlert {
         self.closable = closable;
         self.sync_visibility(cx);
         self.redraw(cx);
+    }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            // Labels re-sync on the next draw_walk.
+            self.applied_size = None;
+            self.redraw(cx);
+        }
     }
 
     /// Close the alert (set visible to false)
@@ -705,6 +753,20 @@ impl MpAlertRef {
             matches!(item.cast::<MpAlertAction>(), MpAlertAction::Close)
         } else {
             false
+        }
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
         }
     }
 }
