@@ -4486,6 +4486,16 @@ startup() do #(App::script_component(vm)){
                                     }
                                     text: "Selected: none"
                                 }
+
+                                SubsectionLabel{ text: "Sizes" }
+
+                                demo_combobox_sm := mod.widgets.MpComboboxSmall{
+                                    width: Fill
+                                }
+
+                                demo_combobox_lg := mod.widgets.MpComboboxLarge{
+                                    width: Fill
+                                }
                             }
                         }
 
@@ -4858,6 +4868,30 @@ startup() do #(App::script_component(vm)){
                                     color: TEXT_MUTED
                                 }
                                 text: "Selected: none"
+                            }
+
+                            SubsectionLabel{ text: "Sizes" }
+
+                            View {
+                                width: Fill, height: Fit,
+                                flow: Right, spacing: 16,
+                                align: Align{y: 0.5},
+
+                                View {
+                                    width: Fit, height: Fit, flow: Down, spacing: 4,
+                                    mod.widgets.MpToggleGroup{ size: MpSize.Small, }
+                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Small" }
+                                }
+                                View {
+                                    width: Fit, height: Fit, flow: Down, spacing: 4,
+                                    mod.widgets.MpToggleGroup{ size: MpSize.Medium, }
+                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Medium" }
+                                }
+                                View {
+                                    width: Fit, height: Fit, flow: Down, spacing: 4,
+                                    mod.widgets.MpToggleGroup{ size: MpSize.Large, }
+                                    Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Large" }
+                                }
                             }
                         }
                     }
@@ -6835,6 +6869,27 @@ impl MatchEvent for App {
                     "Lemon".to_string(),
                 ],
             );
+
+        // Populate combobox size-variant demos (same fruit list)
+        for combobox_id in [ids!(demo_combobox_sm), ids!(demo_combobox_lg)] {
+            self.ui
+                .mp_combobox(cx, combobox_id)
+                .set_items(
+                    cx,
+                    vec![
+                        "Apple".to_string(),
+                        "Banana".to_string(),
+                        "Cherry".to_string(),
+                        "Durian".to_string(),
+                        "Elderberry".to_string(),
+                        "Fig".to_string(),
+                        "Grape".to_string(),
+                        "Honeydew".to_string(),
+                        "Kiwi".to_string(),
+                        "Lemon".to_string(),
+                    ],
+                );
+        }
 
         // Populate markdown demo
         self.ui.markdown(cx, ids!(demo_markdown)).set_text(

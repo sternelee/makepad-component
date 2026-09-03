@@ -229,6 +229,17 @@ impl Sizable for crate::widgets::stepper::MpStepper {
     }
 }
 
+// ---------- MpToggleGroup ----------
+
+impl Sizable for crate::widgets::toggle_group::MpToggleGroup {
+    fn size(&self) -> MpSize {
+        crate::widgets::toggle_group::MpToggleGroup::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::toggle_group::MpToggleGroup::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpCollapsibleTrigger ----------
 
 impl Collapsible for crate::widgets::collapsible::MpCollapsibleTrigger {

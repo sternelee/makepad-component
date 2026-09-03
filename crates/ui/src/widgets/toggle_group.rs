@@ -1,5 +1,7 @@
 use makepad_widgets::*;
 
+use crate::widgets::sizing::MpSize;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -143,6 +145,10 @@ pub struct MpToggleGroupItem {
     #[live(true)]
     visible: bool,
 
+    /// Five-step size metrics (padding + font) for this segmented item.
+    #[live]
+    size: MpSize,
+
     #[rust]
     area: Area,
     #[rust]
@@ -176,9 +182,18 @@ impl Widget for MpToggleGroupItem {
         if !self.visible {
             return DrawStep::done();
         }
-        self.draw_bg.draw_walk(cx, walk);
+        // Metrics from the size system (Medium ≈ the original DSL look)
+        self.layout.padding = Inset {
+            left: self.size.padding_h(),
+            right: self.size.padding_h(),
+            top: self.size.padding_v(),
+            bottom: self.size.padding_v(),
+        };
+        self.draw_text.text_style.font_size = self.size.font_size();
+        self.draw_bg.begin(cx, walk, self.layout);
         let label = self.text.as_ref().to_string();
-        self.draw_text.draw_walk(cx, walk, Align::default(), &label);
+        self.draw_text.draw_walk(cx, Walk::fit(), Align::default(), &label);
+        self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
         DrawStep::done()
     }
@@ -196,6 +211,17 @@ impl MpToggleGroupItem {
     pub fn set_index(&mut self, index: usize) {
         self.index = index;
     }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            self.redraw(cx);
+        }
+    }
 }
 
 #[derive(Script, ScriptHook, Widget)]
@@ -207,6 +233,14 @@ pub struct MpToggleGroup {
 
     #[rust]
     selected: Option<usize>,
+
+    /// Five-step size system propagated to the item slots.
+    #[live]
+    size: MpSize,
+
+    /// Last size applied to the items (avoids re-applying every draw).
+    #[rust]
+    applied_size: Option<MpSize>,
 }
 
 impl Widget for MpToggleGroup {
@@ -216,6 +250,17 @@ impl Widget for MpToggleGroup {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        // Propagate the size to the item slots once per size change
+        // (guarded: item.set_size requests redraws, so don't do it per frame).
+        if self.applied_size != Some(self.size) {
+            self.applied_size = Some(self.size);
+            for i in 0..TOGGLE_GROUP_SLOTS {
+                let key = [LiveId::from_str(&format!("i{}", i))];
+                if let Some(mut item) = self.view.mp_toggle_group_item(cx, &key).borrow_mut() {
+                    item.set_size(cx, self.size);
+                }
+            }
+        }
         self.view.draw_walk(cx, scope, walk)
     }
 }
@@ -285,6 +330,19 @@ impl MpToggleGroup {
     pub fn selected(&self) -> Option<usize> {
         self.selected
     }
+
+    pub fn size(&self) -> MpSize {
+        self.size
+    }
+
+    pub fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        if self.size != size {
+            self.size = size;
+            // Items re-sync on the next draw_walk.
+            self.applied_size = None;
+            self.redraw(cx);
+        }
+    }
 }
 
 impl MpToggleGroupRef {
@@ -311,5 +369,19 @@ impl MpToggleGroupRef {
             return inner.selected();
         }
         None
+    }
+
+    pub fn size(&self) -> MpSize {
+        if let Some(inner) = self.borrow() {
+            inner.size()
+        } else {
+            MpSize::default()
+        }
+    }
+
+    pub fn set_size(&self, cx: &mut Cx, size: MpSize) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_size(cx, size);
+        }
     }
 }

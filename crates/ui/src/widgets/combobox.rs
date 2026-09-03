@@ -1,4 +1,5 @@
 use crate::widgets::MpInputAction;
+use crate::widgets::sizing::MpSize;
 use makepad_widgets::*;
 
 script_mod! {
@@ -101,6 +102,36 @@ script_mod! {
             }
             text: "No matches"
             visible: false
+        }
+    }
+
+    // Small variant: tighter trigger + option rows
+    mod.widgets.MpComboboxSmall = mod.widgets.MpCombobox{
+        input: {height: 28}
+        list: {
+            opt0: {size: MpSize.Small}
+            opt1: {size: MpSize.Small}
+            opt2: {size: MpSize.Small}
+            opt3: {size: MpSize.Small}
+            opt4: {size: MpSize.Small}
+            opt5: {size: MpSize.Small}
+            opt6: {size: MpSize.Small}
+            opt7: {size: MpSize.Small}
+        }
+    }
+
+    // Large variant: taller trigger + option rows
+    mod.widgets.MpComboboxLarge = mod.widgets.MpCombobox{
+        input: {height: 42}
+        list: {
+            opt0: {size: MpSize.Large}
+            opt1: {size: MpSize.Large}
+            opt2: {size: MpSize.Large}
+            opt3: {size: MpSize.Large}
+            opt4: {size: MpSize.Large}
+            opt5: {size: MpSize.Large}
+            opt6: {size: MpSize.Large}
+            opt7: {size: MpSize.Large}
         }
     }
 }
@@ -301,6 +332,10 @@ pub struct MpComboboxOption {
     #[live]
     highlighted: bool,
 
+    /// Five-step size metrics (row height, padding, font) for this option.
+    #[live]
+    size: MpSize,
+
     #[rust]
     area: Area,
 }
@@ -336,6 +371,16 @@ impl Widget for MpComboboxOption {
         if !self.visible {
             return DrawStep::done();
         }
+        // Metrics from the size system (row height + padding + font)
+        let mut walk = walk;
+        walk.height = Size::Fixed(self.size.min_height());
+        self.layout.padding = Inset {
+            left: self.size.padding_h() * 0.85,
+            right: self.size.padding_h() * 0.85,
+            top: 0.0,
+            bottom: 0.0,
+        };
+        self.draw_text.text_style.font_size = self.size.font_size();
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_text
             .draw_walk(cx, Walk::fit(), Align::default(), self.label.as_ref());
