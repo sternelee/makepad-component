@@ -447,6 +447,28 @@ impl Disableable for crate::widgets::step_indicator::MpStepIndicator {
     }
 }
 
+// ---------- MpBubble ----------
+
+impl Sizable for crate::widgets::bubble::MpBubble {
+    fn size(&self) -> MpSize {
+        crate::widgets::bubble::MpBubble::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::bubble::MpBubble::set_size(self, cx, size);
+    }
+}
+
+// ---------- MpAttachment ----------
+
+impl Sizable for crate::widgets::attachment::MpAttachment {
+    fn size(&self) -> MpSize {
+        crate::widgets::attachment::MpAttachment::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::attachment::MpAttachment::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpCollapsibleTrigger ----------
 
 impl Collapsible for crate::widgets::collapsible::MpCollapsibleTrigger {

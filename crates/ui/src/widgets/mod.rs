@@ -2,9 +2,11 @@
 
 pub mod accordion;
 pub mod alert;
+pub mod attachment;
 pub mod avatar;
 pub mod badge;
 pub mod breadcrumb;
+pub mod bubble;
 pub mod button;
 pub mod calendar;
 pub mod card;
@@ -69,8 +71,10 @@ pub mod traits;
 
 pub use accordion::*;
 pub use alert::*;
+pub use attachment::*;
 pub use avatar::*;
 pub use badge::*;
+pub use bubble::*;
 pub use breadcrumb::*;
 pub use button::*;
 pub use calendar::*;
@@ -143,6 +147,8 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::widgets::badge::script_mod(vm);
     crate::widgets::breadcrumb::script_mod(vm);
     crate::widgets::button::script_mod(vm);
+    crate::widgets::attachment::script_mod(vm);
+    crate::widgets::bubble::script_mod(vm);
     crate::widgets::card::script_mod(vm);
     crate::widgets::checkbox::script_mod(vm);
     crate::widgets::chip::script_mod(vm);

@@ -3,6 +3,8 @@ use makepad_component::widgets::MpDescriptionItem;
 use makepad_component::widgets::MpDescriptionListWidgetRefExt;
 use makepad_component::widgets::MpAvatarWidgetRefExt;
 use makepad_component::widgets::MpBadgeWidgetRefExt;
+use makepad_component::widgets::MpAttachmentWidgetRefExt;
+use makepad_component::widgets::MpBubbleWidgetRefExt;
 use makepad_component::widgets::MpButtonWidgetExt;
 use makepad_component::widgets::MpButtonWidgetRefExt;
 use makepad_component::widgets::MpCardAction;
@@ -4796,6 +4798,115 @@ startup() do #(App::script_component(vm)){
 
                         mod.widgets.MpDivider {}
 
+                        // ===== Bubble Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Bubble" }
+
+                            View {
+                                width: 460, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Conversation" }
+
+                                View {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    align: Align{x: 0.0},
+
+                                    bubble_assistant := mod.widgets.MpBubble{
+                                        message: "Hi! I can help you set up your project. What are you building?"
+                                        variant: mod.widgets.MpBubbleVariant.Secondary
+                                    }
+                                }
+
+                                View {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    align: Align{x: 1.0},
+
+                                    bubble_user := mod.widgets.MpBubble{
+                                        message: "A Rust CLI that syncs files to S3."
+                                        variant: mod.widgets.MpBubbleVariant.Filled
+                                    }
+                                }
+
+                                View {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    align: Align{x: 0.0},
+
+                                    mod.widgets.MpBubble{
+                                        message: "Got it — here's a starter template."
+                                        variant: mod.widgets.MpBubbleVariant.Secondary
+                                    }
+                                }
+
+                                View {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    align: Align{x: 1.0},
+
+                                    mod.widgets.MpBubble{
+                                        message: "Upload failed. Please retry."
+                                        variant: mod.widgets.MpBubbleVariant.Destructive
+                                    }
+                                }
+
+                                View {
+                                    width: Fill, height: Fit,
+                                    flow: Down,
+                                    align: Align{x: 0.0},
+
+                                    mod.widgets.MpBubble{
+                                        message: "Outlined variant for quiet system messages."
+                                        variant: mod.widgets.MpBubbleVariant.Outline
+                                    }
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Attachment Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Attachment" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Right,
+                                spacing: 12,
+
+                                demo_attachment := mod.widgets.MpAttachment{
+                                    filename: "quarterly-report.pdf"
+                                    meta: "2.4 MB"
+                                }
+
+                                demo_attachment_img := mod.widgets.MpAttachment{
+                                    filename: "banner.png"
+                                    meta: "480 KB"
+                                }
+                            }
+
+                            attachment_status := Label{
+                                draw_text +: {
+                                    text_style: theme.font_regular{ font_size: 12.0 }
+                                    color: TEXT_MUTED
+                                }
+                                text: "Removed: none"
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
                         // ===== Description List Section =====
                         View {
                             width: Fill, height: Fit,
@@ -8076,6 +8187,15 @@ impl MatchEvent for App {
             self.ui
                 .label(cx, ids!(step_status))
                 .set_text(cx, &format!("Step: {}", step + 1));
+        }
+
+        // Attachment demo: removal
+        for attachment_id in [ids!(demo_attachment), ids!(demo_attachment_img)] {
+            if let Some(removed) = self.ui.mp_attachment(cx, attachment_id).removed(actions) {
+                self.ui
+                    .label(cx, ids!(attachment_status))
+                    .set_text(cx, &format!("Removed: {}", removed));
+            }
         }
 
         // Context menu demo: item selection
