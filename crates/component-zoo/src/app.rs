@@ -6206,7 +6206,6 @@ startup() do #(App::script_component(vm)){
                         }
 
                         // Sheet panel (overlay + content)
-                        demo_sheet := mod.widgets.MpSheet{}
 
                         // ============================================================
                         // Dialog
@@ -6287,23 +6286,6 @@ startup() do #(App::script_component(vm)){
                             }
                         }
                         // Dialog overlay (hidden unless opened)
-                        demo_dialog := mod.widgets.MpDialog{
-                            content +: {
-                                dialog +: {
-                                    header +: {
-                                        title +: { text: "Welcome to shadcn Dialog!" }
-                                        description +: { text: "This dialog has smooth fade-in animation." }
-                                    }
-                                    body +: {
-                                        Label{ draw_text +: { text_style: theme.font_regular{font_size: 14.0} color: TEXT } text: "Dialog content with custom children." }
-                                    }
-                                    footer +: {
-                                        dialog_close_btn := mod.widgets.MpButtonGhost{ text: "Cancel" }
-                                        dialog_confirm_btn := mod.widgets.MpButtonProminent{ text: "Confirm" }
-                                    }
-                                }
-                            }
-                        }
 
                         // Command palette overlay (hidden unless opened via ⌘K)
                         demo_command := mod.widgets.MpCommandPalette{
@@ -6535,6 +6517,26 @@ startup() do #(App::script_component(vm)){
                     }
                 }
             } // close demo_modal
+
+                demo_sheet := mod.widgets.MpSheet{}
+
+                demo_dialog := mod.widgets.MpDialog{
+                    content +: {
+                        dialog +: {
+                            header +: {
+                                title +: { text: "Welcome to shadcn Dialog!" }
+                                description +: { text: "This dialog has smooth fade-in animation." }
+                            }
+                            body +: {
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 14.0} color: TEXT } text: "Dialog content with custom children." }
+                            }
+                            footer +: {
+                                dialog_close_btn := mod.widgets.MpButtonGhost{ text: "Cancel" }
+                                dialog_confirm_btn := mod.widgets.MpButtonProminent{ text: "Confirm" }
+                            }
+                        }
+                    }
+                }
 
                 // Theme state provider
                 theme_state := mod.widgets.MpThemeProvider{
