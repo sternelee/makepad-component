@@ -53,6 +53,12 @@ script_mod! {
         alignment: mod.widgets.MpBubbleAlignment.Start
         variant: mod.widgets.MpBubbleVariant.Secondary
         message: ""
+
+        // Text style (font family + size); color overwritten from Rust
+        draw_text +: {
+            text_style: theme.font_regular{font_size: 13.0}
+            color: TEXT
+        }
     }
 }
 
@@ -217,7 +223,7 @@ impl Widget for MpBubble {
         self.draw_text.color = style.fg;
 
         self.draw_bg.begin(cx, walk, self.layout);
-        self.draw_text.color = style.fg;
+        self.draw_text.text_style.font_size = size.font_size();
         self.draw_text
             .draw_walk(cx, Walk::fit(), Align::default(), self.message.as_ref());
         self.draw_bg.end(cx);

@@ -7586,6 +7586,7 @@ impl MatchEvent for App {
         // Set initial category tab as selected
         self.ui.mp_tab(cx, ids!(cat_form)).set_selected(cx, true);
 
+
         // Initialize skeleton in loading state
         self.ui
             .mp_skeleton_widget(cx, ids!(interactive_skeleton))

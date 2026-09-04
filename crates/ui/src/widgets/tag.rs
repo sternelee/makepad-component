@@ -59,6 +59,13 @@ script_mod! {
         style: mod.widgets.MpTagStyle.Filled
         dot: false
 
+        // Text style (font family + size); color is overwritten from Rust
+        // each draw with the resolved variant foreground
+        draw_text +: {
+            text_style: theme.font_regular{font_size: 13.0}
+            color: TEXT
+        }
+
         // Palette baked for Rust-side variant resolution
         c_accent: ACCENT
         c_accent_muted: ACCENT_MUTED
@@ -266,6 +273,7 @@ impl Widget for MpTag {
         self.draw_bg.dot_color = style.dot_color;
 
         self.draw_bg.begin(cx, walk, self.layout);
+        self.draw_text.text_style.font_size = size.font_size();
         self.draw_text.color = style.fg;
         self.draw_text
             .draw_walk(cx, Walk::fit(), Align::default(), self.text.as_ref());
