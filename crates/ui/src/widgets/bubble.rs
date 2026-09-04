@@ -15,6 +15,32 @@ script_mod! {
         width: Fit
         height: Fit
 
+        // Bubble surface shader: bg + border resolved from Rust per variant.
+        // Without this registration the draw struct falls back to DrawQuad's
+        // default transparent pixel and the surface never renders.
+        set_type_default() do #(DrawMpBubble::script_shader(vm)){
+            ..mod.draw.DrawQuad
+
+            bg: #x0000
+            border_color: #x0000
+            border_width: 0.0
+            radius: 12.0
+
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let sz = self.rect_size
+
+                sdf.box(0.5, 0.5, sz.x - 1.0, sz.y - 1.0, self.radius)
+                if (self.bg.w > 0.0) {
+                    sdf.fill_keep(self.bg)
+                }
+                if (self.border_width > 0.0) {
+                    sdf.stroke(self.border_color, self.border_width)
+                }
+                return sdf.result
+            }
+        }
+
         // Palette baked for Rust-side variant resolution
         c_accent: ACCENT
         c_on_accent: ON_ACCENT
@@ -167,7 +193,7 @@ impl MpBubble {
 }
 
 impl Widget for MpBubble {
-    fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {}
+    fn handle_event(&mut self, _cx: &mut Cx, _event: &Event, _scope: &mut Scope) {}
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
         let size = self.size;
@@ -187,6 +213,8 @@ impl Widget for MpBubble {
         self.draw_bg.border_color = style.border;
         self.draw_bg.border_width = style.border_width;
         self.draw_bg.radius = 12.0;
+        // Message text follows the variant foreground (e.g. on-accent for Filled)
+        self.draw_text.color = style.fg;
 
         self.draw_bg.begin(cx, walk, self.layout);
         self.draw_text

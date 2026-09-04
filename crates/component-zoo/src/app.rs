@@ -5,6 +5,7 @@ use makepad_component::widgets::MpAvatarWidgetRefExt;
 use makepad_component::widgets::MpBadgeWidgetRefExt;
 use makepad_component::widgets::MpAttachmentWidgetRefExt;
 use makepad_component::widgets::MpBubbleWidgetRefExt;
+use makepad_component::widgets::MpColorPickerWidgetRefExt;
 use makepad_component::widgets::MpButtonWidgetExt;
 use makepad_component::widgets::MpButtonWidgetRefExt;
 use makepad_component::widgets::MpCardAction;
@@ -5223,6 +5224,60 @@ startup() do #(App::script_component(vm)){
 
                         mod.widgets.MpDivider {}
 
+                        // ===== Color Picker Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Color Picker" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Pick a swatch" }
+
+                                demo_color_picker := mod.widgets.MpColorPicker{}
+
+                                color_status := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{ font_size: 12.0 }
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Picked: none"
+                                }
+
+                                SubsectionLabel{ text: "Sizes" }
+
+                                View {
+                                    width: Fit, height: Fit,
+                                    flow: Right,
+                                    spacing: 20,
+                                    align: Align{y: 0.5},
+
+                                    View {
+                                        width: Fit, height: Fit, flow: Down, spacing: 4,
+                                        demo_color_picker_sm := mod.widgets.MpColorPicker{ size: MpSize.Small }
+                                        Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Small" }
+                                    }
+                                    View {
+                                        width: Fit, height: Fit, flow: Down, spacing: 4,
+                                        demo_color_picker_md := mod.widgets.MpColorPicker{}
+                                        Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Medium" }
+                                    }
+                                    View {
+                                        width: Fit, height: Fit, flow: Down, spacing: 4,
+                                        demo_color_picker_lg := mod.widgets.MpColorPicker{ size: MpSize.Large }
+                                        Label { draw_text +: { text_style: theme.font_regular{ font_size: 11.0 }, color: TEXT_FAINT } text: "Large" }
+                                    }
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
                         // ===== Chips Section =====
                         View {
                             width: Fill, height: Fit,
@@ -7389,6 +7444,36 @@ impl MatchEvent for App {
             self.ui.mp_table(cx, table_id).set_rows(cx, size_demo_rows.clone());
         }
 
+        // Populate color picker demos: a warm-to-cool palette grid
+        let swatch_palette = vec![
+            "#1C1917", "#57534E", "#A8A29E", "#E7E5E4", "#FAFAF9",
+            "#7F1D1D", "#DC2626", "#F87171", "#FECACA", "#FEF2F2",
+            "#9A3412", "#EA580C", "#FB923C", "#FED7AA", "#FFF7ED",
+            "#A16207", "#CA8A04", "#FACC15", "#FDE68A", "#FEFCE8",
+            "#166534", "#16A34A", "#4ADE80", "#BBF7D0", "#F0FDF4",
+            "#155E75", "#0891B2", "#22D3EE", "#A5F3FC", "#ECFEFF",
+            "#1E40AF", "#2563EB", "#60A5FA", "#BFDBFE", "#EFF6FF",
+            "#5B21B6", "#7C3AED", "#A78BFA", "#DDD6FE", "#F5F3FF",
+            "#831843", "#DB2777", "#F472B6", "#FBCFE8", "#FDF2F8",
+        ]
+        .iter()
+        .filter_map(|s| {
+            let hex = s.trim_start_matches('#');
+            u32::from_str_radix(hex, 16).ok().map(|v| Vec4f {
+                x: ((v >> 16) & 0xff) as f32 / 255.0,
+                y: ((v >> 8) & 0xff) as f32 / 255.0,
+                z: (v & 0xff) as f32 / 255.0,
+                w: 1.0,
+            })
+        })
+        .collect::<Vec<_>>();
+        self.ui.mp_color_picker(cx, ids!(demo_color_picker)).set_colors(cx, swatch_palette.clone());
+        self.ui.mp_color_picker(cx, ids!(demo_color_picker)).set_columns(cx, 5);
+        self.ui.mp_color_picker(cx, ids!(demo_color_picker)).set_selected(cx, Some(7));
+        for picker_id in [ids!(demo_color_picker_sm), ids!(demo_color_picker_md), ids!(demo_color_picker_lg)] {
+            self.ui.mp_color_picker(cx, picker_id).set_colors(cx, swatch_palette.clone());
+        }
+
         // Populate combobox demo
         self.ui
             .mp_combobox(cx, ids!(demo_combobox))
@@ -8347,6 +8432,21 @@ impl MatchEvent for App {
             self.ui
                 .label(cx, ids!(rating_status))
                 .set_text(cx, &format!("Rating: {}", value));
+        }
+
+        // Color picker demo: swatch picked
+        if let Some(color) = self.ui.mp_color_picker(cx, ids!(demo_color_picker)).picked(actions) {
+            self.ui
+                .label(cx, ids!(color_status))
+                .set_text(
+                    cx,
+                    &format!(
+                        "Picked: rgb({:.0}, {:.0}, {:.0})",
+                        color.x * 255.0,
+                        color.y * 255.0,
+                        color.z * 255.0
+                    ),
+                );
         }
 
         // Chips demo: remove

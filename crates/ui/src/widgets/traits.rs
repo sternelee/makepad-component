@@ -469,6 +469,17 @@ impl Sizable for crate::widgets::attachment::MpAttachment {
     }
 }
 
+// ---------- MpColorPicker ----------
+
+impl Sizable for crate::widgets::color_picker::MpColorPicker {
+    fn size(&self) -> MpSize {
+        crate::widgets::color_picker::MpColorPicker::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::color_picker::MpColorPicker::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpLabel ----------
 
 impl Sizable for crate::widgets::label::MpLabel {
