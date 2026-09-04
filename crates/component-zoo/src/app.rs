@@ -1,6 +1,7 @@
 use makepad_component::widgets::MpThemeState;
 use makepad_component::widgets::MpTagWidgetRefExt;
 use makepad_component::widgets::MpSearchableListWidgetRefExt;
+use makepad_component::widgets::MpNumberInputWidgetRefExt;
 use makepad_component::widgets::MpDescriptionItem;
 use makepad_component::widgets::MpDescriptionListWidgetRefExt;
 use makepad_component::widgets::MpAvatarWidgetRefExt;
@@ -1774,6 +1775,36 @@ startup() do #(App::script_component(vm)){
                                         }
                                         text: "Value: (empty)"
                                     }
+                                }
+                            }
+
+                            SubsectionLabel{ text: "Number Input" }
+
+                            View {
+                                width: 320, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                demo_number_input := mod.widgets.MpNumberInput{
+                                    width: 220
+                                }
+
+                                View {
+                                    width: Fit, height: Fit,
+                                    flow: Right,
+                                    spacing: 12,
+                                    align: Align{y: 0.5},
+
+                                    demo_number_sm := mod.widgets.MpNumberInputSmall{ width: 140 }
+                                    demo_number_lg := mod.widgets.MpNumberInputLarge{ width: 160 }
+                                }
+
+                                number_status := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{ font_size: 12.0 }
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Number: 1"
                                 }
                             }
                         }
@@ -7654,6 +7685,16 @@ impl MatchEvent for App {
             self.ui.mp_color_picker(cx, picker_id).set_colors(cx, swatch_palette.clone());
         }
 
+        // Configure number input demos: bounds + initial values
+        for number_id in [ids!(demo_number_input), ids!(demo_number_sm), ids!(demo_number_lg)] {
+            self.ui
+                .mp_number_input(cx, number_id)
+                .set_bounds(cx, 0.0, 100.0, 1.0, 0);
+        }
+        self.ui
+            .mp_number_input(cx, ids!(demo_number_input))
+            .set_value(cx, 42.0);
+
         // Populate searchable list demo
         let fruit_items: Vec<String> = [
             "Apple", "Apricot", "Banana", "Blueberry", "Cherry", "Cranberry",
@@ -8651,6 +8692,19 @@ impl MatchEvent for App {
             self.ui
                 .label(cx, ids!(search_status))
                 .set_text(cx, &format!("Selected: {}", text));
+        }
+
+        // Number input demo: any of the three fields changed
+        for number_id in [
+            ids!(demo_number_input),
+            ids!(demo_number_sm),
+            ids!(demo_number_lg),
+        ] {
+            if let Some(v) = self.ui.mp_number_input(cx, number_id).changed(actions) {
+                self.ui
+                    .label(cx, ids!(number_status))
+                    .set_text(cx, &format!("Number: {:.0}", v));
+            }
         }
 
         // Chips demo: remove
