@@ -480,6 +480,17 @@ impl Sizable for crate::widgets::color_picker::MpColorPicker {
     }
 }
 
+// ---------- MpTag ----------
+
+impl Sizable for crate::widgets::tag::MpTag {
+    fn size(&self) -> MpSize {
+        crate::widgets::tag::MpTag::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::tag::MpTag::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpLabel ----------
 
 impl Sizable for crate::widgets::label::MpLabel {

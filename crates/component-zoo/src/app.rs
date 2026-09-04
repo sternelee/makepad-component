@@ -1,4 +1,5 @@
 use makepad_component::widgets::MpThemeState;
+use makepad_component::widgets::MpTagWidgetRefExt;
 use makepad_component::widgets::MpDescriptionItem;
 use makepad_component::widgets::MpDescriptionListWidgetRefExt;
 use makepad_component::widgets::MpAvatarWidgetRefExt;
@@ -2323,7 +2324,83 @@ startup() do #(App::script_component(vm)){
 
                         mod.widgets.MpDivider {}
 
-                        // ===== Avatar Section =====
+                        // ===== Tag Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Tag" }
+
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Variants" }
+
+                                View {
+                                    width: Fit, height: Fit,
+                                    flow: Right,
+                                    spacing: 10,
+                                    align: Align{y: 0.5},
+
+                                    mod.widgets.MpTag{ text: "Primary", variant: MpTagVariant.Primary }
+                                    mod.widgets.MpTag{ text: "Secondary" }
+                                    mod.widgets.MpTag{ text: "Success", variant: MpTagVariant.Success }
+                                    mod.widgets.MpTag{ text: "Warning", variant: MpTagVariant.Warning }
+                                    mod.widgets.MpTag{ text: "Danger", variant: MpTagVariant.Danger }
+                                    mod.widgets.MpTag{ text: "Info", variant: MpTagVariant.Info }
+                                }
+
+                                SubsectionLabel{ text: "Outline" }
+
+                                View {
+                                    width: Fit, height: Fit,
+                                    flow: Right,
+                                    spacing: 10,
+                                    align: Align{y: 0.5},
+
+                                    mod.widgets.MpTag{ text: "Primary", variant: MpTagVariant.Primary, style: MpTagStyle.Outline }
+                                    mod.widgets.MpTag{ text: "Success", variant: MpTagVariant.Success, style: MpTagStyle.Outline }
+                                    mod.widgets.MpTag{ text: "Warning", variant: MpTagVariant.Warning, style: MpTagStyle.Outline }
+                                    mod.widgets.MpTag{ text: "Danger", variant: MpTagVariant.Danger, style: MpTagStyle.Outline }
+                                }
+
+                                SubsectionLabel{ text: "Status Dot" }
+
+                                View {
+                                    width: Fit, height: Fit,
+                                    flow: Right,
+                                    spacing: 10,
+                                    align: Align{y: 0.5},
+
+                                    mod.widgets.MpTag{ text: "Online", variant: MpTagVariant.Success, dot: true }
+                                    mod.widgets.MpTag{ text: "Away", variant: MpTagVariant.Warning, dot: true }
+                                    mod.widgets.MpTag{ text: "Offline", variant: MpTagVariant.Secondary, dot: true }
+                                    mod.widgets.MpTag{ text: "Failed", variant: MpTagVariant.Danger, dot: true }
+                                }
+
+                                SubsectionLabel{ text: "Sizes" }
+
+                                View {
+                                    width: Fit, height: Fit,
+                                    flow: Right,
+                                    spacing: 12,
+                                    align: Align{y: 0.5},
+
+                                    mod.widgets.MpTag{ text: "XS", size: MpSize.XSmall, variant: MpTagVariant.Primary }
+                                    mod.widgets.MpTag{ text: "Small", size: MpSize.Small, variant: MpTagVariant.Primary }
+                                    mod.widgets.MpTag{ text: "Medium", variant: MpTagVariant.Primary }
+                                    mod.widgets.MpTag{ text: "Large", size: MpSize.Large, variant: MpTagVariant.Primary }
+                                    mod.widgets.MpTag{ text: "XLarge", size: MpSize.XLarge, variant: MpTagVariant.Primary }
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Avatar Section ======
                         View {
                             width: Fill, height: Fit,
                             flow: Down,

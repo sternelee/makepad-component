@@ -217,6 +217,7 @@ impl Widget for MpBubble {
         self.draw_text.color = style.fg;
 
         self.draw_bg.begin(cx, walk, self.layout);
+        self.draw_text.color = style.fg;
         self.draw_text
             .draw_walk(cx, Walk::fit(), Align::default(), self.message.as_ref());
         self.draw_bg.end(cx);
