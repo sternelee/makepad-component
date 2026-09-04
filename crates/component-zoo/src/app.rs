@@ -1,5 +1,6 @@
 use makepad_component::widgets::MpThemeState;
 use makepad_component::widgets::MpTagWidgetRefExt;
+use makepad_component::widgets::MpSearchableListWidgetRefExt;
 use makepad_component::widgets::MpDescriptionItem;
 use makepad_component::widgets::MpDescriptionListWidgetRefExt;
 use makepad_component::widgets::MpAvatarWidgetRefExt;
@@ -2394,6 +2395,45 @@ startup() do #(App::script_component(vm)){
                                     mod.widgets.MpTag{ text: "Medium", variant: MpTagVariant.Primary }
                                     mod.widgets.MpTag{ text: "Large", size: MpSize.Large, variant: MpTagVariant.Primary }
                                     mod.widgets.MpTag{ text: "XLarge", size: MpSize.XLarge, variant: MpTagVariant.Primary }
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
+                        // ===== Status Bar Section =====
+                        View {
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Status Bar" }
+
+                            SubsectionLabel{ text: "Editor-style footer" }
+
+                            mod.widgets.MpStatusBar{
+                                left +: {
+                                    mod.widgets.MpStatusLed{}
+                                    mod.widgets.MpStatusText{ text: "Ready" }
+                                }
+                                center +: {
+                                    mod.widgets.MpStatusText{ text: "main.rs" }
+                                }
+                                right +: {
+                                    mod.widgets.MpStatusText{ text: "Ln 42, Col 7" }
+                                    mod.widgets.MpStatusText{ text: "UTF-8" }
+                                    mod.widgets.MpStatusText{ text: "Rust" }
+                                }
+                            }
+
+                            SubsectionLabel{ text: "Minimal" }
+
+                            mod.widgets.MpStatusBar{
+                                left +: {
+                                    mod.widgets.MpStatusText{ text: "3 items" }
+                                }
+                                right +: {
+                                    mod.widgets.MpStatusText{ text: "Synced 2m ago" }
                                 }
                             }
                         }
@@ -5355,6 +5395,35 @@ startup() do #(App::script_component(vm)){
 
                         mod.widgets.MpDivider {}
 
+                        // ===== Searchable List Section =====
+                        View {
+                            width: 360, height: Fit,
+                            flow: Down,
+                            spacing: 16,
+
+                            SectionHeader{ text: "Searchable List" }
+
+                            View {
+                                width: Fill, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Type to filter, click to select" }
+
+                                demo_search_list := mod.widgets.MpSearchableList{}
+
+                                search_status := Label{
+                                    draw_text +: {
+                                        text_style: theme.font_regular{ font_size: 12.0 }
+                                        color: TEXT_MUTED
+                                    }
+                                    text: "Selected: none"
+                                }
+                            }
+                        }
+
+                        mod.widgets.MpDivider {}
+
                         // ===== Chips Section =====
                         View {
                             width: Fill, height: Fit,
@@ -7551,6 +7620,19 @@ impl MatchEvent for App {
             self.ui.mp_color_picker(cx, picker_id).set_colors(cx, swatch_palette.clone());
         }
 
+        // Populate searchable list demo
+        let fruit_items: Vec<String> = [
+            "Apple", "Apricot", "Banana", "Blueberry", "Cherry", "Cranberry",
+            "Grape", "Kiwi", "Lemon", "Lime", "Mango", "Orange", "Papaya",
+            "Peach", "Pear", "Pineapple", "Raspberry", "Strawberry", "Watermelon",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        self.ui
+            .mp_searchable_list(cx, ids!(demo_search_list))
+            .set_items(cx, fruit_items);
+
         // Populate combobox demo
         self.ui
             .mp_combobox(cx, ids!(demo_combobox))
@@ -8524,6 +8606,17 @@ impl MatchEvent for App {
                         color.z * 255.0
                     ),
                 );
+        }
+
+        // Searchable list demo: item picked
+        if let Some(text) = self
+            .ui
+            .mp_searchable_list(cx, ids!(demo_search_list))
+            .selected(actions)
+        {
+            self.ui
+                .label(cx, ids!(search_status))
+                .set_text(cx, &format!("Selected: {}", text));
         }
 
         // Chips demo: remove

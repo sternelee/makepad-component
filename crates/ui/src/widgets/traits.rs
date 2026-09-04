@@ -491,6 +491,17 @@ impl Sizable for crate::widgets::tag::MpTag {
     }
 }
 
+// ---------- MpSearchableList ----------
+
+impl Sizable for crate::widgets::searchable_list::MpSearchableList {
+    fn size(&self) -> MpSize {
+        crate::widgets::searchable_list::MpSearchableList::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::searchable_list::MpSearchableList::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpLabel ----------
 
 impl Sizable for crate::widgets::label::MpLabel {
