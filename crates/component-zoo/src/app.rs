@@ -42,6 +42,7 @@ use makepad_component::widgets::MpTreeWidgetRefExt;
 use makepad_component::widgets::MpToggleGroupWidgetRefExt;
 use makepad_component::widgets::TableColumn;
 use makepad_component::widgets::TreeItem;
+use makepad_component::widgets::flatten_tree;
 use makepad_widgets::*;
 
 script_mod! {
@@ -4715,6 +4716,12 @@ startup() do #(App::script_component(vm)){
                                         size: MpSize.Large
                                     }
                                 }
+
+                                SubsectionLabel{ text: "Disabled rows" }
+
+                                demo_tree_dis := mod.widgets.MpTree{
+                                    width: 360, height: 150
+                                }
                             }
                         }
 
@@ -7589,6 +7596,33 @@ impl MatchEvent for App {
             self.ui.mp_table(cx, table_id).set_columns(size_demo_columns.clone());
             self.ui.mp_table(cx, table_id).set_rows(cx, size_demo_rows.clone());
         }
+
+        // Populate the disabled-rows tree demo: nested builder + flatten,
+        // one disabled leaf under each branch.
+        let disabled_tree = flatten_tree(vec![
+            TreeItem::with_children(
+                "src",
+                vec![
+                    TreeItem::with_children(
+                        "widgets",
+                        vec![
+                            TreeItem::new("button.rs", 0),
+                            TreeItem::new("tree.rs", 0).disabled(true),
+                            TreeItem::new("table.rs", 0),
+                        ],
+                    ),
+                    TreeItem::new("main.rs", 0).disabled(true),
+                ],
+            ),
+            TreeItem::with_children(
+                "docs",
+                vec![
+                    TreeItem::new("guide.md", 0),
+                    TreeItem::new("WIP.md", 0).disabled(true),
+                ],
+            ),
+        ]);
+        self.ui.mp_tree(cx, ids!(demo_tree_dis)).set_items(cx, disabled_tree);
 
         // Populate color picker demos: a warm-to-cool palette grid
         let swatch_palette = vec![

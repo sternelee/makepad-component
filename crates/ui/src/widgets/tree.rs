@@ -16,6 +16,7 @@ script_mod! {
 
         hovered: 0.0
         selected: 0.0
+        disabled: 0.0
         base_color: #x00000000
         hover_color: ELEMENT_HOVER
         selected_color: ELEMENT_ACTIVE
@@ -24,6 +25,8 @@ script_mod! {
             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
             let base = mix(self.base_color, self.hover_color, self.hovered)
             let c = mix(base, self.selected_color, self.selected)
+            // Disabled rows fade to half alpha (gpui grouped fade convention)
+            let c = vec4(c.rgb, c.a * (1.0 - self.disabled * 0.5))
             sdf.box(2.0, 1.0, self.rect_size.x - 4.0, self.rect_size.y - 2.0, 6.0)
             sdf.fill(c)
             return sdf.result
@@ -48,15 +51,29 @@ script_mod! {
             text_style: theme.font_regular{font_size: 10.0}
             color: TEXT_FAINT
         }
+
+        // Palette baked for Rust-side disabled label color
+        c_text: TEXT
+        c_text_muted: TEXT_MUTED
     }
 }
 
 /// One node in the flat tree model. `depth` drives indentation;
 /// children are the items that follow with a greater depth.
+///
+/// The legacy flat API (`TreeItem::new(label, depth)`) feeds the widget
+/// directly; the gpui-style nested builders (`with_children`,
+/// `disabled`) produce nodes that must be passed through
+/// [`flatten_tree`] first.
 #[derive(Clone, Debug, Default)]
 pub struct TreeItem {
     pub label: String,
     pub depth: usize,
+    /// Disabled rows ignore hover/click and render faded.
+    pub disabled: bool,
+    /// Nested children (only populated by the `with_children` builder;
+    /// ignored by the flat widget path until flattened).
+    pub children: Vec<TreeItem>,
 }
 
 impl TreeItem {
@@ -64,8 +81,43 @@ impl TreeItem {
         Self {
             label: label.to_string(),
             depth,
+            disabled: false,
+            children: Vec::new(),
         }
     }
+
+    /// Build a subtree from the gpui-style nested `children` builder.
+    /// The node and all descendants flatten into a list with depths
+    /// assigned by nesting level.
+    pub fn with_children(label: &str, children: Vec<TreeItem>) -> Self {
+        let mut node = Self::new(label, 0);
+        node.children = children;
+        node
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+}
+
+/// Flatten a nested `TreeItem` forest into the flat depth-encoded list
+/// the widget renders. Nested builders assign depths automatically.
+pub fn flatten_tree(forest: Vec<TreeItem>) -> Vec<TreeItem> {
+    fn push(items: &[TreeItem], depth: usize, out: &mut Vec<TreeItem>) {
+        for item in items {
+            out.push(TreeItem {
+                label: item.label.clone(),
+                depth,
+                disabled: item.disabled,
+                children: Vec::new(),
+            });
+            push(&item.children, depth + 1, out);
+        }
+    }
+    let mut out = Vec::new();
+    push(&forest, 0, &mut out);
+    out
 }
 
 #[derive(Clone, Debug, Default)]
@@ -85,6 +137,8 @@ pub struct DrawTreeRow {
     hovered: f32,
     #[live]
     selected: f32,
+    #[live]
+    disabled: f32,
     #[live]
     base_color: Vec4f,
     #[live]
@@ -159,6 +213,12 @@ pub struct MpTree {
 
     #[rust]
     area: Area,
+
+    // Palette baked from the theme (disabled label color)
+    #[live]
+    c_text: Vec4f,
+    #[live]
+    c_text_muted: Vec4f,
 }
 
 impl MpTree {
@@ -254,9 +314,11 @@ impl Widget for MpTree {
         let mut needs_redraw = false;
 
         for (area, item_idx) in self.row_areas.iter() {
+            // Disabled rows ignore hover, cursor and clicks (gpui parity)
+            let disabled = self.items.get(*item_idx).map(|i| i.disabled).unwrap_or(false);
             match event.hits(cx, *area) {
                 Hit::FingerHoverIn(_) => {
-                    if self.hovered_item != Some(*item_idx) {
+                    if !disabled && self.hovered_item != Some(*item_idx) {
                         self.hovered_item = Some(*item_idx);
                         cx.set_cursor(MouseCursor::Hand);
                         needs_redraw = true;
@@ -270,6 +332,9 @@ impl Widget for MpTree {
                     }
                 }
                 Hit::FingerDown(_) => {
+                    if disabled {
+                        continue;
+                    }
                     self.selected_item = Some(*item_idx);
                     cx.widget_action(self.widget_uid(), MpTreeAction::ItemSelected(*item_idx));
                     needs_redraw = true;
@@ -340,11 +405,23 @@ impl Widget for MpTree {
             let item = &self.items[*item_idx];
             let is_hovered = self.hovered_item == Some(*item_idx);
             let is_selected = self.selected_item == Some(*item_idx);
+            let is_disabled = item.disabled;
             let has_children = self.has_children(*item_idx);
             let is_open = self.expanded.contains(item_idx);
 
             self.draw_row.hovered = if is_hovered { 1.0 } else { 0.0 };
             self.draw_row.selected = if is_selected { 1.0 } else { 0.0 };
+            self.draw_row.disabled = if is_disabled { 1.0 } else { 0.0 };
+            // Disabled rows never show hover/selected washes
+            self.draw_row.hovered = self.draw_row.hovered * (1.0 - self.draw_row.disabled);
+            self.draw_row.selected = self.draw_row.selected * (1.0 - self.draw_row.disabled);
+            // Disabled label color resolves to the muted token
+            let label_color = if is_disabled {
+                self.c_text_muted
+            } else {
+                self.c_text
+            };
+            self.draw_label.color = label_color;
 
             self.draw_row.begin(
                 cx,
@@ -436,5 +513,62 @@ impl MpTreeRef {
         if let Some(mut inner) = self.borrow_mut() {
             inner.set_size(cx, size);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn flatten_assigns_depths_by_nesting() {
+        let flat = flatten_tree(vec![
+            TreeItem::with_children(
+                "src",
+                vec![
+                    TreeItem::with_children(
+                        "widgets",
+                        vec![
+                            TreeItem::new("button.rs", 0),
+                            TreeItem::new("tree.rs", 0).disabled(true),
+                        ],
+                    ),
+                    TreeItem::new("main.rs", 0),
+                ],
+            ),
+            TreeItem::new("Cargo.toml", 0),
+        ]);
+        let labels: Vec<(&str, usize, bool)> = flat
+            .iter()
+            .map(|i| (i.label.as_str(), i.depth, i.disabled))
+            .collect();
+        assert_eq!(
+            labels,
+            vec![
+                ("src", 0, false),
+                ("widgets", 1, false),
+                ("button.rs", 2, false),
+                ("tree.rs", 2, true),
+                ("main.rs", 1, false),
+                ("Cargo.toml", 0, false),
+            ]
+        );
+        // Flattened rows carry no children
+        assert!(flat.iter().all(|i| i.children.is_empty()));
+    }
+
+    #[test]
+    fn disabled_rows_reported_on_item() {
+        let mut item = TreeItem::new("wip.rs", 0);
+        assert!(!item.disabled);
+        item = item.disabled(true);
+        assert!(item.disabled);
+        // gpui-style builder keeps disabled flag through flatten
+        let flat = flatten_tree(vec![TreeItem::with_children(
+            "branch",
+            vec![TreeItem::new("a", 0).disabled(true)],
+        )]);
+        assert!(flat[1].disabled);
+        assert!(!flat[0].disabled);
     }
 }
