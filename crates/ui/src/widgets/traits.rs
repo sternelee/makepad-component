@@ -491,6 +491,17 @@ impl Sizable for crate::widgets::tag::MpTag {
     }
 }
 
+// ---------- MpAvatarGroup ----------
+
+impl Sizable for crate::widgets::avatar_group::MpAvatarGroup {
+    fn size(&self) -> MpSize {
+        crate::widgets::avatar_group::MpAvatarGroup::size(self)
+    }
+    fn set_size(&mut self, cx: &mut Cx, size: MpSize) {
+        crate::widgets::avatar_group::MpAvatarGroup::set_size(self, cx, size);
+    }
+}
+
 // ---------- MpSearchableList ----------
 
 impl Sizable for crate::widgets::searchable_list::MpSearchableList {

@@ -317,4 +317,13 @@ impl MpAvatarRef {
             inner.set_size(cx, size);
         }
     }
+
+    /// Set the avatar's left walk margin (used for overlap stacks; negative
+    /// values pull later siblings over earlier ones).
+    pub fn set_overlap_margin(&self, cx: &mut Cx, margin: f64) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.walk.margin.left = margin;
+            inner.redraw(cx);
+        }
+    }
 }

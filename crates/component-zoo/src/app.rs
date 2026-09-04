@@ -1,5 +1,6 @@
 use makepad_component::widgets::MpThemeState;
 use makepad_component::widgets::MpTagWidgetRefExt;
+use makepad_component::widgets::MpAvatarGroupWidgetRefExt;
 use makepad_component::widgets::MpSearchableListWidgetRefExt;
 use makepad_component::widgets::MpNumberInputWidgetRefExt;
 use makepad_component::widgets::MpDescriptionItem;
@@ -2546,6 +2547,28 @@ startup() do #(App::script_component(vm)){
                                             color: TEXT_MUTED
                                         }
                                         text: "Click button..."
+                                    }
+                                }
+                            }
+
+                            // Avatar group
+                            View {
+                                width: Fit, height: Fit,
+                                flow: Down,
+                                spacing: 8,
+
+                                SubsectionLabel{ text: "Group (overlap + tail)" }
+
+                                demo_avatar_group := mod.widgets.MpAvatarGroup{}
+
+                                View {
+                                    width: Fit, height: Fit,
+                                    flow: Right,
+                                    spacing: 14,
+                                    align: Align{ y: 0.5 },
+
+                                    demo_avatar_group_lg := mod.widgets.MpAvatarGroup{
+                                        size: MpSize.Large
                                     }
                                 }
                             }
@@ -7694,6 +7717,36 @@ impl MatchEvent for App {
         self.ui
             .mp_number_input(cx, ids!(demo_number_input))
             .set_value(cx, 42.0);
+
+        // Populate avatar group demos
+        let avatar_members = vec![
+            "AL".to_string(),
+            "BO".to_string(),
+            "CA".to_string(),
+            "DA".to_string(),
+            "EV".to_string(),
+            "FR".to_string(),
+            "GR".to_string(),
+            "HA".to_string(),
+        ];
+        self.ui
+            .mp_avatar_group(cx, ids!(demo_avatar_group))
+            .set_avatars(cx, &avatar_members);
+        self.ui
+            .mp_avatar_group(cx, ids!(demo_avatar_group))
+            .set_limit(cx, 5);
+        self.ui
+            .mp_avatar_group(cx, ids!(demo_avatar_group))
+            .set_ellipsis(cx, true);
+        self.ui
+            .mp_avatar_group(cx, ids!(demo_avatar_group_lg))
+            .set_avatars(cx, &avatar_members);
+        self.ui
+            .mp_avatar_group(cx, ids!(demo_avatar_group_lg))
+            .set_limit(cx, 4);
+        self.ui
+            .mp_avatar_group(cx, ids!(demo_avatar_group_lg))
+            .set_ellipsis(cx, true);
 
         // Populate searchable list demo
         let fruit_items: Vec<String> = [
