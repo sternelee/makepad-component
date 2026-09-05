@@ -198,11 +198,17 @@ impl MpCollapsibleTrigger {
 
 impl MpCollapsibleTriggerRef {
     pub fn toggled(&self, actions: &Actions) -> bool {
-        if let Some(item) = actions.find_widget_action(self.widget_uid()) {
-            matches!(item.cast(), MpCollapsibleAction::Toggle)
-        } else {
-            false
+        let mut hit = false;
+        for item in actions.iter().filter_map(|a| a.downcast_ref::<WidgetAction>()) {
+            if item.widget_uid == self.widget_uid() {
+                if let Some(t) = item.action.downcast_ref::<MpCollapsibleAction>() {
+                    if matches!(t, MpCollapsibleAction::Toggle) {
+                        hit = true;
+                    }
+                }
+            }
         }
+        hit
     }
 
     pub fn is_expanded(&self) -> bool {

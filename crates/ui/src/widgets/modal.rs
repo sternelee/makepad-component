@@ -446,12 +446,16 @@ impl MpModalWidget {
     /// Open the modal
     pub fn open(&mut self, cx: &mut Cx) {
         self.visible = true;
+        // The DSL template root carries `visible: false`; toggle the inner
+        // View too so the overlay draws regardless of where that key landed.
+        self.view.set_visible(cx, true);
         self.redraw(cx);
     }
 
     /// Close the modal
     pub fn close(&mut self, cx: &mut Cx) {
         self.visible = false;
+        self.view.set_visible(cx, false);
         self.redraw(cx);
     }
 
@@ -496,10 +500,18 @@ impl MpModalWidgetRef {
     }
 
     pub fn close_requested(&self, actions: &Actions) -> bool {
+        // Downcast traversal, not find_widget_action: the same widget uid can
+        // carry other action types whose first match would shadow ours.
         if let Some(inner) = self.borrow() {
-            if let Some(item) = actions.find_widget_action(inner.widget_uid()) {
-                return matches!(item.cast::<MpModalAction>(), MpModalAction::CloseRequested);
-            }
+            return actions.iter().any(|a| {
+                a.downcast_ref::<WidgetAction>().is_some_and(|item| {
+                    item.widget_uid == inner.widget_uid()
+                        && matches!(
+                            item.action.downcast_ref::<MpModalAction>(),
+                            Some(MpModalAction::CloseRequested)
+                        )
+                })
+            });
         }
         false
     }

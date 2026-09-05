@@ -209,6 +209,9 @@ impl MpDialog {
     pub fn open(&mut self, cx: &mut Cx) {
         if !self.open {
             self.open = true;
+            // The dialog root is `visible: false` in the DSL template — it must
+            // be toggled too or nothing draws even when `open` flips true.
+            self.view.set_visible(cx, true);
             self.animator_play(cx, ids!(show.on));
             self.redraw(cx);
         }
@@ -216,6 +219,7 @@ impl MpDialog {
     pub fn close(&mut self, cx: &mut Cx) {
         if self.open {
             self.open = false;
+            self.view.set_visible(cx, false);
             self.redraw(cx);
         }
     }
@@ -237,8 +241,10 @@ impl MpDialog {
     pub fn set_description(&mut self, cx: &mut Cx, desc: &str) {
         let d = self.view.label(cx, ids!(content.dialog.header.description));
         d.set_text(cx, desc);
+        // `description` is a Label, not a View — a ViewRef typed getter would
+        // silently fail its borrow, so toggle visibility via WidgetRef.
         self.view
-            .view(cx, ids!(content.dialog.header.description))
+            .widget(cx, ids!(content.dialog.header.description))
             .set_visible(cx, !desc.is_empty());
     }
 }
@@ -277,10 +283,18 @@ impl MpDialogRef {
         }
     }
     pub fn dialog_closed(&self, actions: &Actions) -> bool {
+        // Downcast traversal, not find_widget_action: the same widget uid can
+        // carry other action types whose first match would shadow ours.
         if let Some(inner) = self.borrow() {
-            if let Some(item) = actions.find_widget_action(inner.widget_uid()) {
-                return matches!(item.cast::<MpDialogAction>(), MpDialogAction::Close);
-            }
+            return actions.iter().any(|a| {
+                a.downcast_ref::<WidgetAction>().is_some_and(|item| {
+                    item.widget_uid == inner.widget_uid()
+                        && matches!(
+                            item.action.downcast_ref::<MpDialogAction>(),
+                            Some(MpDialogAction::Close)
+                        )
+                })
+            });
         }
         false
     }

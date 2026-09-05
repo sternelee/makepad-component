@@ -76,6 +76,7 @@ script_mod! {
                     width: 32
                     height: 32
                     cursor: MouseCursor.Hand
+                    show_bg: true
                     draw_bg +: {
                         bg_color: instance(#x00000000)
                         bg_hover: instance(ELEMENT_HOVER)
@@ -160,6 +161,22 @@ impl Widget for MpSheetTrigger {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
         self.view.handle_event(cx, event, scope);
 
+        // The inner MpButton captures the finger hit, so detect its Clicked
+        // action instead of raw finger events on the wrapper area.
+        if let Event::Actions(actions) = event {
+            let mut clicked = false;
+            self.view.children(&mut |_id, child| {
+                if let Some(b) = child.borrow::<crate::widgets::button::MpButton>() {
+                    if b.clicked(actions) {
+                        clicked = true;
+                    }
+                }
+            });
+            if clicked {
+                cx.widget_action(self.widget_uid(), MpSheetAction::Open);
+            }
+        }
+
         match event.hits(cx, self.view.area()) {
             Hit::FingerHoverIn(_) => {
                 cx.set_cursor(MouseCursor::Hand);
@@ -179,11 +196,15 @@ impl Widget for MpSheetTrigger {
 
 impl MpSheetTriggerRef {
     pub fn opened(&self, actions: &Actions) -> bool {
-        if let Some(item) = actions.find_widget_action(self.widget_uid()) {
-            matches!(item.cast(), MpSheetAction::Open)
-        } else {
-            false
-        }
+        actions.iter().any(|a| {
+            a.downcast_ref::<WidgetAction>().is_some_and(|item| {
+                item.widget_uid == self.widget_uid()
+                    && matches!(
+                        item.action.downcast_ref::<MpSheetAction>(),
+                        Some(MpSheetAction::Open)
+                    )
+            })
+        })
     }
 }
 
@@ -218,19 +239,29 @@ impl Widget for MpSheet {
             self.redraw(cx);
         }
 
-        // Close on overlay click
-        if let Hit::FingerUp(fe) = event.hits(cx, self.view.widget(cx, ids!(overlay)).area()) {
-            if fe.is_over && self.open {
-                self.set_open(cx, false);
-                cx.widget_action(self.widget_uid(), MpSheetAction::Close);
-            }
-        }
-
-        // Close on X button click
-        if let Hit::FingerUp(fe) = event.hits(cx, self.view.widget(cx, ids!(close_btn)).area()) {
-            if fe.is_over && self.open {
-                self.set_open(cx, false);
-                cx.widget_action(self.widget_uid(), MpSheetAction::Close);
+        // Close on backdrop click: any finger-up over the sheet root that is
+        // outside the content panel (or over the close button) dismisses it.
+        if self.open {
+            if let Hit::FingerUp(fe) = event.hits(cx, self.view.area()) {
+                if fe.is_over {
+                    let content_rect = self
+                        .view
+                        .widget(cx, ids!(content))
+                        .area()
+                        .rect(cx);
+                    let close_rect = self
+                        .view
+                        .widget(cx, ids!(close_btn))
+                        .area()
+                        .rect(cx);
+                    let p = fe.abs;
+                    let on_panel = content_rect.contains(p);
+                    let on_close = close_rect.contains(p);
+                    if !on_panel || on_close {
+                        self.set_open(cx, false);
+                        cx.widget_action(self.widget_uid(), MpSheetAction::Close);
+                    }
+                }
             }
         }
     }
@@ -250,6 +281,9 @@ impl MpSheet {
         if self.open != open {
             self.open = open;
             self.animator_toggle(cx, open, Animate::Yes, ids!(open.on), ids!(open.off));
+            // The sheet root itself is `visible: false` in the DSL template —
+            // it must be toggled too or the overlay/content never draw.
+            self.view.set_visible(cx, open);
             if open {
                 self.view.widget(cx, ids!(overlay)).set_visible(cx, true);
                 self.view.widget(cx, ids!(content)).set_visible(cx, true);
@@ -265,11 +299,15 @@ impl MpSheet {
 
 impl MpSheetRef {
     pub fn closed(&self, actions: &Actions) -> bool {
-        if let Some(item) = actions.find_widget_action(self.widget_uid()) {
-            matches!(item.cast(), MpSheetAction::Close)
-        } else {
-            false
-        }
+        actions.iter().any(|a| {
+            a.downcast_ref::<WidgetAction>().is_some_and(|item| {
+                item.widget_uid == self.widget_uid()
+                    && matches!(
+                        item.action.downcast_ref::<MpSheetAction>(),
+                        Some(MpSheetAction::Close)
+                    )
+            })
+        })
     }
 
     pub fn set_open(&self, cx: &mut Cx, open: bool) {
