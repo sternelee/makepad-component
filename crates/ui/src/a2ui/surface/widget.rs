@@ -25,7 +25,7 @@ use crate::widgets::{
     description_list::{MpDescriptionItem, MpDescriptionList},
     label::MpLabel,
     number_input::{MpNumberInput, MpNumberInputAction},
-    searchable_list::{MpSearchableList, MpSearchableListAction},
+    searchable_list::MpSearchableList,
     slider::{MpSlider, MpSliderAction},
     step_indicator::MpStepIndicator,
     tag::MpTag,
