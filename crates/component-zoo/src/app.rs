@@ -6114,6 +6114,57 @@ startup() do #(App::script_component(vm)){
                         }
 
                         // ============================================================
+                        // Message
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
+                            text: "Message"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 12.0,
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            mod.widgets.MpMessage{
+                                header +: { name +: { text: "Assistant" } }
+                                body +: { body_label +: { text: "Here is a summary of the changes you asked for." } }
+                                footer +: { footer_label +: { text: "10:24" } }
+                            }
+
+                            mod.widgets.MpMessageEnd{
+                                header +: { name +: { text: "You" } }
+                                body +: { body_label +: { text: "Thanks! Now add tests for the edge cases." } }
+                                footer +: { footer_label +: { text: "10:25" } }
+                            }
+
+                            mod.widgets.MpShimmerText{ text: "Assistant is typing..." }
+                        }
+
+                        // ============================================================
+                        // Shimmer
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
+                            text: "Shimmer"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 12.0,
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            mod.widgets.MpShimmer{ width: 220, height: 14 }
+                            mod.widgets.MpShimmer{ width: 160, height: 14 }
+                            mod.widgets.MpShimmer{ width: 190, height: 14 }
+                            mod.widgets.MpShimmerText{ text: "Thinking..." }
+                        }
+
+                        // ============================================================
                         // GroupBox
                         // ============================================================
                         Label{
