@@ -472,6 +472,11 @@ pub struct MpSelect {
     /// content — in-flow it would be painted over by later widgets).
     #[rust]
     draw_list: Option<DrawList2d>,
+
+    /// Laid-out panel size from the last overlay frame (drives the
+    /// bottom-overflow flip; zero until first measured).
+    #[rust]
+    panel_size: DVec2,
 }
 
 impl Widget for MpSelect {
@@ -575,6 +580,9 @@ impl Widget for MpSelect {
 impl MpSelect {
     /// Draw the open dropdown into an overlay draw list, anchored below the
     /// trigger at the trigger's width (MpTooltip::draw_popup_overlay pattern).
+    /// Like shadcn, the panel flips above the trigger when it would overflow
+    /// the bottom of the window. Panel height is measured on a first
+    /// off-screen frame (Fit height is unknown before layout).
     fn draw_dropdown_overlay(&mut self, cx: &mut Cx2d, scope: &mut Scope) {
         let dd = self.view.widget(cx, ids!(dropdown));
 
@@ -588,11 +596,27 @@ impl MpSelect {
         cx.begin_root_turtle(pass_size, Layout::flow_overlay());
 
         let trig = self.view.widget(cx, ids!(trigger)).area().rect(cx);
+        let measured = self.panel_size.y > 0.5;
+        let below_edge = trig.pos.y + trig.size.y;
+        let pos = if !measured {
+            // First frame: draw off-screen to measure the panel size.
+            DVec2 { x: -10000.0, y: -10000.0 }
+        } else if below_edge + self.panel_size.y > pass_size.y
+            && trig.pos.y - self.panel_size.y >= 0.0
+        {
+            // Would overflow the bottom and fits above: flip up.
+            DVec2 {
+                x: trig.pos.x,
+                y: trig.pos.y - self.panel_size.y,
+            }
+        } else {
+            DVec2 {
+                x: trig.pos.x,
+                y: below_edge,
+            }
+        };
         let mut walk = dd.walk(cx);
-        walk.abs_pos = Some(DVec2 {
-            x: trig.pos.x,
-            y: trig.pos.y + trig.size.y,
-        });
+        walk.abs_pos = Some(pos);
         walk.width = Size::Fixed(trig.size.x.max(120.0));
         walk.margin = Inset::default();
 
@@ -607,6 +631,16 @@ impl MpSelect {
 
         cx.end_pass_sized_turtle();
         draw_list.end(cx);
+
+        // Track the laid-out panel size; request a full redraw when it first
+        // becomes known (or changes) so the panel lands on the right anchor.
+        let new_size = dd.area().rect(cx).size;
+        if (new_size.x - self.panel_size.x).abs() > 0.5
+            || (new_size.y - self.panel_size.y).abs() > 0.5
+        {
+            self.panel_size = new_size;
+            cx.redraw_all();
+        }
     }
 }
 
