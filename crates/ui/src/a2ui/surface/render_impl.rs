@@ -61,6 +61,9 @@ impl A2uiSurface {
             ComponentType::Divider(_) => {
                 self.render_divider(cx);
             }
+            ComponentType::Icon(icon) => {
+                self.render_icon(cx, icon, data_model);
+            }
             // Raycast-style containers
             ComponentType::Detail(detail) => {
                 self.render_detail(cx, scope, surface, data_model, detail);
@@ -925,6 +928,23 @@ impl A2uiSurface {
             .collect();
         let widget = self.pool_description_list(cx, idx);
         widget.set_items(cx, &items);
+        let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+    }
+
+    fn render_icon(
+        &mut self,
+        cx: &mut Cx2d,
+        icon: &IconComponent,
+        data_model: &DataModel,
+    ) {
+        let idx = self.mp_icons.len();
+        let name = resolve_string_value_scoped(
+            &icon.name,
+            data_model,
+            self.current_scope.as_deref(),
+        );
+        let widget = self.pool_icon(cx, idx);
+        widget.set_name(cx, &name);
         let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
     }
 

@@ -54,8 +54,6 @@ pub const ICON_SVGS: &[(&str, &str)] = &[
     ("folder", include_str!("resources/icons/folder.svg")),
     ("grip-vertical", include_str!("resources/icons/grip-vertical.svg")),
     ("heart", include_str!("resources/icons/heart.svg")),
-    // lucide renamed `home` to `house`; keep the old name as an alias
-    ("home", include_str!("resources/icons/house.svg")),
     ("house", include_str!("resources/icons/house.svg")),
     ("info", include_str!("resources/icons/info.svg")),
     ("loader", include_str!("resources/icons/loader.svg")),
@@ -80,11 +78,33 @@ pub const ICON_SVGS: &[(&str, &str)] = &[
     ("x", include_str!("resources/icons/x.svg")),
 ];
 
-/// Look up an icon's SVG source by name.
+/// Common alternate names mapping onto catalog entries.
+const ICON_ALIASES: &[(&str, &str)] = &[
+    ("close", "x"),
+    ("cancel", "x"),
+    ("back", "arrow-left"),
+    ("forward", "arrow-right"),
+    ("done", "check"),
+    ("home", "house"),
+    ("more", "ellipsis"),
+    ("refresh", "rotate-cw"),
+    ("delete", "trash"),
+    ("edit", "pencil"),
+];
+
+/// Look up an icon's SVG source by name (aliases included).
 pub fn icon_svg(name: &str) -> Option<&'static str> {
+    fn canonical(n: &str) -> &str {
+        ICON_ALIASES
+            .iter()
+            .find(|(alias, _)| *alias == n)
+            .map(|(_, canon)| *canon)
+            .unwrap_or(n)
+    }
+    let canon = canonical(name);
     ICON_SVGS
         .iter()
-        .find(|(n, _)| *n == name)
+        .find(|(n, _)| *n == canon)
         .map(|(_, svg)| *svg)
 }
 

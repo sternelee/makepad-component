@@ -23,6 +23,7 @@ use crate::widgets::{
     checkbox::{MpCheckbox, MpCheckboxAction},
     color_picker::{MpColorPicker, MpColorPickerAction},
     description_list::{MpDescriptionItem, MpDescriptionList},
+    icon::MpIcon,
     label::MpLabel,
     number_input::{MpNumberInput, MpNumberInputAction},
     searchable_list::MpSearchableList,
@@ -430,6 +431,10 @@ pub struct A2uiSurface {
     #[rust]
     mp_labels: Vec<MpLabel>,
 
+    /// Pool of MpIcon instances
+    #[rust]
+    mp_icons: Vec<MpIcon>,
+
     /// Pool of Markdown instances (rendered from the MpMarkdown template)
     #[rust]
     mp_markdowns: Vec<Markdown>,
@@ -815,6 +820,14 @@ impl A2uiSurface {
             self.mp_text_inputs.push(new_ti);
         }
         &mut self.mp_text_inputs[idx]
+    }
+
+    fn pool_icon(&mut self, cx: &mut Cx, idx: usize) -> &mut MpIcon {
+        while self.mp_icons.len() <= idx {
+            let new_icon = cx.with_vm(MpIcon::script_new_with_default);
+            self.mp_icons.push(new_icon);
+        }
+        &mut self.mp_icons[idx]
     }
 
     fn pool_tag(&mut self, cx: &mut Cx, idx: usize) -> &mut MpTag {

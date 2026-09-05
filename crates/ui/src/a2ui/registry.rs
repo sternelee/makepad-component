@@ -320,9 +320,9 @@ impl ComponentRegistry {
 
         registry.register(ComponentMapping {
             a2ui_type: A2uiComponentType::Icon,
-            makepad_widget: "Icon",
-            description: "Icon display",
-            implemented: false,
+            makepad_widget: "MpIcon",
+            description: "Named icon from the embedded lucide set",
+            implemented: true,
         });
 
         registry.register(ComponentMapping {
