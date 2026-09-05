@@ -80,7 +80,6 @@ script_mod! {
         width: Fill
         height: Fit
         flow: Down
-        visible: false
 
 
 
@@ -421,6 +420,12 @@ pub struct MpSelectDropdown {
     source: ScriptObjectRef,
     #[deref]
     view: View,
+
+    /// Set only while the panel is being drawn into the overlay draw list —
+    /// in-flow draws (inside the MpSelect root) always skip, so the panel
+    /// renders exactly once per frame and only when open.
+    #[rust]
+    draw_enabled: bool,
 }
 
 impl Widget for MpSelectDropdown {
@@ -429,6 +434,9 @@ impl Widget for MpSelectDropdown {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        if !self.draw_enabled {
+            return DrawStep::done();
+        }
         self.view.draw_walk(cx, scope, walk)
     }
 }
@@ -459,10 +467,31 @@ pub struct MpSelect {
     /// Last size applied to the children (avoids re-applying every draw).
     #[rust]
     applied_size: Option<MpSize>,
+
+    /// Overlay draw list the open dropdown renders into (above sibling
+    /// content — in-flow it would be painted over by later widgets).
+    #[rust]
+    draw_list: Option<DrawList2d>,
 }
 
 impl Widget for MpSelect {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        // Click outside the trigger and dropdown closes the panel (same
+        // geometric approach as makepad's own DropDown).
+        if self.open {
+            if let Event::MouseDown(e) = event {
+                let trig = self.view.widget(cx, ids!(trigger)).area().rect(cx);
+                let dd = self.view.widget(cx, ids!(dropdown)).area().rect(cx);
+                let dd_open = dd.size.x > 0.0 && dd.size.y > 0.0;
+                let inside_trigger = trig.contains(e.abs);
+                let inside_dropdown = dd_open && dd.contains(e.abs);
+                if !inside_trigger && !inside_dropdown {
+                    self.set_open(cx, false);
+                    return;
+                }
+            }
+        }
+
         // Keyboard navigation while the dropdown is open (before child dispatch).
         if self.open {
             if let Event::KeyDown(ke) = event {
@@ -531,15 +560,64 @@ impl Widget for MpSelect {
                 }
             }
         }
-        self.view.draw_walk(cx, scope, walk)
+
+        // The dropdown never renders in the document flow (later siblings
+        // would paint over it); when open it is drawn into an overlay draw
+        // list anchored under the trigger, like MpTooltip's popup.
+        let step = self.view.draw_walk(cx, scope, walk);
+        if self.open {
+            self.draw_dropdown_overlay(cx, scope);
+        }
+        step
+    }
+}
+
+impl MpSelect {
+    /// Draw the open dropdown into an overlay draw list, anchored below the
+    /// trigger at the trigger's width (MpTooltip::draw_popup_overlay pattern).
+    fn draw_dropdown_overlay(&mut self, cx: &mut Cx2d, scope: &mut Scope) {
+        let dd = self.view.widget(cx, ids!(dropdown));
+
+        if self.draw_list.is_none() {
+            self.draw_list = Some(DrawList2d::new(cx));
+        }
+        let draw_list = self.draw_list.as_mut().unwrap();
+        draw_list.begin_overlay_reuse(cx);
+
+        let pass_size = cx.current_pass_size();
+        cx.begin_root_turtle(pass_size, Layout::flow_overlay());
+
+        let trig = self.view.widget(cx, ids!(trigger)).area().rect(cx);
+        let mut walk = dd.walk(cx);
+        walk.abs_pos = Some(DVec2 {
+            x: trig.pos.x,
+            y: trig.pos.y + trig.size.y,
+        });
+        walk.width = Size::Fixed(trig.size.x.max(120.0));
+        walk.margin = Inset::default();
+
+        // Enable drawing only for this overlay pass (see MpSelectDropdown).
+        if let Some(mut inner) = dd.borrow_mut::<MpSelectDropdown>() {
+            inner.draw_enabled = true;
+        }
+        let _ = dd.draw_walk(cx, scope, walk);
+        if let Some(mut inner) = dd.borrow_mut::<MpSelectDropdown>() {
+            inner.draw_enabled = false;
+        }
+
+        cx.end_pass_sized_turtle();
+        draw_list.end(cx);
     }
 }
 
 impl WidgetMatchEvent for MpSelect {
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions, _scope: &mut Scope) {
         // Trigger toggle (mouse down or Enter/Space on the focused trigger).
-        if let Some(action) = actions.find_widget_action(self.trigger_uid(cx)) {
-            if let MpSelectAction::Selected(v) = action.cast() {
+        for item in actions.iter().filter_map(|a| a.downcast_ref::<WidgetAction>()) {
+            if item.widget_uid != self.trigger_uid(cx) {
+                continue;
+            }
+            if let Some(MpSelectAction::Selected(v)) = item.action.downcast_ref::<MpSelectAction>() {
                 if v == "toggle" {
                     self.toggle(cx);
                 }
@@ -580,14 +658,14 @@ impl MpSelect {
     }
 
     /// The value of option `idx` (by child index in the dropdown view).
-    fn option_value(&self, cx: &mut Cx, idx: usize) -> Option<String> {
+    fn option_value(&self, _cx: &mut Cx, idx: usize) -> Option<String> {
         let child = self.option_refs().into_iter().nth(idx)?;
         child
             .borrow::<MpSelectOption>()
             .map(|o| o.value.as_ref().to_string())
     }
 
-    fn option_selected_at(&self, cx: &mut Cx, idx: usize, actions: &Actions) -> Option<String> {
+    fn option_selected_at(&self, _cx: &mut Cx, idx: usize, actions: &Actions) -> Option<String> {
         let child = self.option_refs().into_iter().nth(idx)?;
         let uid = child.widget_uid();
         if let Some(item) = actions.find_widget_action(uid) {
@@ -640,7 +718,9 @@ impl MpSelect {
         if !open {
             self.highlighted = None;
         }
-        self.view.view(cx, ids!(dropdown)).set_visible(cx, open);
+        // The panel's on-screen life is handled in draw_walk: when open it
+        // renders into the overlay draw list (draw_dropdown_overlay), never
+        // in the document flow.
         self.redraw(cx);
     }
 
