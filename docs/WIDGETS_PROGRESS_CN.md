@@ -145,10 +145,10 @@ if !content_rect.contains(p) || close_rect.contains(p) { /* close */ }
 
 | 项 | 说明 |
 |----|------|
-| MpIcon 体系 | 嵌入 lucide SVG 集 + IconName 枚举 + MpSize/主题接入（调研结论见 §7.3） |
-| MpSelect 打磨 | 打开期间键盘高亮随选项滚动 |
+| MpSidebar | gpui sidebar 移植（下一轮首选，§7.3）；MpIcon 已就位 |
+| MpSelect 打磨 | 下拉超长时加 max-height + ScrollYView，键盘高亮随选项滚动 |
 | Switch/Slider 拖拽手感 | 用户报告"不顺畅"，代码审查未见异常，可能需单独打磨 |
-| gpui 剩余缺口（见 §7.3） | sidebar、virtual_list 按需评估 |
+| 流光/图标视觉复验 | MpShimmer 动画、MpIcon 渲染效果需在有截图权限的环境 OCR/像素复验 |
 
 ---
 
@@ -167,13 +167,13 @@ accordion、alert、attachment、avatar(+group)、badge、breadcrumb、bubble、
 | `MpGroupBox` | group_box.rs (191 行) | Normal/Fill/Outline 三 DSL 变体，标题空时整行隐藏；zoo 有演示段 |
 | `MpShimmer`/`MpShimmerText` | shimmer.rs (640 行) | 扫光高亮走像素 shader：块面用 Sdf2d band，文字用 `get_color` 按像素混色（makepad DrawLabelText 技法）；band 中心是自定义 draw 的 instance，Rust 侧 NextFrame 循环驱动；duration/reverse/once/auto_play 对齐 gpui ShimmerStyle |
 | `MpMessage` | message.rs (546 行) | 头像+名字 header / body / footer meta 三槽聊天行；Start/End 对齐（MpMessageEnd 变体右对齐）；show_header/show_footer 支持分组续行；头像自动取姓名首字母。message_scroller 的自动滚动用 ScrollYView 组合即可，不单独移植 |
+| `MpIcon` | icon.rs (200 行) | 43 枚 ISC 协议 lucide SVG 经 include_str! 嵌入（`widgets/resources/icons/`），按名查找 + 别名表（close→x、done→check 等 10 条）；改名时经 `DrawSvg::load_from_str` 加载（文档缓存、仅变更时重网格化）；MpSize 六档尺寸；`color` 走 SVG currentColor 通道（alpha 0 保留原色）。a2ui Icon 组件已接 pool（7ffb2b9）。新增图标 = 放 svg 文件 + ICON_SVGS 加一行 |
 
 ### 7.3 缺口（gpui 有、我方无）
 
 | gpui 组件 | 体量 | 移植评估 |
 |-----------|------|----------|
-| `icon` | 200 行 | **已调研（本轮）**：makepad 自带 `Icon` 底座（DrawSvg + 渐变/旋转变体），但 SVG 内容只能 Rust 侧 `load_from_str`，缺"图标名→SVG 目录"体系。正确路线：嵌入 lucide SVG 集（include_str!）+ `MpIcon` 包装（MpSize 接入 + 主题色）+ `IconName` 枚举。需要先做资产引入决策 |
-| `sidebar` | 目录（5 文件） | 可折叠导航侧栏。中等偏大，依赖 menu/list 打底 |
+| `sidebar` | 目录（5 文件） | **下一轮首选**：可折叠导航侧栏（header/menu group/footer 槽位），MpIcon 已就位可直接用 |
 | `virtual_list` | — | 虚拟滚动大列表。makepad `PortalList` 已覆盖同类能力，暂缓 |
 | `dock` / `form` / `title_bar` / `setting` / `native_menu` / `highlighter` / `clipboard` | — | 维持跳过结论：Entity 状态深度耦合 / 平台耦合 / 已有替代（makepad-clipboard） |
 
