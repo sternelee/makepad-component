@@ -17,7 +17,7 @@
 | **交互 bug 大扫除** | Sheet/Dialog/Select/Collapsible/Tag/Modal 全部无响应问题 | ✅ 完成（§3、§3.7） |
 | a2ui 协议接入 | 新组件接入 ComponentType/processor | ⬜ 未开始 |
 
-测试基线：`cargo test -p makepad-component` **36 passed**（含 clamp_number/snap_step/format_number 纯函数测试）。
+测试基线：`cargo test -p makepad-component` **37 passed**（含 clamp_number/snap_step/format_number 纯函数测试）。
 
 ---
 
@@ -145,10 +145,36 @@ if !content_rect.contains(p) || close_rect.contains(p) { /* close */ }
 
 | 项 | 说明 |
 |----|------|
-| a2ui 协议接入 | DescriptionList/Tag/StepIndicator/NumberInput/SearchableList/StatusBar/AvatarGroup/ColorPicker 接入 ComponentType/processor/registry |
-| 对齐 gpui-component | 对照 `/Users/sternelee/www/github/gpui-component` 组件清单查缺补漏 |
 | MpSelect 打磨 | 面板底部超出窗口时不向上翻转（shadcn 会 flip）；打开期间键盘高亮滚动 |
 | Switch/Slider 拖拽手感 | 用户报告"不顺畅"，代码审查未见异常，可能需单独打磨 |
+| gpui 剩余缺口（见 §7） | shimmer、message/message_scroller、icon、sidebar、virtual_list 按优先级评估 |
+
+---
+
+## 7. gpui-component 对齐清单（2026-09-05 盘点）
+
+对照 `gpui-component/crates/component/src`（77 模块）与 `crates/ui/src/widgets/`：
+
+### 7.1 已对齐（双方都有）
+
+accordion、alert、attachment、avatar(+group)、badge、breadcrumb、bubble、button、calendar、checkbox、collapsible、color_picker、combobox、command、description_list、dialog、hover_card、input、kbd、label、link、list、notification、pagination、popover、progress、radio、rating、searchable_list、select、separator、sheet、skeleton、slider、spinner、status_bar、stepper、switch、tab、table、tag、text、tooltip、tree —— 加上我方独有：chip、context_menu、control_bar、dropdown、dropdown_menu、empty_state、focus、menu_bar、modal、number_input、option_card、orb、page_flip、progress_ring、scaffolding、scroll_area、split_pane、stat_card、status、theme_state、group_box(本轮移植，gpui 反向对齐)、chart(我方 makepad-plot 更全)
+
+### 7.2 本轮新移植
+
+| 组件 | gpui 对应 | 说明 |
+|------|-----------|------|
+| `MpGroupBox` | group_box.rs (191 行) | Normal/Fill/Outline 三 DSL 变体，标题空时整行隐藏；zoo 有演示段 |
+
+### 7.3 缺口（gpui 有、我方无）
+
+| gpui 组件 | 体量 | 移植评估 |
+|-----------|------|----------|
+| `shimmer` | 640 行 | 骨架屏流光动画。**推荐下一个移植**：效果独立、价值直观（加载态） |
+| `message` + `message_scroller` | 546+508 行 | 聊天消息列表（含重试/编辑操作）。与仓库 LLM/a2ui 场景高度契合，但需 text 流式渲染配合 |
+| `icon` | 200 行 | 图标组件。makepad 有 icon 基建，先调研字体/SVG 路线再动手 |
+| `sidebar` | 目录（5 文件） | 可折叠导航侧栏。中等偏大，依赖 menu/list 打底 |
+| `virtual_list` | — | 虚拟滚动大列表。makepad `PortalList` 已覆盖同类能力，暂缓 |
+| `dock` / `form` / `title_bar` / `setting` / `native_menu` / `highlighter` / `clipboard` | — | 维持跳过结论：Entity 状态深度耦合 / 平台耦合 / 已有替代（makepad-clipboard） |
 
 ---
 
