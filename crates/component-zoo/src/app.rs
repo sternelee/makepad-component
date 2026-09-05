@@ -6114,6 +6114,43 @@ startup() do #(App::script_component(vm)){
                         }
 
                         // ============================================================
+                        // GroupBox
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
+                            text: "Group Box"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 12.0,
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            mod.widgets.MpGroupBox{
+                                title +: { text: "Normal" }
+                                content +: {
+                                    Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Plain grouping, no surface." }
+                                }
+                            }
+
+                            mod.widgets.MpGroupBoxFill{
+                                title +: { text: "Fill" }
+                                content +: {
+                                    Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Content on a muted card surface." }
+                                }
+                            }
+
+                            mod.widgets.MpGroupBoxOutline{
+                                title +: { text: "Outline" }
+                                content +: {
+                                    Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Content framed by a 1px border." }
+                                }
+                            }
+                        }
+
+                        // ============================================================
                         // Theme Switcher
                         // ============================================================
                         RoundedView{
