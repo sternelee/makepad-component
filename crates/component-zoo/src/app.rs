@@ -5992,6 +5992,127 @@ startup() do #(App::script_component(vm)){
                             text: "Shadcn-Style Components"
                         }
 
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
+                            text: "Sheet"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 8.0,
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            View{
+                                width: Fill, height: Fit,
+                                flow: Right,
+                                spacing: 8.0,
+                                align: Align{y: 0.5}
+
+                                demo_sheet_trigger := mod.widgets.MpSheetTrigger{ 0: mod.widgets.MpButtonProminent{ text: "Open Sheet" } }
+                            }
+                        }
+
+                        // Sheet panel (overlay + content)
+
+                        // ============================================================
+                        // Dialog
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
+                            text: "Dialog"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 8.0,
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            View{
+                                width: Fill, height: Fit, flow: Right, spacing: 8.0, align: Align{y: 0.5}
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Click to open:" }
+                                demo_dialog_trigger := mod.widgets.MpButtonProminent{ text: "Open Dialog" }
+                            }
+                        }
+
+                        // ============================================================
+                        // Select
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
+                            text: "Select"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 8.0,
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            View{
+                                width: Fill, height: Fit, flow: Right, spacing: 8.0, align: Align{y: 0.5}
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Framework:" }
+                                demo_select := mod.widgets.MpSelect{
+                                    trigger +: {
+                                        label +: { text: "Select a framework" }
+                                        // placeholder_text removed (not valid in DSL)
+                                    }
+                                    dropdown +: {
+                                        demo_opt_react := mod.widgets.MpSelectOption{ value: "React", label +: { text: "React" } }
+                                        demo_opt_vue := mod.widgets.MpSelectOption{ value: "Vue", label +: { text: "Vue" } }
+                                        demo_opt_svelte := mod.widgets.MpSelectOption{ value: "Svelte", label +: { text: "Svelte" } }
+                                        demo_opt_solid := mod.widgets.MpSelectOption{ value: "Solid", label +: { text: "Solid" } }
+                                    }
+                                }
+                            }
+
+                            SubsectionLabel{ text: "Sizes" }
+
+                            View{
+                                width: Fill, height: Fit, flow: Down, spacing: 8.0,
+
+                                mod.widgets.MpSelect{
+                                    size: MpSize.Small
+                                    trigger +: { label +: { text: "Small select" } }
+                                    dropdown +: {
+                                        mod.widgets.MpSelectOption{ value: "A", label +: { text: "Option A" } }
+                                        mod.widgets.MpSelectOption{ value: "B", label +: { text: "Option B" } }
+                                    }
+                                }
+
+                                mod.widgets.MpSelect{
+                                    size: MpSize.Large
+                                    trigger +: { label +: { text: "Large select" } }
+                                    dropdown +: {
+                                        mod.widgets.MpSelectOption{ value: "A", label +: { text: "Option A" } }
+                                        mod.widgets.MpSelectOption{ value: "B", label +: { text: "Option B" } }
+                                    }
+                                }
+                            }
+                        }
+                        // Dialog overlay (hidden unless opened)
+
+                        // Command palette overlay (hidden unless opened via ⌘K)
+                        demo_command := mod.widgets.MpCommandPalette{
+                            panel +: {
+                                list +: {
+                                    cmd_group := View{ width: Fill, height: Fit, flow: Down
+                                        cmd_search := mod.widgets.MpCommandItem{ label +: { text: "Search files..." } shortcut +: { text: "⌘K" } }
+                                        cmd_new := mod.widgets.MpCommandItem{ label +: { text: "New document" } shortcut +: { text: "⌘N" } }
+                                        cmd_open := mod.widgets.MpCommandItem{ label +: { text: "Open project..." } shortcut +: { text: "⌘O" } }
+                                    }
+                                    cmd_group2 := View{ width: Fill, height: Fit, flow: Down
+                                        cmd_settings := mod.widgets.MpCommandItem{ label +: { text: "Settings" } shortcut +: { text: "⌘," } }
+                                        cmd_logout := mod.widgets.MpCommandItem{ label +: { text: "Sign out" } }
+                                    }
+                                }
+                            }
+                        }
+
                         // ============================================================
                         // Theme Switcher
                         // ============================================================
@@ -6034,7 +6155,7 @@ startup() do #(App::script_component(vm)){
                                 width: Fill, height: Fit,
                                 flow: Down,
 
-                                collapsible_trigger := mod.widgets.MpCollapsibleTrigger{ label: { text: "What is shadcn/ui?" } }
+                                collapsible_trigger := mod.widgets.MpCollapsibleTrigger{ label +: { text: "What is shadcn/ui?" } }
                                 collapsible_content := mod.widgets.MpCollapsibleContent{
                                     visible: false
                                     Label{
@@ -6048,7 +6169,7 @@ startup() do #(App::script_component(vm)){
                                 width: Fill, height: Fit,
                                 flow: Down,
 
-                                collapsible_trigger2 := mod.widgets.MpCollapsibleTrigger{ label: { text: "How does it work?" } }
+                                collapsible_trigger2 := mod.widgets.MpCollapsibleTrigger{ label +: { text: "How does it work?" } }
                                 collapsible_content2 := mod.widgets.MpCollapsibleContent{
                                     visible: false
                                     Label{
@@ -6185,130 +6306,6 @@ startup() do #(App::script_component(vm)){
                         // ============================================================
                         Label{
                             draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
-                            text: "Sheet"
-                        }
-
-                        RoundedView{
-                            width: Fill, height: Fit,
-                            flow: Down,
-                            spacing: 8.0,
-                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
-                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
-
-                            View{
-                                width: Fill, height: Fit,
-                                flow: Right,
-                                spacing: 8.0,
-                                align: Align{y: 0.5}
-
-                                demo_sheet_trigger := mod.widgets.MpSheetTrigger{ 0: mod.widgets.MpButtonProminent{ text: "Open Sheet" } }
-                            }
-                        }
-
-                        // Sheet panel (overlay + content)
-
-                        // ============================================================
-                        // Dialog
-                        // ============================================================
-                        Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
-                            text: "Dialog"
-                        }
-
-                        RoundedView{
-                            width: Fill, height: Fit,
-                            flow: Down,
-                            spacing: 8.0,
-                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
-                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
-
-                            View{
-                                width: Fill, height: Fit, flow: Right, spacing: 8.0, align: Align{y: 0.5}
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Click to open:" }
-                                demo_dialog_trigger := mod.widgets.MpButtonProminent{ text: "Open Dialog" }
-                            }
-                        }
-
-                        // ============================================================
-                        // Select
-                        // ============================================================
-                        Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
-                            text: "Select"
-                        }
-
-                        RoundedView{
-                            width: Fill, height: Fit,
-                            flow: Down,
-                            spacing: 8.0,
-                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
-                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
-
-                            View{
-                                width: Fill, height: Fit, flow: Right, spacing: 8.0, align: Align{y: 0.5}
-                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Framework:" }
-                                demo_select := mod.widgets.MpSelect{
-                                    trigger +: {
-                                        label: { text: "Select a framework" }
-                                        // placeholder_text removed (not valid in DSL)
-                                    }
-                                    dropdown +: {
-                                        demo_opt_react := mod.widgets.MpSelectOption{ value: "React", label: { text: "React" } }
-                                        demo_opt_vue := mod.widgets.MpSelectOption{ value: "Vue", label: { text: "Vue" } }
-                                        demo_opt_svelte := mod.widgets.MpSelectOption{ value: "Svelte", label: { text: "Svelte" } }
-                                        demo_opt_solid := mod.widgets.MpSelectOption{ value: "Solid", label: { text: "Solid" } }
-                                    }
-                                }
-                            }
-
-                            SubsectionLabel{ text: "Sizes" }
-
-                            View{
-                                width: Fill, height: Fit, flow: Down, spacing: 8.0,
-
-                                mod.widgets.MpSelect{
-                                    size: MpSize.Small
-                                    trigger +: { label: { text: "Small select" } }
-                                    dropdown +: {
-                                        mod.widgets.MpSelectOption{ value: "A", label: { text: "Option A" } }
-                                        mod.widgets.MpSelectOption{ value: "B", label: { text: "Option B" } }
-                                    }
-                                }
-
-                                mod.widgets.MpSelect{
-                                    size: MpSize.Large
-                                    trigger +: { label: { text: "Large select" } }
-                                    dropdown +: {
-                                        mod.widgets.MpSelectOption{ value: "A", label: { text: "Option A" } }
-                                        mod.widgets.MpSelectOption{ value: "B", label: { text: "Option B" } }
-                                    }
-                                }
-                            }
-                        }
-                        // Dialog overlay (hidden unless opened)
-
-                        // Command palette overlay (hidden unless opened via ⌘K)
-                        demo_command := mod.widgets.MpCommandPalette{
-                            panel +: {
-                                list +: {
-                                    cmd_group := View{ width: Fill, height: Fit, flow: Down
-                                        cmd_search := mod.widgets.MpCommandItem{ label: { text: "Search files..." } shortcut: { text: "⌘K" } }
-                                        cmd_new := mod.widgets.MpCommandItem{ label: { text: "New document" } shortcut: { text: "⌘N" } }
-                                        cmd_open := mod.widgets.MpCommandItem{ label: { text: "Open project..." } shortcut: { text: "⌘O" } }
-                                    }
-                                    cmd_group2 := View{ width: Fill, height: Fit, flow: Down
-                                        cmd_settings := mod.widgets.MpCommandItem{ label: { text: "Settings" } shortcut: { text: "⌘," } }
-                                        cmd_logout := mod.widgets.MpCommandItem{ label: { text: "Sign out" } }
-                                    }
-                                }
-                            }
-                        }
-
-                        // ============================================================
-                        // Separator
-                        // ============================================================
-                        Label{
-                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
                             text: "Separator"
                         }
 
@@ -6323,7 +6320,7 @@ startup() do #(App::script_component(vm)){
                             mod.widgets.MpSeparator{}
 
                             Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "With label:" }
-                            mod.widgets.MpSeparatorWithLabel{ label: { text: "OR" } }
+                            mod.widgets.MpSeparatorWithLabel{ label +: { text: "OR" } }
 
                             Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Subtle:" }
                             mod.widgets.MpSeparatorSubtle{}
@@ -7582,6 +7579,7 @@ pub struct App {
 
 impl MatchEvent for App {
     fn handle_startup(&mut self, cx: &mut Cx) {
+
         self.counter = 0;
         self.current_category = 0;
 
