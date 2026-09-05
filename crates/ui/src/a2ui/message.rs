@@ -188,6 +188,16 @@ pub enum ComponentType {
     DropdownItem(DropdownItemComponent),
     DropdownSection(DropdownSectionComponent),
     TagPickerItem(TagPickerItemComponent),
+
+    // Extended display/interactive components (gpui-component parity batch)
+    Tag(TagComponent),
+    StepIndicator(StepIndicatorComponent),
+    NumberInput(NumberInputComponent),
+    SearchableList(SearchableListComponent),
+    StatusBar(StatusBarComponent),
+    AvatarGroup(AvatarGroupComponent),
+    ColorPicker(ColorPickerComponent),
+    DescriptionList(DescriptionListComponent),
 }
 
 /// Children reference - either explicit list or template-based
@@ -1098,6 +1108,139 @@ pub struct TagPickerItemComponent {
     pub icon: Option<StringValue>,
 }
 
+// ============================================================================
+// Extended components (gpui-component parity batch)
+// ============================================================================
+
+/// Semantic status tag (short status annotation)
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagComponent {
+    /// Tag text
+    #[serde(default)]
+    pub text: StringValue,
+
+    /// Semantic color family: gray | red | orange | green | blue | purple
+    #[serde(default)]
+    pub color: Option<String>,
+
+    /// Treatment: filled (default) | outline
+    #[serde(default)]
+    pub variant: Option<String>,
+
+    /// Show a leading status dot in the family color
+    #[serde(default)]
+    pub dot: Option<bool>,
+}
+
+/// Step progress indicator
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StepIndicatorComponent {
+    /// Step titles, in order
+    #[serde(default)]
+    pub steps: Vec<StringValue>,
+
+    /// Index of the current (active) step; steps before it count as passed
+    #[serde(default)]
+    pub current: Option<f64>,
+}
+
+/// Numeric input with steppers and bounds
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NumberInputComponent {
+    /// Current value (path-bound for two-way binding)
+    #[serde(default)]
+    pub value: NumberValue,
+
+    /// Minimum value
+    #[serde(default)]
+    pub min: Option<f64>,
+
+    /// Maximum value
+    #[serde(default)]
+    pub max: Option<f64>,
+
+    /// Step increment for the steppers and keyboard
+    #[serde(default)]
+    pub step: Option<f64>,
+
+    /// Decimal places shown
+    #[serde(default)]
+    pub decimals: Option<f64>,
+}
+
+/// Filterable list with a search box
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchableListComponent {
+    /// Item labels
+    #[serde(default)]
+    pub items: Vec<StringValue>,
+
+    /// Search box placeholder
+    #[serde(default)]
+    pub placeholder: Option<StringValue>,
+}
+
+/// Status bar strip. Children render in a single row under a hairline
+/// top border (slot routing is a future refinement).
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusBarComponent {
+    /// Child component IDs rendered left to right
+    pub children: ChildrenRef,
+}
+
+/// Overlapping avatar stack with a "+N" overflow tail
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AvatarGroupComponent {
+    /// Member display names (initials are derived)
+    #[serde(default)]
+    pub names: Vec<StringValue>,
+
+    /// Visible avatars before the "+N" tail
+    #[serde(default)]
+    pub max_visible: Option<f64>,
+}
+
+/// Color swatch grid
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColorPickerComponent {
+    /// Currently selected color as `#RRGGBB[AA]` (path-bound)
+    #[serde(default)]
+    pub value: StringValue,
+
+    /// Swatch palette; defaults to a built-in theme palette
+    #[serde(default)]
+    pub colors: Option<Vec<String>>,
+}
+
+/// Term/description pairs
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DescriptionListComponent {
+    /// Label/value rows
+    #[serde(default)]
+    pub items: Vec<DescriptionItem>,
+}
+
+/// One term/description row of a DescriptionList
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DescriptionItem {
+    /// Row label
+    #[serde(default)]
+    pub term: StringValue,
+
+    /// Row value
+    #[serde(default)]
+    pub description: StringValue,
+}
+
 /// File picker component - select files/directories
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1549,4 +1692,51 @@ mod tests {
             _ => panic!("Expected SurfaceUpdate"),
         }
     }
+
+    #[test]
+    fn test_extended_components_parse() {
+        let json = r##"{"surfaceUpdate": {"surfaceId": "main", "components": [
+            {"id": "t", "component": {"Tag": {"text": {"literalString": "Active"}, "color": "green", "variant": "outline", "dot": true}}},
+            {"id": "si", "component": {"StepIndicator": {"steps": [{"literalString": "Cart"}, {"literalString": "Pay"}], "current": 1}}},
+            {"id": "ni", "component": {"NumberInput": {"value": {"literalNumber": 5}, "min": 0, "max": 10, "step": 0.5, "decimals": 1}}},
+            {"id": "slist", "component": {"SearchableList": {"items": [{"literalString": "A"}, {"literalString": "B"}], "placeholder": {"literalString": "Type..."}}}},
+            {"id": "sb", "component": {"StatusBar": {"children": {"explicitList": ["t"]}}}},
+            {"id": "ag", "component": {"AvatarGroup": {"names": [{"literalString": "Alice"}, {"literalString": "Bob"}], "maxVisible": 3}}},
+            {"id": "cp", "component": {"ColorPicker": {"value": {"literalString": "#FF0000"}}}},
+            {"id": "dl", "component": {"DescriptionList": {"items": [{"term": {"literalString": "OS"}, "description": {"literalString": "macOS"}}]}}}
+        ]}}"##;
+
+        let msg: A2uiMessage = serde_json::from_str(json).unwrap();
+        match msg {
+            A2uiMessage::SurfaceUpdate(su) => {
+                assert_eq!(su.components.len(), 8);
+                assert!(matches!(&su.components[0].component, ComponentType::Tag(_)));
+                assert!(matches!(&su.components[1].component, ComponentType::StepIndicator(_)));
+                match &su.components[2].component {
+                    ComponentType::NumberInput(ni) => {
+                        assert_eq!(ni.min, Some(0.0));
+                        assert_eq!(ni.max, Some(10.0));
+                        assert_eq!(ni.step, Some(0.5));
+                    }
+                    _ => panic!("Expected NumberInput"),
+                }
+                assert!(matches!(&su.components[3].component, ComponentType::SearchableList(_)));
+                match &su.components[4].component {
+                    ComponentType::StatusBar(sb) => match &sb.children {
+                        ChildrenRef::ExplicitList(ids) => assert_eq!(ids, &["t".to_string()][..]),
+                        _ => panic!("Expected explicit list children"),
+                    },
+                    _ => panic!("Expected StatusBar"),
+                }
+                match &su.components[5].component {
+                    ComponentType::AvatarGroup(ag) => assert_eq!(ag.max_visible, Some(3.0)),
+                    _ => panic!("Expected AvatarGroup"),
+                }
+                assert!(matches!(&su.components[6].component, ComponentType::ColorPicker(_)));
+                assert!(matches!(&su.components[7].component, ComponentType::DescriptionList(_)));
+            }
+            _ => panic!("Expected SurfaceUpdate"),
+        }
+    }
 }
+

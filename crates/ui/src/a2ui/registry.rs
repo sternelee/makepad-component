@@ -55,6 +55,16 @@ pub enum A2uiComponentType {
     DropdownItem,
     DropdownSection,
     TagPickerItem,
+
+    // Extended components
+    Tag,
+    StepIndicator,
+    NumberInput,
+    SearchableList,
+    StatusBar,
+    AvatarGroup,
+    ColorPicker,
+    DescriptionList,
 }
 
 impl A2uiComponentType {
@@ -96,6 +106,15 @@ impl A2uiComponentType {
             A2uiComponentType::DropdownItem => "DropdownItem",
             A2uiComponentType::DropdownSection => "DropdownSection",
             A2uiComponentType::TagPickerItem => "TagPickerItem",
+            // Extended components
+            A2uiComponentType::Tag => "Tag",
+            A2uiComponentType::StepIndicator => "StepIndicator",
+            A2uiComponentType::NumberInput => "NumberInput",
+            A2uiComponentType::SearchableList => "SearchableList",
+            A2uiComponentType::StatusBar => "StatusBar",
+            A2uiComponentType::AvatarGroup => "AvatarGroup",
+            A2uiComponentType::ColorPicker => "ColorPicker",
+            A2uiComponentType::DescriptionList => "DescriptionList",
         }
     }
 
@@ -137,6 +156,15 @@ impl A2uiComponentType {
             "DropdownItem" => Some(A2uiComponentType::DropdownItem),
             "DropdownSection" => Some(A2uiComponentType::DropdownSection),
             "TagPickerItem" => Some(A2uiComponentType::TagPickerItem),
+            // Extended components
+            "Tag" => Some(A2uiComponentType::Tag),
+            "StepIndicator" => Some(A2uiComponentType::StepIndicator),
+            "NumberInput" => Some(A2uiComponentType::NumberInput),
+            "SearchableList" => Some(A2uiComponentType::SearchableList),
+            "StatusBar" => Some(A2uiComponentType::StatusBar),
+            "AvatarGroup" => Some(A2uiComponentType::AvatarGroup),
+            "ColorPicker" => Some(A2uiComponentType::ColorPicker),
+            "DescriptionList" => Some(A2uiComponentType::DescriptionList),
             _ => None,
         }
     }
@@ -179,6 +207,15 @@ impl A2uiComponentType {
             A2uiComponentType::DropdownItem,
             A2uiComponentType::DropdownSection,
             A2uiComponentType::TagPickerItem,
+            // Extended components
+            A2uiComponentType::Tag,
+            A2uiComponentType::StepIndicator,
+            A2uiComponentType::NumberInput,
+            A2uiComponentType::SearchableList,
+            A2uiComponentType::StatusBar,
+            A2uiComponentType::AvatarGroup,
+            A2uiComponentType::ColorPicker,
+            A2uiComponentType::DescriptionList,
         ]
     }
 }
@@ -477,6 +514,63 @@ impl ComponentRegistry {
             implemented: true,
         });
 
+        // Extended components
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::Tag,
+            makepad_widget: "MpTag",
+            description: "Semantic status tag",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::StepIndicator,
+            makepad_widget: "MpStepIndicator",
+            description: "Step progress indicator",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::NumberInput,
+            makepad_widget: "MpNumberInput",
+            description: "Numeric input with steppers and bounds",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::SearchableList,
+            makepad_widget: "MpSearchableList",
+            description: "Filterable list with search box",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::StatusBar,
+            makepad_widget: "MpStatusBar",
+            description: "Status bar strip with hairline top border",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::AvatarGroup,
+            makepad_widget: "MpAvatarGroup",
+            description: "Overlapping avatar stack with overflow tail",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::ColorPicker,
+            makepad_widget: "MpColorPicker",
+            description: "Color swatch grid",
+            implemented: true,
+        });
+
+        registry.register(ComponentMapping {
+            a2ui_type: A2uiComponentType::DescriptionList,
+            makepad_widget: "MpDescriptionList",
+            description: "Term/description pairs",
+            implemented: true,
+        });
+
         registry
     }
 
@@ -568,6 +662,15 @@ pub fn component_type_of(component: &super::message::ComponentType) -> A2uiCompo
         ComponentType::DropdownItem(_) => A2uiComponentType::DropdownItem,
         ComponentType::DropdownSection(_) => A2uiComponentType::DropdownSection,
         ComponentType::TagPickerItem(_) => A2uiComponentType::TagPickerItem,
+        // Extended components
+        ComponentType::Tag(_) => A2uiComponentType::Tag,
+        ComponentType::StepIndicator(_) => A2uiComponentType::StepIndicator,
+        ComponentType::NumberInput(_) => A2uiComponentType::NumberInput,
+        ComponentType::SearchableList(_) => A2uiComponentType::SearchableList,
+        ComponentType::StatusBar(_) => A2uiComponentType::StatusBar,
+        ComponentType::AvatarGroup(_) => A2uiComponentType::AvatarGroup,
+        ComponentType::ColorPicker(_) => A2uiComponentType::ColorPicker,
+        ComponentType::DescriptionList(_) => A2uiComponentType::DescriptionList,
     }
 }
 

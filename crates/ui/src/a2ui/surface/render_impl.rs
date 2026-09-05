@@ -99,6 +99,31 @@ impl A2uiSurface {
             ComponentType::DropdownItem(_) | ComponentType::DropdownSection(_) | ComponentType::TagPickerItem(_) => {
                 // These are rendered as children of their parent components
             }
+            // Extended components
+            ComponentType::Tag(tag) => {
+                self.render_tag(cx, tag, data_model);
+            }
+            ComponentType::StepIndicator(si) => {
+                self.render_step_indicator(cx, si, data_model);
+            }
+            ComponentType::NumberInput(ni) => {
+                self.render_number_input(cx, ni, data_model, component_id);
+            }
+            ComponentType::SearchableList(sl) => {
+                self.render_searchable_list(cx, sl, data_model);
+            }
+            ComponentType::StatusBar(sb) => {
+                self.render_status_bar(cx, scope, surface, data_model, sb);
+            }
+            ComponentType::AvatarGroup(ag) => {
+                self.render_avatar_group(cx, ag, data_model);
+            }
+            ComponentType::ColorPicker(cp) => {
+                self.render_color_picker(cx, cp, data_model, component_id);
+            }
+            ComponentType::DescriptionList(dl) => {
+                self.render_description_list(cx, dl, data_model);
+            }
             _ => {
                 // Unsupported component - skip for now
             }
@@ -680,6 +705,227 @@ impl A2uiSurface {
             max,
             current_value,
         ));
+    }
+
+    // ============================================================================
+    // Extended components (gpui parity batch)
+    // ============================================================================
+
+    fn render_tag(
+        &mut self,
+        cx: &mut Cx2d,
+        tag: &TagComponent,
+        data_model: &DataModel,
+    ) {
+        let idx = self.tag_count;
+        self.tag_count += 1;
+        let text = resolve_string_value_scoped(
+            &tag.text,
+            data_model,
+            self.current_scope.as_deref(),
+        );
+        let tag_widget = self.pool_tag(cx, idx);
+        tag_widget.set_text(cx, &text);
+        let _ = tag_widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+    }
+
+    fn render_step_indicator(
+        &mut self,
+        cx: &mut Cx2d,
+        si: &StepIndicatorComponent,
+        data_model: &DataModel,
+    ) {
+        let idx = self.step_indicator_count;
+        self.step_indicator_count += 1;
+        let scope = self.current_scope.as_deref();
+        let titles: Vec<String> = si
+            .steps
+            .iter()
+            .map(|s| resolve_string_value_scoped(s, data_model, scope))
+            .collect();
+        let current = si.current.unwrap_or(0.0);
+        let widget = self.pool_step_indicator(cx, idx);
+        widget.set_items(cx, titles);
+        widget.set_step(cx, (current.max(0.0) as usize).saturating_sub(1));
+        let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+    }
+
+    fn render_number_input(
+        &mut self,
+        cx: &mut Cx2d,
+        ni: &NumberInputComponent,
+        data_model: &DataModel,
+        component_id: &str,
+    ) {
+        let idx = self.number_input_meta.len();
+        let scope = self.current_scope.as_deref();
+        let value = resolve_number_value_scoped(&ni.value, data_model, scope);
+        let min = ni.min.unwrap_or(0.0);
+        let max = ni.max.unwrap_or(100.0);
+        let step = ni.step.unwrap_or(1.0);
+        let decimals = ni.decimals.unwrap_or(0.0).max(0.0) as usize;
+        let binding_path = ni.value.as_path().map(|p| {
+            if let Some(s) = scope {
+                format!("{}/{}", s, p.trim_start_matches('/'))
+            } else {
+                p.to_string()
+            }
+        });
+
+        let widget = self.pool_number_input(cx, idx);
+        widget.set_bounds(cx, min, max, step, decimals);
+        widget.set_value(cx, value);
+        let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+
+        self.number_input_meta
+            .push((component_id.to_string(), binding_path));
+    }
+
+    fn render_searchable_list(
+        &mut self,
+        cx: &mut Cx2d,
+        sl: &SearchableListComponent,
+        data_model: &DataModel,
+    ) {
+        let idx = self.searchable_list_count;
+        self.searchable_list_count += 1;
+        let scope = self.current_scope.as_deref();
+        let items: Vec<String> = sl
+            .items
+            .iter()
+            .map(|i| resolve_string_value_scoped(i, data_model, scope))
+            .collect();
+        let placeholder = sl
+            .placeholder
+            .as_ref()
+            .map(|p| resolve_string_value_scoped(p, data_model, scope))
+            .unwrap_or_else(|| "Search...".to_string());
+        let widget = self.pool_searchable_list(cx, idx);
+        widget.set_items(cx, items);
+        widget.set_query(cx, &placeholder);
+        let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+    }
+
+    fn render_status_bar(
+        &mut self,
+        cx: &mut Cx2d,
+        scope: &mut Scope,
+        surface: &crate::a2ui::processor::Surface,
+        data_model: &DataModel,
+        sb: &StatusBarComponent,
+    ) {
+        // v1: a single row under a hairline top border (slot routing TBD).
+        let walk = Walk::fill_fit();
+        let layout = Layout {
+            flow: Flow::right(),
+            spacing: 12.0,
+            align: Align { x: 0.0, y: 0.5 },
+            ..Layout::default()
+        };
+
+        // Hairline top border
+        let line_walk = Walk {
+            width: Size::fill(),
+            height: Size::Fixed(1.0),
+            margin: Inset { top: 0.0, bottom: 4.0, left: 0.0, right: 0.0 },
+            ..Walk::default()
+        };
+        self.draw_divider.draw_walk(cx, line_walk);
+
+        cx.begin_turtle(walk, layout);
+        let children = sb.children.clone();
+        self.render_children(cx, scope, surface, data_model, &children);
+        cx.end_turtle();
+    }
+
+    fn render_avatar_group(
+        &mut self,
+        cx: &mut Cx2d,
+        ag: &AvatarGroupComponent,
+        data_model: &DataModel,
+    ) {
+        let idx = self.avatar_group_count;
+        self.avatar_group_count += 1;
+        let scope = self.current_scope.as_deref();
+        let names: Vec<String> = ag
+            .names
+            .iter()
+            .map(|n| resolve_string_value_scoped(n, data_model, scope))
+            .collect();
+        let widget = self.pool_avatar_group(cx, idx);
+        widget.set_avatars(cx, &names);
+        if let Some(limit) = ag.max_visible {
+            widget.set_limit(cx, limit.max(1.0) as usize);
+        }
+        let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+    }
+
+    fn render_color_picker(
+        &mut self,
+        cx: &mut Cx2d,
+        cp: &ColorPickerComponent,
+        data_model: &DataModel,
+        component_id: &str,
+    ) {
+        let idx = self.color_picker_meta.len();
+        let scope = self.current_scope.as_deref();
+        let value = resolve_string_value_scoped(&cp.value, data_model, scope);
+        let palette: Vec<Vec4f> = cp
+            .colors
+            .as_ref()
+            .map(|colors| colors.iter().filter_map(|c| Self::parse_hex_color(c)).collect())
+            .unwrap_or_else(|| {
+                ["#6366F1", "#8B5CF6", "#EC4899", "#EF4444", "#F59E0B", "#10B981",
+                 "#06B6D4", "#3B82F6", "#64748B", "#0EA5E9", "#84CC16", "#F97316"]
+                    .iter()
+                    .filter_map(|h| Self::parse_hex_color(h))
+                    .collect()
+            });
+        let selected = Self::parse_hex_color(&value).and_then(|v| {
+            palette
+                .iter()
+                .position(|c| {
+                    (v.x - c.x).abs() < 0.002 && (v.y - c.y).abs() < 0.002 && (v.z - c.z).abs() < 0.002
+                })
+        });
+
+        let binding_path = cp.value.as_path().map(|p| {
+            if let Some(s) = scope {
+                format!("{}/{}", s, p.trim_start_matches('/'))
+            } else {
+                p.to_string()
+            }
+        });
+
+        let widget = self.pool_color_picker(cx, idx);
+        widget.set_colors(cx, palette.clone());
+        widget.set_selected(cx, selected);
+        let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+
+        self.color_picker_meta
+            .push((component_id.to_string(), binding_path, palette));
+    }
+
+    fn render_description_list(
+        &mut self,
+        cx: &mut Cx2d,
+        dl: &DescriptionListComponent,
+        data_model: &DataModel,
+    ) {
+        let idx = self.description_list_count;
+        self.description_list_count += 1;
+        let scope = self.current_scope.as_deref();
+        let items: Vec<MpDescriptionItem> = dl
+            .items
+            .iter()
+            .map(|it| MpDescriptionItem::new(
+                &resolve_string_value_scoped(&it.term, data_model, scope),
+                &resolve_string_value_scoped(&it.description, data_model, scope),
+            ))
+            .collect();
+        let widget = self.pool_description_list(cx, idx);
+        widget.set_items(cx, &items);
+        let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
     }
 
     // ============================================================================

@@ -17,11 +17,18 @@ use crate::a2ui::{
     },
 };
 use crate::widgets::{
+    avatar_group::MpAvatarGroup,
     button::MpButton,
     calendar::MpCalendar,
     checkbox::{MpCheckbox, MpCheckboxAction},
+    color_picker::{MpColorPicker, MpColorPickerAction},
+    description_list::{MpDescriptionItem, MpDescriptionList},
     label::MpLabel,
+    number_input::{MpNumberInput, MpNumberInputAction},
+    searchable_list::{MpSearchableList, MpSearchableListAction},
     slider::{MpSlider, MpSliderAction},
+    step_indicator::MpStepIndicator,
+    tag::MpTag,
 };
 
 use super::draw_types::*;
@@ -431,6 +438,22 @@ pub struct A2uiSurface {
     #[rust]
     mp_text_inputs: Vec<TextInput>,
 
+    /// Pool of extended-component instances (gpui parity batch)
+    #[rust]
+    mp_tags: Vec<MpTag>,
+    #[rust]
+    mp_step_indicators: Vec<MpStepIndicator>,
+    #[rust]
+    mp_number_inputs: Vec<MpNumberInput>,
+    #[rust]
+    mp_searchable_lists: Vec<MpSearchableList>,
+    #[rust]
+    mp_avatar_groups: Vec<MpAvatarGroup>,
+    #[rust]
+    mp_color_pickers: Vec<MpColorPicker>,
+    #[rust]
+    mp_description_lists: Vec<MpDescriptionList>,
+
     // ============================================================================
     // Pool metadata (maps pool index to A2UI component info)
     // ============================================================================
@@ -449,6 +472,26 @@ pub struct A2uiSurface {
     /// TextInput metadata: (component_id, binding_path, value)
     #[rust]
     text_input_meta: Vec<(String, Option<String>, String)>,
+
+    /// NumberInput metadata: (component_id, binding_path)
+    #[rust]
+    number_input_meta: Vec<(String, Option<String>)>,
+
+    /// Frame counters for pools without metadata (reset each frame)
+    #[rust]
+    tag_count: usize,
+    #[rust]
+    step_indicator_count: usize,
+    #[rust]
+    searchable_list_count: usize,
+    #[rust]
+    avatar_group_count: usize,
+    #[rust]
+    description_list_count: usize,
+
+    /// ColorPicker metadata: (component_id, binding_path, palette)
+    #[rust]
+    color_picker_meta: Vec<(String, Option<String>, Vec<Vec4f>)>,
 
     /// Frame counter for label pool (reset each frame, used as pool index)
     #[rust]
@@ -772,6 +815,62 @@ impl A2uiSurface {
             self.mp_text_inputs.push(new_ti);
         }
         &mut self.mp_text_inputs[idx]
+    }
+
+    fn pool_tag(&mut self, cx: &mut Cx, idx: usize) -> &mut MpTag {
+        while self.mp_tags.len() <= idx {
+            let new_tag = cx.with_vm(MpTag::script_new_with_default);
+            self.mp_tags.push(new_tag);
+        }
+        &mut self.mp_tags[idx]
+    }
+
+    fn pool_step_indicator(&mut self, cx: &mut Cx, idx: usize) -> &mut MpStepIndicator {
+        while self.mp_step_indicators.len() <= idx {
+            let new_si = cx.with_vm(MpStepIndicator::script_new_with_default);
+            self.mp_step_indicators.push(new_si);
+        }
+        &mut self.mp_step_indicators[idx]
+    }
+
+    fn pool_number_input(&mut self, cx: &mut Cx, idx: usize) -> &mut MpNumberInput {
+        while self.mp_number_inputs.len() <= idx {
+            let new_ni = cx.with_vm(MpNumberInput::script_new_with_default);
+            self.mp_number_inputs.push(new_ni);
+        }
+        &mut self.mp_number_inputs[idx]
+    }
+
+    fn pool_searchable_list(&mut self, cx: &mut Cx, idx: usize) -> &mut MpSearchableList {
+        while self.mp_searchable_lists.len() <= idx {
+            let new_sl = cx.with_vm(MpSearchableList::script_new_with_default);
+            self.mp_searchable_lists.push(new_sl);
+        }
+        &mut self.mp_searchable_lists[idx]
+    }
+
+    fn pool_avatar_group(&mut self, cx: &mut Cx, idx: usize) -> &mut MpAvatarGroup {
+        while self.mp_avatar_groups.len() <= idx {
+            let new_ag = cx.with_vm(MpAvatarGroup::script_new_with_default);
+            self.mp_avatar_groups.push(new_ag);
+        }
+        &mut self.mp_avatar_groups[idx]
+    }
+
+    fn pool_color_picker(&mut self, cx: &mut Cx, idx: usize) -> &mut MpColorPicker {
+        while self.mp_color_pickers.len() <= idx {
+            let new_cp = cx.with_vm(MpColorPicker::script_new_with_default);
+            self.mp_color_pickers.push(new_cp);
+        }
+        &mut self.mp_color_pickers[idx]
+    }
+
+    fn pool_description_list(&mut self, cx: &mut Cx, idx: usize) -> &mut MpDescriptionList {
+        while self.mp_description_lists.len() <= idx {
+            let new_dl = cx.with_vm(MpDescriptionList::script_new_with_default);
+            self.mp_description_lists.push(new_dl);
+        }
+        &mut self.mp_description_lists[idx]
     }
 }
 

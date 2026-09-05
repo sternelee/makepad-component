@@ -29,6 +29,15 @@ impl Widget for A2uiSurface {
             for ti in self.mp_text_inputs.iter_mut() {
                 ti.handle_event(cx, event, scope);
             }
+            for ni in self.mp_number_inputs.iter_mut() {
+                ni.handle_event(cx, event, scope);
+            }
+            for sl in self.mp_searchable_lists.iter_mut() {
+                sl.handle_event(cx, event, scope);
+            }
+            for cp in self.mp_color_pickers.iter_mut() {
+                cp.handle_event(cx, event, scope);
+            }
         });
 
         let mut needs_redraw = false;
@@ -88,6 +97,50 @@ impl Widget for A2uiSurface {
                                     surface_id: surface_id.clone(),
                                     path: path.clone(),
                                     value,
+                                },
+                            );
+                            needs_redraw = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check number input actions (two-way binding)
+        for (idx, ni) in self.mp_number_inputs.iter().enumerate() {
+            if let Some(action) = actions.find_widget_action(ni.widget_uid()) {
+                if let MpNumberInputAction::Changed(v) = action.cast::<MpNumberInputAction>() {
+                    if let Some((_, binding_path)) = self.number_input_meta.get(idx) {
+                        if let Some(path) = binding_path {
+                            cx.widget_action(self.widget_uid(), A2uiSurfaceAction::DataModelChanged {
+                                    surface_id: surface_id.clone(),
+                                    path: path.clone(),
+                                    value: serde_json::json!(v),
+                                },
+                            );
+                            needs_redraw = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check color picker actions (write hex string back to the binding)
+        for (idx, cp) in self.mp_color_pickers.iter().enumerate() {
+            if let Some(action) = actions.find_widget_action(cp.widget_uid()) {
+                if let MpColorPickerAction::Picked(c) = action.cast::<MpColorPickerAction>() {
+                    if let Some((_, binding_path, _)) = self.color_picker_meta.get(idx) {
+                        if let Some(path) = binding_path {
+                            let hex = format!(
+                                "#{:02X}{:02X}{:02X}",
+                                (c.x.clamp(0.0, 1.0) * 255.0).round() as u8,
+                                (c.y.clamp(0.0, 1.0) * 255.0).round() as u8,
+                                (c.z.clamp(0.0, 1.0) * 255.0).round() as u8,
+                            );
+                            cx.widget_action(self.widget_uid(), A2uiSurfaceAction::DataModelChanged {
+                                    surface_id: surface_id.clone(),
+                                    path: path.clone(),
+                                    value: serde_json::Value::String(hex),
                                 },
                             );
                             needs_redraw = true;
@@ -190,6 +243,13 @@ impl Widget for A2uiSurface {
         self.text_input_meta.clear();
         self.audio_player_data.clear();
         self.label_count = 0;
+        self.number_input_meta.clear();
+        self.color_picker_meta.clear();
+        self.tag_count = 0;
+        self.step_indicator_count = 0;
+        self.searchable_list_count = 0;
+        self.avatar_group_count = 0;
+        self.description_list_count = 0;
         self.inside_card = false;
 
         self.draw_bg.begin(cx, walk, self.layout);
