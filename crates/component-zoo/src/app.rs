@@ -6114,6 +6114,67 @@ startup() do #(App::script_component(vm)){
                         }
 
                         // ============================================================
+                        // Icon
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
+                            text: "Icon"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 12.0,
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            View{
+                                width: Fill, height: Fit, flow: Right, spacing: 12.0,
+                                mod.widgets.MpIcon{ name: "search" }
+                                mod.widgets.MpIcon{ name: "bell" }
+                                mod.widgets.MpIcon{ name: "settings" }
+                                mod.widgets.MpIcon{ name: "user" }
+                                mod.widgets.MpIcon{ name: "mail" }
+                                mod.widgets.MpIcon{ name: "calendar" }
+                                mod.widgets.MpIcon{ name: "clock" }
+                                mod.widgets.MpIcon{ name: "star", color: #xF59E0BFF }
+                                mod.widgets.MpIcon{ name: "heart", color: #xEF4444FF }
+                                mod.widgets.MpIcon{ name: "folder" }
+                                mod.widgets.MpIcon{ name: "file" }
+                                mod.widgets.MpIcon{ name: "trash" }
+                                mod.widgets.MpIcon{ name: "pencil" }
+                            }
+                            View{
+                                width: Fill, height: Fit, flow: Right, spacing: 12.0,
+                                mod.widgets.MpIcon{ name: "download" }
+                                mod.widgets.MpIcon{ name: "upload" }
+                                mod.widgets.MpIcon{ name: "send" }
+                                mod.widgets.MpIcon{ name: "copy" }
+                                mod.widgets.MpIcon{ name: "menu" }
+                                mod.widgets.MpIcon{ name: "ellipsis" }
+                                mod.widgets.MpIcon{ name: "info" }
+                                mod.widgets.MpIcon{ name: "circle-check", color: #x10B981FF }
+                                mod.widgets.MpIcon{ name: "circle-alert", color: #xF59E0BFF }
+                                mod.widgets.MpIcon{ name: "circle-x", color: #xEF4444FF }
+                                mod.widgets.MpIcon{ name: "loader" }
+                                mod.widgets.MpIcon{ name: "log-out" }
+                                mod.widgets.MpIcon{ name: "grip-vertical" }
+                            }
+
+                            View{
+                                width: Fill, height: Fit, flow: Right, spacing: 12.0, align: Align{y: 0.5}
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT_MUTED } text: "Sizes:" }
+                                mod.widgets.MpIcon{ name: "chevron-down", size: MpSize.XSmall }
+                                mod.widgets.MpIcon{ name: "chevron-down", size: MpSize.Small }
+                                mod.widgets.MpIcon{ name: "chevron-down", size: MpSize.Medium }
+                                mod.widgets.MpIcon{ name: "chevron-down", size: MpSize.Large }
+                                mod.widgets.MpIcon{ name: "chevron-down", size: MpSize.XLarge }
+                                mod.widgets.MpIcon{ name: "home", size: MpSize.Large }
+                                mod.widgets.MpIcon{ name: "rotate-cw", size: MpSize.Large, color: #x3B82F6FF }
+                            }
+                        }
+
+                        // ============================================================
                         // Message
                         // ============================================================
                         Label{
