@@ -145,9 +145,10 @@ if !content_rect.contains(p) || close_rect.contains(p) { /* close */ }
 
 | 项 | 说明 |
 |----|------|
-| MpSelect 打磨 | 面板底部超出窗口时不向上翻转（shadcn 会 flip）；打开期间键盘高亮滚动 |
+| MpIcon 体系 | 嵌入 lucide SVG 集 + IconName 枚举 + MpSize/主题接入（调研结论见 §7.3） |
+| MpSelect 打磨 | 打开期间键盘高亮随选项滚动 |
 | Switch/Slider 拖拽手感 | 用户报告"不顺畅"，代码审查未见异常，可能需单独打磨 |
-| gpui 剩余缺口（见 §7） | shimmer、message/message_scroller、icon、sidebar、virtual_list 按优先级评估 |
+| gpui 剩余缺口（见 §7.3） | sidebar、virtual_list 按需评估 |
 
 ---
 
@@ -159,19 +160,19 @@ if !content_rect.contains(p) || close_rect.contains(p) { /* close */ }
 
 accordion、alert、attachment、avatar(+group)、badge、breadcrumb、bubble、button、calendar、checkbox、collapsible、color_picker、combobox、command、description_list、dialog、hover_card、input、kbd、label、link、list、notification、pagination、popover、progress、radio、rating、searchable_list、select、separator、sheet、skeleton、slider、spinner、status_bar、stepper、switch、tab、table、tag、text、tooltip、tree —— 加上我方独有：chip、context_menu、control_bar、dropdown、dropdown_menu、empty_state、focus、menu_bar、modal、number_input、option_card、orb、page_flip、progress_ring、scaffolding、scroll_area、split_pane、stat_card、status、theme_state、group_box(本轮移植，gpui 反向对齐)、chart(我方 makepad-plot 更全)
 
-### 7.2 本轮新移植
+### 7.2 已移植
 
 | 组件 | gpui 对应 | 说明 |
 |------|-----------|------|
 | `MpGroupBox` | group_box.rs (191 行) | Normal/Fill/Outline 三 DSL 变体，标题空时整行隐藏；zoo 有演示段 |
+| `MpShimmer`/`MpShimmerText` | shimmer.rs (640 行) | 扫光高亮走像素 shader：块面用 Sdf2d band，文字用 `get_color` 按像素混色（makepad DrawLabelText 技法）；band 中心是自定义 draw 的 instance，Rust 侧 NextFrame 循环驱动；duration/reverse/once/auto_play 对齐 gpui ShimmerStyle |
+| `MpMessage` | message.rs (546 行) | 头像+名字 header / body / footer meta 三槽聊天行；Start/End 对齐（MpMessageEnd 变体右对齐）；show_header/show_footer 支持分组续行；头像自动取姓名首字母。message_scroller 的自动滚动用 ScrollYView 组合即可，不单独移植 |
 
 ### 7.3 缺口（gpui 有、我方无）
 
 | gpui 组件 | 体量 | 移植评估 |
 |-----------|------|----------|
-| `shimmer` | 640 行 | 骨架屏流光动画。**推荐下一个移植**：效果独立、价值直观（加载态） |
-| `message` + `message_scroller` | 546+508 行 | 聊天消息列表（含重试/编辑操作）。与仓库 LLM/a2ui 场景高度契合，但需 text 流式渲染配合 |
-| `icon` | 200 行 | 图标组件。makepad 有 icon 基建，先调研字体/SVG 路线再动手 |
+| `icon` | 200 行 | **已调研（本轮）**：makepad 自带 `Icon` 底座（DrawSvg + 渐变/旋转变体），但 SVG 内容只能 Rust 侧 `load_from_str`，缺"图标名→SVG 目录"体系。正确路线：嵌入 lucide SVG 集（include_str!）+ `MpIcon` 包装（MpSize 接入 + 主题色）+ `IconName` 枚举。需要先做资产引入决策 |
 | `sidebar` | 目录（5 文件） | 可折叠导航侧栏。中等偏大，依赖 menu/list 打底 |
 | `virtual_list` | — | 虚拟滚动大列表。makepad `PortalList` 已覆盖同类能力，暂缓 |
 | `dock` / `form` / `title_bar` / `setting` / `native_menu` / `highlighter` / `clipboard` | — | 维持跳过结论：Entity 状态深度耦合 / 平台耦合 / 已有替代（makepad-clipboard） |
@@ -205,4 +206,6 @@ accordion、alert、attachment、avatar(+group)、badge、breadcrumb、bubble、
 - 运行时日志验证（无截图权限，自动开闭 + rect dump）：
   - Collapsible 展开（内容文本出现 + Link 下移）、Sheet 打开/关闭、Dialog 打开（标题/内容/Cancel/Confirm 全渲染）、MpSelect trigger 文本渲染（前几轮 OCR）
   - MpSelect 下拉：toggle 链路（SEL9）→ 选项吸收（SELD children=[4 opts]）→ overlay 几何（SELX dd_rect=1085.98×128 @ trigger 正下方）三层证据闭环
-- 本轮遗留未验证：Select 打开状态的真实像素（截图权限被拒）；MpSelect 键盘高亮在实际设备上的表现
+- MpSelect 翻转：SELF 日志三帧闭环——帧 1 离屏测量 1085.98×128，帧 2 判定 670.6+128<900 不翻转并锚定正下方，帧 3 稳定无重绘震荡
+- MpShimmer/MpMessage：DSL 模板运行时 0 [E]；流光动画为 NextFrame 驱动（MpPopoverWidget 同款模式），实际视觉效果待有截图权限环境复验
+- 本轮遗留未验证：Select 键盘高亮滚动、真实设备上的拖拽手感
