@@ -1242,7 +1242,31 @@ startup() do #(App::script_component(vm)){
                                 flow: Down,
                                 spacing: 8,
 
-                                SubsectionLabel{ text: "Sizes" }
+                                SubsectionLabel{ text: "Many options (scrolls)" }
+
+                            View{
+                                width: Fill, height: Fit, flow: Right, spacing: 8.0, align: Align{y: 0.5}
+                                Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Pick:" }
+                                demo_select_many := mod.widgets.MpSelect{
+                                    trigger +: { label +: { text: "Twelve options" } }
+                                    dropdown +: {
+                                        mod.widgets.MpSelectOption{ value: "One", label +: { text: "One" } }
+                                        mod.widgets.MpSelectOption{ value: "Two", label +: { text: "Two" } }
+                                        mod.widgets.MpSelectOption{ value: "Three", label +: { text: "Three" } }
+                                        mod.widgets.MpSelectOption{ value: "Four", label +: { text: "Four" } }
+                                        mod.widgets.MpSelectOption{ value: "Five", label +: { text: "Five" } }
+                                        mod.widgets.MpSelectOption{ value: "Six", label +: { text: "Six" } }
+                                        mod.widgets.MpSelectOption{ value: "Seven", label +: { text: "Seven" } }
+                                        mod.widgets.MpSelectOption{ value: "Eight", label +: { text: "Eight" } }
+                                        mod.widgets.MpSelectOption{ value: "Nine", label +: { text: "Nine" } }
+                                        mod.widgets.MpSelectOption{ value: "Ten", label +: { text: "Ten" } }
+                                        mod.widgets.MpSelectOption{ value: "Eleven", label +: { text: "Eleven" } }
+                                        mod.widgets.MpSelectOption{ value: "Twelve", label +: { text: "Twelve" } }
+                                    }
+                                }
+                            }
+
+                            SubsectionLabel{ text: "Sizes" }
 
                                 View {
                                     width: Fit, height: Fit,
@@ -6060,7 +6084,7 @@ startup() do #(App::script_component(vm)){
                                 Label{ draw_text +: { text_style: theme.font_regular{font_size: 13.0} color: TEXT } text: "Framework:" }
                                 demo_select := mod.widgets.MpSelect{
                                     trigger +: {
-                                        label +: { text: "Select a framework" }
+                                        label +: { text: "Twelve frameworks" }
                                         // placeholder_text removed (not valid in DSL)
                                     }
                                     dropdown +: {
@@ -6068,6 +6092,14 @@ startup() do #(App::script_component(vm)){
                                         demo_opt_vue := mod.widgets.MpSelectOption{ value: "Vue", label +: { text: "Vue" } }
                                         demo_opt_svelte := mod.widgets.MpSelectOption{ value: "Svelte", label +: { text: "Svelte" } }
                                         demo_opt_solid := mod.widgets.MpSelectOption{ value: "Solid", label +: { text: "Solid" } }
+                                        mod.widgets.MpSelectOption{ value: "Angular", label +: { text: "Angular" } }
+                                        mod.widgets.MpSelectOption{ value: "Qwik", label +: { text: "Qwik" } }
+                                        mod.widgets.MpSelectOption{ value: "Astro", label +: { text: "Astro" } }
+                                        mod.widgets.MpSelectOption{ value: "Lit", label +: { text: "Lit" } }
+                                        mod.widgets.MpSelectOption{ value: "Preact", label +: { text: "Preact" } }
+                                        mod.widgets.MpSelectOption{ value: "Ember", label +: { text: "Ember" } }
+                                        mod.widgets.MpSelectOption{ value: "Alpine", label +: { text: "Alpine" } }
+                                        mod.widgets.MpSelectOption{ value: "HTMX", label +: { text: "HTMX" } }
                                     }
                                 }
                             }

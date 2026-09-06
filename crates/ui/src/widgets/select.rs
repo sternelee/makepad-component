@@ -1,6 +1,9 @@
 use crate::widgets::sizing::MpSize;
 use makepad_widgets::*;
 
+/// Maximum dropdown panel height before it scrolls.
+const MAX_DROPDOWN_HEIGHT: f64 = 320.0;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -80,6 +83,15 @@ script_mod! {
         width: Fill
         height: Fit
         flow: Down
+
+        // The overlay draw caps the height (Fit{max} from Rust); these bars
+        // engage whenever the options exceed it. Options stay direct
+        // children so `dropdown +: { ... }` keeps working.
+        scroll_bars: mod.widgets.ScrollBars{
+            show_scroll_x: false
+            show_scroll_y: true
+            scroll_bar_y.drag_scrolling: true
+        }
 
 
 
@@ -618,6 +630,8 @@ impl MpSelect {
         let mut walk = dd.walk(cx);
         walk.abs_pos = Some(pos);
         walk.width = Size::Fixed(trig.size.x.max(120.0));
+        // Cap very long option lists; scroll_bars take over beyond this.
+        walk.height = Size::Fit { min: None, max: Some(FitBound::Abs(MAX_DROPDOWN_HEIGHT)) };
         walk.margin = Inset::default();
 
         // Enable drawing only for this overlay pass (see MpSelectDropdown).
@@ -745,6 +759,47 @@ impl MpSelect {
                 opt.set_highlighted(cx, on);
             }
         }
+        if let Some(idx) = self.highlighted {
+            self.scroll_highlight_into_view(cx, idx);
+        }
+    }
+
+    /// Keep the keyboard-highlighted option visible: derive the current
+    /// scroll geometrically (first option's screen offset), then nudge it
+    /// so the highlighted row is inside the panel viewport.
+    fn scroll_highlight_into_view(&mut self, cx: &mut Cx, idx: usize) {
+        let opts = self.option_refs();
+        let Some(first) = opts.first() else { return };
+        let Some(hl) = opts.get(idx) else { return };
+        let dd_rect = self
+            .view
+            .widget(cx, ids!(dropdown))
+            .area()
+            .rect(cx);
+        if dd_rect.size.y <= 0.0 {
+            return; // not laid out yet
+        }
+        let first_rect = first.area().rect(cx);
+        let hl_rect = hl.area().rect(cx);
+        if first_rect.size.y <= 0.0 || hl_rect.size.y <= 0.0 {
+            return;
+        }
+        let scroll = (dd_rect.pos.y - first_rect.pos.y).max(0.0);
+        let hl_top = hl_rect.pos.y - first_rect.pos.y + scroll;
+        let hl_bottom = hl_top + hl_rect.size.y;
+        let viewport = dd_rect.size.y;
+
+        let target = if hl_top < scroll {
+            hl_top
+        } else if hl_bottom > scroll + viewport {
+            hl_bottom - viewport
+        } else {
+            return;
+        };
+        if let Some(mut dd) = self.view.widget(cx, ids!(dropdown)).borrow_mut::<MpSelectDropdown>() {
+            dd.view.set_scroll_pos(cx, Vec2d { x: 0.0, y: target.max(0.0) });
+        }
+        self.redraw(cx);
     }
 
     fn set_open(&mut self, cx: &mut Cx, open: bool) {
