@@ -17,7 +17,7 @@
 | **交互 bug 大扫除** | Sheet/Dialog/Select/Collapsible/Tag/Modal 全部无响应问题 | ✅ 完成（§3、§3.7） |
 | a2ui 协议接入 | 新组件接入 ComponentType/processor | ⬜ 未开始 |
 
-测试基线：`cargo test -p makepad-component` **37 passed**（含 clamp_number/snap_step/format_number 纯函数测试）。
+测试基线：`cargo test -p makepad-component` **37 passed**；全 crate `cargo check` 0 errors（含 clamp_number/snap_step/format_number 纯函数测试）。
 
 ---
 
@@ -146,9 +146,9 @@ if !content_rect.contains(p) || close_rect.contains(p) { /* close */ }
 | 项 | 说明 |
 |----|------|
 | MpSidebar 子菜单 | SidebarMenuItem 的 children submenu（caret 展开/收起）暂未移植，需要时补 |
-| MpSelect 打磨 | 下拉超长加 max-height + ScrollYView：**注意 option_refs 只枚举直接子件**，嵌套滚动层后需改为递归收集，否则键盘导航/点击提交全断 |
 | Switch/Slider 拖拽手感 | 用户报告"不顺畅"，代码审查未见异常，可能需单独打磨 |
 | 流光/图标/侧栏视觉复验 | MpShimmer 动画、MpIcon 渲染、MpSidebar 折叠交互需在有截图/点击权限的环境复验 |
+| ~~MpSelect 长列表~~ | ✅ 已解决（fdb2063）：滚动是 View 的 `scroll_bars` 属性，**无需嵌套**（原 option_refs 递归担忧不成立）；overlay 侧用 `Size::Fit{max: FitBound::Abs(320)}` 封顶；键盘跟随用"首选项屏幕偏移"几何推导当前滚动位，对滚轮滚动鲁棒 |
 
 ---
 
