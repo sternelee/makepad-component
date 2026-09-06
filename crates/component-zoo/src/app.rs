@@ -1,4 +1,6 @@
 use makepad_component::widgets::MpThemeState;
+use makepad_component::widgets::MpSidebarItemWidgetRefExt;
+use makepad_component::widgets::MpSidebarWidgetRefExt;
 use makepad_component::widgets::MpTagWidgetRefExt;
 use makepad_component::widgets::MpAvatarGroupWidgetRefExt;
 use makepad_component::widgets::MpSearchableListWidgetRefExt;
@@ -6226,6 +6228,65 @@ startup() do #(App::script_component(vm)){
                         }
 
                         // ============================================================
+                        // Sidebar
+                        // ============================================================
+                        Label{
+                            draw_text +: { text_style: theme.font_bold{font_size: 16.0} color: TEXT }
+                            text: "Sidebar"
+                        }
+
+                        RoundedView{
+                            width: Fill, height: Fit,
+                            flow: Down,
+                            spacing: 12.0,
+                            draw_bg +: { color: SURFACE_CARD, border_radius: 8.0, border_color: BORDER }
+                            padding: Inset{left: 16, right: 16, top: 12, bottom: 12}
+
+                            View{
+                                width: Fill, height: 320, flow: Right, spacing: 12.0,
+
+                                demo_sidebar := mod.widgets.MpSidebar{
+                                    header +: {
+                                        View{
+                                            width: Fill, height: Fit, flow: Right, spacing: 8.0, align: Align{y: 0.5}
+                                            padding: Inset{left: 4, right: 4, top: 4, bottom: 8}
+                                            mod.widgets.MpIcon{ name: "settings", size: MpSize.Large }
+                                            Label{ draw_text +: { text_style: theme.font_bold{font_size: 14.0} color: TEXT } text: "Workspace" }
+                                        }
+                                    }
+                                    body +: {
+                                        mod.widgets.MpSidebarGroup{
+                                            group_label +: { text: "Platform" }
+                                            content +: {
+                                                demo_side_home := mod.widgets.MpSidebarItem{ icon +: { name: "house" }, label +: { text: "Home" }, active: true }
+                                                demo_side_search := mod.widgets.MpSidebarItem{ icon +: { name: "search" }, label +: { text: "Search" } }
+                                                demo_side_docs := mod.widgets.MpSidebarItem{ icon +: { name: "file" }, label +: { text: "Documents" } }
+                                            }
+                                        }
+                                        mod.widgets.MpSidebarGroup{
+                                            group_label +: { text: "Projects" }
+                                            content +: {
+                                                demo_side_design := mod.widgets.MpSidebarItem{ icon +: { name: "folder" }, label +: { text: "Design System" } }
+                                                demo_side_mobile := mod.widgets.MpSidebarItem{ icon +: { name: "folder" }, label +: { text: "Mobile App" }, disabled: true }
+                                            }
+                                        }
+                                    }
+                                    footer +: {
+                                        demo_side_logout := mod.widgets.MpSidebarItem{ icon +: { name: "log-out" }, label +: { text: "Sign out" } }
+                                    }
+                                }
+
+                                View{
+                                    width: Fill, height: Fit, flow: Down, spacing: 8.0,
+                                    align: Align{x: 0.0, y: 0.0}
+
+                                    demo_side_toggle := mod.widgets.MpButtonProminent{ text: "Toggle Sidebar" }
+                                    Label{ draw_text +: { text_style: theme.font_regular{font_size: 12.0} color: TEXT_MUTED } text: "Click items or collapse to the icon rail" }
+                                }
+                            }
+                        }
+
+                        // ============================================================
                         // GroupBox
                         // ============================================================
                         Label{
@@ -8117,6 +8178,33 @@ impl MatchEvent for App {
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
+        // Sidebar demo: toggle collapse, and single-select among items.
+        if self
+            .ui
+            .mp_button(cx, ids!(demo_side_toggle))
+            .clicked(actions)
+        {
+            self.ui.mp_sidebar(cx, ids!(demo_sidebar)).toggle(cx);
+        }
+        let demo_side_items = [
+            ids!(demo_side_home),
+            ids!(demo_side_search),
+            ids!(demo_side_docs),
+            ids!(demo_side_design),
+            ids!(demo_side_mobile),
+            ids!(demo_side_logout),
+        ];
+        for item_id in demo_side_items {
+            let item = self.ui.mp_sidebar_item(cx, item_id);
+            if item.clicked(actions) {
+                for other in demo_side_items {
+                    self.ui
+                        .mp_sidebar_item(cx, other)
+                        .set_active(cx, other == item_id);
+                }
+            }
+        }
+
         // Handle category tab clicks
         if self.ui.mp_tab(cx, ids!(cat_form)).clicked(actions) {
             self.select_category(cx, 0);
