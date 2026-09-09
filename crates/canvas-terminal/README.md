@@ -22,7 +22,8 @@
 - ✅ 持久终端会话：daemon 跨 GUI 重启持有 PTY，下次启动自动 re-attach 并回放 scrollback
 - ✅ 拖拽 PNG/JPG/WebP/GIF/SVG 等图片到画布原生预览（`Image` 组件槽位，等比缩放）
 - ✅ 拖拽 MP4/MOV/WebM 等视频到画布原生播放（`Video` 组件 + 平台播放后端，静音自动播放）
-- ✅ 拖拽 PDF 到画布原生渲染（makepad `PdfPageView`，首页按卡片尺寸 letterbox）
+- ✅ 拖拽 PDF 到画布原生渲染（makepad `PdfPageView`，首页按卡片尺寸 letterbox），标题栏带打印按钮（`lp` 发送系统打印队列）
+- ✅ 拖拽 HTML 到画布内嵌浏览器预览（CEF `file://` 槽位，完整网页渲染）
 - ✅ 拖拽文本文件（txt/md/代码/配置等 40+ 扩展名）为等宽文本卡片，支持滚轮滚动、截断标记
 
 ## 运行
@@ -67,7 +68,7 @@ cargo run -p canvas-terminal -- --daemon
 - **调整大小**：拖动卡片右下角手柄。
 - **便签编辑**：双击便签正文进入行内编辑，`Esc` 提交。
 - **白板涂鸦**：左侧工具栏选择 Pen/Rect/Circle/Text/Eraser 后在画布上绘制。
-- **拖放媒体**：把 Finder 里的图片/视频/PDF/文本文件直接拖到画布上，松手即在落点创建预览卡片
+- **拖放媒体**：把 Finder 里的图片/视频/PDF/文本/HTML 文件直接拖到画布上，松手即在落点创建预览卡片
   （拖入时画布出现蓝色高亮框；多个文件级联摆放，不支持的扩展名会在状态栏提示）。
 - **工作区**：顶部标签栏切换、添加画布。
 
@@ -112,6 +113,7 @@ daemon，会以 detach 方式重新执行自己并加上 `--daemon`，之后所�
   Linux GStreamer）；不支持的编码会在视频卡片内显示错误状态。
 - PDF 目前渲染第一页；多页浏览/缩放待后续（`PdfPageView` 本身支持 zoom）。
 - 文本卡片为只读预览：每文件读取上限 256KB（超出显示截断标记），长行水平裁剪不换行。
+- PDF 打印走系统 `lp` 命令（CUPS）发送默认打印队列；未配置打印机会在状态栏报错。
 - 视频/PDF 卡片内容区点击属于内嵌播放器（播放控制/翻页），拖动卡片请使用标题栏。
 - 给 `draw_title` / `draw_cell_text` 设置文字颜色必须直接赋值 `.color` 字段；
   `draw_vars.set_dyn_instance(live_id!(color), ...)` 对这些 shader 无效。

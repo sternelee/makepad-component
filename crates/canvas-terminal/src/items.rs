@@ -23,6 +23,8 @@ pub enum MediaKind {
     /// Plain-text file (source code, markdown, logs, configs...) rendered
     /// with the terminal's monospace font.
     Text,
+    /// Local HTML file, previewed through an embedded CEF browser slot.
+    Web,
 }
 
 impl MediaKind {
@@ -49,10 +51,11 @@ impl MediaKind {
             "txt" | "md" | "markdown" | "log" | "json" | "toml" | "yaml" | "yml" | "xml"
             | "csv" | "tsv" | "ini" | "cfg" | "conf" | "rs" | "py" | "js" | "jsx" | "ts"
             | "tsx" | "c" | "h" | "cc" | "cpp" | "hpp" | "java" | "kt" | "swift" | "go" | "rb"
-            | "php" | "sh" | "bash" | "zsh" | "fish" | "lua" | "sql" | "css" | "scss" | "html"
-            | "htm" | "vue" | "svelte" | "proto" | "graphql" | "diff" | "patch" => {
-                Some(MediaKind::Text)
-            }
+            | "php" | "sh" | "bash" | "zsh" | "fish" | "lua" | "sql" | "css" | "scss" | "vue"
+            | "svelte" | "proto" | "graphql" | "diff" | "patch" => Some(MediaKind::Text),
+            // HTML renders in an embedded browser (file:// URL), like a
+            // browser card, not as static text.
+            "html" | "htm" => Some(MediaKind::Web),
             _ => None,
         }
     }
@@ -64,6 +67,7 @@ impl MediaKind {
             MediaKind::Video => "Video",
             MediaKind::Pdf => "PDF",
             MediaKind::Text => "Text",
+            MediaKind::Web => "Web",
         }
     }
 
@@ -74,6 +78,7 @@ impl MediaKind {
             MediaKind::Video => [0.70, 0.48, 0.96, 1.0],
             MediaKind::Pdf => [0.96, 0.45, 0.42, 1.0],
             MediaKind::Text => [0.42, 0.76, 0.60, 1.0],
+            MediaKind::Web => [0.98, 0.63, 0.25, 1.0],
         }
     }
 
@@ -84,6 +89,7 @@ impl MediaKind {
             MediaKind::Video => "V",
             MediaKind::Pdf => "P",
             MediaKind::Text => "T",
+            MediaKind::Web => "H",
         }
     }
 
@@ -95,6 +101,7 @@ impl MediaKind {
             MediaKind::Video => (460.0, 300.0),
             MediaKind::Pdf => (420.0, 540.0),
             MediaKind::Text => (460.0, 340.0),
+            MediaKind::Web => (620.0, 440.0),
         }
     }
 }
@@ -466,6 +473,14 @@ impl CanvasItem {
         }
     }
 
+    /// Filesystem path of a Media item's source file.
+    pub fn path(&self) -> Option<&str> {
+        match self {
+            CanvasItem::Media { path, .. } => Some(path),
+            _ => None,
+        }
+    }
+
     /// Media payload kind of a Media item.
     pub fn media_kind(&self) -> Option<MediaKind> {
         match self {
@@ -574,6 +589,12 @@ mod tests {
         assert_eq!(MediaKind::from_path("README.md"), Some(MediaKind::Text));
         assert_eq!(MediaKind::from_path("src/main.rs"), Some(MediaKind::Text));
         assert_eq!(MediaKind::from_path("config.yaml"), Some(MediaKind::Text));
+    }
+
+    #[test]
+    fn media_kind_routes_html_to_web_preview() {
+        assert_eq!(MediaKind::from_path("page.html"), Some(MediaKind::Web));
+        assert_eq!(MediaKind::from_path("/a/b/INDEX.HTM"), Some(MediaKind::Web));
     }
 
     #[test]

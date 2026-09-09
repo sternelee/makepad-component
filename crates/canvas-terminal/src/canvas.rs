@@ -194,6 +194,8 @@ enum DragMode {
 enum BtnKind {
     Minimize,
     Close,
+    /// PDF media cards only: send the file to the system print queue.
+    Print,
 }
 
 /// What part of the workspace tab bar a click landed on.
@@ -1306,28 +1308,54 @@ impl CanvasPanel {
 
     /// Compute the minimize/close button rects for an item's screen rect.
     /// Buttons live at the top-right of the item title bar.
-    fn control_button_rects(r: Rect) -> (Rect, Rect) {
-        let bx = r.pos.x + r.size.x - 2.0 * BTN_W - 8.0;
+    /// Title-bar control button rects, right-aligned: close, minimize, and
+    /// (for PDF media cards) print leftmost.
+    fn control_button_rects(r: Rect, with_print: bool) -> (Option<Rect>, Rect, Rect) {
         let by = r.pos.y + 4.0;
-        let min_rect = Rect {
-            pos: Vec2d { x: bx, y: by },
-            size: Vec2d { x: BTN_W, y: BTN_H },
-        };
         let close_rect = Rect {
             pos: Vec2d {
-                x: bx + BTN_W + 4.0,
+                x: r.pos.x + r.size.x - BTN_W - 4.0,
                 y: by,
             },
             size: Vec2d { x: BTN_W, y: BTN_H },
         };
-        (min_rect, close_rect)
+        let min_rect = Rect {
+            pos: Vec2d {
+                x: close_rect.pos.x - BTN_W - 4.0,
+                y: by,
+            },
+            size: Vec2d { x: BTN_W, y: BTN_H },
+        };
+        let print_rect = if with_print {
+            Some(Rect {
+                pos: Vec2d {
+                    x: min_rect.pos.x - BTN_W - 4.0,
+                    y: by,
+                },
+                size: Vec2d { x: BTN_W, y: BTN_H },
+            })
+        } else {
+            None
+        };
+        (print_rect, min_rect, close_rect)
+    }
+
+    /// Whether an item's title bar carries the extra print button.
+    fn has_print_button(item: &CanvasItem) -> bool {
+        item.media_kind() == Some(MediaKind::Pdf)
     }
 
     /// Topmost item whose title-bar control button is under `screen`.
     fn control_button_under(&self, screen: Vec2d) -> Option<(u64, BtnKind)> {
         self.items.iter().rev().find_map(|i| {
             let r = self.item_screen_rect(i);
-            let (min_r, close_r) = Self::control_button_rects(r);
+            let (print_r, min_r, close_r) =
+                Self::control_button_rects(r, Self::has_print_button(i));
+            if let Some(pr) = print_r {
+                if pr.contains(screen) {
+                    return Some((i.id(), BtnKind::Print));
+                }
+            }
             if min_r.contains(screen) {
                 Some((i.id(), BtnKind::Minimize))
             } else if close_r.contains(screen) {
@@ -3457,9 +3485,38 @@ impl CanvasPanel {
 
     /// Draw the minimize/close control buttons in the item's title bar.
     fn draw_control_buttons(&mut self, cx: &mut Cx2d, id: u64, screen: Rect) {
-        let (min_r, close_r) = Self::control_button_rects(screen);
+        let with_print = self
+            .items
+            .iter()
+            .find(|i| i.id() == id)
+            .is_some_and(Self::has_print_button);
+        let (print_r, min_r, close_r) = Self::control_button_rects(screen, with_print);
         let min_hov = self.hovered_btn == Some((id, BtnKind::Minimize));
         let close_hov = self.hovered_btn == Some((id, BtnKind::Close));
+        if let Some(pr) = print_r {
+            let print_hov = self.hovered_btn == Some((id, BtnKind::Print));
+            self.draw_item_bg_rect(cx, pr, if print_hov { BTN_HOVER } else { BTN_BG });
+            self.draw_border_rect(cx, pr, BTN_BORDER);
+            // Printer glyph: paper sheet over a body tray.
+            let glyph = [0.70, 0.75, 0.85, 1.0];
+            let body = Rect {
+                pos: pr.pos + Vec2d { x: 4.0, y: 8.0 },
+                size: Vec2d {
+                    x: pr.size.x - 8.0,
+                    y: pr.size.y - 11.0,
+                },
+            };
+            self.draw_border_rect(cx, body, glyph);
+            let paper = Rect {
+                pos: pr.pos + Vec2d { x: 6.5, y: 4.0 },
+                size: Vec2d {
+                    x: pr.size.x - 13.0,
+                    y: 6.0,
+                },
+            };
+            self.draw_item_bg_rect(cx, paper, BTN_BG);
+            self.draw_border_rect(cx, paper, glyph);
+        }
         // Minimize button (—)
         self.draw_item_bg_rect(cx, min_r, if min_hov { BTN_HOVER } else { BTN_BG });
         self.draw_border_rect(cx, min_r, BTN_BORDER);
@@ -4215,6 +4272,10 @@ impl CanvasPanel {
                 self.draw_text_slot(cx, id, content, path);
                 None
             }
+            MediaKind::Web => {
+                self.draw_web_slot(cx, id, content, path);
+                None
+            }
             MediaKind::Video => Some((id, content, kind, path.to_string())),
         }
     }
@@ -4309,6 +4370,70 @@ impl CanvasPanel {
             );
         }
         cx.pop_clip_rect();
+    }
+
+    /// Draw a local HTML item's content rect through a CEF `Browser` slot
+    /// pointing at the file's `file://` URL (shares the browser slot pool;
+    /// Chromium renders it like any web page).
+    fn draw_web_slot(&mut self, cx: &mut Cx2d, id: u64, rect: Rect, path: &str) {
+        let slot = match self.browser_slots.iter().find(|(i, _)| *i == id) {
+            Some((_, s)) => *s,
+            None => {
+                let free = (0..4)
+                    .find(|s| !self.browser_slots.iter().any(|(_, used)| used == s))
+                    .unwrap_or(0);
+                self.browser_slots.push((id, free));
+                free
+            }
+        };
+        let slot_id = LiveId::from_str(&format!("browser_slot_{}", slot));
+        let slot_widget = self.view.widget(cx.cx, &[slot_id]);
+        let slot_browser = slot_widget.as_browser();
+        if !self.browser_spawned.contains(&id) {
+            self.browser_spawned.push(id);
+            slot_browser.set_url(cx.cx, &file_url(path));
+        }
+        slot_browser.set_visible(cx.cx, true);
+        let walk = Walk {
+            abs_pos: Some(rect.pos),
+            width: Size::Fixed(rect.size.x),
+            height: Size::Fixed(rect.size.y),
+            ..Default::default()
+        };
+        let _ = slot_widget.draw_walk(cx, &mut Scope::empty(), walk);
+        slot_browser.set_visible(cx.cx, false);
+    }
+
+    /// Print a PDF media item's file via the system print queue (`lp` on
+    /// Unix). Feedback lands in the status bar.
+    fn print_pdf(&mut self, cx: &mut Cx, id: u64) {
+        let Some(path) = self
+            .items
+            .iter()
+            .find(|i| i.id() == id)
+            .and_then(|i| i.path())
+            .map(|p| p.to_string())
+        else {
+            return;
+        };
+        self.status(cx, &format!("Printing {}…", path_file_name(&path)));
+        let output = std::process::Command::new("lp").arg(&path).output();
+        match output {
+            Ok(out) if out.status.success() => {
+                self.status(
+                    cx,
+                    &format!("Sent {} to the default printer", path_file_name(&path)),
+                );
+            }
+            Ok(out) => {
+                let err = String::from_utf8_lossy(&out.stderr);
+                self.status(cx, &format!("Print failed: {}", err.trim()));
+            }
+            Err(e) => {
+                self.status(cx, &format!("Print failed: {e} (no 'lp' command?)"));
+            }
+        }
+        self.redraw(cx);
     }
 
     /// Draw deferred video slots (after the child pass, so the Video
@@ -4893,6 +5018,7 @@ impl Widget for CanvasPanel {
                     match kind {
                         BtnKind::Minimize => self.minimize_item(cx, id),
                         BtnKind::Close => self.close_item(cx, id),
+                        BtnKind::Print => self.print_pdf(cx, id),
                     }
                     return;
                 }
@@ -6043,9 +6169,36 @@ impl Widget for CanvasPanel {
     }
 }
 
+/// Percent-encode a filesystem path into a `file://` URL for the embedded
+/// browser (HTML preview). Unreserved characters and `/` pass through; all
+/// other bytes are %XX-escaped so spaces/`#`/`?` in filenames survive.
+fn file_url(path: &str) -> String {
+    let mut out = String::with_capacity(path.len() + 8);
+    out.push_str("file://");
+    for b in path.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn file_url_encodes_special_characters() {
+        assert_eq!(file_url("/tmp/a.html"), "file:///tmp/a.html");
+        assert_eq!(
+            file_url("/Users/me/My Page.html"),
+            "file:///Users/me/My%20Page.html"
+        );
+        assert_eq!(file_url("/tmp/a#b.html"), "file:///tmp/a%23b.html");
+    }
 
     #[test]
     fn fitted_content_size_keeps_aspect_within_bounds() {
