@@ -4388,13 +4388,22 @@ impl Widget for CanvasPanel {
         // point (image / video / PDF, classified by extension).
         match event.drag_hits(cx, self.area) {
             DragHit::Drag(f) => {
-                let hovering = matches!(
-                    f.state,
-                    makepad_widgets::DragState::In | makepad_widgets::DragState::Over
-                ) && f
+                let has_files = f
                     .items
                     .iter()
                     .any(|i| matches!(i, DragItem::FilePath { .. }));
+                let hovering = has_files
+                    && matches!(
+                        f.state,
+                        makepad_widgets::DragState::In | makepad_widgets::DragState::Over
+                    );
+                // Claim the drag: dragging_updated returns NSDragOperation::None
+                // unless a widget writes a DragResponse while handling the Drag
+                // event, and with None macOS never fires performDragOperation
+                // (i.e. Event::Drop is never delivered).
+                if hovering {
+                    *f.response.lock().unwrap() = DragResponse::Copy;
+                }
                 if hovering != self.drop_hover {
                     self.drop_hover = hovering;
                     if hovering {
