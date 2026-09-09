@@ -31,6 +31,8 @@ const TIP_BORDER: [f32; 4] = [0.216, 0.255, 0.318, 1.0];
 const TIP_TEXT: [f32; 4] = [0.976, 0.980, 0.965, 1.0];
 /// Hover delay before the palette tooltip shows (MpTooltip show_delay).
 const TIP_SHOW_DELAY: f64 = 0.3;
+/// Per-file byte cap for text media previews (reads are synchronous).
+const TEXT_MAX_BYTES: usize = 256 * 1024;
 
 /// Media card chrome subtracted from the card to get the content rect
 /// (2px inset each side, 32px title bar, 2px bottom rim).
@@ -389,6 +391,13 @@ pub struct CanvasPanel {
     /// minimize/restore and workspace switches keep their parse).
     #[rust]
     pdf_pages: HashMap<u64, CachedPage>,
+    /// Read text content per text media item (keyed by item id; global like
+    /// pdf_pages). Capped at TEXT_MAX_BYTES per file.
+    #[rust]
+    text_docs: HashMap<u64, String>,
+    /// Scroll offset (in lines) per text media item.
+    #[rust]
+    text_scroll: HashMap<u64, f64>,
     /// Tool-palette button currently hovered (drives its tooltip).
     #[rust]
     palette_hover: Option<PaletteHit>,
@@ -1515,6 +1524,8 @@ impl CanvasPanel {
         self.media_pdf_slots.retain(|(i, _)| *i != id);
         self.media_image_slots.retain(|(i, _)| *i != id);
         self.pdf_pages.remove(&id);
+        self.text_docs.remove(&id);
+        self.text_scroll.remove(&id);
         self.redraw(cx);
     }
 
@@ -1776,7 +1787,7 @@ impl CanvasPanel {
                 None => {
                     self.status(
                         cx,
-                        "Unsupported file type — try png/jpg/webp/gif/svg, mp4/mov/webm, or pdf",
+                        "Unsupported file type — try images, mp4/mov/webm, pdf, or text (txt/md/code)",
                     );
                 }
             },
@@ -4200,6 +4211,10 @@ impl CanvasPanel {
                 self.draw_pdf_slot(cx, id, content, path);
                 None
             }
+            MediaKind::Text => {
+                self.draw_text_slot(cx, id, content, path);
+                None
+            }
             MediaKind::Video => Some((id, content, kind, path.to_string())),
         }
     }
@@ -4229,6 +4244,71 @@ impl CanvasPanel {
         };
         let _ = widget.draw_walk(cx, &mut Scope::empty(), walk);
         image.set_visible(cx.cx, false);
+    }
+
+    /// Draw a text item's content rect: read the file once (UTF-8 lossy,
+    /// capped at [`TEXT_MAX_BYTES`]) and render it with the terminal's
+    /// monospace font, clipped to the card and offset by the per-item scroll.
+    fn draw_text_slot(&mut self, cx: &mut Cx2d, id: u64, rect: Rect, path: &str) {
+        if !self.text_docs.contains_key(&id) {
+            let content = std::fs::read(path)
+                .map(|bytes| {
+                    let truncated = bytes.len() > TEXT_MAX_BYTES;
+                    let mut text =
+                        String::from_utf8_lossy(&bytes[..bytes.len().min(TEXT_MAX_BYTES)])
+                            .into_owned();
+                    if truncated {
+                        text.push_str("\n… (truncated)");
+                    }
+                    text
+                })
+                .unwrap_or_else(|e| format!("(failed to read {path}: {e})"));
+            self.text_docs.insert(id, content);
+        }
+        let content = self.text_docs.get(&id).cloned().unwrap_or_default();
+        let scroll = self.text_scroll.get(&id).copied().unwrap_or(0.0);
+
+        // Monospace grid shared with terminal rendering.
+        const CELL_W: f64 = 8.0;
+        const CELL_H: f64 = 17.3;
+        let rows = ((rect.size.y / CELL_H).floor() as usize).max(1);
+        let lines: Vec<&str> = content.lines().collect();
+        let max_scroll = lines.len().saturating_sub(rows) as f64;
+        let scroll = scroll.clamp(0.0, max_scroll);
+        let first = scroll as usize;
+
+        cx.push_clip_rect(rect);
+        // Keep the card's dark paper under the text (the card bg is already
+        // dark; draw text a row at a time).
+        self.draw_cell_text.color = vec4f([0.86, 0.89, 0.94, 1.0]);
+        let baseline = rect.pos + Vec2d { x: 8.0, y: 4.0 };
+        for (row, line) in lines.iter().skip(first).take(rows + 1).enumerate() {
+            // Trim trailing \r from CRLF files.
+            let line = line.strip_suffix('\r').unwrap_or(line);
+            // Rough horizontal clip: skip drawing rows that fall below the rect.
+            let y = baseline.y + row as f64 * CELL_H;
+            if y > rect.pos.y + rect.size.y {
+                break;
+            }
+            // Horizontal cull: drop leading chars that scroll out of view.
+            let max_chars = ((rect.size.x - 16.0) / CELL_W).floor().max(1.0) as usize;
+            let line = if line.chars().count() > max_chars {
+                let cropped: String = line.chars().take(max_chars).collect();
+                cropped
+            } else {
+                line.to_string()
+            };
+            self.draw_cell_text.draw_abs(
+                cx,
+                baseline
+                    + Vec2d {
+                        x: 0.0,
+                        y: row as f64 * CELL_H,
+                    },
+                &line,
+            );
+        }
+        cx.pop_clip_rect();
     }
 
     /// Draw deferred video slots (after the child pass, so the Video
@@ -4650,7 +4730,10 @@ impl Widget for CanvasPanel {
                 if hovering != self.drop_hover {
                     self.drop_hover = hovering;
                     if hovering {
-                        self.status(cx, "Drop to preview on the canvas (image · video · PDF)");
+                        self.status(
+                            cx,
+                            "Drop to preview on the canvas (image · video · PDF · text)",
+                        );
                     }
                     self.redraw(cx);
                 }
@@ -5346,6 +5429,22 @@ impl Widget for CanvasPanel {
                     && se.abs.y > self.item_screen_rect(i).pos.y + 26.0
             });
             if pdf_under.is_some() {
+                return;
+            }
+            // Over a text card's content area: scroll the text preview
+            // (offset clamped at draw time to the line count).
+            let text_under = self.items.iter().rev().find(|i| {
+                i.media_kind() == Some(MediaKind::Text)
+                    && self.item_screen_rect(i).contains(se.abs)
+                    && se.abs.y > self.item_screen_rect(i).pos.y + 26.0
+            });
+            if let Some(item) = text_under {
+                let delta = (se.scroll.y / 20.0).round();
+                if delta != 0.0 {
+                    let entry = self.text_scroll.entry(item.id()).or_insert(0.0);
+                    *entry = (*entry + delta).max(0.0);
+                    self.redraw(cx);
+                }
                 return;
             }
             // Not over a terminal: zoom/pan the canvas as before.

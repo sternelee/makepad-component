@@ -20,6 +20,9 @@ pub enum MediaKind {
     Image,
     Video,
     Pdf,
+    /// Plain-text file (source code, markdown, logs, configs...) rendered
+    /// with the terminal's monospace font.
+    Text,
 }
 
 impl MediaKind {
@@ -41,6 +44,15 @@ impl MediaKind {
             // through the Video widget's own error state.
             "mp4" | "m4v" | "mov" | "webm" | "mkv" | "avi" | "ogv" => Some(MediaKind::Video),
             "pdf" => Some(MediaKind::Pdf),
+            // Plain-text files: docs, code, configs, logs. Read as UTF-8
+            // (lossy) and previewed in a monospace text card.
+            "txt" | "md" | "markdown" | "log" | "json" | "toml" | "yaml" | "yml" | "xml"
+            | "csv" | "tsv" | "ini" | "cfg" | "conf" | "rs" | "py" | "js" | "jsx" | "ts"
+            | "tsx" | "c" | "h" | "cc" | "cpp" | "hpp" | "java" | "kt" | "swift" | "go" | "rb"
+            | "php" | "sh" | "bash" | "zsh" | "fish" | "lua" | "sql" | "css" | "scss" | "html"
+            | "htm" | "vue" | "svelte" | "proto" | "graphql" | "diff" | "patch" => {
+                Some(MediaKind::Text)
+            }
             _ => None,
         }
     }
@@ -51,6 +63,7 @@ impl MediaKind {
             MediaKind::Image => "Image",
             MediaKind::Video => "Video",
             MediaKind::Pdf => "PDF",
+            MediaKind::Text => "Text",
         }
     }
 
@@ -60,6 +73,7 @@ impl MediaKind {
             MediaKind::Image => [0.38, 0.72, 0.98, 1.0],
             MediaKind::Video => [0.70, 0.48, 0.96, 1.0],
             MediaKind::Pdf => [0.96, 0.45, 0.42, 1.0],
+            MediaKind::Text => [0.42, 0.76, 0.60, 1.0],
         }
     }
 
@@ -69,6 +83,7 @@ impl MediaKind {
             MediaKind::Image => "I",
             MediaKind::Video => "V",
             MediaKind::Pdf => "P",
+            MediaKind::Text => "T",
         }
     }
 
@@ -79,6 +94,7 @@ impl MediaKind {
             MediaKind::Image => (360.0, 280.0),
             MediaKind::Video => (460.0, 300.0),
             MediaKind::Pdf => (420.0, 540.0),
+            MediaKind::Text => (460.0, 340.0),
         }
     }
 }
@@ -550,8 +566,19 @@ mod tests {
     }
 
     #[test]
+    fn media_kind_classifies_text_files() {
+        assert_eq!(
+            MediaKind::from_path("/tmp/notes.txt"),
+            Some(MediaKind::Text)
+        );
+        assert_eq!(MediaKind::from_path("README.md"), Some(MediaKind::Text));
+        assert_eq!(MediaKind::from_path("src/main.rs"), Some(MediaKind::Text));
+        assert_eq!(MediaKind::from_path("config.yaml"), Some(MediaKind::Text));
+    }
+
+    #[test]
     fn media_kind_rejects_unknown_extensions() {
-        assert_eq!(MediaKind::from_path("/tmp/notes.txt"), None);
+        assert_eq!(MediaKind::from_path("/tmp/model.gltf"), None);
         assert_eq!(MediaKind::from_path("archive.tar.gz"), None);
         assert_eq!(MediaKind::from_path("no_extension"), None);
     }
