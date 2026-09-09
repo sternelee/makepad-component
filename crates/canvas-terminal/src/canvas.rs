@@ -24,6 +24,31 @@ const VIDEO_SLOTS: usize = 2;
 /// PdfView widget slots backing dropped-PDF previews.
 const PDF_SLOTS: usize = 2;
 
+/// Media card chrome subtracted from the card to get the content rect
+/// (2px inset each side, 32px title bar, 2px bottom rim).
+const MEDIA_CHROME_W: f64 = 4.0;
+const MEDIA_CHROME_H: f64 = 34.0;
+/// Media card content box in world units: content is fitted (aspect kept)
+/// between these bounds, so dropped images/videos spawn at their own ratio.
+const MEDIA_MIN_CONTENT: Vec2d = Vec2d { x: 200.0, y: 150.0 };
+const MEDIA_MAX_CONTENT: Vec2d = Vec2d { x: 560.0, y: 400.0 };
+
+/// Fit an intrinsic pixel size into the media-card content box, keeping the
+/// aspect ratio and clamping between the min/max content bounds. Extreme
+/// aspects may drift slightly from the exact ratio (the image/video widgets
+/// letterbox the remainder).
+fn fitted_content_size(iw: f64, ih: f64) -> Option<(f64, f64)> {
+    if iw <= 0.0 || ih <= 0.0 {
+        return None;
+    }
+    let mut scale = (MEDIA_MAX_CONTENT.x / iw).min(MEDIA_MAX_CONTENT.y / ih);
+    scale = scale.max((MEDIA_MIN_CONTENT.x / iw).max(MEDIA_MIN_CONTENT.y / ih));
+    Some((
+        (iw * scale).clamp(MEDIA_MIN_CONTENT.x, MEDIA_MAX_CONTENT.x),
+        (ih * scale).clamp(MEDIA_MIN_CONTENT.y, MEDIA_MAX_CONTENT.y),
+    ))
+}
+
 /// Sticky-note (hand-drawn) palette: cream paper, pencil-brown wobbly edge,
 /// translucent washi tape strip, dark ink text.
 const NOTE_PAPER: [f32; 4] = [0.97, 0.93, 0.80, 1.0];
@@ -350,6 +375,11 @@ pub struct CanvasPanel {
     /// minimize/restore and workspace switches keep their parse).
     #[rust]
     pdf_pages: HashMap<u64, CachedPage>,
+    /// Dimensions from `Event::VideoPlaybackPrepared`, FIFO-paired with the
+    /// `VideoAction::PlaybackPrepared` widget actions (same child iteration
+    /// order) so a prepared video slot can snap its card to the clip's aspect.
+    #[rust]
+    video_prep_queue: Vec<(usize, usize)>,
     /// True while dragged files hover the canvas (draws a drop highlight).
     #[rust]
     drop_hover: bool,
@@ -971,7 +1001,19 @@ impl CanvasPanel {
         let mut world_pos = self.camera.screen_to_world(screen, self.world_viewport());
         world_pos.x += nth as f64 * 24.0;
         world_pos.y += nth as f64 * 24.0;
-        let (w, h) = kind.default_size();
+        let (w, h) = match kind {
+            MediaKind::Image => std::fs::read(path)
+                .ok()
+                .and_then(|data| {
+                    let p = std::path::Path::new(path);
+                    image_size_by_data(&data, p)
+                        .ok()
+                        .and_then(|(iw, ih)| fitted_content_size(iw as f64, ih as f64))
+                })
+                .map(|(cw, ch)| (cw + MEDIA_CHROME_W, MEDIA_CHROME_H + ch))
+                .unwrap_or_else(|| kind.default_size()),
+            _ => kind.default_size(),
+        };
         let id = self.next_item_id;
         let item = CanvasItem::Media {
             id,
@@ -986,6 +1028,21 @@ impl CanvasPanel {
         self.next_item_id += 1;
         self.items.push(item);
         self.selected = Some(id);
+        self.redraw(cx);
+    }
+
+    /// Snap a media card's size to a content aspect ratio (fitted between
+    /// [`MEDIA_MIN_CONTENT`] and [`MEDIA_MAX_CONTENT`]); position is kept.
+    fn resize_media_to_aspect(&mut self, cx: &mut Cx, id: u64, iw: f64, ih: f64) {
+        let Some((cw, ch)) = fitted_content_size(iw, ih) else {
+            return;
+        };
+        if let Some(item) = self.items.iter_mut().find(|i| i.id() == id) {
+            item.world_mut().size = Vec2d {
+                x: cw + MEDIA_CHROME_W,
+                y: MEDIA_CHROME_H + ch,
+            };
+        }
         self.redraw(cx);
     }
 
@@ -4439,6 +4496,40 @@ impl Widget for CanvasPanel {
             self.view.handle_event(cx, event, scope);
         });
 
+        // Snap video cards to their clip's aspect once playback prepares.
+        for item in actions
+            .iter()
+            .filter_map(|a| a.downcast_ref::<WidgetAction>())
+        {
+            if !matches!(
+                item.action.downcast_ref::<VideoAction>(),
+                Some(VideoAction::PlaybackPrepared)
+            ) {
+                continue;
+            }
+            let Some((vw, vh)) = self.video_prep_queue.first().copied() else {
+                continue;
+            };
+            self.video_prep_queue.remove(0);
+            let slot = (0..VIDEO_SLOTS).find(|&s| {
+                let slot_id = LiveId::from_str(&format!("video_slot_{}", s));
+                self.view.widget(cx, &[slot_id]).widget_uid() == item.widget_uid
+            });
+            let Some(slot) = slot else { continue };
+            let Some(item_id) = self
+                .media_video_slots
+                .iter()
+                .find(|(_, s)| *s == slot)
+                .map(|(i, _)| *i)
+            else {
+                continue;
+            };
+            self.resize_media_to_aspect(cx, item_id, vw as f64, vh as f64);
+        }
+        // Drop stale entries (a prepare whose action never fired) so the
+        // FIFO pairing can't drift.
+        self.video_prep_queue.clear();
+
         // Sync the hidden note editor with the canvas-drawn buffer.
         self.sync_note_editor(cx);
 
@@ -5002,6 +5093,14 @@ impl Widget for CanvasPanel {
                     }
                 }
             }
+        }
+
+        // Video dimensions arrive on the platform prepared event; the
+        // VideoAction::PlaybackPrepared for the same widget is captured from
+        // the children below (same iteration order) and applies them.
+        if let Event::VideoPlaybackPrepared(ev) = event {
+            self.video_prep_queue
+                .push((ev.video_width as usize, ev.video_height as usize));
         }
 
         if let Event::Scroll(se) = event {
@@ -5633,6 +5732,22 @@ impl Widget for CanvasPanel {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fitted_content_size_keeps_aspect_within_bounds() {
+        // 16:9 landscape fills the width bound.
+        let (w, h) = fitted_content_size(1280.0, 720.0).unwrap();
+        assert!((w - 560.0).abs() < 0.01 && (h - 315.0).abs() < 0.01);
+        // Small 4:3 images upscale to a usable card.
+        let (w, h) = fitted_content_size(64.0, 48.0).unwrap();
+        assert!((w - 533.33).abs() < 0.01 && (h - 400.0).abs() < 0.01);
+        // Tall images clamp at the height bound (slight aspect drift is ok,
+        // the widget letterboxes the remainder).
+        let (w, h) = fitted_content_size(400.0, 1200.0).unwrap();
+        assert_eq!((w, h), (200.0, 400.0));
+        // Degenerate input: no size.
+        assert_eq!(fitted_content_size(0.0, 0.0), None);
+    }
 
     #[test]
     fn alloc_slot_maps_items_and_reports_freshness() {
