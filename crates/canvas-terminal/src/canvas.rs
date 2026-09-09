@@ -24,6 +24,14 @@ const VIDEO_SLOTS: usize = 2;
 /// PdfView widget slots backing dropped-PDF previews.
 const PDF_SLOTS: usize = 2;
 
+/// Tool palette tooltip colors, matching the MpTooltip component's bubble
+/// (#1f2937 bg / #374151 border / #f9fafb text).
+const TIP_BG: [f32; 4] = [0.122, 0.161, 0.216, 0.98];
+const TIP_BORDER: [f32; 4] = [0.216, 0.255, 0.318, 1.0];
+const TIP_TEXT: [f32; 4] = [0.976, 0.980, 0.965, 1.0];
+/// Hover delay before the palette tooltip shows (MpTooltip show_delay).
+const TIP_SHOW_DELAY: f64 = 0.3;
+
 /// Media card chrome subtracted from the card to get the content rect
 /// (2px inset each side, 32px title bar, 2px bottom rim).
 const MEDIA_CHROME_W: f64 = 4.0;
@@ -357,6 +365,12 @@ pub struct CanvasPanel {
     /// Browser page area (used to anchor the system WebView window).
     #[live]
     draw_browser_page: DrawColor,
+    /// Tool palette tooltip bubble (styled after the MpTooltip component).
+    #[live]
+    draw_tooltip: DrawColor,
+    /// Tool palette tooltip text.
+    #[live]
+    draw_tooltip_text: DrawText,
     #[rust]
     browser_spawned: Vec<u64>,
     /// item_id → browser slot index (0..=3) for CEF embedded browsers.
@@ -375,6 +389,16 @@ pub struct CanvasPanel {
     /// minimize/restore and workspace switches keep their parse).
     #[rust]
     pdf_pages: HashMap<u64, CachedPage>,
+    /// Tool-palette button currently hovered (drives its tooltip).
+    #[rust]
+    palette_hover: Option<PaletteHit>,
+    /// Delay timer before the hovered button's tooltip shows (MpTooltip's
+    /// 0.3s show_delay).
+    #[rust]
+    palette_tip_timer: Option<Timer>,
+    /// Whether the delayed palette tooltip is currently shown.
+    #[rust]
+    palette_tip_visible: bool,
     /// Dimensions from `Event::VideoPlaybackPrepared`, FIFO-paired with the
     /// `VideoAction::PlaybackPrepared` widget actions (same child iteration
     /// order) so a prepared video slot can snap its card to the clip's aspect.
@@ -1044,6 +1068,155 @@ impl CanvasPanel {
             };
         }
         self.redraw(cx);
+    }
+
+    /// Screen rect of a tool-palette button (mirrors draw_tool_palette's
+    /// layout; used to anchor its tooltip).
+    fn palette_button_rect(&self, hit: PaletteHit) -> Option<Rect> {
+        let (palette_rect, tools_y, colors_y, widths_y) = self.palette_layout();
+        let in_bounds = |i: usize, n: usize| i < n;
+        match hit {
+            PaletteHit::Tool(i) => {
+                if !in_bounds(i, Self::note_tools().len()) {
+                    return None;
+                }
+                Some(Rect {
+                    pos: Vec2d {
+                        x: palette_rect.pos.x + (Self::PAL_W - Self::PAL_BTN) * 0.5,
+                        y: tools_y + i as f64 * (Self::PAL_BTN + Self::PAL_GAP),
+                    },
+                    size: Vec2d {
+                        x: Self::PAL_BTN,
+                        y: Self::PAL_BTN,
+                    },
+                })
+            }
+            PaletteHit::Color(i) => {
+                if !in_bounds(i, INK_COLORS.len()) {
+                    return None;
+                }
+                let col_w = Self::PAL_SWATCH + Self::PAL_SWATCH_GAP;
+                let grid_x = palette_rect.pos.x
+                    + (palette_rect.size.x - 2.0 * col_w + Self::PAL_SWATCH_GAP) * 0.5;
+                Some(Rect {
+                    pos: Vec2d {
+                        x: grid_x + (i % 2) as f64 * col_w,
+                        y: colors_y + (i / 2) as f64 * (Self::PAL_SWATCH + Self::PAL_SWATCH_GAP),
+                    },
+                    size: Vec2d {
+                        x: Self::PAL_SWATCH,
+                        y: Self::PAL_SWATCH,
+                    },
+                })
+            }
+            PaletteHit::Width(i) => {
+                if !in_bounds(i, INK_WIDTHS.len()) {
+                    return None;
+                }
+                Some(Rect {
+                    pos: Vec2d {
+                        x: palette_rect.pos.x + (palette_rect.size.x - Self::PAL_BTN) * 0.5,
+                        y: widths_y + i as f64 * (Self::PAL_WIDTH_BTN_H + Self::PAL_GAP),
+                    },
+                    size: Vec2d {
+                        x: Self::PAL_BTN,
+                        y: Self::PAL_WIDTH_BTN_H,
+                    },
+                })
+            }
+        }
+    }
+
+    /// Tooltip copy for a tool-palette button.
+    fn palette_tip_text(hit: PaletteHit) -> String {
+        match hit {
+            PaletteHit::Tool(i) => Self::note_tools()
+                .get(i)
+                .map(|t| t.label().to_string())
+                .unwrap_or_default(),
+            PaletteHit::Color(i) => ["White", "Blue", "Green", "Yellow", "Red", "Magenta"]
+                .get(i)
+                .map(|n| format!("Ink: {n}"))
+                .unwrap_or_default(),
+            PaletteHit::Width(i) => INK_WIDTHS
+                .get(i)
+                .map(|w| format!("Stroke: {w:.1} px"))
+                .unwrap_or_default(),
+        }
+    }
+
+    /// Draw the hovered palette button's tooltip: a MpTooltip-style dark
+    /// bubble to the right of the button, with a left-pointing arrow and a
+    /// hand-drawn wobble to match the palette's sketch aesthetic.
+    fn draw_palette_tooltip(&mut self, cx: &mut Cx2d) {
+        let Some(hit) = self.palette_hover else {
+            return;
+        };
+        if !self.palette_tip_visible {
+            return;
+        }
+        let Some(anchor) = self.palette_button_rect(hit) else {
+            return;
+        };
+        let text = Self::palette_tip_text(hit);
+        if text.is_empty() {
+            return;
+        }
+
+        // Bubble size: ~6.6px per char at 12px regular + MpTooltip padding.
+        const PAD_X: f64 = 8.0;
+        const TIP_H: f64 = 26.0;
+        const GAP: f64 = 8.0; // MpTooltip gap + arrow depth
+        let text_w = text.chars().count() as f64 * 6.6;
+        let tip_w = (text_w + PAD_X * 2.0).max(40.0);
+        let mut pos = Vec2d {
+            x: anchor.pos.x + anchor.size.x + GAP,
+            y: anchor.pos.y + (anchor.size.y - TIP_H) * 0.5,
+        };
+        // Clamp inside the viewport (MpTooltip's edge behavior, simplified —
+        // the palette hugs the left edge so only vertical clamping bites).
+        pos.x = pos.x.min((self.viewport.x - tip_w - 2.0).max(2.0));
+        pos.y = pos.y.max(2.0).min((self.viewport.y - TIP_H - 2.0).max(2.0));
+
+        let tip_rect = Rect {
+            pos,
+            size: Vec2d { x: tip_w, y: TIP_H },
+        };
+        self.draw_tooltip.color = vec4f(TIP_BG);
+        self.draw_tooltip.draw_abs(cx, tip_rect);
+
+        // Left-pointing arrow from the bubble towards the button.
+        let cy = (anchor.pos.y + anchor.size.y * 0.5).clamp(pos.y + 7.0, pos.y + TIP_H - 7.0);
+        let ax = pos.x + 1.0;
+        self.draw_sketch_polyline(
+            cx,
+            &[
+                Vec2d {
+                    x: ax + 5.0,
+                    y: cy - 4.5,
+                },
+                Vec2d { x: ax, y: cy },
+                Vec2d {
+                    x: ax + 5.0,
+                    y: cy + 4.5,
+                },
+            ],
+            false,
+            1.2,
+            TIP_BORDER,
+            900,
+            0.3,
+        );
+
+        self.draw_tooltip_text.color = vec4f(TIP_TEXT);
+        self.draw_tooltip_text.draw_abs(
+            cx,
+            pos + Vec2d {
+                x: PAD_X,
+                y: (TIP_H - 14.0) * 0.5,
+            },
+            &text,
+        );
     }
 
     fn term_grid_size_from(&self, w: f64, h: f64) -> (usize, usize) {
@@ -3198,6 +3371,9 @@ impl CanvasPanel {
                 0.9,
             );
         }
+
+        // Hovered button's tooltip (MpTooltip-style bubble).
+        self.draw_palette_tooltip(cx);
     }
 
     /// Draw all global whiteboard shapes (world coords) plus the in-progress
@@ -4440,6 +4616,16 @@ impl Widget for CanvasPanel {
             }
         }
 
+        // Pointer left the window: drop any pending palette tooltip.
+        if let Event::MouseLeave(_) = event {
+            if self.palette_hover.is_some() || self.palette_tip_visible {
+                self.palette_hover = None;
+                self.palette_tip_visible = false;
+                self.palette_tip_timer = None;
+                self.redraw(cx);
+            }
+        }
+
         // File drag & drop: while dragged files hover the canvas, highlight
         // it; on drop, spawn a media card per supported file at the drop
         // point (image / video / PDF, classified by extension).
@@ -4536,6 +4722,16 @@ impl Widget for CanvasPanel {
         // Refresh suggestions whenever the command input text may have changed.
         self.update_suggestions(cx);
 
+        // Palette tooltip show delay elapsed while still hovering.
+        if let Some(t) = self.palette_tip_timer {
+            if t.is_event(event).is_some() {
+                if self.palette_hover.is_some() && !self.palette_tip_visible {
+                    self.palette_tip_visible = true;
+                    self.redraw(cx);
+                }
+            }
+        }
+
         if let Event::Timer(te) = event {
             let is_our_timer = self
                 .timer
@@ -4573,6 +4769,12 @@ impl Widget for CanvasPanel {
         if let Event::MouseDown(me) = event {
             if me.button.contains(MouseButton::PRIMARY) {
                 self.last_mouse = me.abs;
+                // Any press hides the palette tooltip (the click may switch
+                // the tool, and a stale bubble shouldn't linger).
+                if self.palette_tip_visible {
+                    self.palette_tip_visible = false;
+                    self.redraw(cx);
+                }
                 // If a note is being edited inline, clicking outside it commits
                 // the edit; clicking on the same note keeps the editor active.
                 if let Some(edit_id) = self.note_edit_id {
@@ -5022,15 +5224,28 @@ impl Widget for CanvasPanel {
                 } else {
                     None
                 };
+                let hov_pal = self.palette_hit(me.abs);
                 if hov != self.hovered
                     || hov_btn != self.hovered_btn
                     || hov_chip != self.hovered_chip
                     || hov_shape != self.hovered_shape
+                    || hov_pal != self.palette_hover
                 {
                     self.hovered = hov;
                     self.hovered_btn = hov_btn;
                     self.hovered_chip = hov_chip;
                     self.hovered_shape = hov_shape;
+                    if hov_pal != self.palette_hover {
+                        self.palette_hover = hov_pal;
+                        // Moving between buttons restarts the show delay
+                        // (same as MpTooltip's hover restart).
+                        self.palette_tip_visible = false;
+                        self.palette_tip_timer = if hov_pal.is_some() {
+                            Some(cx.start_timeout(TIP_SHOW_DELAY))
+                        } else {
+                            None
+                        };
+                    }
                     self.redraw(cx);
                 }
             }

@@ -132,6 +132,25 @@ script_mod! {
             color: #x29303dff
         }
 
+        // ── Tool palette tooltip bubble (styling mirrors MpTooltip: dark
+        // bubble, 1px #374151 border, 6px radius, 12px regular text) ──
+        draw_tooltip +: {
+            color: #x1f2937ff
+            border_color: #x374151ff
+            radius: instance(6.0)
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, self.radius)
+                sdf.fill(self.color)
+                sdf.stroke(self.border_color, 1.0)
+                return sdf.result
+            }
+        }
+        draw_tooltip_text +: {
+            text_style: theme.font_regular{font_size: 12.0}
+            color: #xf9fafbff
+        }
+
         // ── Embedded CEF browser slots (absolute-positioned by CanvasPanel) ──
         // Keep them `visible: false` so the overlay flow never lays them out;
         // CanvasPanel toggles visibility and draws each active one with an
