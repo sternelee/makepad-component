@@ -60,7 +60,7 @@ Crate-specific guidance exists in `crates/raycast-launcher/CLAUDE.md` and `crate
 ## 3. Dependencies & Toolchain
 
 - **Rust stable** (edition 2021), resolver "2".
-- `makepad-widgets` / `makepad-script` are pulled from the Makepad git repo (`https://github.com/makepad/makepad`, no branch/rev pinned in `Cargo.toml`; `Cargo.lock` currently pins commit `4f9ce7a8`).
+- `makepad-widgets` / `makepad-script` / `makepad-cef` are pulled from the Makepad git repo (`https://github.com/makepad/makepad`). Pinned in `Cargo.toml` to rev `14fe611e` (2026-09 dev HEAD, pushed to upstream) — canvas-terminal's dropped-PDF preview needs this version: older pins ship a `PdfView` with an invisible page-paper shader, a wrong `cm` matrix order and broken text decoding. Verified by building `examples/pdf` from that commit.
 - Two API generations used to coexist in this workspace; the Makepad 2.0 migration (July 2026) moved every crate to `script_mod!`. The App entry pattern is: `impl AppMain for App { fn script_mod(vm) -> ScriptValue { ...; self::script_mod(vm) } }` with the `ui: Root{...}` tree inside a `startup() do #(App::script_component(vm)){...}` block as the last expression of the `script_mod!` block.
 
 ### ⚠️ Current build status (verified 2026-08-25, after the Makepad 2.0 migration)

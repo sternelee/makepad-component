@@ -9,6 +9,83 @@ pub enum ItemKind {
     MusicPlayer,
     Terminal,
     Browser,
+    /// A dropped media file (image / video / PDF); the payload kind is
+    /// re-derived from the stored path when needed.
+    Media,
+}
+
+/// What kind of media a dropped file is (drives the preview renderer).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MediaKind {
+    Image,
+    Video,
+    Pdf,
+}
+
+impl MediaKind {
+    /// Classify a file path by extension (case-insensitive). Unknown
+    /// extensions return None so the drop can be rejected with a hint.
+    pub fn from_path(path: &str) -> Option<MediaKind> {
+        let ext = path
+            .rsplit('.')
+            .next()
+            .map(|e| e.to_ascii_lowercase())
+            .unwrap_or_default();
+        match ext.as_str() {
+            // Raster formats the makepad Image widget decodes, plus SVG.
+            "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" | "qoi" | "svg" => {
+                Some(MediaKind::Image)
+            }
+            // Platform playback backends (AVFoundation / Media Foundation /
+            // GStreamer) cover these containers; unsupported codecs surface
+            // through the Video widget's own error state.
+            "mp4" | "m4v" | "mov" | "webm" | "mkv" | "avi" | "ogv" => Some(MediaKind::Video),
+            "pdf" => Some(MediaKind::Pdf),
+            _ => None,
+        }
+    }
+
+    /// Short label for status messages.
+    pub fn label(self) -> &'static str {
+        match self {
+            MediaKind::Image => "Image",
+            MediaKind::Video => "Video",
+            MediaKind::Pdf => "PDF",
+        }
+    }
+
+    /// Card accent color (avatar chip + selection border).
+    pub fn accent(self) -> [f32; 4] {
+        match self {
+            MediaKind::Image => [0.38, 0.72, 0.98, 1.0],
+            MediaKind::Video => [0.70, 0.48, 0.96, 1.0],
+            MediaKind::Pdf => [0.96, 0.45, 0.42, 1.0],
+        }
+    }
+
+    /// Single-letter avatar shown in the card title bar.
+    pub fn avatar(self) -> &'static str {
+        match self {
+            MediaKind::Image => "I",
+            MediaKind::Video => "V",
+            MediaKind::Pdf => "P",
+        }
+    }
+
+    /// Default card size in world units, chosen per kind (portrait for PDF
+    /// pages, 4:3-ish for images, 16:10-ish for video).
+    pub fn default_size(self) -> (f64, f64) {
+        match self {
+            MediaKind::Image => (360.0, 280.0),
+            MediaKind::Video => (460.0, 300.0),
+            MediaKind::Pdf => (420.0, 540.0),
+        }
+    }
+}
+
+/// Filename part of a path, used as the default card title.
+pub fn path_file_name(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or(path)
 }
 
 /// Agent status shown on terminal/agent cards (CNVS-style presence indicator).
@@ -271,6 +348,16 @@ pub enum CanvasItem {
         title: String,
         url: String,
     },
+    /// A dropped media file previewing on the canvas.
+    Media {
+        id: u64,
+        world: Rect,
+        /// File name (card title).
+        title: String,
+        /// Absolute filesystem path of the source file.
+        path: String,
+        kind: MediaKind,
+    },
 }
 
 impl CanvasItem {
@@ -279,7 +366,8 @@ impl CanvasItem {
             CanvasItem::Note { id, .. }
             | CanvasItem::MusicPlayer { id, .. }
             | CanvasItem::Terminal { id, .. }
-            | CanvasItem::Browser { id, .. } => *id,
+            | CanvasItem::Browser { id, .. }
+            | CanvasItem::Media { id, .. } => *id,
         }
     }
 
@@ -289,6 +377,7 @@ impl CanvasItem {
             CanvasItem::MusicPlayer { .. } => ItemKind::MusicPlayer,
             CanvasItem::Terminal { .. } => ItemKind::Terminal,
             CanvasItem::Browser { .. } => ItemKind::Browser,
+            CanvasItem::Media { .. } => ItemKind::Media,
         }
     }
 
@@ -297,7 +386,8 @@ impl CanvasItem {
             CanvasItem::Note { world, .. }
             | CanvasItem::MusicPlayer { world, .. }
             | CanvasItem::Terminal { world, .. }
-            | CanvasItem::Browser { world, .. } => *world,
+            | CanvasItem::Browser { world, .. }
+            | CanvasItem::Media { world, .. } => *world,
         }
     }
 
@@ -306,7 +396,8 @@ impl CanvasItem {
             CanvasItem::Note { world, .. }
             | CanvasItem::MusicPlayer { world, .. }
             | CanvasItem::Terminal { world, .. }
-            | CanvasItem::Browser { world, .. } => world,
+            | CanvasItem::Browser { world, .. }
+            | CanvasItem::Media { world, .. } => world,
         }
     }
 
@@ -315,7 +406,8 @@ impl CanvasItem {
             CanvasItem::Note { title, .. }
             | CanvasItem::MusicPlayer { title, .. }
             | CanvasItem::Terminal { title, .. }
-            | CanvasItem::Browser { title, .. } => title,
+            | CanvasItem::Browser { title, .. }
+            | CanvasItem::Media { title, .. } => title,
         }
     }
 
@@ -325,7 +417,8 @@ impl CanvasItem {
             CanvasItem::Note { title, .. }
             | CanvasItem::MusicPlayer { title, .. }
             | CanvasItem::Terminal { title, .. }
-            | CanvasItem::Browser { title, .. } => title,
+            | CanvasItem::Browser { title, .. }
+            | CanvasItem::Media { title, .. } => title,
         }
     }
 
@@ -334,7 +427,8 @@ impl CanvasItem {
             CanvasItem::Terminal { session, .. } => session.as_deref(),
             CanvasItem::Note { .. }
             | CanvasItem::MusicPlayer { .. }
-            | CanvasItem::Browser { .. } => None,
+            | CanvasItem::Browser { .. }
+            | CanvasItem::Media { .. } => None,
         }
     }
 
@@ -344,13 +438,22 @@ impl CanvasItem {
             CanvasItem::Terminal { session, .. } => session.as_deref_mut(),
             CanvasItem::Note { .. }
             | CanvasItem::MusicPlayer { .. }
-            | CanvasItem::Browser { .. } => None,
+            | CanvasItem::Browser { .. }
+            | CanvasItem::Media { .. } => None,
         }
     }
 
     pub fn url(&self) -> Option<&str> {
         match self {
             CanvasItem::Browser { url, .. } => Some(url),
+            _ => None,
+        }
+    }
+
+    /// Media payload kind of a Media item.
+    pub fn media_kind(&self) -> Option<MediaKind> {
+        match self {
+            CanvasItem::Media { kind, .. } => Some(*kind),
             _ => None,
         }
     }
@@ -404,5 +507,69 @@ impl CanvasItem {
             CanvasItem::Terminal { status, .. } => Some(status),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn media_kind_classifies_images() {
+        assert_eq!(
+            MediaKind::from_path("/tmp/photo.PNG"),
+            Some(MediaKind::Image)
+        );
+        assert_eq!(MediaKind::from_path("cat.jpeg"), Some(MediaKind::Image));
+        assert_eq!(
+            MediaKind::from_path("/a/b/anim.gif"),
+            Some(MediaKind::Image)
+        );
+        assert_eq!(MediaKind::from_path("logo.svg"), Some(MediaKind::Image));
+    }
+
+    #[test]
+    fn media_kind_classifies_videos() {
+        assert_eq!(
+            MediaKind::from_path("/Users/me/clip.mp4"),
+            Some(MediaKind::Video)
+        );
+        assert_eq!(
+            MediaKind::from_path("screen recording.MOV"),
+            Some(MediaKind::Video)
+        );
+        assert_eq!(MediaKind::from_path("clip.webm"), Some(MediaKind::Video));
+    }
+
+    #[test]
+    fn media_kind_classifies_pdf() {
+        assert_eq!(
+            MediaKind::from_path("/docs/report.pdf"),
+            Some(MediaKind::Pdf)
+        );
+    }
+
+    #[test]
+    fn media_kind_rejects_unknown_extensions() {
+        assert_eq!(MediaKind::from_path("/tmp/notes.txt"), None);
+        assert_eq!(MediaKind::from_path("archive.tar.gz"), None);
+        assert_eq!(MediaKind::from_path("no_extension"), None);
+    }
+
+    #[test]
+    fn media_kind_defaults_and_labels_cover_all_variants() {
+        for kind in [MediaKind::Image, MediaKind::Video, MediaKind::Pdf] {
+            assert!(!kind.label().is_empty());
+            assert!(!kind.avatar().is_empty());
+            let (w, h) = kind.default_size();
+            assert!(w > 0.0 && h > 0.0);
+        }
+    }
+
+    #[test]
+    fn path_file_name_extracts_last_component() {
+        assert_eq!(path_file_name("/a/b/c.png"), "c.png");
+        assert_eq!(path_file_name("plain.txt"), "plain.txt");
+        assert_eq!(path_file_name("/"), "");
     }
 }

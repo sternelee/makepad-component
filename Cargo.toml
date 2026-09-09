@@ -21,8 +21,11 @@ publish = false
 
 [workspace.dependencies]
 
-makepad-widgets = { git = "https://github.com/makepad/makepad" }
-makepad-script = { git = "https://github.com/makepad/makepad" }
+# Pinned to 2026-09 makepad dev HEAD: contains the PdfView fixes (visible
+# page paper shader, `cm` pre-multiply, text decoding) required by
+# canvas-terminal's dropped-PDF preview. Older pins render blank PDF pages.
+makepad-widgets = { git = "https://github.com/makepad/makepad", rev = "14fe611e66c7defda5cef84cc1bbcae2eee29b2f" }
+makepad-script = { git = "https://github.com/makepad/makepad", rev = "14fe611e66c7defda5cef84cc1bbcae2eee29b2f" }
 makepad-component = { path = "crates/ui" }
 makepad-theme = { path = "crates/theme" }
 makepad-motion = { path = "crates/motion" }

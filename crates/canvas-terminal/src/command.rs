@@ -49,6 +49,11 @@ pub enum Command {
     Clear,
     /// Toggle the grid overlay on the CNVS background.
     Grid,
+    /// Open a local file (image/video/PDF) as a media card. The kind is
+    /// derived from the extension, same classifier as drag & drop.
+    OpenPath {
+        path: String,
+    },
     /// No recognized prefix: forward to the active terminal.
     Forward {
         text: String,
@@ -133,6 +138,22 @@ pub fn parse(line: &str) -> Command {
             Some("help") => return Command::Help,
             Some("clear") => return Command::Clear,
             Some("grid") => return Command::Grid,
+            Some("open") => {
+                // Everything after the `open` token is the path (may contain
+                // spaces); surrounding quotes are stripped.
+                let path = rest
+                    .split_once(char::is_whitespace)
+                    .map(|(_, tail)| tail)
+                    .unwrap_or("")
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'');
+                if !path.is_empty() {
+                    return Command::OpenPath {
+                        path: path.to_string(),
+                    };
+                }
+            }
             _ => {}
         }
     }
@@ -207,6 +228,30 @@ mod tests {
     #[test]
     fn parses_clear() {
         assert_eq!(parse("/clear"), Command::Clear);
+    }
+
+    #[test]
+    fn parses_open_path() {
+        assert_eq!(
+            parse("/open /tmp/photo.png"),
+            Command::OpenPath {
+                path: "/tmp/photo.png".into()
+            }
+        );
+        // Paths may contain spaces; surrounding quotes are stripped.
+        assert_eq!(
+            parse("/open \"/Users/me/My File.pdf\""),
+            Command::OpenPath {
+                path: "/Users/me/My File.pdf".into()
+            }
+        );
+        // A bare `/open` without a path falls through to Forward.
+        assert_eq!(
+            parse("/open"),
+            Command::Forward {
+                text: "/open".into()
+            }
+        );
     }
 
     #[test]

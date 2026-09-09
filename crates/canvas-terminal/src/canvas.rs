@@ -1,8 +1,14 @@
-use makepad_widgets::*;
+use makepad_widgets::{
+    makepad_pdf_parse::{parse_content_stream, PdfDocument},
+    *,
+};
+use std::collections::HashMap;
 
 use crate::camera::Camera;
 use crate::command::{self, Command};
-use crate::items::{AgentStatus, CanvasItem, DrawnShape, ItemKind, NoteShape, NoteTool};
+use crate::items::{
+    path_file_name, AgentStatus, CanvasItem, DrawnShape, ItemKind, MediaKind, NoteShape, NoteTool,
+};
 use crate::terminal::state::{Cell, DEFAULT_BG};
 
 /// Grid spacing in world units.
@@ -10,6 +16,13 @@ const GRID_SIZE: f64 = 24.0;
 /// Terminal font metrics.
 const TERM_CELL_W: f64 = 8.0;
 const TERM_CELL_H: f64 = 17.3;
+
+/// Image widget slots backing dropped-image previews.
+const IMAGE_SLOTS: usize = 8;
+/// Video widget slots backing dropped-video previews.
+const VIDEO_SLOTS: usize = 2;
+/// PdfView widget slots backing dropped-PDF previews.
+const PDF_SLOTS: usize = 2;
 
 /// Sticky-note (hand-drawn) palette: cream paper, pencil-brown wobbly edge,
 /// translucent washi tape strip, dark ink text.
@@ -183,6 +196,9 @@ struct Workspace {
     minimized: Vec<MinimizedItem>,
     browser_spawned: Vec<u64>,
     browser_slots: Vec<(u64, usize)>,
+    media_image_slots: Vec<(u64, usize)>,
+    media_video_slots: Vec<(u64, usize)>,
+    media_pdf_slots: Vec<(u64, usize)>,
     tool: NoteTool,
     shapes: Vec<DrawnShape>,
     pending: Option<NoteShape>,
@@ -216,6 +232,9 @@ impl Workspace {
             minimized: Vec::new(),
             browser_spawned: Vec::new(),
             browser_slots: Vec::new(),
+            media_image_slots: Vec::new(),
+            media_video_slots: Vec::new(),
+            media_pdf_slots: Vec::new(),
             tool: NoteTool::default(),
             shapes: Vec::new(),
             pending: None,
@@ -318,6 +337,22 @@ pub struct CanvasPanel {
     /// item_id → browser slot index (0..=3) for CEF embedded browsers.
     #[rust]
     browser_slots: Vec<(u64, usize)>,
+    /// item_id → image slot index (0..=7) for dropped-image previews.
+    #[rust]
+    media_image_slots: Vec<(u64, usize)>,
+    /// item_id → video slot index (0..=1) for native video previews.
+    #[rust]
+    media_video_slots: Vec<(u64, usize)>,
+    /// item_id → PDF slot index (0..=1) for native PdfPageView previews.
+    #[rust]
+    media_pdf_slots: Vec<(u64, usize)>,
+    /// Parsed first page per PDF media item (keyed by item id; global so
+    /// minimize/restore and workspace switches keep their parse).
+    #[rust]
+    pdf_pages: HashMap<u64, CachedPage>,
+    /// True while dragged files hover the canvas (draws a drop highlight).
+    #[rust]
+    drop_hover: bool,
     /// Global whiteboard: active tool (cnvs-style palette).
     #[rust]
     tool: NoteTool,
@@ -438,6 +473,9 @@ impl CanvasPanel {
             minimized: std::mem::take(&mut self.minimized),
             browser_spawned: std::mem::take(&mut self.browser_spawned),
             browser_slots: std::mem::take(&mut self.browser_slots),
+            media_image_slots: std::mem::take(&mut self.media_image_slots),
+            media_video_slots: std::mem::take(&mut self.media_video_slots),
+            media_pdf_slots: std::mem::take(&mut self.media_pdf_slots),
             tool: self.tool,
             shapes: std::mem::take(&mut self.shapes),
             pending: self.pending.take(),
@@ -481,6 +519,9 @@ impl CanvasPanel {
         self.minimized = std::mem::take(&mut ws.minimized);
         self.browser_spawned = std::mem::take(&mut ws.browser_spawned);
         self.browser_slots = std::mem::take(&mut ws.browser_slots);
+        self.media_image_slots = std::mem::take(&mut ws.media_image_slots);
+        self.media_video_slots = std::mem::take(&mut ws.media_video_slots);
+        self.media_pdf_slots = std::mem::take(&mut ws.media_pdf_slots);
         self.tool = ws.tool;
         self.shapes = std::mem::take(&mut ws.shapes);
         self.pending = ws.pending.take();
@@ -882,6 +923,72 @@ impl CanvasPanel {
         self.redraw(cx);
     }
 
+    /// Spawn a media card for `path` at the canvas center (the `/open`
+    /// command path — drag & drop uses [`Self::drop_files`] instead).
+    pub fn spawn_media(&mut self, cx: &mut Cx, path: &str, kind: MediaKind) {
+        let center = self.viewport * 0.5;
+        self.spawn_media_at(cx, path, kind, center, 0);
+    }
+
+    /// Handle dropped file paths, creating a media card per supported file
+    /// centered at the drop point (`screen`), cascading multiple files so
+    /// they don't stack exactly. Unsupported extensions are reported via
+    /// the status bar.
+    pub fn drop_files(&mut self, cx: &mut Cx, paths: &[String], screen: Vec2d) {
+        let mut opened = 0usize;
+        let mut rejected: Vec<String> = Vec::new();
+        for path in paths {
+            match MediaKind::from_path(path) {
+                Some(kind) => {
+                    self.spawn_media_at(cx, path, kind, screen, opened);
+                    opened += 1;
+                }
+                None => rejected.push(path_file_name(path).to_string()),
+            }
+        }
+        let mut msg = match opened {
+            0 => "Dropped: no previewable file".to_string(),
+            1 => format!("Opened {}", path_file_name(&paths[0])),
+            n => format!("Opened {n} files"),
+        };
+        if !rejected.is_empty() {
+            let names: Vec<String> = rejected.iter().take(3).cloned().collect();
+            msg.push_str(&format!(" — skipped {} (unsupported)", names.join(", ")));
+        }
+        self.status(cx, &msg);
+    }
+
+    /// Create a Media item centered at `screen` (window coords), offset by
+    /// `nth * 24px` so multiple simultaneous drops cascade.
+    fn spawn_media_at(
+        &mut self,
+        cx: &mut Cx,
+        path: &str,
+        kind: MediaKind,
+        screen: Vec2d,
+        nth: usize,
+    ) {
+        let mut world_pos = self.camera.screen_to_world(screen, self.world_viewport());
+        world_pos.x += nth as f64 * 24.0;
+        world_pos.y += nth as f64 * 24.0;
+        let (w, h) = kind.default_size();
+        let id = self.next_item_id;
+        let item = CanvasItem::Media {
+            id,
+            world: Rect {
+                pos: world_pos,
+                size: Vec2d { x: w, y: h },
+            },
+            title: path_file_name(path).to_string(),
+            path: path.to_string(),
+            kind,
+        };
+        self.next_item_id += 1;
+        self.items.push(item);
+        self.selected = Some(id);
+        self.redraw(cx);
+    }
+
     fn term_grid_size_from(&self, w: f64, h: f64) -> (usize, usize) {
         let cols = ((w - 12.0) / TERM_CELL_W).floor().max(10.0) as usize;
         let rows = ((h - 34.0) / TERM_CELL_H).floor().max(3.0) as usize;
@@ -927,6 +1034,26 @@ impl CanvasPanel {
         self.items.iter().find(|i| {
             i.kind() == ItemKind::Terminal && i.title().to_lowercase() == name.to_lowercase()
         })
+    }
+
+    /// True when `screen` is inside a video/PDF card's content area (below
+    /// its title bar). Clicks there belong to the embedded viewer widget
+    /// (playback controls / page scrolling), not to card dragging.
+    fn is_media_content(&self, id: u64, screen: Vec2d) -> bool {
+        match self.items.iter().find(|i| i.id() == id) {
+            Some(item)
+                if matches!(
+                    item.media_kind(),
+                    Some(MediaKind::Video) | Some(MediaKind::Pdf)
+                ) =>
+            {
+                let r = self
+                    .camera
+                    .world_rect_to_screen(item.world(), self.world_viewport());
+                screen.y > r.pos.y + 26.0
+            }
+            _ => false,
+        }
     }
 
     fn hit_test(&self, screen: Vec2d) -> Option<u64> {
@@ -1050,6 +1177,9 @@ impl CanvasPanel {
                 None,
                 None,
             ),
+            CanvasItem::Media {
+                world, title, path, ..
+            } => (id, ItemKind::Media, world, title, path, None, None),
         };
         self.minimized.push(meta);
         self.selected = None;
@@ -1103,6 +1233,19 @@ impl CanvasPanel {
                     playing: false,
                 });
             }
+            ItemKind::Media => {
+                // The media kind is re-derived from the stored path, so the
+                // minimize tuple stays a plain string.
+                if let Some(kind) = MediaKind::from_path(&extra) {
+                    self.items.push(CanvasItem::Media {
+                        id,
+                        world,
+                        title,
+                        path: extra,
+                        kind,
+                    });
+                }
+            }
         }
         self.selected = Some(id);
         // Restoring a non-terminal item should not leave a stale terminal focus.
@@ -1134,6 +1277,14 @@ impl CanvasPanel {
             self.note_edit_buffer.clear();
             self.note_edit_caret = 0;
         }
+        // Release any preview slots the item held so later items can reuse
+        // them (also fixes the same leak for CEF browser slots).
+        self.browser_spawned.retain(|&i| i != id);
+        self.browser_slots.retain(|(i, _)| *i != id);
+        self.media_video_slots.retain(|(i, _)| *i != id);
+        self.media_pdf_slots.retain(|(i, _)| *i != id);
+        self.media_image_slots.retain(|(i, _)| *i != id);
+        self.pdf_pages.remove(&id);
         self.redraw(cx);
     }
 
@@ -1384,6 +1535,21 @@ impl CanvasPanel {
                 self.spawn_music_player(cx, &title);
                 self.status(cx, &format!("Music player: {title}"));
             }
+            Command::OpenPath { path } => match MediaKind::from_path(&path) {
+                Some(kind) => {
+                    self.spawn_media(cx, &path, kind);
+                    self.status(
+                        cx,
+                        &format!("Opened {} ({})", path_file_name(&path), kind.label()),
+                    );
+                }
+                None => {
+                    self.status(
+                        cx,
+                        "Unsupported file type — try png/jpg/webp/gif/svg, mp4/mov/webm, or pdf",
+                    );
+                }
+            },
             Command::SetStatus { name, status } => {
                 let new_status = match status.to_lowercase().as_str() {
                     "busy" => AgentStatus::Busy,
@@ -1439,7 +1605,7 @@ impl CanvasPanel {
             Command::Help => {
                 self.status(
                     cx,
-                    "Commands: @name text · /new terminal NAME · /new browser URL · /new music TITLE · /new note · /status NAME online|busy|idle · /focus NAME · /zoom N · /grid · /clear · /help",
+                    "Commands: @name text · /new terminal NAME · /new browser URL · /new music TITLE · /new note · /open FILE · /status NAME online|busy|idle · /focus NAME · /zoom N · /grid · /clear · /help",
                 );
             }
             Command::Clear => {
@@ -1505,6 +1671,7 @@ impl CanvasPanel {
             "/new browser ",
             "/new note",
             "/new music ",
+            "/open ",
             "/status ",
             "/focus ",
             "/rename ",
@@ -3139,6 +3306,7 @@ impl CanvasPanel {
                 ItemKind::Browser => "◎",
                 ItemKind::Note => "📝",
                 ItemKind::MusicPlayer => "♫",
+                ItemKind::Media => "🖼",
             };
             let label = format!("{kind_label} {title}");
             self.draw_cell_text.color = vec4f(TITLE_TEXT);
@@ -3702,6 +3870,263 @@ impl CanvasPanel {
         slot_browser.set_visible(cx.cx, false);
     }
 
+    /// Allocate a free slot in `slots` (a pool of `count` widget instances).
+    /// Returns `(slot_index, fresh)` — `fresh` is true when the item was
+    /// mapped for the first time, which is the "load the source once" guard.
+    /// None means every slot is taken by live items; the caller draws a
+    /// placeholder instead of stealing (stealing would ping-pong sources).
+    fn alloc_slot(slots: &mut Vec<(u64, usize)>, id: u64, count: usize) -> Option<(usize, bool)> {
+        if let Some((_, s)) = slots.iter().find(|(i, _)| *i == id) {
+            return Some((*s, false));
+        }
+        let free = (0..count).find(|s| !slots.iter().any(|(_, used)| used == s))?;
+        slots.push((id, free));
+        Some((free, true))
+    }
+
+    /// Draw a dropped-media card (image / video / PDF preview) and return
+    /// `Some((id, content_rect, path))` for video items, which the caller
+    /// must draw after the child pass (see `draw_deferred_videos`).
+    ///
+    /// Image items render through one of the hidden `Image` widget slots and
+    /// PDF items through the CEF `Browser` slots (Chromium's built-in PDF
+    /// viewer loading a `file://` URL) — both follow the browser-slot
+    /// pattern: make visible, draw at the item rect with an abs_pos walk,
+    /// hide again. Video items are deferred because the Video widget has no
+    /// `visible` flag: its 0×0 flow-pass draw would clobber the widget area
+    /// (and thus the controls' hit testing).
+    fn draw_media_at(
+        &mut self,
+        cx: &mut Cx2d,
+        id: u64,
+        screen: Rect,
+        is_sel: bool,
+        kind: MediaKind,
+        path: &str,
+    ) -> Option<(u64, Rect, MediaKind, String)> {
+        // Card chrome: shadow, background, border.
+        self.draw_shadow_rect(cx, screen);
+        if is_sel {
+            self.draw_glow_border(cx, screen, SEL_BORDER);
+        }
+        self.draw_item_bg_rect(cx, screen, TERM_BG);
+        self.draw_border_rect(cx, screen, if is_sel { SEL_BORDER } else { TERM_BORDER });
+
+        let accent = kind.accent();
+        let bar_rect = Rect {
+            pos: screen.pos,
+            size: Vec2d {
+                x: screen.size.x,
+                y: 30.0,
+            },
+        };
+        self.draw_item_bg_rect(cx, bar_rect, [0.14, 0.16, 0.22, 1.0]);
+        self.draw_avatar(
+            cx,
+            screen.pos + Vec2d { x: 8.0, y: 5.0 },
+            kind.avatar(),
+            accent,
+        );
+        self.draw_title.color = vec4f(TITLE_TEXT);
+        self.draw_title.draw_abs(
+            cx,
+            bar_rect.pos + Vec2d { x: 32.0, y: 7.0 },
+            path_file_name(path),
+        );
+
+        // Content area below the title bar, with a chrome divider like the
+        // browser card.
+        let content = Rect {
+            pos: screen.pos + Vec2d { x: 2.0, y: 32.0 },
+            size: screen.size - Vec2d { x: 4.0, y: 34.0 },
+        };
+        self.draw_item_bg_rect(
+            cx,
+            Rect {
+                pos: Vec2d {
+                    x: screen.pos.x + 6.0,
+                    y: screen.pos.y + 30.0,
+                },
+                size: Vec2d {
+                    x: screen.size.x - 12.0,
+                    y: 1.0,
+                },
+            },
+            [0.20, 0.24, 0.32, 0.8],
+        );
+        if content.size.x <= 4.0 || content.size.y <= 4.0 {
+            return None;
+        }
+
+        match kind {
+            MediaKind::Image => {
+                self.draw_image_slot(cx, id, content, path);
+                None
+            }
+            MediaKind::Pdf => {
+                self.draw_pdf_slot(cx, id, content, path);
+                None
+            }
+            MediaKind::Video => Some((id, content, kind, path.to_string())),
+        }
+    }
+
+    /// Draw an image item's content rect through an `Image` widget slot,
+    /// loading the file into that slot the first time the item is drawn.
+    fn draw_image_slot(&mut self, cx: &mut Cx2d, id: u64, rect: Rect, path: &str) {
+        let Some((slot, fresh)) = Self::alloc_slot(&mut self.media_image_slots, id, IMAGE_SLOTS)
+        else {
+            self.draw_slot_busy(cx, rect);
+            return;
+        };
+        let slot_id = LiveId::from_str(&format!("image_slot_{}", slot));
+        let widget = self.view.widget(cx.cx, &[slot_id]);
+        let image = widget.as_image();
+        if fresh {
+            if let Err(e) = image.load_image_file_by_path(cx.cx, std::path::Path::new(path)) {
+                log!("canvas: failed to load image '{path}': {e:?}");
+            }
+        }
+        image.set_visible(cx.cx, true);
+        let walk = Walk {
+            abs_pos: Some(rect.pos),
+            width: Size::Fixed(rect.size.x),
+            height: Size::Fixed(rect.size.y),
+            ..Default::default()
+        };
+        let _ = widget.draw_walk(cx, &mut Scope::empty(), walk);
+        image.set_visible(cx.cx, false);
+    }
+
+    /// Draw deferred video slots (after the child pass, so the Video
+    /// widget's recorded area — its controls' hit rect — is the item rect,
+    /// not its 0×0 flow-pass slot).
+    fn draw_deferred_media(&mut self, cx: &mut Cx2d, deferred: &[(u64, Rect, MediaKind, String)]) {
+        for (id, rect, kind, path) in deferred {
+            match kind {
+                MediaKind::Video => self.draw_video_slot(cx, *id, *rect, path),
+                _ => {}
+            }
+        }
+    }
+
+    /// Draw a video item's content rect through a `Video` widget slot,
+    /// handing the file path to the slot the first time the item is drawn.
+    /// Playback is started explicitly (no DSL autoplay): autoplay would
+    /// prepare the slot's empty startup source and crash the platform
+    /// player on a nil URL.
+    fn draw_video_slot(&mut self, cx: &mut Cx2d, id: u64, rect: Rect, path: &str) {
+        let Some((slot, fresh)) = Self::alloc_slot(&mut self.media_video_slots, id, VIDEO_SLOTS)
+        else {
+            self.draw_slot_busy(cx, rect);
+            return;
+        };
+        let slot_id = LiveId::from_str(&format!("video_slot_{}", slot));
+        let widget = self.view.widget(cx.cx, &[slot_id]);
+        let video = widget.as_video();
+        if fresh {
+            if !video.is_unprepared() {
+                // Slot reuse: release the previous item's player first.
+                video.stop_and_cleanup_resources(cx.cx);
+            }
+            video.set_source(VideoDataSource::Filesystem {
+                path: path.to_string(),
+            });
+            video.begin_playback(cx.cx);
+        }
+        let walk = Walk {
+            abs_pos: Some(rect.pos),
+            width: Size::Fixed(rect.size.x),
+            height: Size::Fixed(rect.size.y),
+            ..Default::default()
+        };
+        let _ = widget.draw_walk(cx, &mut Scope::empty(), walk);
+    }
+
+    /// Draw a PDF item's content rect through a native `PdfPageView` slot
+    /// (makepad's own PDF renderer, `pdf` feature). The file is parsed once
+    /// into [`Self::pdf_pages`]; the first page is then letterboxed into the
+    /// content rect. PdfPageView is a simple draw-call widget, so it is
+    /// drawn off-flow like the video slots, in two phases:
+    /// draw_walk (page paper) → render_page (ops) → draw_walk (finish).
+    fn draw_pdf_slot(&mut self, cx: &mut Cx2d, id: u64, rect: Rect, path: &str) {
+        if !self.pdf_pages.contains_key(&id) {
+            let parsed = std::fs::read(path).ok().and_then(|data| {
+                let mut doc = PdfDocument::parse(&data).ok()?;
+                let page = doc.page(0).ok()?;
+                let ops = parse_content_stream(&page.content_data).unwrap_or_default();
+                Some(CachedPage::new(page, ops))
+            });
+            let Some(cached) = parsed else {
+                self.draw_slot_busy(cx, rect);
+                return;
+            };
+            self.pdf_pages.insert(id, cached);
+        }
+        let Some((slot, _fresh)) = Self::alloc_slot(&mut self.media_pdf_slots, id, PDF_SLOTS)
+        else {
+            self.draw_slot_busy(cx, rect);
+            return;
+        };
+        // Letterbox the page inside the content rect.
+        let page_size = self
+            .pdf_pages
+            .get(&id)
+            .map(|c| c.size())
+            .unwrap_or_default();
+        if page_size.x <= 0.0 || page_size.y <= 0.0 {
+            self.draw_slot_busy(cx, rect);
+            return;
+        }
+        let zoom = (rect.size.x / page_size.x)
+            .min(rect.size.y / page_size.y)
+            .min(6.0);
+        let draw_w = (page_size.x * zoom).max(1.0);
+        let draw_h = (page_size.y * zoom).max(1.0);
+        let page_rect = Rect {
+            pos: rect.pos
+                + Vec2d {
+                    x: (rect.size.x - draw_w) * 0.5,
+                    y: (rect.size.y - draw_h) * 0.5,
+                },
+            size: Vec2d {
+                x: draw_w,
+                y: draw_h,
+            },
+        };
+        let slot_id = LiveId::from_str(&format!("pdf_slot_{}", slot));
+        let widget = self.view.widget(cx.cx, &[slot_id]);
+        let walk = Walk {
+            abs_pos: Some(page_rect.pos),
+            width: Size::Fixed(draw_w),
+            height: Size::Fixed(draw_h),
+            ..Default::default()
+        };
+        // Two-phase draw with the page ops rendered in between.
+        let _ = widget.draw_walk(cx, &mut Scope::empty(), walk);
+        if let Some(cached) = self.pdf_pages.get(&id) {
+            if let Some(mut pv) = widget.borrow_mut::<PdfPageView>() {
+                pv.render_page(cx, cached, zoom);
+            }
+        }
+        let _ = widget.draw_walk(cx, &mut Scope::empty(), walk);
+    }
+
+    /// Placeholder for a media card whose widget slot pool is exhausted.
+    fn draw_slot_busy(&mut self, cx: &mut Cx2d, rect: Rect) {
+        self.draw_item_bg_rect(cx, rect, [0.09, 0.10, 0.13, 1.0]);
+        self.draw_cell_text.color = vec4f([0.55, 0.60, 0.72, 1.0]);
+        self.draw_cell_text.draw_abs(
+            cx,
+            rect.pos
+                + Vec2d {
+                    x: 12.0,
+                    y: (rect.size.y * 0.5 - 8.0).max(8.0),
+                },
+            "All preview slots are busy — close another media card",
+        );
+    }
+
     /// Draw a CNVS-style music player card.
     ///
     /// The card has a title bar, a play/pause toggle, a progress bar, and a
@@ -3958,6 +4383,49 @@ impl Widget for CanvasPanel {
             }
         }
 
+        // File drag & drop: while dragged files hover the canvas, highlight
+        // it; on drop, spawn a media card per supported file at the drop
+        // point (image / video / PDF, classified by extension).
+        match event.drag_hits(cx, self.area) {
+            DragHit::Drag(f) => {
+                let hovering = matches!(
+                    f.state,
+                    makepad_widgets::DragState::In | makepad_widgets::DragState::Over
+                ) && f
+                    .items
+                    .iter()
+                    .any(|i| matches!(i, DragItem::FilePath { .. }));
+                if hovering != self.drop_hover {
+                    self.drop_hover = hovering;
+                    if hovering {
+                        self.status(cx, "Drop to preview on the canvas (image · video · PDF)");
+                    }
+                    self.redraw(cx);
+                }
+            }
+            DragHit::Drop(f) => {
+                self.drop_hover = false;
+                let paths: Vec<String> = f
+                    .items
+                    .iter()
+                    .filter_map(|i| match i {
+                        DragItem::FilePath { path, .. } => Some(path.clone()),
+                        _ => None,
+                    })
+                    .collect();
+                if !paths.is_empty() {
+                    self.drop_files(cx, &paths, f.abs);
+                }
+            }
+            DragHit::DragEnd => {
+                if self.drop_hover {
+                    self.drop_hover = false;
+                    self.redraw(cx);
+                }
+            }
+            _ => {}
+        }
+
         let actions = cx.capture_actions(|cx| {
             self.view.handle_event(cx, event, scope);
         });
@@ -4148,6 +4616,13 @@ impl Widget for CanvasPanel {
                                 self.redraw(cx);
                             }
                         }
+                    }
+                    // Video media card: clicks in the content area belong to
+                    // the embedded Video widget (play/pause/seek/volume);
+                    // starting a card drag here would fight its controls. The
+                    // title bar still drags the card.
+                    else if self.is_media_content(id, me.abs) {
+                        // Selection already set above; nothing else to do.
                     } else if let Some(item) = self.items.iter().find(|i| i.id() == id) {
                         let is_terminal = item.kind() == ItemKind::Terminal;
                         // In the terminal CONTENT area (below title bar),
@@ -4540,6 +5015,16 @@ impl Widget for CanvasPanel {
                     return;
                 }
             }
+            // Over a PDF card's content area: the embedded PdfView scrolls
+            // its pages; don't pan/zoom the canvas underneath.
+            let pdf_under = self.items.iter().rev().find(|i| {
+                i.media_kind() == Some(MediaKind::Pdf)
+                    && self.item_screen_rect(i).contains(se.abs)
+                    && se.abs.y > self.item_screen_rect(i).pos.y + 26.0
+            });
+            if pdf_under.is_some() {
+                return;
+            }
             // Not over a terminal: zoom/pan the canvas as before.
             if se.is_mouse {
                 // Wheel: zoom out/in based on delta.y
@@ -4879,6 +5364,14 @@ impl Widget for CanvasPanel {
         self.ensure_workspace();
         self.draw_grid(cx, rect);
         self.draw_empty_hint(cx, rect);
+        if self.drop_hover {
+            // Inset glow frame signals the canvas accepts the pending drop.
+            let inset = Rect {
+                pos: Vec2d { x: 14.0, y: 14.0 },
+                size: rect.size - Vec2d { x: 28.0, y: 28.0 },
+            };
+            self.draw_glow_border(cx, inset, [0.30, 0.62, 0.98, 1.0]);
+        }
 
         // Draw items (world → screen) by index; extract item data first to
         // avoid borrowing self.items while mutating self.
@@ -4898,6 +5391,7 @@ impl Widget for CanvasPanel {
             bool,
             AgentStatus,
             Option<std::sync::Arc<std::sync::Mutex<crate::terminal::state::TerminalState>>>,
+            Option<(MediaKind, String)>,
         );
         let n_items = self.items.len();
         let mut draw_queue: Vec<DrawItem> = Vec::new();
@@ -4930,6 +5424,10 @@ impl Widget for CanvasPanel {
                 } => (*progress, *playing),
                 _ => (0.0f32, false),
             };
+            let media = match item {
+                CanvasItem::Media { path, kind, .. } => Some((*kind, path.clone())),
+                _ => None,
+            };
             let status = item.agent_status().unwrap_or_default();
             draw_queue.push((
                 item.id(),
@@ -4947,9 +5445,12 @@ impl Widget for CanvasPanel {
                 playing,
                 status,
                 state,
+                media,
             ));
         }
 
+        // Video/PDF cards draw after the child pass (see draw_deferred_media).
+        let mut deferred_media: Vec<(u64, Rect, MediaKind, String)> = Vec::new();
         for (
             item_id,
             kind,
@@ -4966,6 +5467,7 @@ impl Widget for CanvasPanel {
             playing,
             status,
             state,
+            media,
         ) in draw_queue
         {
             // Subtle hover backlight so the card under the mouse is clear,
@@ -5050,6 +5552,19 @@ impl Widget for CanvasPanel {
                         self.draw_resize_handle(cx, item_screen);
                     }
                 }
+                ItemKind::Media => {
+                    if let Some((mkind, mpath)) = &media {
+                        if let Some(deferred) =
+                            self.draw_media_at(cx, item_id, item_screen, is_sel, *mkind, mpath)
+                        {
+                            deferred_media.push(deferred);
+                        }
+                    }
+                    self.draw_control_buttons(cx, item_id, item_screen);
+                    if is_sel {
+                        self.draw_resize_handle(cx, item_screen);
+                    }
+                }
             }
         }
 
@@ -5073,6 +5588,14 @@ impl Widget for CanvasPanel {
         // dock, so the menu always covers the dock tray.
         while self.view.draw_walk(cx, scope, walk).step().is_some() {}
 
+        // Video/PDF preview slots draw after the child pass so each widget's
+        // recorded area (its controls'/scroll view's hit rect) points at the
+        // item rect, not at its 0×0 flow-pass slot.
+        if !deferred_media.is_empty() {
+            let deferred = std::mem::take(&mut deferred_media);
+            self.draw_deferred_media(cx, &deferred);
+        }
+
         // Workspace tab bar sits on top of the canvas items and dock.
         self.draw_workspace_tabs(cx, rect.size);
 
@@ -5095,5 +5618,24 @@ impl Widget for CanvasPanel {
         }
 
         DrawStep::done()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn alloc_slot_maps_items_and_reports_freshness() {
+        let mut slots = Vec::new();
+        assert_eq!(CanvasPanel::alloc_slot(&mut slots, 1, 2), Some((0, true)));
+        assert_eq!(CanvasPanel::alloc_slot(&mut slots, 2, 2), Some((1, true)));
+        // Existing mapping returns the same slot, not fresh.
+        assert_eq!(CanvasPanel::alloc_slot(&mut slots, 1, 2), Some((0, false)));
+        // Full pool: no silent eviction.
+        assert_eq!(CanvasPanel::alloc_slot(&mut slots, 3, 2), None);
+        // Closing an item frees its slot for reuse.
+        slots.retain(|(i, _)| *i != 1);
+        assert_eq!(CanvasPanel::alloc_slot(&mut slots, 3, 2), Some((0, true)));
     }
 }

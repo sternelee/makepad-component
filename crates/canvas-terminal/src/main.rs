@@ -165,6 +165,52 @@ script_mod! {
             url: "about:blank"
         }
 
+        // ── Dropped-image preview slots (absolute-positioned by CanvasPanel) ──
+        // Same pattern as the browser slots: hidden from the overlay flow,
+        // drawn manually at each image item's content rect. The Image widget
+        // handles async/async-free decoding (png/jpg/webp/gif/bmp/ico/qoi/svg)
+        // and aspect-preserving letterboxing (ImageFit.Smallest).
+        image_slot_0 := Image{visible: false fit: ImageFit.Smallest width: Fill height: Fill}
+        image_slot_1 := Image{visible: false fit: ImageFit.Smallest width: Fill height: Fill}
+        image_slot_2 := Image{visible: false fit: ImageFit.Smallest width: Fill height: Fill}
+        image_slot_3 := Image{visible: false fit: ImageFit.Smallest width: Fill height: Fill}
+        image_slot_4 := Image{visible: false fit: ImageFit.Smallest width: Fill height: Fill}
+        image_slot_5 := Image{visible: false fit: ImageFit.Smallest width: Fill height: Fill}
+        image_slot_6 := Image{visible: false fit: ImageFit.Smallest width: Fill height: Fill}
+        image_slot_7 := Image{visible: false fit: ImageFit.Smallest width: Fill height: Fill}
+
+        // ── Native video preview slots (absolute-positioned by CanvasPanel) ──
+        // The Video widget has no `visible` field, so these are declared 0×0
+        // to stay invisible in the overlay flow pass; CanvasPanel draws each
+        // one with an explicit abs_pos Walk at its item rect (after the child
+        // pass, so the widget's recorded area — and thus its controls' hit
+        // testing — points at the item rect, not the 0×0 slot).
+        //
+        // No `autoplay` here: autoplay prepares the player with whatever
+        // source the slot was created with, and an empty Filesystem path
+        // makes AVPlayerItem return nil (crash). CanvasPanel sets the real
+        // source and calls begin_playback once an item claims the slot.
+        video_slot_0 := Video{
+            width: 0
+            height: 0
+            source: VideoDataSource.Filesystem{path: ""}
+            mute: true
+        }
+        video_slot_1 := Video{
+            width: 0
+            height: 0
+            source: VideoDataSource.Filesystem{path: ""}
+            mute: true
+        }
+
+        // ── Native PDF preview slots (absolute-positioned by CanvasPanel) ──
+        // The low-level PdfPageView (makepad's own PDF renderer, `pdf`
+        // feature): a simple draw-call widget like Video, so it is declared
+        // 0×0 and drawn off-flow at the pdf item's page rect (two-phase:
+        // draw_walk → render_page → draw_walk, see CanvasPanel::draw_pdf_slot).
+        pdf_slot_0 := PdfPageView{width: 0 height: 0}
+        pdf_slot_1 := PdfPageView{width: 0 height: 0}
+
         // ── Hidden inline note editor (IME/text-input sink) ──
         // Kept at zero size and transparent; the canvas draws the note body
         // itself, but this widget owns the focus and IME composition so that
