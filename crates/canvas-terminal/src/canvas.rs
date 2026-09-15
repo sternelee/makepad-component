@@ -76,47 +76,17 @@ fn path_tail(path: &str) -> &str {
         .unwrap_or(path)
 }
 
-/// Resolve the agent provider from the environment.
+/// Which CLI hosts new agent cards, from the environment.
 ///
-/// `AGENT_PROVIDER=scripted` selects a canned conversation (no network, no
-/// key) so the canvas can be exercised without spending tokens. Otherwise an
-/// OpenAI-compatible endpoint is built from the same variables the a2ui bridge
-/// reads (`LLM_API_URL`, `LLM_API_KEY`/`MOONSHOT_API_KEY`, `LLM_MODEL`).
-fn provider_from_env() -> Result<crate::ipc::AgentProviderConfig, String> {
-    if std::env::var("AGENT_PROVIDER")
-        .map(|v| v.eq_ignore_ascii_case("scripted"))
-        .unwrap_or(false)
-    {
-        return Ok(crate::ipc::AgentProviderConfig::Scripted {
-            turns: vec![
-                crate::ipc::ScriptedTurnConfig {
-                    text: "I can look around the workspace for you.".into(),
-                    tool: Some((
-                        "find_files".into(),
-                        serde_json::json!({ "pattern": "**/*.rs" }),
-                    )),
-                    chunk_delay_ms: Some(20),
-                },
-                crate::ipc::ScriptedTurnConfig {
-                    text: "That's what I found. I'm a scripted demo agent — set \
-LLM_API_KEY for a real one."
-                        .into(),
-                    tool: None,
-                    chunk_delay_ms: Some(20),
-                },
-            ],
-        });
+/// `AGENT_CLI` picks `pi` (default), `claude` or `codex`. The card is a chat
+/// view over a PTY running that CLI in its JSON mode; auth, tools and
+/// session persistence all belong to the CLI, not to this app.
+fn agent_cli_from_env() -> String {
+    match std::env::var("AGENT_CLI").as_deref() {
+        Ok("claude") => "claude".into(),
+        Ok("codex") => "codex".into(),
+        _ => "pi".into(),
     }
-    let api_key = std::env::var("LLM_API_KEY")
-        .or_else(|_| std::env::var("MOONSHOT_API_KEY"))
-        .map_err(|_| "set LLM_API_KEY (or AGENT_PROVIDER=scripted for a demo agent)".to_string())?;
-    Ok(crate::ipc::AgentProviderConfig::OpenAi {
-        api_url: std::env::var("LLM_API_URL")
-            .unwrap_or_else(|_| "https://api.moonshot.ai/v1/chat/completions".into()),
-        api_key,
-        model: std::env::var("LLM_MODEL").unwrap_or_else(|_| "kimi-k2.5".into()),
-        temperature: None,
-    })
 }
 
 /// Tool palette tooltip colors, matching the MpTooltip component's bubble
@@ -1041,50 +1011,27 @@ impl CanvasPanel {
         self.redraw(cx);
     }
 
-    /// Create an agent card backed by a daemon-hosted session.
-    ///
-    /// The provider comes from the environment, so the canvas never needs a
-    /// settings UI to start a card: `LLM_API_URL`/`LLM_API_KEY`/`LLM_MODEL` for
-    /// a real model (same variables the a2ui bridge uses), or
-    /// `AGENT_PROVIDER=scripted` for a canned conversation that needs neither
-    /// network nor key — useful for UI work and demos.
+    /// Create an agent card: a terminal session whose CLI launches straight
+    /// into JSON mode, rendered as a chat. The daemon types the launch line
+    /// into the fresh PTY exactly as the user would.
     pub fn spawn_agent_card(&mut self, cx: &mut Cx, name: &str) {
         let cwd = std::env::current_dir()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|_| ".".to_string());
-        let provider = match provider_from_env() {
-            Ok(provider) => provider,
-            Err(message) => {
-                self.status(cx, &format!("agent: {message}"));
-                return;
-            }
-        };
-        let provider_label = match &provider {
-            crate::ipc::AgentProviderConfig::OpenAi { model, .. } => model.clone(),
-            crate::ipc::AgentProviderConfig::Scripted { .. } => "scripted".to_owned(),
-        };
-
-        let request = crate::ipc::AgentCreateRequest {
-            name: name.to_owned(),
-            cwd: cwd.clone(),
-            provider,
-            permission: crate::ipc::AgentPermissionConfig::Interactive { timeout_ms: None },
-            model: None,
-            system_prompt: None,
-            enabled_tools: None,
-        };
-        match crate::agent::AgentClient::spawn(request) {
-            Ok(client) => {
+        let cli = agent_cli_from_env();
+        let (world, cols, rows) = self.new_terminal_geometry();
+        match crate::terminal::TerminalSession::spawn(name, "zsh", Some(&cwd), cols, rows) {
+            Ok(session) => {
+                session.chat_switch(&cli, true, crate::ipc::SwitchScript::FreshLaunch);
                 let id = self.next_item_id;
                 self.next_item_id += 1;
-                let world = self.new_agent_geometry();
                 self.items.push(CanvasItem::Agent {
                     id,
                     world,
                     title: name.to_owned(),
-                    cwd: client.cwd.clone(),
-                    provider: provider_label,
-                    session: Some(Box::new(client)),
+                    cwd,
+                    provider: cli,
+                    session: Some(Box::new(session)),
                 });
                 self.selected = Some(id);
                 self.redraw(cx);
@@ -1147,19 +1094,17 @@ impl CanvasPanel {
             self.redraw(cx);
             return;
         }
-        if let Some(client) = self
+        if let Some(session) = self
             .items
             .iter()
             .find(|i| i.id() == id)
             .and_then(|i| i.agent_session())
         {
-            if client.is_busy() {
-                client.steer(&text);
-                self.status(cx, "steered the running turn");
-            } else {
-                client.prompt(&text);
-                self.status(cx, "prompted the agent");
-            }
+            // The adapter decides the shape: a JSONL user message for
+            // persistent CLIs (a mid-turn message steers), or a relaunch
+            // command for per-turn ones.
+            session.chat_send(&text);
+            self.status(cx, "sent");
             // A sent prompt should be read at the tail again.
             self.agent_scroll.remove(&id);
         }
@@ -1694,38 +1639,11 @@ impl CanvasPanel {
         })
     }
 
-    /// The agent approval button under `screen`, if any: `(item, allow?)`.
-    fn approval_button_under(&self, screen: Vec2d) -> Option<(u64, bool)> {
-        self.items.iter().rev().find_map(|item| {
-            if item.kind() != ItemKind::Agent {
-                return None;
-            }
-            // Only test cards that are actually showing a prompt.
-            let showing = item
-                .agent_session()
-                .and_then(|client| client.state.lock().ok())
-                .map(|card| card.approval.is_some())
-                .unwrap_or(false);
-            if !showing {
-                return None;
-            }
-            let r = self.item_screen_rect(item);
-            let (allow_rect, deny_rect) = Self::approval_button_rects(r);
-            if allow_rect.contains(screen) {
-                Some((item.id(), true))
-            } else if deny_rect.contains(screen) {
-                Some((item.id(), false))
-            } else {
-                None
-            }
-        })
-    }
-
     /// The agent Stop button under `screen`, if the agent is mid-turn.
     /// The composer strip rect, derived from the card rect with the same
-    /// math as the draw pass (approval reservation included), so clicking
-    /// exactly where the input line is drawn starts typing.
-    fn agent_composer_rect(screen: Rect, has_approval: bool) -> Rect {
+    /// math as the draw pass, so clicking exactly where the input line is
+    /// drawn starts typing.
+    fn agent_composer_rect(screen: Rect) -> Rect {
         let body = Rect {
             pos: screen.pos + Vec2d { x: 8.0, y: 32.0 },
             size: Vec2d {
@@ -1733,12 +1651,7 @@ impl CanvasPanel {
                 y: (screen.size.y - 40.0).max(1.0),
             },
         };
-        let reserved = if has_approval {
-            AGENT_BTN_H + 30.0
-        } else {
-            0.0
-        };
-        let text_h = (body.size.y - reserved - AGENT_STRIP_H).max(1.0);
+        let text_h = (body.size.y - AGENT_STRIP_H).max(1.0);
         let line_y = body.pos.y + text_h;
         Rect {
             pos: Vec2d {
@@ -1759,8 +1672,8 @@ impl CanvasPanel {
             }
             let busy = item
                 .agent_session()
-                .and_then(|client| client.state.lock().ok())
-                .map(|card| card.busy && !card.dead)
+                .and_then(|session| session.chat.lock().ok())
+                .map(|card| card.busy)
                 .unwrap_or(false);
             if !busy {
                 return None;
@@ -1959,8 +1872,9 @@ impl CanvasPanel {
             if let Some(session) = item.session() {
                 session.kill();
             }
-            // Killing the client asks the daemon to stop the agent's worker, so
-            // a closed card does not keep burning tokens in the background.
+            // An agent card's session is a terminal session: `session()`
+            // above found nothing (it only matches Terminal items), so kill
+            // through the agent arm instead.
             if let Some(agent) = item.agent_session() {
                 agent.kill();
             }
@@ -2208,7 +2122,7 @@ impl CanvasPanel {
                     })
                     .map(|i| i.id());
                 if let Some(id) = agent {
-                    if let Some(client) = self
+                    if let Some(session) = self
                         .items
                         .iter()
                         .find(|i| i.id() == id)
@@ -2217,7 +2131,7 @@ impl CanvasPanel {
                         if text.is_empty() {
                             self.status(cx, "Say something: @name message");
                         } else {
-                            client.prompt(&text);
+                            session.chat_send(&text);
                             self.status(cx, &format!("sent to agent '{target}'"));
                         }
                     }
@@ -2265,22 +2179,6 @@ impl CanvasPanel {
             }
             Command::NewAgent { name } => {
                 self.spawn_agent_card(cx, &name);
-            }
-            Command::Goal { objective } => {
-                // Goals address the selected agent card, like Forward does.
-                let goal_set = self
-                    .items
-                    .iter()
-                    .find(|i| Some(i.id()) == self.selected && i.kind() == ItemKind::Agent)
-                    .and_then(|i| i.agent_session())
-                    .map(|client| {
-                        client.set_goal(objective.clone());
-                    });
-                match (goal_set, &objective) {
-                    (Some(()), Some(text)) => self.status(cx, &format!("goal: {text}")),
-                    (Some(()), None) => self.status(cx, "goal cleared"),
-                    (None, _) => self.status(cx, "select an agent card first"),
-                }
             }
             Command::OpenPath { path } => match MediaKind::from_path(&path) {
                 Some(kind) => {
@@ -2352,7 +2250,7 @@ impl CanvasPanel {
             Command::Help => {
                 self.status(
                     cx,
-                    "Commands: @agent text · /new agent NAME · /goal TEXT (clears if empty) · /new terminal NAME · /new browser URL · /new music TITLE · /new note · /open FILE · /focus NAME · /zoom N · /grid · /clear · /help",
+                    "Commands: @agent text · /new agent NAME [pi|claude|codex] · /new terminal NAME · /new browser URL · /new music TITLE · /new note · /open FILE · /focus NAME · /zoom N · /grid · /clear · /help",
                 );
             }
             Command::Clear => {
@@ -2378,21 +2276,15 @@ impl CanvasPanel {
                 );
             }
             Command::Forward { text } => {
-                // A selected agent turns the command bar into its composer:
-                // a prompt when idle, a steer when mid-turn.
+                // A selected agent turns the command bar into its composer.
                 let selected_agent = self
                     .items
                     .iter()
                     .find(|i| Some(i.id()) == self.selected && i.kind() == ItemKind::Agent)
-                    .and_then(|i| i.agent_session().map(|c| (i.id(), c.is_busy(), c)));
-                if let Some((id, busy, client)) = selected_agent {
-                    if busy {
-                        client.steer(&text);
-                        self.status(cx, "steered the running turn");
-                    } else {
-                        client.prompt(&text);
-                        self.status(cx, "prompted the agent");
-                    }
+                    .and_then(|i| i.agent_session().map(|c| (i.id(), c)));
+                if let Some((id, session)) = selected_agent {
+                    session.chat_send(&text);
+                    self.status(cx, "sent");
                     let _ = id;
                     return;
                 }
@@ -2433,7 +2325,6 @@ impl CanvasPanel {
         &[
             "@",
             "/new agent ",
-            "/goal ",
             "/new terminal ",
             "/new browser ",
             "/new note",
@@ -4607,7 +4498,7 @@ impl CanvasPanel {
         cwd: &str,
         provider: &str,
         is_sel: bool,
-        card: &std::sync::Arc<std::sync::Mutex<crate::agent::AgentCardState>>,
+        card: &std::sync::Arc<std::sync::Mutex<crate::chat::ChatCardState>>,
         composer: Option<&str>,
         stop_hover: bool,
     ) {
@@ -4641,10 +4532,8 @@ impl CanvasPanel {
             &format!("{title} — {sub}"),
         );
 
-        // Presence: working / exited / ready, on the right of the title bar.
-        let (status_label, status_color) = if card.dead {
-            ("exited", [0.55, 0.60, 0.72, 1.0])
-        } else if card.busy {
+        // Presence: working / ready, on the right of the title bar.
+        let (status_label, status_color) = if card.busy {
             ("working", crate::items::AgentStatus::Busy.color())
         } else {
             ("ready", crate::items::AgentStatus::Online.color())
@@ -4709,15 +4598,8 @@ impl CanvasPanel {
         let max_chars = ((body_rect.size.x / char_w).floor().max(8.0)) as usize;
         let max_lines = (body_rect.size.y / line_h).floor().max(1.0) as usize;
 
-        // Reserve space for the composer strip and, when an approval is
-        // pending, its button band - the transcript must never run under
-        // either.
-        let reserved = if card.approval.is_some() {
-            AGENT_BTN_H + 30.0
-        } else {
-            0.0
-        };
-        let text_h = (body_rect.size.y - reserved - AGENT_STRIP_H).max(1.0);
+        // The transcript must never run under the composer strip.
+        let text_h = (body_rect.size.y - AGENT_STRIP_H).max(1.0);
         let budget = (text_h / line_h).floor() as usize;
 
         // No conversation yet: say so, or the card reads as broken.
@@ -4746,7 +4628,7 @@ impl CanvasPanel {
                     x: body_rect.pos.x + 4.0,
                     y: body_rect.pos.y + line_h * 4.0,
                 },
-                "From the command bar: @name text, /goal text.",
+                "@name text from the command bar.",
             );
         }
 
@@ -4755,13 +4637,13 @@ impl CanvasPanel {
         let mut rendered_lines: Vec<([f32; 4], String)> = Vec::new();
         for row in card.rows().iter().rev() {
             match row {
-                crate::agent::Row::User { text } => {
+                crate::chat::Row::User { text } => {
                     for line in wrap("> ", text, max_chars) {
                         rendered_lines.push((AGENT_ROW_USER, line));
                     }
                     rendered_lines.push((AGENT_ROW_USER, String::new()));
                 }
-                crate::agent::Row::Assistant { text, streaming } => {
+                crate::chat::Row::Assistant { text, streaming } => {
                     let marker = if *streaming { "▍" } else { "" };
                     for line in wrap("", text, max_chars) {
                         rendered_lines.push((AGENT_ROW_ASSISTANT, line));
@@ -4773,32 +4655,28 @@ impl CanvasPanel {
                     }
                     rendered_lines.push((AGENT_ROW_ASSISTANT, String::new()));
                 }
-                crate::agent::Row::Reasoning { text } => {
+                crate::chat::Row::Reasoning { text } => {
                     for line in wrap("· ", text, max_chars) {
                         rendered_lines.push((AGENT_ROW_REASONING, line));
                     }
                     rendered_lines.push((AGENT_ROW_REASONING, String::new()));
                 }
-                crate::agent::Row::Tool {
-                    name, ok, summary, ..
-                } => {
+                crate::chat::Row::Tool { name, ok, summary } => {
                     let (icon, color) = match ok {
                         Some(true) => ("✓", AGENT_ROW_OK),
                         Some(false) => ("✗", AGENT_ROW_FAIL),
                         None => ("…", AGENT_ROW_NOTICE),
                     };
                     let mut first = format!("{icon} {name}");
-                    if let Some(summary) = summary {
-                        if !summary.is_empty() {
-                            first.push_str(&format!(" — {summary}"));
-                        }
+                    if !summary.is_empty() {
+                        first.push_str(&format!(" — {summary}"));
                     }
                     for line in wrap("", &first, max_chars) {
                         rendered_lines.push((color, line));
                     }
                     rendered_lines.push((color, String::new()));
                 }
-                crate::agent::Row::Notice { text } => {
+                crate::chat::Row::Notice { text } => {
                     for line in wrap("", text, max_chars) {
                         rendered_lines.push((AGENT_ROW_NOTICE, line));
                     }
@@ -4838,34 +4716,6 @@ impl CanvasPanel {
             );
         }
 
-        // Approval prompt: what is being asked, and two buttons.
-        if let Some(approval) = &card.approval {
-            let (allow_rect, deny_rect) = Self::approval_button_rects(screen);
-            let banner_y = body_rect.pos.y + text_h + 6.0;
-            let mut ask = format!("allow {}?", approval.name);
-            if let Some(path) = approval.arguments.get("path").and_then(|p| p.as_str()) {
-                ask = format!("allow {} {}?", approval.name, path);
-            }
-            self.draw_cell_text.color = vec4f(AGENT_ROW_USER);
-            self.draw_cell_text.draw_abs(
-                cx,
-                Vec2d {
-                    x: body_rect.pos.x,
-                    y: banner_y,
-                },
-                &ask,
-            );
-
-            for (rect, label, fill) in [
-                (allow_rect, "Allow", AGENT_ACCENT),
-                (deny_rect, "Deny", [0.55, 0.28, 0.34, 1.0]),
-            ] {
-                self.draw_item_bg_rect(cx, rect, fill);
-                self.draw_cell_text.color = vec4f([1.0, 1.0, 1.0, 1.0]);
-                self.draw_cell_text
-                    .draw_abs(cx, rect.pos + Vec2d { x: 12.0, y: 6.0 }, label);
-            }
-        }
         // Composer line: where the user types into this card. Always drawn,
         // so the card is visibly interactive; an empty line shows a
         // placeholder instead of a bare caret.
@@ -4910,9 +4760,9 @@ impl CanvasPanel {
         }
         cx.pop_clip_rect();
 
-        // Usage in the bottom-left corner, when the provider reports it.
-        if let Some((prompt_tokens, completion_tokens)) = card.usage {
-            let text = format!("{prompt_tokens}+{completion_tokens} tok");
+        // Usage in the bottom-left corner, when the CLI reports it.
+        if let Some(usage) = &card.usage {
+            let text = usage.clone();
             self.draw_title.color = vec4f(DIM_TEXT);
             self.draw_title.draw_abs(
                 cx,
@@ -4924,8 +4774,8 @@ impl CanvasPanel {
             );
         }
 
-        // Stop button while the agent is mid-turn.
-        if card.busy && !card.dead {
+        // Stop button while the CLI is mid-turn.
+        if card.busy {
             let rect = Self::agent_stop_rect(screen);
             let fill = if stop_hover {
                 [0.72, 0.30, 0.34, 1.0]
@@ -5795,11 +5645,15 @@ impl Widget for CanvasPanel {
                     continue;
                 }
                 if self.composer_focus_repair && item.widget_uid == composer_uid {
-                    self.view.text_input(cx, ids!(agent_composer)).take_key_focus(cx);
+                    self.view
+                        .text_input(cx, ids!(agent_composer))
+                        .take_key_focus(cx);
                     self.composer_focus_repair = false;
                     self.redraw(cx);
                 } else if self.note_focus_repair && item.widget_uid == note_uid {
-                    self.view.text_input(cx, ids!(note_editor)).take_key_focus(cx);
+                    self.view
+                        .text_input(cx, ids!(note_editor))
+                        .take_key_focus(cx);
                     self.note_focus_repair = false;
                     self.redraw(cx);
                 }
@@ -5967,38 +5821,16 @@ impl Widget for CanvasPanel {
                 // The Stop button sits above the card body, so it wins over
                 // selecting the card.
                 if let Some(id) = self.agent_stop_under(me.abs) {
-                    if let Some(client) = self
+                    if let Some(session) = self
                         .items
                         .iter()
                         .find(|i| i.id() == id)
                         .and_then(|i| i.agent_session())
                     {
-                        client.cancel();
+                        // Ctrl-C on the PTY: how a user interrupts the CLI.
+                        session.write_bytes(&[3]);
                         self.status(cx, "cancelled");
                         self.hovered_stop = None;
-                    }
-                    return;
-                }
-                // Agent approval buttons: they sit inside the card, so they
-                // must be resolved before the card itself is selected.
-                if let Some((id, allow)) = self.approval_button_under(me.abs) {
-                    let approval_id = self
-                        .items
-                        .iter()
-                        .find(|i| i.id() == id)
-                        .and_then(|i| i.agent_session())
-                        .and_then(|client| client.state.lock().ok())
-                        .and_then(|card| card.approval.as_ref().map(|a| a.approval_id));
-                    if let Some(approval_id) = approval_id {
-                        if let Some(client) = self
-                            .items
-                            .iter()
-                            .find(|i| i.id() == id)
-                            .and_then(|i| i.agent_session())
-                        {
-                            client.reply(approval_id, allow, None);
-                        }
-                        self.status(cx, if allow { "approved" } else { "denied" });
                     }
                     return;
                 }
@@ -6090,12 +5922,7 @@ impl Widget for CanvasPanel {
                         // when that composer is already open, so re-clicking
                         // the line never wipes a half-typed draft.
                         if item.kind() == ItemKind::Agent && self.agent_composer_id != Some(id) {
-                            let has_approval = item
-                                .agent_session()
-                                .and_then(|client| client.state.lock().ok())
-                                .map(|card| card.approval.is_some())
-                                .unwrap_or(false);
-                            if Self::agent_composer_rect(self.item_screen_rect(item), has_approval)
+                            if Self::agent_composer_rect(self.item_screen_rect(item))
                                 .contains(me.abs)
                             {
                                 self.start_agent_composer(cx, id);
@@ -6551,7 +6378,7 @@ impl Widget for CanvasPanel {
                 let id = item.id();
                 let rows: usize = item
                     .agent_session()
-                    .and_then(|c| c.state.lock().ok())
+                    .and_then(|c| c.chat.lock().ok())
                     .map(|card| card.rows().len().max(1))
                     .unwrap_or(1);
                 let delta = (se.scroll.y / 20.0).round();
@@ -7005,7 +6832,7 @@ impl Widget for CanvasPanel {
             AgentStatus,
             Option<std::sync::Arc<std::sync::Mutex<crate::terminal::state::TerminalState>>>,
             Option<(MediaKind, String)>,
-            Option<std::sync::Arc<std::sync::Mutex<crate::agent::AgentCardState>>>,
+            Option<std::sync::Arc<std::sync::Mutex<crate::chat::ChatCardState>>>,
             String,
             String,
         );
@@ -7025,7 +6852,7 @@ impl Widget for CanvasPanel {
                 .unwrap_or_default();
             let url = item.url().unwrap_or("").to_string();
             let state = item.session().map(|t| t.state.clone());
-            let agent_state = item.agent_session().map(|a| a.state.clone());
+            let agent_state = item.agent_session().map(|a| a.chat.clone());
             let agent_cwd = item.agent_cwd().unwrap_or("").to_string();
             let agent_provider = item.agent_provider().unwrap_or("").to_string();
             let (body, font_size, color_idx) = match item {
@@ -7165,15 +6992,13 @@ impl Widget for CanvasPanel {
                             .map(|card| card.gap().is_some())
                             .unwrap_or(false);
                         if needs_reload {
-                            if let Some(client) = self
+                            if let Some(session) = self
                                 .items
                                 .iter()
                                 .find(|i| i.id() == item_id)
                                 .and_then(|i| i.agent_session())
                             {
-                                if let Err(e) = client.reload() {
-                                    log!("canvas: agent reload failed: {e}");
-                                }
+                                session.chat_sync();
                             }
                         }
                         // The composer line is drawn only for the selected

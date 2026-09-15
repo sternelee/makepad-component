@@ -388,11 +388,14 @@ pub enum CanvasItem {
         id: u64,
         world: Rect,
         title: String,
-        /// The workspace the agent works in, shown as the card subtitle.
+        /// The shell command the card's PTY runs (the CLI or its wrapper).
         cwd: String,
-        /// The provider/model label shown in the title bar.
+        /// The hosting CLI label (`pi` / `claude` / `codex`).
         provider: String,
-        session: Option<Box<crate::agent::AgentClient>>,
+        /// The terminal session this card is a chat view of. Same PTY as
+        /// the grid view: switching views swaps the renderer, not the
+        /// session.
+        session: Option<Box<TerminalSession>>,
     },
 }
 
@@ -472,7 +475,7 @@ impl CanvasItem {
     }
 
     /// The agent client backing an Agent card.
-    pub fn agent_session(&self) -> Option<&crate::agent::AgentClient> {
+    pub fn agent_session(&self) -> Option<&TerminalSession> {
         match self {
             CanvasItem::Agent { session, .. } => session.as_deref(),
             _ => None,
@@ -480,7 +483,7 @@ impl CanvasItem {
     }
 
     #[allow(dead_code)]
-    pub fn agent_session_mut(&mut self) -> Option<&mut crate::agent::AgentClient> {
+    pub fn agent_session_mut(&mut self) -> Option<&mut TerminalSession> {
         match self {
             CanvasItem::Agent { session, .. } => session.as_deref_mut(),
             _ => None,

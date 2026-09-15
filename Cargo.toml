@@ -10,7 +10,6 @@ members = [
   "crates/makepad-clipboard",
   "crates/gemini-talker",
   "crates/canvas-terminal",
-  "crates/agent-core",
   "crates/dbpro",
 ]
 resolver = "2"

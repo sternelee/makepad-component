@@ -46,10 +46,9 @@ makepad-component/
 │   │                            #   rmux-ipc, no system-installed rmux needed), CEF browsers,
 │   │                            #   hand-drawn whiteboard/notes, agent cards. Single binary,
 │   │                            #   dual mode. Progress: docs/AGENT_WORKBENCH_PROGRESS_CN.md
-│   ├── agent-core/              # Headless agent runtime (no Makepad dep): provider drivers
-│   │                            #   ([OI]/scripted), tool loop + workspace sandbox, permission
-│   │                            #   gates, resumable event journal. See its lib.rs docs for
-│   │                            #   the concurrency contracts all hosts depend on.
+│   │                            # Agent cards are chat views over a session's PTY: the daemon
+│   │                            #   parses the hosted CLI's JSONL (pi/claude/codex) into
+│   │                            #   normalized chat events (src/chat/).
 │   ├── raycast-launcher/        # Raycast-style launcher, Makepad 2.0 `script_mod!` API
 │   │                            #   (runtime Splash app loading from *-app.json descriptors)
 │   ├── gemini-talker/           # Gemini Live voice companion, Makepad 2.0 `script_mod!` API
@@ -76,8 +75,8 @@ Crate-specific guidance exists in `crates/raycast-launcher/CLAUDE.md` and `crate
 The workspace has been migrated to the Makepad 2.0 `script_mod!` API. Everything compiles against the currently locked makepad commit except `gemini-talker`:
 
 - `cargo check -p makepad-component` / `-p makepad-plot` / `-p component-zoo` / `-p a2ui-demo` / `-p makepad-clipboard` / `-p raycast-launcher` — **pass**. The legacy `live_design!` API is gone from these crates; all widget/shader registration now happens through `script_mod!` blocks wired into each crate's `script_mod(vm)` function.
-- `cargo check -p agent-core` / `-p canvas-terminal` — **pass** (both `--tests` too).
-- `cargo test -p agent-core -p canvas-terminal` — **104 passed** (agent runtime unit/session/tool suites + daemon end-to-end over real sockets). Before the agent workbench, canvas-terminal had ~23 tests.
+- `cargo check -p canvas-terminal` — **pass** (`--tests` too).
+- `cargo test -p canvas-terminal` — **39 passed** (chat adapter/fold units with real probed pi JSONL + daemon chat e2e over real sockets: parse/replay, switch scripts, parser pause).
 - `cargo test -p makepad-component` — **pass** (28 unit tests, 4 doc-tests ignored).
 - `cargo check -p dbpro` — **pass** (with `PATH="/Library/Developer/CommandLineTools/usr/bin:$PATH"` so the bundled sqlite3 cc step uses CLT clang). `cargo test -p dbpro` — **5 passed** (SQLite round trip incl. write-back UPDATE/NULL/DELETE + FK error, INSERT-copy, SQL builders, config persistence). Runtime verified clean: `grep -c '\[E\]'` on the app log is 0.
 - `cargo check -p gemini-talker` — **fails** (pre-existing: unresolved `gemini_live::prelude` import). Unrelated to the script_mod migration.
@@ -268,7 +267,7 @@ Bridge env vars: `LLM_API_URL` (default `https://api.moonshot.ai/v1/chat/complet
 - Use descriptive names: `test_should_fail_on_invalid_json`.
 - Prioritize `Processor` and `DataModel` correctness (A2UI protocol behavior).
 - UI changes are verified visually: `cargo run -p component-zoo` (widgets) or `cargo run -p a2ui-demo` (A2UI). The `makepad-screenshot` skill in `skills/` automates GUI screenshots.
-- `agent-core` and `canvas-terminal`'s agent path carry the strongest coverage in the workspace (unit + session-loop + daemon end-to-end over real sockets); keep new contracts under test there. `dbpro` covers its driver layer (SQLite round trip, paging/search/sort, persistence). Other crates have little or no test coverage; treat `cargo check -p <crate>` as the smoke test there.
+- `canvas-terminal`'s chat path carries the strongest coverage in the workspace (adapter/fold units with real probed pi JSONL + daemon end-to-end over real sockets); keep new contracts under test there. `dbpro` covers its driver layer (SQLite round trip, paging/search/sort, persistence). Other crates have little or no test coverage; treat `cargo check -p <crate>` as the smoke test there.
 - No CI is configured (no `.github/` workflows) — run tests and clippy locally before submitting.
 
 ## 9. Security Considerations

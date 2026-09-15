@@ -361,65 +361,36 @@ App Descriptor (JSON)
 
 ## Canvas Terminal Agent Workbench
 
-`canvas-terminal` hosts coding-agent sessions as cards on the infinite canvas,
-next to terminals, browsers and media. The runtime (`agent-core`) is
-MIT/Apache and knows nothing about Makepad; the canvas talks to it over a
-local IPC protocol through the same bundled `--daemon` that holds PTYs, so
-agent sessions survive GUI restarts.
+Agent cards on the infinite canvas are **chat views over a terminal
+session's PTY**: run `claude`, `codex` or `pi` inside a terminal card, and
+the same session renders as a conversation. The CLI owns the model, tools,
+auth and session persistence; the workbench hosts the process and renders
+it. Both views share one PTY, so switching loses nothing.
 
 ```bash
-# Canned conversation - no network, no API key (good for a first look)
-AGENT_PROVIDER=scripted cargo run -p canvas-terminal
-
-# A real model - same variables the A2UI bridge uses
-export LLM_API_URL=https://api.moonshot.ai/v1/chat/completions
-export LLM_API_KEY=sk-...
-export LLM_MODEL=kimi-k2.5
-cargo run -p canvas-terminal
+AGENT_CLI=pi cargo run -p canvas-terminal   # or claude / codex
 ```
 
 Then, in the command bar:
 
 | Command | Action |
 | ------- | ------ |
-| `/new agent demo` | create an agent card |
-| `@demo text` | send a prompt to the agent named `demo` |
-| `/goal ship the parser` | set the selected agent's workflow goal (`/goal` clears it) |
+| `/new agent demo` | terminal named `demo`, CLI launched in JSON mode, rendered as chat |
+| `@demo text` | send a prompt to that agent |
 
-On the card itself: **double-click** opens an inline composer (`Enter`
-submits - a prompt when idle, a steer mid-turn; `Esc` cancels), the wheel
-scrolls the transcript, **■ stop** aborts the running turn, and tool calls
-that need it show **Allow / Deny** buttons - nothing runs until a human
-answers, and the answer is what the model sees as the refusal reason.
+On the card: **double-click** (or click the input line) opens the composer,
+`Enter` sends, `Esc` cancels, the wheel scrolls the transcript, and **■
+stop** interrupts the CLI (Ctrl-C on the PTY).
 
-Tools available to an agent: `read_file`, `write_file`, `edit_file`,
-`find_files`, `search_files`, `run_command`. Paths are resolved inside the
-card's workspace root (symlinks pointing out are refused), output is
-size-capped, and commands are killed when they overrun their timeout.
+How it works: the daemon flips a per-session parser on — every PTY output
+line is also read as the hosted CLI's JSONL (`pi --mode json`,
+`claude --input-format/--output-format stream-json`, `codex exec --json`)
+and folded into normalized chat events with sequence numbers, so a client
+that misses some repairs the hole with a sync. Mode switches are typed into
+the PTY exactly as a user would (`/exit`, then a `--resume`/`--session`
+relaunch), which is why the conversation continues across a view switch.
 
 Design notes and progress: [`docs/AGENT_WORKBENCH_PROGRESS_CN.md`](docs/AGENT_WORKBENCH_PROGRESS_CN.md).
-
----
-
-## DbPro Database GUI
-
-A TablePro-inspired, cross-platform database client built on the component
-library and the Makepad 2.0 `script_mod!` API. Supports **SQLite, MySQL and
-PostgreSQL** with a connection library, an explorer sidebar, document tabs
-(per-tab state, bound to their connection), a paged data grid with
-server-side sort + filter, a Structure view, a real SQL editor with history
-(`⌘↑/↓`), and CSV export. See [crates/dbpro/README.md](crates/dbpro/README.md).
-
-```bash
-cargo run -p dbpro
-```
-
-First launch seeds and connects to a local demo SQLite database
-(`dbpro-demo.db`), so data browsing and query execution work immediately.
-Connection profiles persist to `~/.dbpro/connections.json`.
-
-Development progress and iteration log:
-[`docs/DBPRO_PROGRESS_CN.md`](docs/DBPRO_PROGRESS_CN.md).
 
 ## LLM Configuration
 
@@ -630,21 +601,15 @@ makepad-component/
 │   │       └── text.rs      # Plot text rendering
 │   ├── raycast-launcher/    # Raycast-style launcher with Splash dynamic app loading
 │   │   └── src/             # LauncherPanel + Splash VM app loading + chat panel
-│   ├── agent-core/          # Headless agent runtime (no Makepad dep)
-│   │   └── src/
-│   │       ├── session.rs   # AgentSession: tool loop + event journal (worker thread)
-│   │       ├── provider/    # OpenAI-compatible SSE driver + ScriptedProvider
-│   │       ├── tools/       # read/write/edit/find/search/run_command (workspace sandbox)
-│   │       ├── identity.rs  # ResumeCursor (session_id, epoch, seq) for reconnect
-│   │       └── cancel.rs    # cancellation that reaches inside a model call
 │   └── canvas-terminal/     # Infinite-canvas terminal workspace (CNVS-style)
 │       └── src/
-│           ├── main.rs      # Makepad GUI + `--daemon` dual mode (PTY + agents)
-│           ├── canvas.rs    # CanvasPanel: cards, whiteboard, agent cards
-│           ├── daemon.rs    # PTY + agent session daemon, interactive approvals
-│           ├── ipc.rs       # GUI↔daemon framing (terminals, agents, approvals)
-│           ├── agent/       # Card-side client + event→transcript folding
-│           ├── terminal/    # PTY session client + vte grid
+│           ├── main.rs      # Makepad GUI + `--daemon` dual mode (PTY host)
+│           ├── canvas.rs    # CanvasPanel: cards, whiteboard, agent chat cards
+│           ├── chat/        # Agent CLIs as chat: adapter (pi/claude/codex
+│           │                #   JSONL → normalized events), card fold, wire types
+│           ├── daemon.rs    # PTY daemon: sessions, chat parser + event ring
+│           ├── ipc.rs       # GUI↔daemon framing (terminals, chat view)
+│           ├── terminal/    # PTY session client + vte grid + chat fold
 │           └── persist.rs   # Canvas layout persistence (atomic save)
 ├── ui_live.json             # Live-editable A2UI JSON
 ├── chart_test.json          # Chart examples

@@ -24,7 +24,6 @@ serde_json = "1.0"
 # daemon — `canvas-terminal` re-executes itself in `--daemon` mode to hold
 # the PTYs, surviving GUI restarts for session re-attach.
 # Headless agent runtime (provider drivers + tool loop + event journal).
-agent-core = { path = "../agent-core" }
 
 rmux-pty = "0.10.0"
 rmux-ipc = "0.10.0"

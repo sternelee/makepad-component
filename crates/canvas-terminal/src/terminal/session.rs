@@ -82,6 +82,7 @@ pub(crate) fn spawn_writer_task(
 fn spawn_read_task(
     mut r: ReadHalf,
     state: Arc<Mutex<TerminalState>>,
+    chat: Arc<Mutex<crate::chat::ChatCardState>>,
     notify: std::sync::mpsc::Sender<bool>,
 ) -> tokio::task::JoinHandle<()> {
     runtime().spawn(async move {
@@ -90,6 +91,22 @@ fn spawn_read_task(
                 Ok(Some(ipc::Frame::Output { bytes, .. })) => {
                     if let Ok(mut st) = state.lock() {
                         st.feed(&bytes);
+                    }
+                    let _ = notify.send(true);
+                }
+                Ok(Some(ipc::Frame::ChatEvent { item, .. })) => {
+                    // Fold by sequence number: a replayed event and its live
+                    // twin both arrive sometimes, and the fold dedupes.
+                    if let Ok(mut card) = chat.lock() {
+                        card.apply(item);
+                    }
+                    let _ = notify.send(true);
+                }
+                Ok(Some(ipc::Frame::ChatSync(resp))) => {
+                    if let Ok(mut card) = chat.lock() {
+                        for item in resp.events {
+                            card.apply(item);
+                        }
                     }
                     let _ = notify.send(true);
                 }
@@ -170,6 +187,9 @@ pub struct TerminalSession {
     pub command: String,
     /// Local terminal grid (written by the read task).
     pub state: Arc<Mutex<TerminalState>>,
+    /// Chat view fold over the same session (written by the read task when
+    /// the daemon's chat parser is on).
+    pub chat: Arc<Mutex<crate::chat::ChatCardState>>,
     pub(crate) session_id: u64,
     /// Outbound request channel (drained by the writer task).
     writer_tx: tokio::sync::mpsc::Sender<ipc::Request>,
@@ -231,12 +251,14 @@ impl TerminalSession {
         })?;
 
         // Read task: stream Output/Ended into the local grid.
-        let read_task = spawn_read_task(r, Arc::clone(&state), notify.clone());
+        let chat = Arc::new(Mutex::new(crate::chat::ChatCardState::new()));
+        let read_task = spawn_read_task(r, Arc::clone(&state), Arc::clone(&chat), notify.clone());
 
         Ok(Self {
             name: name.to_string(),
             command: command.to_string(),
             state,
+            chat,
             session_id,
             writer_tx,
             notify,
@@ -287,12 +309,14 @@ impl TerminalSession {
             }
         }
 
-        let read_task = spawn_read_task(r, Arc::clone(&state), notify.clone());
+        let chat = Arc::new(Mutex::new(crate::chat::ChatCardState::new()));
+        let read_task = spawn_read_task(r, Arc::clone(&state), Arc::clone(&chat), notify.clone());
 
         Ok(Self {
             name: name.to_string(),
             command,
             state,
+            chat,
             session_id,
             writer_tx,
             notify,
@@ -437,5 +461,46 @@ mod tests {
         assert_eq!(expand_tilde("~"), home);
         assert_eq!(expand_tilde("/usr/local/bin"), "/usr/local/bin");
         assert_eq!(expand_tilde("~bob/x"), "~bob/x");
+    }
+}
+
+impl TerminalSession {
+    /// Send a composer prompt through the daemon, which formats it for the
+    /// hosted CLI (JSONL stdin or a relaunch command line).
+    pub fn chat_send(&self, text: &str) {
+        let _ = self
+            .writer_tx
+            .try_send(ipc::Request::ChatSend(ipc::ChatSendRequest {
+                session: self.name.clone(),
+                text: text.to_owned(),
+            }));
+    }
+
+    /// Flip the daemon's chat parser for this session on or off, optionally
+    /// typing the launch/exit script into the PTY on the way.
+    pub fn chat_switch(&self, cli: &str, chat: bool, script: ipc::SwitchScript) {
+        let _ = self
+            .writer_tx
+            .try_send(ipc::Request::ChatSwitch(ipc::ChatSwitchRequest {
+                session: self.name.clone(),
+                cli: cli.to_owned(),
+                chat,
+                script,
+                resume: None,
+            }));
+    }
+
+    /// Ask the daemon for everything the card is missing. The reply is
+    /// handled by the read task like any other chat traffic: it folds the
+    /// replayed events into the card, and sequence dedup absorbs the overlap
+    /// with anything the live stream delivered in the meantime.
+    pub fn chat_sync(&self) {
+        let after_seq = self.chat.lock().map(|card| card.last_seq()).unwrap_or(0);
+        let _ = self
+            .writer_tx
+            .try_send(ipc::Request::ChatSync(ipc::ChatSyncRequest {
+                session: self.name.clone(),
+                after_seq,
+            }));
     }
 }
