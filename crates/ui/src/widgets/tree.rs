@@ -440,15 +440,15 @@ impl Widget for MpTree {
 
             // Chevron gutter for branch nodes
             if has_children {
-                let glyph = if is_open { "▾" } else { "▸" };
+                let glyph = if is_open { "－" } else { "＋" };
                 self.draw_chevron.draw_walk(
                     cx,
                     Walk {
                         width: Size::Fixed(self.indent_step.min(14.0)),
-                        height: Size::fit(),
+                        height: Size::fill(),
                         ..Walk::default()
                     },
-                    Align::default(),
+                    Align { x: 0.0, y: 0.5 },
                     glyph,
                 );
                 self.chevron_areas.push((self.draw_chevron.area(), *item_idx));
@@ -458,16 +458,29 @@ impl Widget for MpTree {
                     cx,
                     Walk {
                         width: Size::Fixed(self.indent_step.min(14.0)),
-                        height: Size::fit(),
+                        height: Size::fill(),
                         ..Walk::default()
                     },
-                    Align::default(),
+                    Align { x: 0.0, y: 0.5 },
                     "",
                 );
             }
 
-            self.draw_label
-                .draw_walk(cx, Walk::fit(), Align::default(), &item.label);
+            // Fill the row and center the text block vertically — a
+            // fit-sized rect makes glyphs sit high (trailing line spacing).
+            self.draw_label.draw_walk(
+                cx,
+                Walk {
+                    width: Size::fill(),
+                    height: Size::fill(),
+                    ..Walk::default()
+                },
+                Align {
+                    x: 0.0,
+                    y: 0.5,
+                },
+                &item.label,
+            );
 
             self.draw_row.end(cx);
             self.row_areas.push((self.draw_row.area(), *item_idx));

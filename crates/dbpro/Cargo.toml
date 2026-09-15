@@ -1,0 +1,20 @@
+[package]
+name = "dbpro"
+version = "0.1.0"
+edition = "2021"
+description = "DbPro — a TablePro-inspired cross-platform database GUI built with Makepad + Rust"
+
+[dependencies]
+makepad-widgets = { workspace = true }
+makepad-component = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Database drivers (synchronous, used from worker threads)
+rusqlite = { version = "0.32", features = ["bundled"] }
+postgres = "0.19"
+mysql = "27"
+
+[[bin]]
+name = "dbpro"
+path = "src/main.rs"

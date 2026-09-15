@@ -23,6 +23,7 @@ A modern UI component library for [Makepad](https://github.com/makepad/makepad),
   - [Math Charts Demo](#math-charts-demo)
   - [Raycast Launcher + Splash App](#raycast-launcher--splash-app)
   - [Canvas Terminal Agent Workbench](#canvas-terminal-agent-workbench)
+  - [DbPro Database GUI](#dbpro-database-gui)
 - [LLM Configuration](#llm-configuration)
 - [A2UI App Types & Examples](#a2ui-app-types--examples)
 - [Architecture](#architecture)
@@ -397,6 +398,28 @@ card's workspace root (symlinks pointing out are refused), output is
 size-capped, and commands are killed when they overrun their timeout.
 
 Design notes and progress: [`docs/AGENT_WORKBENCH_PROGRESS_CN.md`](docs/AGENT_WORKBENCH_PROGRESS_CN.md).
+
+---
+
+## DbPro Database GUI
+
+A TablePro-inspired, cross-platform database client built on the component
+library and the Makepad 2.0 `script_mod!` API. Supports **SQLite, MySQL and
+PostgreSQL** with a connection library, an explorer sidebar, document tabs
+(per-tab state, bound to their connection), a paged data grid with
+server-side sort + filter, a Structure view, a real SQL editor with history
+(`⌘↑/↓`), and CSV export. See [crates/dbpro/README.md](crates/dbpro/README.md).
+
+```bash
+cargo run -p dbpro
+```
+
+First launch seeds and connects to a local demo SQLite database
+(`dbpro-demo.db`), so data browsing and query execution work immediately.
+Connection profiles persist to `~/.dbpro/connections.json`.
+
+Development progress and iteration log:
+[`docs/DBPRO_PROGRESS_CN.md`](docs/DBPRO_PROGRESS_CN.md).
 
 ## LLM Configuration
 

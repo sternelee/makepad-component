@@ -53,6 +53,9 @@ makepad-component/
 │   ├── raycast-launcher/        # Raycast-style launcher, Makepad 2.0 `script_mod!` API
 │   │                            #   (runtime Splash app loading from *-app.json descriptors)
 │   ├── gemini-talker/           # Gemini Live voice companion, Makepad 2.0 `script_mod!` API
+│   ├── dbpro/                   # TablePro-style database GUI (SQLite/MySQL/PostgreSQL),
+│   │                            #   Makepad 2.0 `script_mod!` API. Driver layer + custom
+│   │                            #   DbTabBar widget. See crates/dbpro/README.md
 │   └── makepad-clipboard/       # Cross-platform clipboard (per-OS modules: macos/windows/linux/ios)
 ├── docs/                        # A2UI guides (EN/CN), bridge docs, splash pitch
 ├── skills/                      # Claude Code skills: makepad-screenshot, xor-shader-techniques
@@ -76,6 +79,7 @@ The workspace has been migrated to the Makepad 2.0 `script_mod!` API. Everything
 - `cargo check -p agent-core` / `-p canvas-terminal` — **pass** (both `--tests` too).
 - `cargo test -p agent-core -p canvas-terminal` — **104 passed** (agent runtime unit/session/tool suites + daemon end-to-end over real sockets). Before the agent workbench, canvas-terminal had ~23 tests.
 - `cargo test -p makepad-component` — **pass** (28 unit tests, 4 doc-tests ignored).
+- `cargo check -p dbpro` — **pass** (with `PATH="/Library/Developer/CommandLineTools/usr/bin:$PATH"` so the bundled sqlite3 cc step uses CLT clang). `cargo test -p dbpro` — **5 passed** (SQLite round trip incl. write-back UPDATE/NULL/DELETE + FK error, INSERT-copy, SQL builders, config persistence). Runtime verified clean: `grep -c '\[E\]'` on the app log is 0.
 - `cargo check -p gemini-talker` — **fails** (pre-existing: unresolved `gemini_live::prelude` import). Unrelated to the script_mod migration.
 - ⚠️ Test runs require an accepted Xcode license; after a macOS/Xcode update the linker refuses (`cc` exit 69) until `sudo xcodebuild -license accept`. This also breaks `/usr/bin/git` (it is an Xcode shim) — use
   `/Library/Developer/CommandLineTools/usr/bin/git` as a stopgap.
@@ -89,6 +93,8 @@ Interactive widgets (`MpButton`, `MpCheckbox`, `MpToggle`, `MpSwitch`, `MpRadio`
 **Shader gotcha:** theme tokens (e.g. `CARET`, `SOLID`) cannot be referenced as bare identifiers inside a shader `pixel: fn()` body — bind them as an instance field (`focus_color: instance(CARET)`) and read via `self.focus_color`. The `script_mod!` macro does NOT catch this; it only fails at runtime when the shader first compiles. Always verify with `grep -c '\[E\]'` on the app's runtime log.
 
 **Inheritance gotcha:** the old `live_design!` `<Base>{...}` angle-bracket inheritance is NOT valid in `script_mod!`. Use `mod.widgets.Variant = mod.widgets.Base{...}`. The just-landed `MpControlBar` variants used the old syntax and were fixed (parse errors only surfaced at runtime in a2ui-demo).
+
+**Script-derive gotchas (hit while building dbpro, 2026-09-15):** the `#[derive(Script)]` field parser is token-based — (1) doc comments (`///`) on struct fields fail with "Unexpected field form"; (2) commas inside generic field types (e.g. `HashMap<u64, Arc<Mutex<T>>>`) break parsing — use type aliases; (3) in the DSL, 6-digit hex colors (`#xRRGGBB`) evaluate to objects at runtime ("type mismatch ... expected Vec4f, got object") — always write 8-digit `#xRRGGBBAA`; (4) don't wrap module/global color values in `instance(...)`/`uniform(...)` when overriding View/DrawText props — assign them plain (`color: mod.db_theme.panel`), matching the mpc widget library convention; (5) `WidgetRef` path accessors (`mp_table`, `mp_tree`, `text_input`, …) live in generated `*WidgetRefExt` traits — `use makepad_component::widgets::*;` brings them in; (6) `MpTextArea` is **display-only** (paints text, no editing, no `Returned` action) — for a real editor use makepad's `TextInput{is_multiline: true}`; with multiline, ⌘/Ctrl+Enter emits `TextInputAction::Returned` instead of inserting a newline (handle it via `TextInputRef::returned(actions)`); (7) `match`/`if let` on `&self.tabs[...]` while calling `&mut self` methods inside the arms is a borrow error — snapshot the needed data (clone) or use `matches!` first; (8) makepad's `DataGrid` widget hosts per-cell widgets via DSL **templates**: any object-valued key in a `DataGrid{...}` block (e.g. `Editor := TextInput{...}`) becomes a template; the app drives cells in its own draw via `while let Some(step) = view.draw_walk(...).step()` → `step.as_data_grid()` → `next_cell` + `cell_text_styled`/`item(row,col,live_id!(Editor))` + `draw_item`, and reads edits back through `cell_widgets_with_actions` (see dbpro/src/grid.rs and makepad's apps/mpsheets for the reference pattern).
 
 Before assuming a change broke something, check whether the failure pre-exists. When fixing builds, prefer pinning/updating the dependency deliberately over speculative edits, and record what you did.
 
@@ -133,6 +139,7 @@ cargo run -p component-zoo --bin component-zoo   # Widget showcase
 cargo run -p a2ui-demo --bin a2ui-demo           # A2UI demo app
 cargo run -p raycast-launcher                    # Raycast-style launcher
 cargo run -p gemini-talker                       # Gemini Live app (needs GEMINI_API_KEY)
+cargo run -p dbpro                               # Database GUI (auto-creates dbpro-demo.db on first run)
 
 # a2ui-demo auxiliary binaries
 cargo run --bin a2ui-streaming
@@ -261,7 +268,7 @@ Bridge env vars: `LLM_API_URL` (default `https://api.moonshot.ai/v1/chat/complet
 - Use descriptive names: `test_should_fail_on_invalid_json`.
 - Prioritize `Processor` and `DataModel` correctness (A2UI protocol behavior).
 - UI changes are verified visually: `cargo run -p component-zoo` (widgets) or `cargo run -p a2ui-demo` (A2UI). The `makepad-screenshot` skill in `skills/` automates GUI screenshots.
-- `agent-core` and `canvas-terminal`'s agent path carry the strongest coverage in the workspace (unit + session-loop + daemon end-to-end over real sockets); keep new contracts under test there. Other crates have little or no test coverage; treat `cargo check -p <crate>` as the smoke test there.
+- `agent-core` and `canvas-terminal`'s agent path carry the strongest coverage in the workspace (unit + session-loop + daemon end-to-end over real sockets); keep new contracts under test there. `dbpro` covers its driver layer (SQLite round trip, paging/search/sort, persistence). Other crates have little or no test coverage; treat `cargo check -p <crate>` as the smoke test there.
 - No CI is configured (no `.github/` workflows) — run tests and clippy locally before submitting.
 
 ## 9. Security Considerations
