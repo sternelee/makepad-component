@@ -388,7 +388,7 @@ script_mod! {
                     command_input := TextInput{
                         width: Fill
                         height: 26
-                        empty_text: "@name text · /new terminal NAME · /new browser URL · /help"
+                        empty_text: "@agent text · /new agent NAME · /goal TEXT · /new terminal NAME · /help"
                         // Transparent background/border so the capsule's rounded corners show through.
                         draw_bg +: {
                             color: #00000000

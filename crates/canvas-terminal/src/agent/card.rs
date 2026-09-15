@@ -129,10 +129,7 @@ impl AgentCardState {
     /// Fold one already-sequenced event into the rows.
     fn fold(&mut self, event: &AgentEvent) {
         match event {
-            AgentEvent::GoalUpdated {
-                objective,
-                status,
-            } => {
+            AgentEvent::GoalUpdated { objective, status } => {
                 self.goal = Some(objective.clone());
                 let text = match (objective, status) {
                     (Some(o), Some(s)) => format!("◎ goal: {o} ({s})"),

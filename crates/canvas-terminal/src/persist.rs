@@ -107,6 +107,10 @@ pub enum SavedItem {
 }
 
 impl SavedItem {
+    /// Accessors for the canvas wiring, which maps `CanvasItem` <-> `SavedItem`
+    /// on save and restore. Unused until that wiring lands; kept next to the
+    /// data they belong to.
+    #[allow(dead_code)]
     pub fn title(&self) -> &str {
         match self {
             Self::Note { title, .. }
@@ -118,6 +122,7 @@ impl SavedItem {
         }
     }
 
+    #[allow(dead_code)]
     pub fn rect(&self) -> SavedRect {
         match self {
             Self::Note { rect, .. }

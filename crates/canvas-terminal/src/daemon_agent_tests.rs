@@ -841,8 +841,7 @@ fn a_goal_survives_an_attach_replay() {
     start_daemon_sync(&label);
 
     let client =
-        AgentClient::spawn_on(&label, card_create("goaled", workspace.path()))
-            .expect("spawn");
+        AgentClient::spawn_on(&label, card_create("goaled", workspace.path())).expect("spawn");
     client.set_goal(Some("ship the parser".into()));
 
     // The daemon journals the goal; the card folds it.

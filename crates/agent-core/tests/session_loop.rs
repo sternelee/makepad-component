@@ -1146,12 +1146,11 @@ fn the_goal_is_recorded_replayable_and_clearable() {
     assert_eq!(session.goal().as_deref(), Some("ship the parser"));
 
     // The journal records it, so a replayed transcript shows the objective.
-    let recorded = session
-        .journal()
-        .iter()
-        .any(|item| matches!(&item.value, AgentEvent::GoalUpdated {
+    let recorded = session.journal().iter().any(|item| {
+        matches!(&item.value, AgentEvent::GoalUpdated {
             objective: Some(text), ..
-        } if text == "ship the parser"));
+        } if text == "ship the parser")
+    });
     assert!(recorded, "the goal must be replayable from the journal");
 
     // Clearing works and is journaled too.
@@ -1162,7 +1161,13 @@ fn the_goal_is_recorded_replayable_and_clearable() {
     }
     assert_eq!(session.goal(), None);
     let cleared = session.journal().iter().any(|item| {
-        matches!(&item.value, AgentEvent::GoalUpdated { objective: None, .. })
+        matches!(
+            &item.value,
+            AgentEvent::GoalUpdated {
+                objective: None,
+                ..
+            }
+        )
     });
     assert!(cleared, "clearing must be journaled as well");
 }

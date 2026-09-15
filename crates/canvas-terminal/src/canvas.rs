@@ -45,6 +45,9 @@ const AGENT_LINE_H: f64 = 1.45;
 /// Approval buttons at the bottom of the card.
 const AGENT_BTN_W: f64 = 84.0;
 const AGENT_BTN_H: f64 = 26.0;
+/// Height of the always-visible composer strip at the bottom of an agent
+/// card (text line plus padding), reserved out of the transcript area.
+const AGENT_STRIP_H: f64 = 13.0 * AGENT_LINE_H + 8.0;
 
 /// Soft-wrap `text` at `max_chars` characters, prefixing the first line.
 /// Character-count wrapping rather than measuring, matching the note card.
@@ -1697,6 +1700,36 @@ impl CanvasPanel {
     }
 
     /// The agent Stop button under `screen`, if the agent is mid-turn.
+    /// The composer strip rect, derived from the card rect with the same
+    /// math as the draw pass (approval reservation included), so clicking
+    /// exactly where the input line is drawn starts typing.
+    fn agent_composer_rect(screen: Rect, has_approval: bool) -> Rect {
+        let body = Rect {
+            pos: screen.pos + Vec2d { x: 8.0, y: 32.0 },
+            size: Vec2d {
+                x: (screen.size.x - 16.0).max(1.0),
+                y: (screen.size.y - 40.0).max(1.0),
+            },
+        };
+        let reserved = if has_approval {
+            AGENT_BTN_H + 30.0
+        } else {
+            0.0
+        };
+        let text_h = (body.size.y - reserved - AGENT_STRIP_H).max(1.0);
+        let line_y = body.pos.y + text_h;
+        Rect {
+            pos: Vec2d {
+                x: body.pos.x - 4.0,
+                y: line_y + 2.0,
+            },
+            size: Vec2d {
+                x: body.size.x + 8.0,
+                y: AGENT_STRIP_H - 4.0,
+            },
+        }
+    }
+
     fn agent_stop_under(&self, screen: Vec2d) -> Option<u64> {
         self.items.iter().rev().find_map(|item| {
             if item.kind() != ItemKind::Agent {
@@ -2297,7 +2330,7 @@ impl CanvasPanel {
             Command::Help => {
                 self.status(
                     cx,
-                    "Commands: @name text · /new terminal NAME · /new browser URL · /new music TITLE · /new note · /open FILE · /status NAME online|busy|idle · /focus NAME · /zoom N · /grid · /clear · /help",
+                    "Commands: @agent text · /new agent NAME · /goal TEXT (clears if empty) · /new terminal NAME · /new browser URL · /new music TITLE · /new note · /open FILE · /focus NAME · /zoom N · /grid · /clear · /help",
                 );
             }
             Command::Clear => {
@@ -2377,6 +2410,8 @@ impl CanvasPanel {
     fn command_templates() -> &'static [&'static str] {
         &[
             "@",
+            "/new agent ",
+            "/goal ",
             "/new terminal ",
             "/new browser ",
             "/new note",
@@ -4316,9 +4351,14 @@ impl CanvasPanel {
         let status_color = status.color();
         let dot_size = 8.0;
         // Clearance for the two control buttons (2*BTN_W + gap + margin).
-        let buttons_w = 2.0 * BTN_W + 8.0;
-        let label_w = status_label.len() as f64 * 7.0;
-        let status_x = (screen.size.x - buttons_w - label_w - 18.0).max(screen.size.x * 0.5);
+        // Measure the reserved right edge from the same rects the control
+        // buttons draw with (three slots worst case), so the presence label
+        // can never slide under them; the old `.max(size.x * 0.5)` forced
+        // the label into the buttons on narrow cards.
+        let (_, min_r, _) = Self::control_button_rects(screen, true);
+        let buttons_left = min_r.pos.x - screen.pos.x;
+        let label_w = status_label.len() as f64 * 8.0;
+        let status_x = (buttons_left - 14.0 - label_w).max(60.0);
         let status_y = screen.pos.y + 9.0;
         self.draw_item_bg_rect(
             cx,
@@ -4587,9 +4627,14 @@ impl CanvasPanel {
         } else {
             ("ready", crate::items::AgentStatus::Online.color())
         };
-        let buttons_w = 2.0 * BTN_W + 8.0;
-        let label_w = status_label.len() as f64 * 7.0;
-        let status_x = (screen.size.x - buttons_w - label_w - 18.0).max(screen.size.x * 0.5);
+        // Measure the reserved right edge from the same rects the control
+        // buttons draw with (three slots worst case), so the presence label
+        // can never slide under them; the old `.max(size.x * 0.5)` forced
+        // the label into the buttons on narrow cards.
+        let (_, min_r, _) = Self::control_button_rects(screen, true);
+        let buttons_left = min_r.pos.x - screen.pos.x;
+        let label_w = status_label.len() as f64 * 8.0;
+        let status_x = (buttons_left - 14.0 - label_w).max(60.0);
         let status_y = screen.pos.y + 9.0;
         self.draw_item_bg_rect(
             cx,
@@ -4642,14 +4687,46 @@ impl CanvasPanel {
         let max_chars = ((body_rect.size.x / char_w).floor().max(8.0)) as usize;
         let max_lines = (body_rect.size.y / line_h).floor().max(1.0) as usize;
 
-        // Reserve space for the approval buttons at the bottom.
+        // Reserve space for the composer strip and, when an approval is
+        // pending, its button band - the transcript must never run under
+        // either.
         let reserved = if card.approval.is_some() {
             AGENT_BTN_H + 30.0
         } else {
             0.0
         };
-        let text_h = (body_rect.size.y - reserved).max(1.0);
+        let text_h = (body_rect.size.y - reserved - AGENT_STRIP_H).max(1.0);
         let budget = (text_h / line_h).floor() as usize;
+
+        // No conversation yet: say so, or the card reads as broken.
+        if card.rows().is_empty() {
+            self.draw_cell_text.color = vec4f([0.42, 0.46, 0.56, 1.0]);
+            self.draw_cell_text.draw_abs(
+                cx,
+                Vec2d {
+                    x: body_rect.pos.x + 4.0,
+                    y: body_rect.pos.y + line_h,
+                },
+                "No conversation yet.",
+            );
+            self.draw_cell_text.color = vec4f([0.34, 0.37, 0.45, 1.0]);
+            self.draw_cell_text.draw_abs(
+                cx,
+                Vec2d {
+                    x: body_rect.pos.x + 4.0,
+                    y: body_rect.pos.y + line_h * 3.0,
+                },
+                "Click the input line below, or double-click the card.",
+            );
+            self.draw_cell_text.draw_abs(
+                cx,
+                Vec2d {
+                    x: body_rect.pos.x + 4.0,
+                    y: body_rect.pos.y + line_h * 4.0,
+                },
+                "From the command bar: @name text, /goal text.",
+            );
+        }
 
         // Show the tail of the conversation: an agent's transcript grows, and
         // the latest turns are what the card is for.
@@ -4657,7 +4734,7 @@ impl CanvasPanel {
         for row in card.rows().iter().rev() {
             match row {
                 crate::agent::Row::User { text } => {
-                    for line in wrap("❯ ", text, max_chars) {
+                    for line in wrap("> ", text, max_chars) {
                         rendered_lines.push((AGENT_ROW_USER, line));
                     }
                     rendered_lines.push((AGENT_ROW_USER, String::new()));
@@ -4767,7 +4844,9 @@ impl CanvasPanel {
                     .draw_abs(cx, rect.pos + Vec2d { x: 12.0, y: 6.0 }, label);
             }
         }
-        // Composer line: where the user types into this card.
+        // Composer line: where the user types into this card. Always drawn,
+        // so the card is visibly interactive; an empty line shows a
+        // placeholder instead of a bare caret.
         if let Some(text) = composer {
             let line_y = body_rect.pos.y + text_h;
             self.draw_item_bg_rect(
@@ -4775,25 +4854,36 @@ impl CanvasPanel {
                 Rect {
                     pos: Vec2d {
                         x: body_rect.pos.x - 4.0,
-                        y: line_y - 4.0,
+                        y: line_y + 2.0,
                     },
                     size: Vec2d {
                         x: body_rect.size.x + 8.0,
-                        y: 13.0 * AGENT_LINE_H + 6.0,
+                        y: AGENT_STRIP_H - 4.0,
                     },
                 },
                 [0.16, 0.17, 0.22, 1.0],
             );
-            let shown = format!("❯ {text}▍");
-            self.draw_cell_text.color = vec4f(AGENT_ROW_USER);
-            self.draw_cell_text.draw_abs(
-                cx,
-                Vec2d {
-                    x: body_rect.pos.x,
-                    y: line_y,
-                },
-                &shown,
-            );
+            if text.is_empty() {
+                self.draw_cell_text.color = vec4f([0.40, 0.44, 0.54, 1.0]);
+                self.draw_cell_text.draw_abs(
+                    cx,
+                    Vec2d {
+                        x: body_rect.pos.x,
+                        y: line_y + 4.0,
+                    },
+                    "> type a prompt; ⏎ sends",
+                );
+            } else {
+                self.draw_cell_text.color = vec4f(AGENT_ROW_USER);
+                self.draw_cell_text.draw_abs(
+                    cx,
+                    Vec2d {
+                        x: body_rect.pos.x,
+                        y: line_y + 4.0,
+                    },
+                    &format!("> {text}▍"),
+                );
+            }
             let _ = gap_at_tail;
         }
         cx.pop_clip_rect();
@@ -4806,7 +4896,7 @@ impl CanvasPanel {
                 cx,
                 Vec2d {
                     x: screen.pos.x + 10.0,
-                    y: screen.pos.y + screen.size.y - 17.0,
+                    y: screen.pos.y + screen.size.y - 17.0 - AGENT_STRIP_H,
                 },
                 &text,
             );
@@ -5929,6 +6019,22 @@ impl Widget for CanvasPanel {
                         if item.kind() != ItemKind::Terminal {
                             self.focused_terminal = None;
                         }
+                        // Clicking an agent card's input line focuses it for
+                        // typing (double-click anywhere also opens it). No-op
+                        // when that composer is already open, so re-clicking
+                        // the line never wipes a half-typed draft.
+                        if item.kind() == ItemKind::Agent && self.agent_composer_id != Some(id) {
+                            let has_approval = item
+                                .agent_session()
+                                .and_then(|client| client.state.lock().ok())
+                                .map(|card| card.approval.is_some())
+                                .unwrap_or(false);
+                            if Self::agent_composer_rect(self.item_screen_rect(item), has_approval)
+                                .contains(me.abs)
+                            {
+                                self.start_agent_composer(cx, id);
+                            }
+                        }
                     }
                     // Double-click a note to edit it inline, or an agent card
                     // to open its composer.
@@ -7028,11 +7134,7 @@ impl Widget for CanvasPanel {
                             &agent_provider,
                             is_sel,
                             &card,
-                            if composing {
-                                Some(composer_text.as_str())
-                            } else {
-                                None
-                            },
+                            Some(composer_text.as_str()),
                             stop_hover,
                         );
                     }
