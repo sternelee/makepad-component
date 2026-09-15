@@ -617,6 +617,18 @@ pub struct CanvasPanel {
     /// caret) while IME composition is still in flight.
     #[rust]
     agent_input: String,
+    /// Set while a click that belongs to the composing card is in flight.
+    /// The hidden composer is zero-size, and makepad clears key focus when a
+    /// MouseUp lands outside the focused input's rect - which for an empty
+    /// rect is every MouseUp, including the one that finishes the very click
+    /// that started composing. When the KeyFocusLost action then arrives
+    /// (actions run after all event handlers), the click is known to belong
+    /// to the card and the focus is taken right back.
+    #[rust]
+    composer_focus_repair: bool,
+    /// Same repair for the hidden note editor, which shares the mechanism.
+    #[rust]
+    note_focus_repair: bool,
     /// Transcript scroll offset (lines from the tail) per agent card.
     #[rust]
     agent_scroll: HashMap<u64, f64>,
@@ -749,6 +761,8 @@ impl CanvasPanel {
         self.note_edit_caret = 0;
         self.agent_composer_id = None;
         self.agent_input.clear();
+        self.composer_focus_repair = false;
+        self.note_focus_repair = false;
         self.redraw(cx);
     }
 
@@ -895,6 +909,8 @@ impl CanvasPanel {
         if let Some(item) = self.items.iter().find(|i| i.id() == id) {
             if let Some(body) = item.body() {
                 self.note_edit_id = Some(id);
+                // Same MouseUp-clears-focus repair as the agent composer.
+                self.note_focus_repair = true;
                 self.note_edit_buffer = body.to_string();
                 self.note_edit_caret = self.note_edit_buffer.chars().count();
                 self.selected = Some(id);
@@ -922,6 +938,7 @@ impl CanvasPanel {
 
     /// Commit the inline edit buffer back to the note and exit edit mode.
     fn finish_note_edit(&mut self, cx: &mut Cx) {
+        self.note_focus_repair = false;
         if let Some(id) = self.note_edit_id.take() {
             // Prefer the hidden editor's text so the final IME composition is
             // captured; fall back to the cached buffer if the editor is gone.
@@ -1092,6 +1109,9 @@ impl CanvasPanel {
             return;
         }
         self.agent_composer_id = Some(id);
+        // The MouseUp completing this click will clear the fresh focus (the
+        // hidden input's rect is empty); re-take it from the action loop.
+        self.composer_focus_repair = true;
         self.agent_input.clear();
         self.selected = Some(id);
         // Keys must reach the composer, not a terminal or the note editor.
@@ -1108,6 +1128,7 @@ impl CanvasPanel {
         let Some(id) = self.agent_composer_id.take() else {
             return;
         };
+        self.composer_focus_repair = false;
         // Prefer the proxy's text so a pending IME composition is captured.
         let text = {
             let composer = self.view.text_input(cx, ids!(agent_composer));
@@ -1160,6 +1181,7 @@ impl CanvasPanel {
 
     /// Close the composer without sending (Escape).
     fn cancel_agent_composer(&mut self, cx: &mut Cx) {
+        self.composer_focus_repair = false;
         if self.agent_composer_id.take().is_some() {
             self.agent_input.clear();
             self.view
@@ -5755,6 +5777,35 @@ impl Widget for CanvasPanel {
             self.view.handle_event(cx, event, scope);
         });
 
+        // Re-take focus the hidden inputs just lost to the empty-rect
+        // MouseUp rule, when the click belonged to their hosting card.
+        // Actions arrive after every event handler, so a re-assert here is
+        // final for this event round - no later handler can clear it again.
+        if self.composer_focus_repair || self.note_focus_repair {
+            let composer_uid = self.view.text_input(cx, ids!(agent_composer)).widget_uid();
+            let note_uid = self.view.text_input(cx, ids!(note_editor)).widget_uid();
+            for item in actions
+                .iter()
+                .filter_map(|a| a.downcast_ref::<WidgetAction>())
+            {
+                if !matches!(
+                    item.action.downcast_ref::<TextInputAction>(),
+                    Some(TextInputAction::KeyFocusLost)
+                ) {
+                    continue;
+                }
+                if self.composer_focus_repair && item.widget_uid == composer_uid {
+                    self.view.text_input(cx, ids!(agent_composer)).take_key_focus(cx);
+                    self.composer_focus_repair = false;
+                    self.redraw(cx);
+                } else if self.note_focus_repair && item.widget_uid == note_uid {
+                    self.view.text_input(cx, ids!(note_editor)).take_key_focus(cx);
+                    self.note_focus_repair = false;
+                    self.redraw(cx);
+                }
+            }
+        }
+
         // Snap video cards to their clip's aspect once playback prepares.
         for item in actions
             .iter()
@@ -5851,6 +5902,21 @@ impl Widget for CanvasPanel {
         if let Event::MouseDown(me) = event {
             if me.button.contains(MouseButton::PRIMARY) {
                 self.last_mouse = me.abs;
+                // A click inside the card/note being edited keeps its hidden
+                // input focused: mark this click for the focus repair, since
+                // the MouseUp would otherwise clear it (empty-rect rule).
+                if self.agent_composer_id.is_some() || self.note_edit_id.is_some() {
+                    let hosting = self
+                        .items
+                        .iter()
+                        .find(|i| Some(i.id()) == self.agent_composer_id.or(self.note_edit_id));
+                    if let Some(item) = hosting {
+                        if self.item_screen_rect(item).contains(me.abs) {
+                            self.composer_focus_repair = self.agent_composer_id.is_some();
+                            self.note_focus_repair = self.note_edit_id.is_some();
+                        }
+                    }
+                }
                 // Any press hides the palette tooltip (the click may switch
                 // the tool, and a stale bubble shouldn't linger).
                 if self.palette_tip_visible {
