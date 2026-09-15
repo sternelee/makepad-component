@@ -1,0 +1,13 @@
+[package]
+name = "agent-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Headless agent runtime: provider driver abstraction, tool loop, and event journal"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+regex = "1"
+ureq = { version = "2.9", features = ["json"] }
