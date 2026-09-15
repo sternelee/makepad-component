@@ -9,6 +9,8 @@ pub enum ItemKind {
     MusicPlayer,
     Terminal,
     Browser,
+    /// A daemon-hosted agent with a transcript, driven by `crate::agent`.
+    Agent,
     /// A dropped media file (image / video / PDF); the payload kind is
     /// re-derived from the stored path when needed.
     Media,
@@ -381,6 +383,17 @@ pub enum CanvasItem {
         path: String,
         kind: MediaKind,
     },
+    /// An agent conversation card.
+    Agent {
+        id: u64,
+        world: Rect,
+        title: String,
+        /// The workspace the agent works in, shown as the card subtitle.
+        cwd: String,
+        /// The provider/model label shown in the title bar.
+        provider: String,
+        session: Option<Box<crate::agent::AgentClient>>,
+    },
 }
 
 impl CanvasItem {
@@ -390,7 +403,8 @@ impl CanvasItem {
             | CanvasItem::MusicPlayer { id, .. }
             | CanvasItem::Terminal { id, .. }
             | CanvasItem::Browser { id, .. }
-            | CanvasItem::Media { id, .. } => *id,
+            | CanvasItem::Media { id, .. }
+            | CanvasItem::Agent { id, .. } => *id,
         }
     }
 
@@ -401,6 +415,7 @@ impl CanvasItem {
             CanvasItem::Terminal { .. } => ItemKind::Terminal,
             CanvasItem::Browser { .. } => ItemKind::Browser,
             CanvasItem::Media { .. } => ItemKind::Media,
+            CanvasItem::Agent { .. } => ItemKind::Agent,
         }
     }
 
@@ -410,7 +425,8 @@ impl CanvasItem {
             | CanvasItem::MusicPlayer { world, .. }
             | CanvasItem::Terminal { world, .. }
             | CanvasItem::Browser { world, .. }
-            | CanvasItem::Media { world, .. } => *world,
+            | CanvasItem::Media { world, .. }
+            | CanvasItem::Agent { world, .. } => *world,
         }
     }
 
@@ -420,7 +436,8 @@ impl CanvasItem {
             | CanvasItem::MusicPlayer { world, .. }
             | CanvasItem::Terminal { world, .. }
             | CanvasItem::Browser { world, .. }
-            | CanvasItem::Media { world, .. } => world,
+            | CanvasItem::Media { world, .. }
+            | CanvasItem::Agent { world, .. } => world,
         }
     }
 
@@ -430,7 +447,8 @@ impl CanvasItem {
             | CanvasItem::MusicPlayer { title, .. }
             | CanvasItem::Terminal { title, .. }
             | CanvasItem::Browser { title, .. }
-            | CanvasItem::Media { title, .. } => title,
+            | CanvasItem::Media { title, .. }
+            | CanvasItem::Agent { title, .. } => title,
         }
     }
 
@@ -441,17 +459,47 @@ impl CanvasItem {
             | CanvasItem::MusicPlayer { title, .. }
             | CanvasItem::Terminal { title, .. }
             | CanvasItem::Browser { title, .. }
-            | CanvasItem::Media { title, .. } => title,
+            | CanvasItem::Media { title, .. }
+            | CanvasItem::Agent { title, .. } => title,
         }
     }
 
     pub fn session(&self) -> Option<&TerminalSession> {
         match self {
             CanvasItem::Terminal { session, .. } => session.as_deref(),
-            CanvasItem::Note { .. }
-            | CanvasItem::MusicPlayer { .. }
-            | CanvasItem::Browser { .. }
-            | CanvasItem::Media { .. } => None,
+            _ => None,
+        }
+    }
+
+    /// The agent client backing an Agent card.
+    pub fn agent_session(&self) -> Option<&crate::agent::AgentClient> {
+        match self {
+            CanvasItem::Agent { session, .. } => session.as_deref(),
+            _ => None,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn agent_session_mut(&mut self) -> Option<&mut crate::agent::AgentClient> {
+        match self {
+            CanvasItem::Agent { session, .. } => session.as_deref_mut(),
+            _ => None,
+        }
+    }
+
+    /// The workspace an agent card is rooted at.
+    pub fn agent_cwd(&self) -> Option<&str> {
+        match self {
+            CanvasItem::Agent { cwd, .. } => Some(cwd),
+            _ => None,
+        }
+    }
+
+    /// The provider/model label of an agent card.
+    pub fn agent_provider(&self) -> Option<&str> {
+        match self {
+            CanvasItem::Agent { provider, .. } => Some(provider),
+            _ => None,
         }
     }
 
@@ -459,10 +507,7 @@ impl CanvasItem {
     pub fn session_mut(&mut self) -> Option<&mut TerminalSession> {
         match self {
             CanvasItem::Terminal { session, .. } => session.as_deref_mut(),
-            CanvasItem::Note { .. }
-            | CanvasItem::MusicPlayer { .. }
-            | CanvasItem::Browser { .. }
-            | CanvasItem::Media { .. } => None,
+            _ => None,
         }
     }
 

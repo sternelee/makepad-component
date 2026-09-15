@@ -24,10 +24,110 @@ const VIDEO_SLOTS: usize = 2;
 /// PdfView widget slots backing dropped-PDF previews.
 const PDF_SLOTS: usize = 2;
 
+/// Dimmed text used for agent card chrome when the card is not focused.
+const DIM_TEXT: [f32; 4] = [0.55, 0.58, 0.66, 1.0];
+/// Agent card chrome. A violet accent keeps them distinct from terminals
+/// (blue) and media cards, without leaving the card palette.
+const AGENT_BG: [f32; 4] = [0.11, 0.12, 0.16, 1.0];
+const AGENT_BORDER: [f32; 4] = [0.28, 0.25, 0.38, 1.0];
+const AGENT_ACCENT: [f32; 4] = [0.62, 0.51, 0.96, 1.0];
+/// Text colours for the transcript rows.
+const AGENT_ROW_USER: [f32; 4] = [0.78, 0.83, 0.99, 1.0];
+const AGENT_ROW_ASSISTANT: [f32; 4] = [0.88, 0.90, 0.95, 1.0];
+const AGENT_ROW_REASONING: [f32; 4] = [0.55, 0.57, 0.66, 1.0];
+const AGENT_ROW_NOTICE: [f32; 4] = [0.62, 0.66, 0.74, 1.0];
+const AGENT_ROW_OK: [f32; 4] = [0.42, 0.80, 0.55, 1.0];
+const AGENT_ROW_FAIL: [f32; 4] = [0.95, 0.55, 0.52, 1.0];
+/// Wrapping width used for transcript rows, in pixels at font_scale 1.
+const AGENT_CHAR_W: f64 = 7.5;
+/// Per-row line height multiplier.
+const AGENT_LINE_H: f64 = 1.45;
+/// Approval buttons at the bottom of the card.
+const AGENT_BTN_W: f64 = 84.0;
+const AGENT_BTN_H: f64 = 26.0;
+
+/// Soft-wrap `text` at `max_chars` characters, prefixing the first line.
+/// Character-count wrapping rather than measuring, matching the note card.
+fn wrap(prefix: &str, text: &str, max_chars: usize) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut current = String::from(prefix);
+    for ch in text.chars() {
+        if ch == '\n' {
+            out.push(std::mem::take(&mut current));
+        } else {
+            if current.chars().count() >= max_chars {
+                out.push(std::mem::take(&mut current));
+            }
+            current.push(ch);
+        }
+    }
+    out.push(current);
+    out
+}
+
+/// Last path component of a workspace, for the card subtitle.
+fn path_tail(path: &str) -> &str {
+    path.trim_end_matches('/')
+        .rsplit('/')
+        .next()
+        .unwrap_or(path)
+}
+
+/// Resolve the agent provider from the environment.
+///
+/// `AGENT_PROVIDER=scripted` selects a canned conversation (no network, no
+/// key) so the canvas can be exercised without spending tokens. Otherwise an
+/// OpenAI-compatible endpoint is built from the same variables the a2ui bridge
+/// reads (`LLM_API_URL`, `LLM_API_KEY`/`MOONSHOT_API_KEY`, `LLM_MODEL`).
+fn provider_from_env() -> Result<crate::ipc::AgentProviderConfig, String> {
+    if std::env::var("AGENT_PROVIDER")
+        .map(|v| v.eq_ignore_ascii_case("scripted"))
+        .unwrap_or(false)
+    {
+        return Ok(crate::ipc::AgentProviderConfig::Scripted {
+            turns: vec![
+                crate::ipc::ScriptedTurnConfig {
+                    text: "I can look around the workspace for you.".into(),
+                    tool: Some((
+                        "find_files".into(),
+                        serde_json::json!({ "pattern": "**/*.rs" }),
+                    )),
+                    chunk_delay_ms: Some(20),
+                },
+                crate::ipc::ScriptedTurnConfig {
+                    text: "That's what I found. I'm a scripted demo agent — set \
+LLM_API_KEY for a real one."
+                        .into(),
+                    tool: None,
+                    chunk_delay_ms: Some(20),
+                },
+            ],
+        });
+    }
+    let api_key = std::env::var("LLM_API_KEY")
+        .or_else(|_| std::env::var("MOONSHOT_API_KEY"))
+        .map_err(|_| "set LLM_API_KEY (or AGENT_PROVIDER=scripted for a demo agent)".to_string())?;
+    Ok(crate::ipc::AgentProviderConfig::OpenAi {
+        api_url: std::env::var("LLM_API_URL")
+            .unwrap_or_else(|_| "https://api.moonshot.ai/v1/chat/completions".into()),
+        api_key,
+        model: std::env::var("LLM_MODEL").unwrap_or_else(|_| "kimi-k2.5".into()),
+        temperature: None,
+    })
+}
+
 /// Tool palette tooltip colors, matching the MpTooltip component's bubble
 /// (#1f2937 bg / #374151 border / #f9fafb text).
+///
+/// `approx_constant` fires on the border's blue channel because 81/255 = 0.318
+/// is close to 1/π. These are colour channels, not math constants, so the lint
+/// is wrong here — and as a `correctness` lint it denies by default, which
+/// would otherwise fail `cargo clippy` for the whole crate.
+#[allow(clippy::approx_constant)]
 const TIP_BG: [f32; 4] = [0.122, 0.161, 0.216, 0.98];
+#[allow(clippy::approx_constant)]
 const TIP_BORDER: [f32; 4] = [0.216, 0.255, 0.318, 1.0];
+#[allow(clippy::approx_constant)]
 const TIP_TEXT: [f32; 4] = [0.976, 0.980, 0.965, 1.0];
 /// Hover delay before the palette tooltip shows (MpTooltip show_delay).
 const TIP_SHOW_DELAY: f64 = 0.3;
@@ -256,6 +356,9 @@ struct Workspace {
     prop_selected_id: Option<u64>,
     prop_synced: bool,
     ime_active: bool,
+    agent_composer_id: Option<u64>,
+    agent_input: String,
+    agent_scroll: HashMap<u64, f64>,
 }
 
 impl Workspace {
@@ -291,6 +394,9 @@ impl Workspace {
             prop_selected_id: None,
             prop_synced: false,
             ime_active: false,
+            agent_composer_id: None,
+            agent_input: String::new(),
+            agent_scroll: HashMap::new(),
         }
     }
 }
@@ -501,6 +607,19 @@ pub struct CanvasPanel {
     /// Note currently being edited inline, if any.
     #[rust]
     note_edit_id: Option<u64>,
+    /// Agent card whose inline composer is open, if any.
+    #[rust]
+    agent_composer_id: Option<u64>,
+    /// Mirrors the composer proxy's text so the canvas can draw it (with the
+    /// caret) while IME composition is still in flight.
+    #[rust]
+    agent_input: String,
+    /// Transcript scroll offset (lines from the tail) per agent card.
+    #[rust]
+    agent_scroll: HashMap<u64, f64>,
+    /// Whether the per-card Stop button is hovered.
+    #[rust]
+    hovered_stop: Option<u64>,
     /// Inline edit buffer for the note being edited.
     #[rust]
     note_edit_buffer: String,
@@ -560,6 +679,9 @@ impl CanvasPanel {
             prop_selected_id: self.prop_selected_id,
             prop_synced: self.prop_synced,
             ime_active: self.ime_active,
+            agent_composer_id: self.agent_composer_id,
+            agent_input: std::mem::take(&mut self.agent_input),
+            agent_scroll: std::mem::take(&mut self.agent_scroll),
         };
         if self.current_workspace < self.workspaces.len() {
             self.workspaces[self.current_workspace] = ws;
@@ -606,6 +728,9 @@ impl CanvasPanel {
         self.prop_selected_id = ws.prop_selected_id;
         self.prop_synced = ws.prop_synced;
         self.ime_active = ws.ime_active;
+        self.agent_composer_id = ws.agent_composer_id;
+        self.agent_input = ws.agent_input;
+        self.agent_scroll = ws.agent_scroll;
         self.current_workspace = idx;
         // Clear transient cross-workspace interaction state.
         self.drag = None;
@@ -619,6 +744,8 @@ impl CanvasPanel {
         self.note_edit_id = None;
         self.note_edit_buffer.clear();
         self.note_edit_caret = 0;
+        self.agent_composer_id = None;
+        self.agent_input.clear();
         self.redraw(cx);
     }
 
@@ -892,6 +1019,182 @@ impl CanvasPanel {
         self.items.push(item);
         self.selected = Some(id);
         self.redraw(cx);
+    }
+
+    /// Create an agent card backed by a daemon-hosted session.
+    ///
+    /// The provider comes from the environment, so the canvas never needs a
+    /// settings UI to start a card: `LLM_API_URL`/`LLM_API_KEY`/`LLM_MODEL` for
+    /// a real model (same variables the a2ui bridge uses), or
+    /// `AGENT_PROVIDER=scripted` for a canned conversation that needs neither
+    /// network nor key — useful for UI work and demos.
+    pub fn spawn_agent_card(&mut self, cx: &mut Cx, name: &str) {
+        let cwd = std::env::current_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| ".".to_string());
+        let provider = match provider_from_env() {
+            Ok(provider) => provider,
+            Err(message) => {
+                self.status(cx, &format!("agent: {message}"));
+                return;
+            }
+        };
+        let provider_label = match &provider {
+            crate::ipc::AgentProviderConfig::OpenAi { model, .. } => model.clone(),
+            crate::ipc::AgentProviderConfig::Scripted { .. } => "scripted".to_owned(),
+        };
+
+        let request = crate::ipc::AgentCreateRequest {
+            name: name.to_owned(),
+            cwd: cwd.clone(),
+            provider,
+            permission: crate::ipc::AgentPermissionConfig::Interactive { timeout_ms: None },
+            model: None,
+            system_prompt: None,
+            enabled_tools: None,
+        };
+        match crate::agent::AgentClient::spawn(request) {
+            Ok(client) => {
+                let id = self.next_item_id;
+                self.next_item_id += 1;
+                let world = self.new_agent_geometry();
+                self.items.push(CanvasItem::Agent {
+                    id,
+                    world,
+                    title: name.to_owned(),
+                    cwd: client.cwd.clone(),
+                    provider: provider_label,
+                    session: Some(Box::new(client)),
+                });
+                self.selected = Some(id);
+                self.redraw(cx);
+                self.status(cx, &format!("agent '{name}' ready — type to prompt it"));
+            }
+            Err(message) => {
+                log!("canvas: failed to spawn agent '{name}': {message}");
+                self.status(cx, &format!("Failed to create agent: {message}"));
+            }
+        }
+    }
+
+    /// Open the inline composer on agent card `id` (double-click, like notes).
+    ///
+    /// A zero-size TextInput proxy owns focus and IME composition while the
+    /// canvas draws the line itself — the same arrangement as note editing.
+    fn start_agent_composer(&mut self, cx: &mut Cx, id: u64) {
+        let Some(item) = self.items.iter().find(|i| i.id() == id) else {
+            return;
+        };
+        if item.kind() != ItemKind::Agent {
+            return;
+        }
+        self.agent_composer_id = Some(id);
+        self.agent_input.clear();
+        self.selected = Some(id);
+        // Keys must reach the composer, not a terminal or the note editor.
+        self.focused_terminal = None;
+        self.note_edit_id = None;
+        let composer = self.view.text_input(cx, ids!(agent_composer));
+        composer.set_text(cx, "");
+        composer.set_key_focus(cx);
+        self.redraw(cx);
+    }
+
+    /// Submit the composer: a prompt when idle, a steer mid-turn.
+    fn finish_agent_composer(&mut self, cx: &mut Cx) {
+        let Some(id) = self.agent_composer_id.take() else {
+            return;
+        };
+        // Prefer the proxy's text so a pending IME composition is captured.
+        let text = {
+            let composer = self.view.text_input(cx, ids!(agent_composer));
+            let text = composer.text();
+            composer.set_text(cx, "");
+            text
+        };
+        let text = if text.is_empty() {
+            std::mem::take(&mut self.agent_input)
+        } else {
+            text
+        };
+        self.agent_input.clear();
+        let text = text.trim().to_owned();
+        if text.is_empty() {
+            self.redraw(cx);
+            return;
+        }
+        if let Some(client) = self
+            .items
+            .iter()
+            .find(|i| i.id() == id)
+            .and_then(|i| i.agent_session())
+        {
+            if client.is_busy() {
+                client.steer(&text);
+                self.status(cx, "steered the running turn");
+            } else {
+                client.prompt(&text);
+                self.status(cx, "prompted the agent");
+            }
+            // A sent prompt should be read at the tail again.
+            self.agent_scroll.remove(&id);
+        }
+        // Focus returns to the command bar, matching note editing.
+        self.view
+            .text_input(
+                cx,
+                ids!(
+                    command_wrap
+                        .command_bar
+                        .input_row
+                        .input_capsule
+                        .command_input
+                ),
+            )
+            .set_key_focus(cx);
+        self.redraw(cx);
+    }
+
+    /// Close the composer without sending (Escape).
+    fn cancel_agent_composer(&mut self, cx: &mut Cx) {
+        if self.agent_composer_id.take().is_some() {
+            self.agent_input.clear();
+            self.view
+                .text_input(cx, ids!(agent_composer))
+                .set_text(cx, "");
+            self.redraw(cx);
+        }
+    }
+
+    /// The agent card's Stop button rect, pure in the card rect so drawing and
+    /// hit-testing agree.
+    fn agent_stop_rect(screen: Rect) -> Rect {
+        Rect {
+            pos: Vec2d {
+                x: screen.pos.x + screen.size.x - 8.0 - 52.0,
+                y: screen.pos.y + screen.size.y - 8.0 - 22.0,
+            },
+            size: Vec2d { x: 52.0, y: 22.0 },
+        }
+    }
+
+    /// Default geometry for a new agent card.
+    fn new_agent_geometry(&self) -> Rect {
+        let mut world_pos = self
+            .camera
+            .screen_to_world(self.viewport * 0.5, self.world_viewport());
+        // Cascade by the number of existing agents, like the attach path.
+        let n = self
+            .items
+            .iter()
+            .filter(|i| i.kind() == ItemKind::Agent)
+            .count() as f64;
+        world_pos.x += n * 32.0;
+        world_pos.y += n * 26.0;
+        Rect {
+            pos: world_pos - Vec2d { x: 240.0, y: 200.0 },
+            size: Vec2d { x: 480.0, y: 400.0 },
+        }
     }
 
     /// Spawn a terminal item running `command` (default shell) with the
@@ -1366,6 +1669,52 @@ impl CanvasPanel {
         })
     }
 
+    /// The agent approval button under `screen`, if any: `(item, allow?)`.
+    fn approval_button_under(&self, screen: Vec2d) -> Option<(u64, bool)> {
+        self.items.iter().rev().find_map(|item| {
+            if item.kind() != ItemKind::Agent {
+                return None;
+            }
+            // Only test cards that are actually showing a prompt.
+            let showing = item
+                .agent_session()
+                .and_then(|client| client.state.lock().ok())
+                .map(|card| card.approval.is_some())
+                .unwrap_or(false);
+            if !showing {
+                return None;
+            }
+            let r = self.item_screen_rect(item);
+            let (allow_rect, deny_rect) = Self::approval_button_rects(r);
+            if allow_rect.contains(screen) {
+                Some((item.id(), true))
+            } else if deny_rect.contains(screen) {
+                Some((item.id(), false))
+            } else {
+                None
+            }
+        })
+    }
+
+    /// The agent Stop button under `screen`, if the agent is mid-turn.
+    fn agent_stop_under(&self, screen: Vec2d) -> Option<u64> {
+        self.items.iter().rev().find_map(|item| {
+            if item.kind() != ItemKind::Agent {
+                return None;
+            }
+            let busy = item
+                .agent_session()
+                .and_then(|client| client.state.lock().ok())
+                .map(|card| card.busy && !card.dead)
+                .unwrap_or(false);
+            if !busy {
+                return None;
+            }
+            let rect = Self::agent_stop_rect(self.item_screen_rect(item));
+            rect.contains(screen).then_some(item.id())
+        })
+    }
+
     /// The minimized-item chip under `screen` in the bottom dock (if any).
     fn dock_chip_under(&self, screen: Vec2d, viewport: Vec2d) -> Option<u64> {
         if self.minimized.is_empty() {
@@ -1395,6 +1744,22 @@ impl CanvasPanel {
 
     /// Minimize `id`: remove it from the canvas, add it to the bottom dock.
     fn minimize_item(&mut self, cx: &mut Cx, id: u64) {
+        // Agent cards are not minimizable for now: the minimized slot holds a
+        // terminal session, and widening it is not worth it before the dock
+        // learns about agents. Closing (✕) works and kills the agent.
+        if self
+            .items
+            .iter()
+            .find(|i| i.id() == id)
+            .is_some_and(|i| i.kind() == ItemKind::Agent)
+        {
+            self.status(
+                cx,
+                "agent cards cannot be docked yet — close (✕) or leave them",
+            );
+            return;
+        }
+
         if self.minimized.iter().any(|m| m.0 == id) {
             return;
         }
@@ -1423,6 +1788,11 @@ impl CanvasPanel {
                     Some(status),
                     session,
                 )
+            }
+            CanvasItem::Agent { .. } => {
+                // Unreachable: guarded above. Present so the match stays
+                // exhaustive if the guard is ever relaxed.
+                return;
             }
             CanvasItem::Browser {
                 world, title, url, ..
@@ -1461,6 +1831,10 @@ impl CanvasPanel {
         };
         let (id, kind, world, title, extra, status, session) = self.minimized.remove(pos);
         match kind {
+            ItemKind::Agent => {
+                // Agent cards are never minimized; see minimize_item.
+                return;
+            }
             ItemKind::Terminal => {
                 // Reuse the live session saved at minimize time; re-spawning
                 // would collide on the create_only rmux session name.
@@ -1529,6 +1903,11 @@ impl CanvasPanel {
         if let Some(item) = self.items.iter().find(|i| i.id() == id) {
             if let Some(session) = item.session() {
                 session.kill();
+            }
+            // Killing the client asks the daemon to stop the agent's worker, so
+            // a closed card does not keep burning tokens in the background.
+            if let Some(agent) = item.agent_session() {
+                agent.kill();
             }
         }
         self.minimized.retain(|m| m.0 != id);
@@ -1764,6 +2143,31 @@ impl CanvasPanel {
     pub fn exec_command(&mut self, cx: &mut Cx, line: &str) {
         match command::parse(line) {
             Command::Send { target, text } => {
+                // An agent card with that name takes the message as a prompt.
+                let agent = self
+                    .items
+                    .iter()
+                    .find(|i| {
+                        i.kind() == ItemKind::Agent
+                            && i.title().to_lowercase() == target.to_lowercase()
+                    })
+                    .map(|i| i.id());
+                if let Some(id) = agent {
+                    if let Some(client) = self
+                        .items
+                        .iter()
+                        .find(|i| i.id() == id)
+                        .and_then(|i| i.agent_session())
+                    {
+                        if text.is_empty() {
+                            self.status(cx, "Say something: @name message");
+                        } else {
+                            client.prompt(&text);
+                            self.status(cx, &format!("sent to agent '{target}'"));
+                        }
+                    }
+                    return;
+                }
                 let target_id = self
                     .items
                     .iter()
@@ -1803,6 +2207,9 @@ impl CanvasPanel {
             Command::NewMusicPlayer { title } => {
                 self.spawn_music_player(cx, &title);
                 self.status(cx, &format!("Music player: {title}"));
+            }
+            Command::NewAgent { name } => {
+                self.spawn_agent_card(cx, &name);
             }
             Command::OpenPath { path } => match MediaKind::from_path(&path) {
                 Some(kind) => {
@@ -1900,6 +2307,24 @@ impl CanvasPanel {
                 );
             }
             Command::Forward { text } => {
+                // A selected agent turns the command bar into its composer:
+                // a prompt when idle, a steer when mid-turn.
+                let selected_agent = self
+                    .items
+                    .iter()
+                    .find(|i| Some(i.id()) == self.selected && i.kind() == ItemKind::Agent)
+                    .and_then(|i| i.agent_session().map(|c| (i.id(), c.is_busy(), c)));
+                if let Some((id, busy, client)) = selected_agent {
+                    if busy {
+                        client.steer(&text);
+                        self.status(cx, "steered the running turn");
+                    } else {
+                        client.prompt(&text);
+                        self.status(cx, "prompted the agent");
+                    }
+                    let _ = id;
+                    return;
+                }
                 if let Some(id) = self.focused_terminal {
                     if let Some(item) = self.items.iter().find(|i| i.id() == id) {
                         if let Some(session) = item.session() {
@@ -1910,7 +2335,7 @@ impl CanvasPanel {
                 }
                 self.status(
                     cx,
-                    "No focused terminal — use @name text or click a terminal",
+                    "Nothing focused — select an agent card, or use @name text",
                 );
             }
         }
@@ -2211,6 +2636,11 @@ impl CanvasPanel {
         for item in self.items.iter() {
             if let Some(session) = item.session() {
                 if session.poll() {
+                    changed = true;
+                }
+            }
+            if let Some(agent) = item.agent_session() {
+                if agent.poll() {
                     changed = true;
                 }
             }
@@ -3608,6 +4038,7 @@ impl CanvasPanel {
                 ItemKind::Note => "📝",
                 ItemKind::MusicPlayer => "♫",
                 ItemKind::Media => "🖼",
+                ItemKind::Agent => "✦",
             };
             let label = format!("{kind_label} {title}");
             self.draw_cell_text.color = vec4f(TITLE_TEXT);
@@ -4078,6 +4509,334 @@ impl CanvasPanel {
         }
 
         cx.pop_clip_rect();
+    }
+
+    /// Draw an agent card: title bar with presence, then the transcript.
+    ///
+    /// The transcript is rendered from the card state's rows, soft-wrapped at a
+    /// fixed character width like the note card — good enough to read, and
+    /// consistent with everything else on the canvas.
+    // Eleven parameters matches the sibling draw_*_at functions (see
+    // `draw_terminal_at`, `draw_music_player`); the card state travels as an
+    // Arc so drawing never touches the client.
+    #[allow(clippy::too_many_arguments)]
+    fn draw_agent_at(
+        &mut self,
+        cx: &mut Cx2d,
+        item_id: u64,
+        screen: Rect,
+        title: &str,
+        cwd: &str,
+        provider: &str,
+        is_sel: bool,
+        card: &std::sync::Arc<std::sync::Mutex<crate::agent::AgentCardState>>,
+        composer: Option<&str>,
+        stop_hover: bool,
+    ) {
+        let card = card.lock();
+        let Ok(card) = card else { return };
+
+        self.draw_shadow_rect(cx, screen);
+        if is_sel {
+            self.draw_glow_border(cx, screen, SEL_BORDER);
+        }
+        self.draw_item_bg_rect(cx, screen, AGENT_BG);
+        self.draw_border_rect(cx, screen, if is_sel { SEL_BORDER } else { AGENT_BORDER });
+
+        // Title bar: avatar, name + provider, presence.
+        let avatar_color = name_color(title);
+        self.draw_avatar(
+            cx,
+            screen.pos + Vec2d { x: 8.0, y: 5.0 },
+            title,
+            avatar_color,
+        );
+        self.draw_title.color = vec4f(if is_sel { TITLE_TEXT } else { DIM_TEXT });
+        let sub = if provider.is_empty() {
+            cwd.to_string()
+        } else {
+            format!("{provider} · {}", path_tail(cwd))
+        };
+        self.draw_title.draw_abs(
+            cx,
+            screen.pos + Vec2d { x: 32.0, y: 6.0 },
+            &format!("{title} — {sub}"),
+        );
+
+        // Presence: working / exited / ready, on the right of the title bar.
+        let (status_label, status_color) = if card.dead {
+            ("exited", [0.55, 0.60, 0.72, 1.0])
+        } else if card.busy {
+            ("working", crate::items::AgentStatus::Busy.color())
+        } else {
+            ("ready", crate::items::AgentStatus::Online.color())
+        };
+        let buttons_w = 2.0 * BTN_W + 8.0;
+        let label_w = status_label.len() as f64 * 7.0;
+        let status_x = (screen.size.x - buttons_w - label_w - 18.0).max(screen.size.x * 0.5);
+        let status_y = screen.pos.y + 9.0;
+        self.draw_item_bg_rect(
+            cx,
+            Rect {
+                pos: Vec2d {
+                    x: screen.pos.x + status_x,
+                    y: status_y,
+                },
+                size: Vec2d { x: 8.0, y: 8.0 },
+            },
+            status_color,
+        );
+        self.draw_title.color = vec4f(if is_sel { MUSIC_SECONDARY } else { DIM_TEXT });
+        self.draw_title.draw_abs(
+            cx,
+            Vec2d {
+                x: screen.pos.x + status_x + 13.0,
+                y: status_y - 2.0,
+            },
+            status_label,
+        );
+
+        // Divider between the title bar and the transcript.
+        self.draw_item_bg_rect(
+            cx,
+            Rect {
+                pos: Vec2d {
+                    x: screen.pos.x + 6.0,
+                    y: screen.pos.y + 28.0,
+                },
+                size: Vec2d {
+                    x: screen.size.x - 12.0,
+                    y: 1.0,
+                },
+            },
+            [0.24, 0.22, 0.32, 0.8],
+        );
+
+        // Transcript, clipped to the content area.
+        let body_rect = Rect {
+            pos: screen.pos + Vec2d { x: 8.0, y: 32.0 },
+            size: Vec2d {
+                x: (screen.size.x - 16.0).max(1.0),
+                y: (screen.size.y - 40.0).max(1.0),
+            },
+        };
+        cx.push_clip_rect(body_rect);
+        let char_w = AGENT_CHAR_W * self.camera.zoom as f64;
+        let line_h = 13.0 * AGENT_LINE_H * self.camera.zoom as f64;
+        let max_chars = ((body_rect.size.x / char_w).floor().max(8.0)) as usize;
+        let max_lines = (body_rect.size.y / line_h).floor().max(1.0) as usize;
+
+        // Reserve space for the approval buttons at the bottom.
+        let reserved = if card.approval.is_some() {
+            AGENT_BTN_H + 30.0
+        } else {
+            0.0
+        };
+        let text_h = (body_rect.size.y - reserved).max(1.0);
+        let budget = (text_h / line_h).floor() as usize;
+
+        // Show the tail of the conversation: an agent's transcript grows, and
+        // the latest turns are what the card is for.
+        let mut rendered_lines: Vec<([f32; 4], String)> = Vec::new();
+        for row in card.rows().iter().rev() {
+            match row {
+                crate::agent::Row::User { text } => {
+                    for line in wrap("❯ ", text, max_chars) {
+                        rendered_lines.push((AGENT_ROW_USER, line));
+                    }
+                    rendered_lines.push((AGENT_ROW_USER, String::new()));
+                }
+                crate::agent::Row::Assistant { text, streaming } => {
+                    let marker = if *streaming { "▍" } else { "" };
+                    for line in wrap("", text, max_chars) {
+                        rendered_lines.push((AGENT_ROW_ASSISTANT, line));
+                    }
+                    if *streaming && !text.is_empty() {
+                        if let Some(last) = rendered_lines.last_mut() {
+                            last.1.push_str(marker);
+                        }
+                    }
+                    rendered_lines.push((AGENT_ROW_ASSISTANT, String::new()));
+                }
+                crate::agent::Row::Reasoning { text } => {
+                    for line in wrap("· ", text, max_chars) {
+                        rendered_lines.push((AGENT_ROW_REASONING, line));
+                    }
+                    rendered_lines.push((AGENT_ROW_REASONING, String::new()));
+                }
+                crate::agent::Row::Tool {
+                    name, ok, summary, ..
+                } => {
+                    let (icon, color) = match ok {
+                        Some(true) => ("✓", AGENT_ROW_OK),
+                        Some(false) => ("✗", AGENT_ROW_FAIL),
+                        None => ("…", AGENT_ROW_NOTICE),
+                    };
+                    let mut first = format!("{icon} {name}");
+                    if let Some(summary) = summary {
+                        if !summary.is_empty() {
+                            first.push_str(&format!(" — {summary}"));
+                        }
+                    }
+                    for line in wrap("", &first, max_chars) {
+                        rendered_lines.push((color, line));
+                    }
+                    rendered_lines.push((color, String::new()));
+                }
+                crate::agent::Row::Notice { text } => {
+                    for line in wrap("", text, max_chars) {
+                        rendered_lines.push((AGENT_ROW_NOTICE, line));
+                    }
+                    rendered_lines.push((AGENT_ROW_NOTICE, String::new()));
+                }
+            }
+        }
+        rendered_lines.reverse();
+
+        // Draw the tail, honouring a per-card scroll offset into the history.
+        // Scrolling is clamped so the view can never leave the transcript.
+        let scroll = self.agent_scroll.get(&item_id).copied().unwrap_or(0.0);
+        let scroll = scroll.clamp(0.0, (rendered_lines.len() as f64).max(1.0) - 1.0);
+        let tail_len = rendered_lines.len().saturating_sub(scroll as usize);
+        let gap_at_tail = rendered_lines.len() - tail_len > 0 && scroll > 0.0;
+
+        // Draw only as much as fits, from the bottom up.
+        let skip = tail_len.saturating_sub(budget);
+        let view: Vec<([f32; 4], String)> = rendered_lines
+            .iter()
+            .skip(skip)
+            .take(budget)
+            .cloned()
+            .collect();
+        for (index, (color, line)) in view.iter().enumerate() {
+            if index >= max_lines {
+                break;
+            }
+            self.draw_cell_text.color = vec4f(*color);
+            self.draw_cell_text.draw_abs(
+                cx,
+                Vec2d {
+                    x: body_rect.pos.x,
+                    y: body_rect.pos.y + index as f64 * line_h,
+                },
+                line,
+            );
+        }
+
+        // Approval prompt: what is being asked, and two buttons.
+        if let Some(approval) = &card.approval {
+            let (allow_rect, deny_rect) = Self::approval_button_rects(screen);
+            let banner_y = body_rect.pos.y + text_h + 6.0;
+            let mut ask = format!("allow {}?", approval.name);
+            if let Some(path) = approval.arguments.get("path").and_then(|p| p.as_str()) {
+                ask = format!("allow {} {}?", approval.name, path);
+            }
+            self.draw_cell_text.color = vec4f(AGENT_ROW_USER);
+            self.draw_cell_text.draw_abs(
+                cx,
+                Vec2d {
+                    x: body_rect.pos.x,
+                    y: banner_y,
+                },
+                &ask,
+            );
+
+            for (rect, label, fill) in [
+                (allow_rect, "Allow", AGENT_ACCENT),
+                (deny_rect, "Deny", [0.55, 0.28, 0.34, 1.0]),
+            ] {
+                self.draw_item_bg_rect(cx, rect, fill);
+                self.draw_cell_text.color = vec4f([1.0, 1.0, 1.0, 1.0]);
+                self.draw_cell_text
+                    .draw_abs(cx, rect.pos + Vec2d { x: 12.0, y: 6.0 }, label);
+            }
+        }
+        // Composer line: where the user types into this card.
+        if let Some(text) = composer {
+            let line_y = body_rect.pos.y + text_h;
+            self.draw_item_bg_rect(
+                cx,
+                Rect {
+                    pos: Vec2d {
+                        x: body_rect.pos.x - 4.0,
+                        y: line_y - 4.0,
+                    },
+                    size: Vec2d {
+                        x: body_rect.size.x + 8.0,
+                        y: 13.0 * AGENT_LINE_H + 6.0,
+                    },
+                },
+                [0.16, 0.17, 0.22, 1.0],
+            );
+            let shown = format!("❯ {text}▍");
+            self.draw_cell_text.color = vec4f(AGENT_ROW_USER);
+            self.draw_cell_text.draw_abs(
+                cx,
+                Vec2d {
+                    x: body_rect.pos.x,
+                    y: line_y,
+                },
+                &shown,
+            );
+            let _ = gap_at_tail;
+        }
+        cx.pop_clip_rect();
+
+        // Usage in the bottom-left corner, when the provider reports it.
+        if let Some((prompt_tokens, completion_tokens)) = card.usage {
+            let text = format!("{prompt_tokens}+{completion_tokens} tok");
+            self.draw_title.color = vec4f(DIM_TEXT);
+            self.draw_title.draw_abs(
+                cx,
+                Vec2d {
+                    x: screen.pos.x + 10.0,
+                    y: screen.pos.y + screen.size.y - 17.0,
+                },
+                &text,
+            );
+        }
+
+        // Stop button while the agent is mid-turn.
+        if card.busy && !card.dead {
+            let rect = Self::agent_stop_rect(screen);
+            let fill = if stop_hover {
+                [0.72, 0.30, 0.34, 1.0]
+            } else {
+                [0.45, 0.22, 0.26, 1.0]
+            };
+            self.draw_item_bg_rect(cx, rect, fill);
+            self.draw_cell_text.color = vec4f([1.0, 1.0, 1.0, 1.0]);
+            self.draw_cell_text
+                .draw_abs(cx, rect.pos + Vec2d { x: 10.0, y: 4.0 }, "■ stop");
+        }
+    }
+
+    /// Approval button rects, derived purely from the card rect so the draw
+    /// pass and the hit-test can never disagree (same discipline as
+    /// [`Self::control_button_rects`]).
+    fn approval_button_rects(screen: Rect) -> (Rect, Rect) {
+        let bottom = screen.pos.y + screen.size.y - AGENT_BTN_H - 8.0;
+        let allow = Rect {
+            pos: Vec2d {
+                x: screen.pos.x + 12.0,
+                y: bottom,
+            },
+            size: Vec2d {
+                x: AGENT_BTN_W,
+                y: AGENT_BTN_H,
+            },
+        };
+        let deny = Rect {
+            pos: Vec2d {
+                x: allow.pos.x + AGENT_BTN_W + 8.0,
+                y: bottom,
+            },
+            size: Vec2d {
+                x: AGENT_BTN_W,
+                y: AGENT_BTN_H,
+            },
+        };
+        (allow, deny)
     }
 
     /// Draw a browser card and drive the embedded CEF browser slot.
@@ -4974,6 +5733,15 @@ impl Widget for CanvasPanel {
             self.redraw(cx);
         }
 
+        if let Event::MouseMove(me) = event {
+            // Track the agent Stop button so it can show a pressed-ready tint.
+            let stop = self.agent_stop_under(me.abs);
+            if stop != self.hovered_stop {
+                self.hovered_stop = stop;
+                self.redraw(cx);
+            }
+        }
+
         if let Event::MouseDown(me) = event {
             if me.button.contains(MouseButton::PRIMARY) {
                 self.last_mouse = me.abs;
@@ -5013,7 +5781,57 @@ impl Widget for CanvasPanel {
                     }
                     return;
                 }
-                // Title-bar control buttons take priority.
+                // An open agent composer commits when clicking outside its
+                // card, exactly like the note editor does.
+                if let Some(compose_id) = self.agent_composer_id {
+                    match self.hit_test(me.abs) {
+                        Some(id) if id == compose_id => {}
+                        _ => {
+                            self.finish_agent_composer(cx);
+                        }
+                    }
+                }
+                // Agent Stop button: abort the running turn.
+                // The Stop button sits above the card body, so it wins over
+                // selecting the card.
+                if let Some(id) = self.agent_stop_under(me.abs) {
+                    if let Some(client) = self
+                        .items
+                        .iter()
+                        .find(|i| i.id() == id)
+                        .and_then(|i| i.agent_session())
+                    {
+                        client.cancel();
+                        self.status(cx, "cancelled");
+                        self.hovered_stop = None;
+                    }
+                    return;
+                }
+                // Agent approval buttons: they sit inside the card, so they
+                // must be resolved before the card itself is selected.
+                if let Some((id, allow)) = self.approval_button_under(me.abs) {
+                    let approval_id = self
+                        .items
+                        .iter()
+                        .find(|i| i.id() == id)
+                        .and_then(|i| i.agent_session())
+                        .and_then(|client| client.state.lock().ok())
+                        .and_then(|card| card.approval.as_ref().map(|a| a.approval_id));
+                    if let Some(approval_id) = approval_id {
+                        if let Some(client) = self
+                            .items
+                            .iter()
+                            .find(|i| i.id() == id)
+                            .and_then(|i| i.agent_session())
+                        {
+                            client.reply(approval_id, allow, None);
+                        }
+                        self.status(cx, if allow { "approved" } else { "denied" });
+                    }
+                    return;
+                }
+                // Agent Stop button hover is derived in the Move handler; a
+                // press lands directly below.
                 if let Some((id, kind)) = self.control_button_under(me.abs) {
                     match kind {
                         BtnKind::Minimize => self.minimize_item(cx, id),
@@ -5096,13 +5914,20 @@ impl Widget for CanvasPanel {
                             self.focused_terminal = None;
                         }
                     }
-                    // Double-click a note to edit it inline.
+                    // Double-click a note to edit it inline, or an agent card
+                    // to open its composer.
                     if is_double {
-                        if let Some(item) = self.items.iter().find(|i| i.id() == id) {
-                            if item.kind() == ItemKind::Note {
+                        let kind = self.items.iter().find(|i| i.id() == id).map(|i| i.kind());
+                        match kind {
+                            Some(ItemKind::Note) => {
                                 self.start_note_edit(cx, id);
                                 return;
                             }
+                            Some(ItemKind::Agent) => {
+                                self.start_agent_composer(cx, id);
+                                return;
+                            }
+                            _ => {}
                         }
                     }
                     // Music player: clicking the body toggles play/pause; the
@@ -5528,6 +6353,33 @@ impl Widget for CanvasPanel {
         }
 
         if let Event::Scroll(se) = event {
+            // Transcript: over an agent card, wheel scrolls the conversation
+            // history instead of panning the canvas.
+            let agent_under =
+                self.items.iter().rev().find(|i| {
+                    i.kind() == ItemKind::Agent && self.item_screen_rect(i).contains(se.abs)
+                });
+            if let Some(item) = agent_under {
+                let id = item.id();
+                let rows: usize = item
+                    .agent_session()
+                    .and_then(|c| c.state.lock().ok())
+                    .map(|card| card.rows().len().max(1))
+                    .unwrap_or(1);
+                let delta = (se.scroll.y / 20.0).round();
+                let current = self.agent_scroll.get(&id).copied().unwrap_or(0.0);
+                // Wheel up (negative y) moves into history: offset grows.
+                let next = (current - delta).clamp(0.0, rows as f64);
+                if (next - current).abs() > f64::EPSILON {
+                    if next <= f64::EPSILON {
+                        self.agent_scroll.remove(&id);
+                    } else {
+                        self.agent_scroll.insert(id, next);
+                    }
+                    self.redraw(cx);
+                }
+                return;
+            }
             // Scrollback: if the cursor is over a terminal's content area,
             // scroll the terminal history instead of panning/zooming the
             // canvas (like alacritty/wezterm).
@@ -5638,8 +6490,33 @@ impl Widget for CanvasPanel {
                     }
                 }
             }
-            // Whiteboard text editing takes priority over terminal input.
-            if self.text_editing {
+            // The agent composer takes priority over terminal input, mirroring
+            // the note editor: Return submits, Escape cancels.
+            if self.agent_composer_id.is_some() {
+                match key.key_code {
+                    KeyCode::ReturnKey => {
+                        self.finish_agent_composer(cx);
+                    }
+                    KeyCode::Escape => {
+                        self.cancel_agent_composer(cx);
+                    }
+                    _ => {}
+                }
+                // Typing reaches the hidden proxy through the text-input path;
+                // mirror its text for the canvas to draw.
+                if let Some(text) = {
+                    let composer = self.view.text_input(cx, ids!(agent_composer));
+                    let text = composer.text();
+                    if text.is_empty() {
+                        None
+                    } else {
+                        Some(text)
+                    }
+                } {
+                    self.agent_input = text;
+                }
+                self.redraw(cx);
+            } else if self.text_editing {
                 match key.key_code {
                     KeyCode::Backspace => {
                         if let Some(NoteShape::Text { text, .. }) = &mut self.pending {
@@ -5940,6 +6817,9 @@ impl Widget for CanvasPanel {
             AgentStatus,
             Option<std::sync::Arc<std::sync::Mutex<crate::terminal::state::TerminalState>>>,
             Option<(MediaKind, String)>,
+            Option<std::sync::Arc<std::sync::Mutex<crate::agent::AgentCardState>>>,
+            String,
+            String,
         );
         let n_items = self.items.len();
         let mut draw_queue: Vec<DrawItem> = Vec::new();
@@ -5957,6 +6837,9 @@ impl Widget for CanvasPanel {
                 .unwrap_or_default();
             let url = item.url().unwrap_or("").to_string();
             let state = item.session().map(|t| t.state.clone());
+            let agent_state = item.agent_session().map(|a| a.state.clone());
+            let agent_cwd = item.agent_cwd().unwrap_or("").to_string();
+            let agent_provider = item.agent_provider().unwrap_or("").to_string();
             let (body, font_size, color_idx) = match item {
                 CanvasItem::Note {
                     body,
@@ -5994,6 +6877,9 @@ impl Widget for CanvasPanel {
                 status,
                 state,
                 media,
+                agent_state,
+                agent_cwd,
+                agent_provider,
             ));
         }
 
@@ -6016,6 +6902,9 @@ impl Widget for CanvasPanel {
             status,
             state,
             media,
+            agent_state,
+            agent_cwd,
+            agent_provider,
         ) in draw_queue
         {
             // Subtle hover backlight so the card under the mouse is clear,
@@ -6073,6 +6962,64 @@ impl Widget for CanvasPanel {
                         editing,
                         self.note_edit_caret,
                     );
+                    self.draw_control_buttons(cx, item_id, item_screen);
+                    if is_sel {
+                        self.draw_resize_handle(cx, item_screen);
+                    }
+                }
+                ItemKind::Agent => {
+                    if let Some(card) = agent_state {
+                        // A gap in the sequence stream means the card is missing
+                        // transcript; repair it from the daemon's journal
+                        // before drawing, so the user never sees a hole.
+                        let needs_reload = card
+                            .lock()
+                            .map(|card| card.gap().is_some())
+                            .unwrap_or(false);
+                        if needs_reload {
+                            if let Some(client) = self
+                                .items
+                                .iter()
+                                .find(|i| i.id() == item_id)
+                                .and_then(|i| i.agent_session())
+                            {
+                                if let Err(e) = client.reload() {
+                                    log!("canvas: agent reload failed: {e}");
+                                }
+                            }
+                        }
+                        // The composer line is drawn only for the selected
+                        // card, and the Stop button reads its hover state.
+                        let composing = self.agent_composer_id == Some(item_id);
+                        let composer_text = if composing {
+                            let proxy = self.view.text_input(cx, ids!(agent_composer));
+                            let typed = proxy.text();
+                            if typed.is_empty() {
+                                self.agent_input.clone()
+                            } else {
+                                typed
+                            }
+                        } else {
+                            String::new()
+                        };
+                        let stop_hover = self.hovered_stop == Some(item_id);
+                        self.draw_agent_at(
+                            cx,
+                            item_id,
+                            item_screen,
+                            &title,
+                            &agent_cwd,
+                            &agent_provider,
+                            is_sel,
+                            &card,
+                            if composing {
+                                Some(composer_text.as_str())
+                            } else {
+                                None
+                            },
+                            stop_hover,
+                        );
+                    }
                     self.draw_control_buttons(cx, item_id, item_screen);
                     if is_sel {
                         self.draw_resize_handle(cx, item_screen);

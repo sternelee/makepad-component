@@ -30,6 +30,10 @@ pub enum Command {
     NewMusicPlayer {
         title: String,
     },
+    /// `/new agent NAME` — create an agent card.
+    NewAgent {
+        name: String,
+    },
     SetStatus {
         name: String,
         status: String,
@@ -106,6 +110,10 @@ pub fn parse(line: &str) -> Command {
                 Some("music") => {
                     let title = parts.next().unwrap_or("Music").to_string();
                     return Command::NewMusicPlayer { title };
+                }
+                Some("agent") => {
+                    let name = parts.next().unwrap_or("agent").to_string();
+                    return Command::NewAgent { name };
                 }
                 _ => {}
             },
@@ -209,6 +217,19 @@ mod tests {
             parse("/new browser https://github.com"),
             Command::NewBrowser {
                 url: "https://github.com".into()
+            }
+        );
+        // Agents: default name, explicit name.
+        assert_eq!(
+            parse("/new agent"),
+            Command::NewAgent {
+                name: "agent".into()
+            }
+        );
+        assert_eq!(
+            parse("/new agent writer"),
+            Command::NewAgent {
+                name: "writer".into()
             }
         );
     }
