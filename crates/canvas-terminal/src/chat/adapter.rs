@@ -111,6 +111,31 @@ impl CliAdapter {
         }
     }
 
+    /// Launch line that continues the CLI's most recent session in the
+    /// current directory - used on the first view switch, before the CLI
+    /// has told us its session id, so the conversation survives the flip.
+    pub fn launch_continue(&self, mode: ChatMode) -> String {
+        match self {
+            Self::Pi => match mode {
+                ChatMode::Chat => "pi --mode json -c".into(),
+                ChatMode::Tui => "pi -c".into(),
+            },
+            Self::Claude => match mode {
+                ChatMode::Chat => "claude --print --input-format stream-json --output-format stream-json --continue".into(),
+                ChatMode::Tui => "claude --continue".into(),
+            },
+            Self::Codex => match mode {
+                ChatMode::Chat => "codex exec --json resume --last".into(),
+                ChatMode::Tui => "codex resume --last".into(),
+            },
+            Self::Fake => match mode {
+                ChatMode::Chat => "fake-agent --mode json".into(),
+                ChatMode::Tui => "fake-agent".into(),
+            },
+            Self::Unknown => String::new(),
+        }
+    }
+
     /// What to type so the current mode exits back to the shell. `false`
     /// means "cannot exit cleanly; the daemon may kill the child".
     pub fn exit_sequence(&self) -> Option<String> {

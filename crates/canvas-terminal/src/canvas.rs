@@ -1639,6 +1639,130 @@ impl CanvasPanel {
         })
     }
 
+    /// Flip a card between the terminal grid view and the agent chat view.
+    ///
+    /// The PTY session moves between the item variants untouched — the grid
+    /// kept feeding the whole time, and the daemon's event ring survives a
+    /// pause — so neither direction loses history. The daemon types the
+    /// exit + relaunch script into the PTY (with continue flags when the
+    /// CLI's own session id is unknown), exactly as a user switching by
+    /// hand would.
+    fn toggle_chat_view(&mut self, cx: &mut Cx, id: u64, to_chat: bool) {
+        let Some(index) = self.items.iter().position(|i| i.id() == id) else {
+            return;
+        };
+        let item = self.items.remove(index);
+        let (world, title, mut session, cwd) = match item {
+            CanvasItem::Terminal {
+                world,
+                title,
+                session,
+                ..
+            } => (world, title, session, None),
+            CanvasItem::Agent {
+                world,
+                title,
+                session,
+                cwd,
+                ..
+            } => (world, title, session, Some(cwd)),
+            other => {
+                self.items.insert(index, other);
+                return;
+            }
+        };
+        let Some(mut session) = session else {
+            return;
+        };
+        if to_chat {
+            // "auto" lets the daemon detect what the user launched here;
+            // it falls back to AGENT_CLI (default pi) when nothing matches.
+            session.chat_switch("auto", true, crate::ipc::SwitchScript::FromTui);
+            let cli = std::env::var("AGENT_CLI").unwrap_or_else(|_| "pi".into());
+            self.items.insert(
+                index,
+                CanvasItem::Agent {
+                    id,
+                    world,
+                    title,
+                    cwd: cwd.unwrap_or_default(),
+                    provider: cli,
+                    session: Some(session),
+                },
+            );
+            self.status(cx, "switched to chat view");
+        } else {
+            session.chat_switch("auto", false, crate::ipc::SwitchScript::FromChat);
+            self.items.insert(
+                index,
+                CanvasItem::Terminal {
+                    id,
+                    world,
+                    title,
+                    status: crate::items::AgentStatus::Online,
+                    session: Some(session),
+                },
+            );
+            self.status(cx, "switched to terminal view");
+        }
+        // Close any composer that pointed at the old variant.
+        if self.agent_composer_id == Some(id) {
+            self.agent_composer_id = None;
+            self.agent_input.clear();
+        }
+        self.selected = Some(id);
+        self.redraw(cx);
+    }
+
+    /// Draw the view-switch button (◎ on terminals, ▮ on chat cards).
+    fn draw_chat_switch(&mut self, cx: &mut Cx2d, screen: Rect, to_chat: bool) {
+        let rect = Self::chat_switch_rect(screen);
+        self.draw_item_bg_rect(cx, rect, BTN_BG);
+        self.draw_border_rect(cx, rect, BTN_BORDER);
+        self.draw_cell_text.color = vec4f([0.70, 0.75, 0.85, 1.0]);
+        self.draw_cell_text.draw_abs(
+            cx,
+            rect.pos + Vec2d { x: 6.0, y: 4.0 },
+            if to_chat { "◎" } else { "▮" },
+        );
+    }
+
+    /// The view-switch button rect: sits left of the control buttons, same
+    /// slot geometry so the draw pass and hit-test agree.
+    fn chat_switch_rect(screen: Rect) -> Rect {
+        let (_, min_r, _) = Self::control_button_rects(screen, true);
+        Rect {
+            pos: Vec2d {
+                x: min_r.pos.x - BTN_W - 4.0,
+                y: min_r.pos.y,
+            },
+            size: Vec2d { x: BTN_W, y: BTN_H },
+        }
+    }
+
+    /// The terminal/agent card whose view-switch button is under `screen`,
+    /// with the view it wants next (`true` = chat).
+    fn chat_switch_under(&self, screen: Vec2d) -> Option<(u64, bool)> {
+        self.items.iter().rev().find_map(|item| {
+            let wants_chat = match item.kind() {
+                ItemKind::Terminal => true,
+                ItemKind::Agent => false,
+                _ => return None,
+            };
+            // Both variants need a live session to switch.
+            let has_session = match item {
+                CanvasItem::Terminal { session, .. } => session.is_some(),
+                CanvasItem::Agent { session, .. } => session.is_some(),
+                _ => false,
+            };
+            if !has_session {
+                return None;
+            }
+            let rect = Self::chat_switch_rect(self.item_screen_rect(item));
+            rect.contains(screen).then_some((item.id(), wants_chat))
+        })
+    }
+
     /// The agent Stop button under `screen`, if the agent is mid-turn.
     /// The composer strip rect, derived from the card rect with the same
     /// math as the draw pass, so clicking exactly where the input line is
@@ -5817,6 +5941,11 @@ impl Widget for CanvasPanel {
                         }
                     }
                 }
+                // View switch (◎ / ▮): flip terminal <-> chat card.
+                if let Some((id, to_chat)) = self.chat_switch_under(me.abs) {
+                    self.toggle_chat_view(cx, id, to_chat);
+                    return;
+                }
                 // Agent Stop button: abort the running turn.
                 // The Stop button sits above the card body, so it wins over
                 // selecting the card.
@@ -6957,6 +7086,8 @@ impl Widget for CanvasPanel {
                             is_sel,
                             &state,
                         );
+                        // View switch: turn this terminal into a chat card.
+                        self.draw_chat_switch(cx, item_screen, true);
                     }
                     self.draw_control_buttons(cx, item_id, item_screen);
                     if is_sel {
@@ -7028,6 +7159,8 @@ impl Widget for CanvasPanel {
                             Some(composer_text.as_str()),
                             stop_hover,
                         );
+                        // View switch: turn this chat card back into a grid.
+                        self.draw_chat_switch(cx, item_screen, false);
                     }
                     self.draw_control_buttons(cx, item_id, item_screen);
                     if is_sel {

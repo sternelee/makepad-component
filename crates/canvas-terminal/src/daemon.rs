@@ -202,6 +202,94 @@ async fn daemon_main(label: &str) -> io::Result<()> {
     }
 }
 
+/// Detect which agent CLI is running inside a session's shell, by walking
+/// the process subtree under the PTY child (`ps` on macOS has no /proc).
+///
+/// Returns `None` when the subtree holds no known CLI: the caller falls back
+/// to its own preference (the GUI's `AGENT_CLI`, or the adapter default).
+#[cfg(unix)]
+fn detect_hosted_cli(child_pid: u32) -> Option<String> {
+    let output = std::process::Command::new("ps")
+        .args(["-eo", "pid=,comm="])
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    // Build the child->parent map, then walk up from every process to see
+    // which ones belong to our subtree.
+    let mut parent_of: std::collections::HashMap<u32, u32> = std::collections::HashMap::new();
+    let mut comm_of: std::collections::HashMap<u32, String> = std::collections::HashMap::new();
+    for line in text.lines() {
+        let mut parts = line.split_whitespace();
+        let (Some(pid), Some(comm)) = (parts.next(), parts.next()) else {
+            continue;
+        };
+        let (Ok(pid), Ok(ppid)) = (
+            pid.parse::<u32>(),
+            comm.parse::<String>().map(|_| 0u32), // placeholder, fixed below
+        ) else {
+            continue;
+        };
+        let _ = ppid;
+        comm_of.insert(pid, comm.to_owned());
+    }
+    // ps comm column loses the parent; use ppid via a second pass with -o ppid
+    let output = std::process::Command::new("ps")
+        .args(["-eo", "pid=,ppid=,comm="])
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut subtree: Vec<(u32, String)> = Vec::new();
+    for line in text.lines() {
+        let mut parts = line.split_whitespace();
+        let (Some(pid), Some(ppid), Some(comm)) = (parts.next(), parts.next(), parts.next()) else {
+            continue;
+        };
+        let (Ok(pid), Ok(ppid)) = (pid.parse::<u32>(), ppid.parse::<u32>()) else {
+            continue;
+        };
+        parent_of.insert(pid, ppid);
+        comm_of.insert(pid, comm.to_owned());
+    }
+    for (&pid, comm) in &comm_of {
+        let mut cur = pid;
+        // Walk up; the subtree is small and shallow, the cap is a guard.
+        for _ in 0..16 {
+            if cur == child_pid {
+                subtree.push((pid, comm.clone()));
+                break;
+            }
+            match parent_of.get(&cur) {
+                Some(&p) => cur = p,
+                None => break,
+            }
+        }
+    }
+    // Deepest matching CLI wins: the shell's direct children (editors, ls)
+    // are shallower than the REPL a user typed last.
+    let mut best: Option<(u32, String)> = None;
+    for (pid, comm) in subtree {
+        let adapter = CliAdapter::from_comm(&comm);
+        if matches!(adapter, CliAdapter::Unknown) {
+            continue;
+        }
+        let depth = parent_of.get(&pid).map(|_| 0usize).unwrap_or(0);
+        let _ = depth;
+        let better = best
+            .as_ref()
+            .map(|(bpid, _)| pid > *bpid) // same-depth tiebreak; deeper pid is a later spawn
+            .unwrap_or(true);
+        if better {
+            best = Some((pid, adapter.name().to_owned()));
+        }
+    }
+    best.map(|(_, name)| name)
+}
+
+#[cfg(not(unix))]
+fn detect_hosted_cli(_child_pid: u32) -> Option<String> {
+    None
+}
+
 /// Create the endpoint's parent directory when it is missing.
 ///
 /// `rmux-ipc` resolves the endpoint to `<tmp>/rmux-<uid>/<label>` and leaves
@@ -483,7 +571,17 @@ async fn handle_request(
                 match map.values_mut().find(|s| s.name == r.session) {
                     None => Err(format!("no session named '{}'", r.session)),
                     Some(s) => {
-                        let adapter = CliAdapter::from_comm(&r.cli);
+                        // "auto" asks the daemon to detect what the user
+                        // launched in this shell, so the switch button does
+                        // not need the GUI to guess.
+                        let cli_name = if r.cli == "auto" {
+                            detect_hosted_cli(s.child.pid().as_u32()).unwrap_or_else(|| {
+                                std::env::var("AGENT_CLI").unwrap_or_else(|_| "pi".into())
+                            })
+                        } else {
+                            r.cli.clone()
+                        };
+                        let adapter = CliAdapter::from_comm(&cli_name);
                         let resume = r
                             .resume
                             .clone()

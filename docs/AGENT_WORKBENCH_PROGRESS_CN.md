@@ -1,3 +1,36 @@
+# Agent Workbench 进度（架构转折版）
+
+> **2026-09-16 架构转折**：agent 卡片不再是独立的会话类型，而是**终端会话的 chat 视图**。
+> `claude`/`codex`/`pi` 跑在卡片的 PTY 里；chat 转录 = 它们 JSONL 输出的解析结果。
+> 自研运行时（agent-core：provider 驱动、工具循环、沙箱、journal）**整体删除**，
+> 模型/工具/认证/会话持久化全部归属 CLI 本身。
+
+## 新架构
+
+```
+TerminalCard（vte 网格视图）      AgentChatCard（chat 转录 + composer）
+        └──── 同一个 PTY 会话，◎/▮ 按钮切换 ────┘
+                       │
+        daemon: Session { chat: ChatState(adapter, on, seq, ring) }
+          - PTY 字节流照旧进 ring（grid 重放无损）
+          - chat 开启时，每行同时过 adapter（pi/claude/codex JSONL → ChatEvent）
+          - 事件带 seq；客户端缺了就 ChatSync 补（ring 是权威）
+        切换 = daemon 往 PTY 打字：/exit + 重进（resume 已知用 --session/--resume，
+               未知用 -c/--continue 续最近会话）
+        输入 = ChatSend → adapter 格式化（claude 常驻 JSONL stdin；pi/codex 每轮重进）
+        检测 = ChatSwitch cli="auto" → ps 子树遍历找 pi/claude/codex
+```
+
+## 关键文件
+
+- `src/chat/adapter.rs` — CliAdapter：launch/launch_continue/exit/parse_line/format_input
+- `src/chat/event.rs` — ChatEvent + Sequenced（wire 形状）
+- `src/chat/fold.rs` — ChatCardState：seq 去重、gap 提示、busy/usage/session_id
+- `daemon.rs` — ChatState（暂停不丢弃）、fanout 双路、ChatSend/Switch/Sync、auto 检测
+- `daemon_chat_tests.rs` — 3 个 e2e：解析+重放、切换脚本+输入格式化（cat 观测）、暂停保留 ring
+
+## 历史章节
+
 # Agent 工作台开发进度（canvas-terminal）
 
 > 最后更新：2026-09-15 · 分支 `dev` · 基线 commit `620af9c`
