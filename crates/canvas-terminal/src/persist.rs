@@ -337,7 +337,12 @@ mod tests {
     #[test]
     fn a_foreign_version_is_reported_not_loaded() {
         let canvas = SavedCanvas::empty();
-        let json = canvas.to_json().unwrap().replace("\"version\":1", "\"version\":999");
+        // Mutate through serde_json::Value so the test does not depend on
+        // the pretty-printer's exact spacing.
+        let mut value: serde_json::Value =
+            serde_json::from_str(&canvas.to_json().unwrap()).expect("parses");
+        value["version"] = serde_json::json!(999);
+        let json = value.to_string();
         let parsed = SavedCanvas::from_json(&json).expect("parses");
         assert!(parsed.is_foreign_version());
     }
