@@ -34,6 +34,10 @@ pub enum Command {
     NewAgent {
         name: String,
     },
+    /// `/goal [text]` — set (or clear, with no text) the selected agent's goal.
+    Goal {
+        objective: Option<String>,
+    },
     SetStatus {
         name: String,
         status: String,
@@ -114,6 +118,16 @@ pub fn parse(line: &str) -> Command {
                 Some("agent") => {
                     let name = parts.next().unwrap_or("agent").to_string();
                     return Command::NewAgent { name };
+                }
+                Some("goal") => {
+                    let objective = parts.collect::<Vec<_>>().join(" ");
+                    return Command::Goal {
+                        objective: if objective.is_empty() {
+                            None
+                        } else {
+                            Some(objective)
+                        },
+                    };
                 }
                 _ => {}
             },

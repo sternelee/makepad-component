@@ -50,6 +50,16 @@ pub enum AgentEvent {
         name: String,
         reason: String,
     },
+    /// The session's workflow goal changed. A goal is what the agent is
+    /// driving towards across turns, set by the user and echoed by the
+    /// provider; `objective` is the text and `status` its progress wording.
+    /// Both are `None` when the goal was cleared.
+    GoalUpdated {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        objective: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        status: Option<String>,
+    },
     /// A steer message was written into the running turn. The turn continues;
     /// the model sees the text as an extra user instruction.
     SteerAccepted { text: String },

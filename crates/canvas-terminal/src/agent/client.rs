@@ -264,6 +264,23 @@ impl AgentClient {
             }));
     }
 
+    /// Set (or clear) the agent's workflow goal.
+    #[allow(dead_code)]
+    pub fn set_goal(&self, objective: Option<String>) {
+        let _ = self
+            .writer_tx
+            .try_send(ipc::Request::AgentGoal(ipc::AgentGoalRequest {
+                agent_id: self.agent_id,
+                objective,
+            }));
+    }
+
+    /// The workflow goal as last folded, if any.
+    #[allow(dead_code)]
+    pub fn goal(&self) -> Option<Option<String>> {
+        self.state.lock().ok().and_then(|card| card.goal.clone())
+    }
+
     /// Answer an approval prompt.
     pub fn reply(&self, approval_id: u64, allow: bool, reason: Option<&str>) {
         let _ = self.writer_tx.try_send(ipc::Request::AgentPermissionReply(

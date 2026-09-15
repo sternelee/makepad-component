@@ -835,6 +835,47 @@ where
 }
 
 #[test]
+fn a_goal_survives_an_attach_replay() {
+    let label = unique_label();
+    let workspace = temp_workspace("goal", &[("a.txt", "hello\n")]);
+    start_daemon_sync(&label);
+
+    let client =
+        AgentClient::spawn_on(&label, card_create("goaled", workspace.path()))
+            .expect("spawn");
+    client.set_goal(Some("ship the parser".into()));
+
+    // The daemon journals the goal; the card folds it.
+    wait_for_card(&client, |card| card.goal.is_some());
+    let goal = client.goal().expect("goal set");
+    assert_eq!(goal.as_deref(), Some("ship the parser"));
+    let kinds = row_kinds(&client.state.lock().unwrap());
+    assert!(
+        kinds.contains(&"notice"),
+        "the goal should be visible in the transcript: {kinds:?}"
+    );
+
+    // A second client attaching replays the journal, so it inherits the goal.
+    let agents = AgentClient::list_on(&label).expect("list");
+    let mine = agents
+        .iter()
+        .find(|a| a.name == "goaled")
+        .expect("daemon holds the agent")
+        .clone();
+    let second = AgentClient::attach_on(&label, mine).expect("attach");
+    wait_for_card(&second, |card| card.goal.is_some());
+    assert_eq!(
+        second.goal().expect("replayed goal").as_deref(),
+        Some("ship the parser")
+    );
+
+    // Clearing goes through the daemon as well.
+    client.set_goal(None);
+    wait_for_card(&client, |card| matches!(card.goal, Some(None)));
+    wait_for_card(&second, |card| matches!(card.goal, Some(None)));
+}
+
+#[test]
 fn the_canvas_card_client_runs_a_full_conversation() {
     let label = unique_label();
     let workspace = temp_workspace("client", &[("a.txt", "hello\n")]);

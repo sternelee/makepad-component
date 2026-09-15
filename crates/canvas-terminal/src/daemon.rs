@@ -732,6 +732,13 @@ async fn handle_request(
             };
             approvals.resolve(r.approval_id, decision);
         }
+        ipc::Request::AgentGoal(g) => {
+            let result = with_agent(agents, g.agent_id, |entry| {
+                entry.session.set_goal(g.objective);
+                Ok(())
+            });
+            report_agent_result(agents, g.agent_id, result, tx, "goal").await;
+        }
         ipc::Request::AgentList => {
             let infos = {
                 let Ok(map) = agents.lock() else { return };

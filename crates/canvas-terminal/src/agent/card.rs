@@ -79,6 +79,9 @@ pub struct AgentCardState {
     pub dead: bool,
     pub usage: Option<(u64, u64)>,
     pub approval: Option<PendingApproval>,
+    /// The workflow goal, as last updated. `Some(None)` means cleared, which
+    /// is distinct from "no goal event yet".
+    pub goal: Option<Option<String>>,
 }
 
 impl AgentCardState {
@@ -126,6 +129,18 @@ impl AgentCardState {
     /// Fold one already-sequenced event into the rows.
     fn fold(&mut self, event: &AgentEvent) {
         match event {
+            AgentEvent::GoalUpdated {
+                objective,
+                status,
+            } => {
+                self.goal = Some(objective.clone());
+                let text = match (objective, status) {
+                    (Some(o), Some(s)) => format!("◎ goal: {o} ({s})"),
+                    (Some(o), None) => format!("◎ goal: {o}"),
+                    (None, _) => "◎ goal cleared".to_owned(),
+                };
+                self.rows.push(Row::Notice { text });
+            }
             AgentEvent::PromptSubmitted { text } => {
                 self.rows.push(Row::User { text: text.clone() });
             }
@@ -282,6 +297,7 @@ impl AgentCardState {
         self.dead = false;
         self.usage = None;
         self.approval = None;
+        self.goal = None;
         let log = std::mem::take(&mut self.log);
         for item in log {
             self.apply(item);

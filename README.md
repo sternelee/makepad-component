@@ -22,6 +22,7 @@ A modern UI component library for [Makepad](https://github.com/makepad/makepad),
   - [Watch Server (Live File Editing)](#watch-server-live-file-editing)
   - [Math Charts Demo](#math-charts-demo)
   - [Raycast Launcher + Splash App](#raycast-launcher--splash-app)
+  - [Canvas Terminal Agent Workbench](#canvas-terminal-agent-workbench)
 - [LLM Configuration](#llm-configuration)
 - [A2UI App Types & Examples](#a2ui-app-types--examples)
 - [Architecture](#architecture)
@@ -357,6 +358,46 @@ App Descriptor (JSON)
 
 ---
 
+## Canvas Terminal Agent Workbench
+
+`canvas-terminal` hosts coding-agent sessions as cards on the infinite canvas,
+next to terminals, browsers and media. The runtime (`agent-core`) is
+MIT/Apache and knows nothing about Makepad; the canvas talks to it over a
+local IPC protocol through the same bundled `--daemon` that holds PTYs, so
+agent sessions survive GUI restarts.
+
+```bash
+# Canned conversation - no network, no API key (good for a first look)
+AGENT_PROVIDER=scripted cargo run -p canvas-terminal
+
+# A real model - same variables the A2UI bridge uses
+export LLM_API_URL=https://api.moonshot.ai/v1/chat/completions
+export LLM_API_KEY=sk-...
+export LLM_MODEL=kimi-k2.5
+cargo run -p canvas-terminal
+```
+
+Then, in the command bar:
+
+| Command | Action |
+| ------- | ------ |
+| `/new agent demo` | create an agent card |
+| `@demo text` | send a prompt to the agent named `demo` |
+| `/goal ship the parser` | set the selected agent's workflow goal (`/goal` clears it) |
+
+On the card itself: **double-click** opens an inline composer (`Enter`
+submits - a prompt when idle, a steer mid-turn; `Esc` cancels), the wheel
+scrolls the transcript, **■ stop** aborts the running turn, and tool calls
+that need it show **Allow / Deny** buttons - nothing runs until a human
+answers, and the answer is what the model sees as the refusal reason.
+
+Tools available to an agent: `read_file`, `write_file`, `edit_file`,
+`find_files`, `search_files`, `run_command`. Paths are resolved inside the
+card's workspace root (symlinks pointing out are refused), output is
+size-capped, and commands are killed when they overrun their timeout.
+
+Design notes and progress: [`docs/AGENT_WORKBENCH_PROGRESS_CN.md`](docs/AGENT_WORKBENCH_PROGRESS_CN.md).
+
 ## LLM Configuration
 
 The A2UI Bridge is fully configurable via environment variables — no code changes needed. See the [environment variables table](#environment-variables) above.
@@ -564,14 +605,24 @@ makepad-component/
 │   │       ├── plot/        # Chart widgets (LinePlot, BarPlot, Surface3D, etc.)
 │   │       ├── elements.rs  # Drawing primitives
 │   │       └── text.rs      # Plot text rendering
-│   └── raycast-launcher/    # Raycast-style launcher with Splash dynamic app loading
-│       ├── src/
-│       │   ├── main.rs      # LauncherPanel + dynamic app loading
-│       │   ├── todo.rs      # TodoList widget (theme from mod.state)
-│       │   ├── app_loader.rs# JSON descriptor → Splash VM eval + state injection
-│       │   └── chat.rs      # Chat panel
-│       ├── todo-app.json    # Todo app descriptor (splash_code + state)
-│       └── todo.json        # Todo runtime data
+│   ├── raycast-launcher/    # Raycast-style launcher with Splash dynamic app loading
+│   │   └── src/             # LauncherPanel + Splash VM app loading + chat panel
+│   ├── agent-core/          # Headless agent runtime (no Makepad dep)
+│   │   └── src/
+│   │       ├── session.rs   # AgentSession: tool loop + event journal (worker thread)
+│   │       ├── provider/    # OpenAI-compatible SSE driver + ScriptedProvider
+│   │       ├── tools/       # read/write/edit/find/search/run_command (workspace sandbox)
+│   │       ├── identity.rs  # ResumeCursor (session_id, epoch, seq) for reconnect
+│   │       └── cancel.rs    # cancellation that reaches inside a model call
+│   └── canvas-terminal/     # Infinite-canvas terminal workspace (CNVS-style)
+│       └── src/
+│           ├── main.rs      # Makepad GUI + `--daemon` dual mode (PTY + agents)
+│           ├── canvas.rs    # CanvasPanel: cards, whiteboard, agent cards
+│           ├── daemon.rs    # PTY + agent session daemon, interactive approvals
+│           ├── ipc.rs       # GUI↔daemon framing (terminals, agents, approvals)
+│           ├── agent/       # Card-side client + event→transcript folding
+│           ├── terminal/    # PTY session client + vte grid
+│           └── persist.rs   # Canvas layout persistence (atomic save)
 ├── ui_live.json             # Live-editable A2UI JSON
 ├── chart_test.json          # Chart examples
 └── math_test.json           # Math charts output

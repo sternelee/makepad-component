@@ -2211,6 +2211,22 @@ impl CanvasPanel {
             Command::NewAgent { name } => {
                 self.spawn_agent_card(cx, &name);
             }
+            Command::Goal { objective } => {
+                // Goals address the selected agent card, like Forward does.
+                let goal_set = self
+                    .items
+                    .iter()
+                    .find(|i| Some(i.id()) == self.selected && i.kind() == ItemKind::Agent)
+                    .and_then(|i| i.agent_session())
+                    .map(|client| {
+                        client.set_goal(objective.clone());
+                    });
+                match (goal_set, &objective) {
+                    (Some(()), Some(text)) => self.status(cx, &format!("goal: {text}")),
+                    (Some(()), None) => self.status(cx, "goal cleared"),
+                    (None, _) => self.status(cx, "select an agent card first"),
+                }
+            }
             Command::OpenPath { path } => match MediaKind::from_path(&path) {
                 Some(kind) => {
                     self.spawn_media(cx, &path, kind);

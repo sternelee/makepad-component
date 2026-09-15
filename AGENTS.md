@@ -44,7 +44,12 @@ makepad-component/
 │   ├── canvas-terminal/         # Infinite-canvas terminal workspace (CNVS-style): PTY via a
 │   │                            #   bundled daemon mode (`canvas-terminal --daemon`, rmux-pty +
 │   │                            #   rmux-ipc, no system-installed rmux needed), CEF browsers,
-│   │                            #   hand-drawn whiteboard/notes. Single binary, dual mode.
+│   │                            #   hand-drawn whiteboard/notes, agent cards. Single binary,
+│   │                            #   dual mode. Progress: docs/AGENT_WORKBENCH_PROGRESS_CN.md
+│   ├── agent-core/              # Headless agent runtime (no Makepad dep): provider drivers
+│   │                            #   ([OI]/scripted), tool loop + workspace sandbox, permission
+│   │                            #   gates, resumable event journal. See its lib.rs docs for
+│   │                            #   the concurrency contracts all hosts depend on.
 │   ├── raycast-launcher/        # Raycast-style launcher, Makepad 2.0 `script_mod!` API
 │   │                            #   (runtime Splash app loading from *-app.json descriptors)
 │   ├── gemini-talker/           # Gemini Live voice companion, Makepad 2.0 `script_mod!` API
@@ -63,13 +68,17 @@ Crate-specific guidance exists in `crates/raycast-launcher/CLAUDE.md` and `crate
 - `makepad-widgets` / `makepad-script` / `makepad-cef` are pulled from the Makepad git repo (`https://github.com/makepad/makepad`). Pinned in `Cargo.toml` to rev `14fe611e` (2026-09 dev HEAD, pushed to upstream) — canvas-terminal's dropped-PDF preview needs this version: older pins ship a `PdfView` with an invisible page-paper shader, a wrong `cm` matrix order and broken text decoding. Verified by building `examples/pdf` from that commit.
 - Two API generations used to coexist in this workspace; the Makepad 2.0 migration (July 2026) moved every crate to `script_mod!`. The App entry pattern is: `impl AppMain for App { fn script_mod(vm) -> ScriptValue { ...; self::script_mod(vm) } }` with the `ui: Root{...}` tree inside a `startup() do #(App::script_component(vm)){...}` block as the last expression of the `script_mod!` block.
 
-### ⚠️ Current build status (verified 2026-08-25, after the Makepad 2.0 migration)
+### ⚠️ Current build status (last fully verified 2026-09-15, agent workbench lands)
 
 The workspace has been migrated to the Makepad 2.0 `script_mod!` API. Everything compiles against the currently locked makepad commit except `gemini-talker`:
 
 - `cargo check -p makepad-component` / `-p makepad-plot` / `-p component-zoo` / `-p a2ui-demo` / `-p makepad-clipboard` / `-p raycast-launcher` — **pass**. The legacy `live_design!` API is gone from these crates; all widget/shader registration now happens through `script_mod!` blocks wired into each crate's `script_mod(vm)` function.
+- `cargo check -p agent-core` / `-p canvas-terminal` — **pass** (both `--tests` too).
+- `cargo test -p agent-core -p canvas-terminal` — **104 passed** (agent runtime unit/session/tool suites + daemon end-to-end over real sockets). Before the agent workbench, canvas-terminal had ~23 tests.
 - `cargo test -p makepad-component` — **pass** (28 unit tests, 4 doc-tests ignored).
 - `cargo check -p gemini-talker` — **fails** (pre-existing: unresolved `gemini_live::prelude` import). Unrelated to the script_mod migration.
+- ⚠️ Test runs require an accepted Xcode license; after a macOS/Xcode update the linker refuses (`cc` exit 69) until `sudo xcodebuild -license accept`. This also breaks `/usr/bin/git` (it is an Xcode shim) — use
+  `/Library/Developer/CommandLineTools/usr/bin/git` as a stopgap.
 
 ### Interaction alignment (bezel port, 2026-08-25)
 
@@ -252,7 +261,7 @@ Bridge env vars: `LLM_API_URL` (default `https://api.moonshot.ai/v1/chat/complet
 - Use descriptive names: `test_should_fail_on_invalid_json`.
 - Prioritize `Processor` and `DataModel` correctness (A2UI protocol behavior).
 - UI changes are verified visually: `cargo run -p component-zoo` (widgets) or `cargo run -p a2ui-demo` (A2UI). The `makepad-screenshot` skill in `skills/` automates GUI screenshots.
-- Other crates have little or no test coverage; treat `cargo check -p <crate>` as the smoke test there.
+- `agent-core` and `canvas-terminal`'s agent path carry the strongest coverage in the workspace (unit + session-loop + daemon end-to-end over real sockets); keep new contracts under test there. Other crates have little or no test coverage; treat `cargo check -p <crate>` as the smoke test there.
 - No CI is configured (no `.github/` workflows) — run tests and clippy locally before submitting.
 
 ## 9. Security Considerations

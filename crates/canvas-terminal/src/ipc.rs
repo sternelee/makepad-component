@@ -69,6 +69,7 @@ const TAG_AGENT_KILL_REQ: u8 = 0x0c;
 const TAG_AGENT_LIST_REQ: u8 = 0x0d;
 const TAG_AGENT_ATTACH_REQ: u8 = 0x0e;
 const TAG_AGENT_PERMISSION_REPLY_REQ: u8 = 0x0f;
+const TAG_AGENT_GOAL_REQ: u8 = 0x10;
 
 const TAG_CREATE_RES: u8 = 0x81;
 const TAG_ATTACH_RES: u8 = 0x82;
@@ -278,6 +279,14 @@ pub struct AgentInputRequest {
     pub text: String,
 }
 
+/// `AgentGoal` — set (or clear) an agent's workflow goal.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentGoalRequest {
+    pub agent_id: u64,
+    /// `None` clears the goal.
+    pub objective: Option<String>,
+}
+
 /// `AgentCancel` / `AgentKill`.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AgentIdRequest {
@@ -337,6 +346,7 @@ pub enum Request {
     AgentCancel(AgentIdRequest),
     AgentKill(AgentIdRequest),
     AgentPermissionReply(AgentPermissionReplyRequest),
+    AgentGoal(AgentGoalRequest),
     AgentList,
 }
 
@@ -506,6 +516,10 @@ pub async fn write_request<W: AsyncWrite + Unpin>(w: &mut W, req: &Request) -> i
             let p = serde_json::to_vec(r)?;
             write_frame_raw(w, TAG_AGENT_PERMISSION_REPLY_REQ, &p).await
         }
+        Request::AgentGoal(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_GOAL_REQ, &p).await
+        }
         Request::AgentList => write_frame_raw(w, TAG_AGENT_LIST_REQ, &[]).await,
     }
 }
@@ -538,6 +552,7 @@ pub async fn read_request<R: AsyncRead + Unpin>(r: &mut R) -> io::Result<Option<
         TAG_AGENT_PERMISSION_REPLY_REQ => {
             Request::AgentPermissionReply(serde_json::from_slice(&p)?)
         }
+        TAG_AGENT_GOAL_REQ => Request::AgentGoal(serde_json::from_slice(&p)?),
         TAG_AGENT_LIST_REQ => Request::AgentList,
         _ => return Err(io_invalid(&format!("unknown request tag {tag:#x}"))),
     };

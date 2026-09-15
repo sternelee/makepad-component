@@ -148,6 +148,7 @@ fn kinds(events: &[AgentEvent]) -> Vec<&'static str> {
     events
         .iter()
         .map(|event| match event {
+            AgentEvent::GoalUpdated { .. } => "goal",
             AgentEvent::PromptSubmitted { .. } => "prompt",
             AgentEvent::TurnStarted => "started",
             AgentEvent::TextDelta { .. } => "text",
@@ -1122,6 +1123,48 @@ fn tools_outside_enabled_tools_are_neither_advertised_nor_runnable() {
         kinds(&events)
     );
     assert!(!workspace.path().join("should-not-exist.txt").exists());
+}
+
+#[test]
+fn the_goal_is_recorded_replayable_and_clearable() {
+    let workspace = TempDir::new("goal");
+    let (provider, _) = ScriptedProvider::new(vec![text_response("ok")]);
+    let session = AgentSession::start(
+        Box::new(provider),
+        ToolRegistry::coding(),
+        Arc::new(AllowAll),
+        AgentSessionConfig::new(workspace.path()),
+    );
+    assert_eq!(session.goal(), None);
+
+    session.set_goal(Some("ship the parser".into()));
+    // Wait for the goal event (processed on the worker).
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while session.goal().is_none() && Instant::now() < deadline {
+        let _ = session.recv_timeout(Duration::from_millis(20));
+    }
+    assert_eq!(session.goal().as_deref(), Some("ship the parser"));
+
+    // The journal records it, so a replayed transcript shows the objective.
+    let recorded = session
+        .journal()
+        .iter()
+        .any(|item| matches!(&item.value, AgentEvent::GoalUpdated {
+            objective: Some(text), ..
+        } if text == "ship the parser"));
+    assert!(recorded, "the goal must be replayable from the journal");
+
+    // Clearing works and is journaled too.
+    session.set_goal(None);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while session.goal().is_some() && Instant::now() < deadline {
+        let _ = session.recv_timeout(Duration::from_millis(20));
+    }
+    assert_eq!(session.goal(), None);
+    let cleared = session.journal().iter().any(|item| {
+        matches!(&item.value, AgentEvent::GoalUpdated { objective: None, .. })
+    });
+    assert!(cleared, "clearing must be journaled as well");
 }
 
 #[test]

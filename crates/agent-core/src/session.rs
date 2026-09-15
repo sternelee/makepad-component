@@ -106,6 +106,9 @@ changed rather than what you intend to change.";
 /// was meant to affect. They reach the running turn directly instead.
 enum SessionCommand {
     Prompt(String),
+    /// Set (or clear, with `None`) the workflow goal. The provider is asked
+    /// to record it, and the outcome arrives as a GoalUpdated event.
+    Goal(Option<String>),
     Shutdown,
 }
 
@@ -156,6 +159,9 @@ pub struct AgentSession {
     /// Asks the worker to exit instead of starting anything new.
     stop: Arc<AtomicBool>,
     busy: Arc<AtomicBool>,
+    /// The workflow goal, as last set. Mirrored from the journal so a
+    /// long-lived host can read it without replaying.
+    goal: Arc<Mutex<Option<String>>>,
     /// Signalled by the worker the moment its thread ends — including on a
     /// panic, so a host that pumps events can always tell why the stream
     /// stopped instead of waiting forever.
@@ -203,6 +209,7 @@ impl AgentSession {
         let steer = Arc::new(Mutex::new(SteerInbox::default()));
         let stop = Arc::new(AtomicBool::new(false));
         let busy = Arc::new(AtomicBool::new(false));
+        let goal = Arc::new(Mutex::new(None));
         let finished_flag = Arc::new(AtomicBool::new(false));
 
         let worker = {
@@ -212,6 +219,7 @@ impl AgentSession {
             let steer = Arc::clone(&steer);
             let stop = Arc::clone(&stop);
             let busy = Arc::clone(&busy);
+            let goal = Arc::clone(&goal);
             let finished_flag = Arc::clone(&finished_flag);
             std::thread::Builder::new()
                 .name(format!("agent-session-{id}"))
@@ -235,6 +243,7 @@ impl AgentSession {
                         &steer,
                         &stop,
                         &busy,
+                        &goal,
                         &mut emitter,
                     );
                     emitter.emit(AgentEvent::Exited);
@@ -254,6 +263,7 @@ impl AgentSession {
             steer,
             stop,
             busy,
+            goal,
             finished_flag,
             finished: finished_rx,
             worker: Some(worker),
@@ -353,6 +363,15 @@ impl AgentSession {
         Ok(())
     }
 
+    /// Set the workflow goal shown on the card. `None` clears it.
+    ///
+    /// The goal is recorded in the journal, so a client that replays it sees
+    /// the objective; a provider-side goal sync is a later, per-driver
+    /// concern.
+    pub fn set_goal(&self, objective: Option<String>) {
+        let _ = self.commands.try_send(SessionCommand::Goal(objective));
+    }
+
     /// Ask the running turn to stop.
     ///
     /// Reaches the provider driver's stream loop, so the turn ends within
@@ -367,6 +386,11 @@ impl AgentSession {
     /// composer in "steer or cancel" mode.
     pub fn is_busy(&self) -> bool {
         self.busy.load(Ordering::Acquire)
+    }
+
+    /// The workflow goal as last set, if any.
+    pub fn goal(&self) -> Option<String> {
+        self.goal.lock().ok().and_then(|goal| goal.clone())
     }
 
     /// True once the worker thread has ended, for any reason including a panic.
@@ -546,6 +570,7 @@ fn run_session(
     steer: &Arc<Mutex<SteerInbox>>,
     stop: &Arc<AtomicBool>,
     busy: &Arc<AtomicBool>,
+    goal: &Arc<Mutex<Option<String>>>,
     emitter: &mut Emitter,
 ) {
     let mut messages: Vec<Message> = Vec::new();
@@ -616,6 +641,18 @@ fn run_session(
 
                 busy.store(false, Ordering::Release);
                 emitter.emit(AgentEvent::TurnFinished { stop_reason });
+            }
+            SessionCommand::Goal(objective) => {
+                // The goal is not provider state yet: recording it in the
+                // journal is what makes it survive replay, which is what the
+                // card needs. Provider-side sync arrives with driver support.
+                if let Ok(mut slot) = goal.lock() {
+                    *slot = objective.clone();
+                }
+                emitter.emit(AgentEvent::GoalUpdated {
+                    objective,
+                    status: None,
+                });
             }
             SessionCommand::Shutdown => break,
         }
