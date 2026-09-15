@@ -24,11 +24,26 @@
 
 use std::io;
 
+use agent_core::{AgentEvent, Sequenced};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 /// Socket/pipe label used to derive the per-user `rmux-ipc` endpoint.
 pub const LABEL: &str = "canvas-terminal";
+
+/// Env override for the endpoint label.
+///
+/// Exists so a test (or a second, isolated instance) can run its own daemon
+/// without colliding with the user's. Normal runs leave it unset.
+pub const LABEL_ENV: &str = "CANVAS_TERMINAL_DAEMON_LABEL";
+
+/// The endpoint label this process should use.
+pub fn label() -> String {
+    std::env::var(LABEL_ENV)
+        .ok()
+        .filter(|label| !label.trim().is_empty())
+        .unwrap_or_else(|| LABEL.to_owned())
+}
 
 /// Per-frame byte ceiling (16 MiB). Terminal reads are chunked well below
 /// this; the guard exists only to reject a corrupted length prefix.
@@ -43,10 +58,27 @@ const TAG_KILL_REQ: u8 = 0x05;
 const TAG_LIST_REQ: u8 = 0x06;
 const TAG_RENAME_REQ: u8 = 0x07;
 
+// Agent requests. Same connection, same framing; an agent is just another kind
+// of session the daemon owns. Tags 0x08..=0x0f are reserved for them so a new
+// terminal request can never collide with an agent one.
+const TAG_AGENT_CREATE_REQ: u8 = 0x08;
+const TAG_AGENT_PROMPT_REQ: u8 = 0x09;
+const TAG_AGENT_STEER_REQ: u8 = 0x0a;
+const TAG_AGENT_CANCEL_REQ: u8 = 0x0b;
+const TAG_AGENT_KILL_REQ: u8 = 0x0c;
+const TAG_AGENT_LIST_REQ: u8 = 0x0d;
+const TAG_AGENT_ATTACH_REQ: u8 = 0x0e;
+const TAG_AGENT_PERMISSION_REPLY_REQ: u8 = 0x0f;
+
 const TAG_CREATE_RES: u8 = 0x81;
 const TAG_ATTACH_RES: u8 = 0x82;
 const TAG_LIST_RES: u8 = 0x86;
+const TAG_AGENT_CREATED_RES: u8 = 0x88;
+const TAG_AGENT_ATTACHED_RES: u8 = 0x89;
+const TAG_AGENT_LIST_RES: u8 = 0x8a;
 const TAG_OUTPUT: u8 = 0x10;
+const TAG_AGENT_EVENT: u8 = 0x30;
+const TAG_AGENT_PERMISSION_REQUEST: u8 = 0x31;
 const TAG_ENDED: u8 = 0x20;
 const TAG_ERROR: u8 = 0xFF;
 
@@ -117,6 +149,175 @@ pub struct ErrorResponse {
     pub message: String,
 }
 
+// ── agent payloads ─────────────────────────────────────────────────────────
+
+/// How the daemon should build the model behind a new agent.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum AgentProviderConfig {
+    /// An OpenAI-compatible `/chat/completions` endpoint.
+    ///
+    /// The API key travels over this connection by design: the endpoint is a
+    /// per-user local socket with the same trust level as the GUI process, and
+    /// the daemon needs the key to talk to the provider. It is never logged and
+    /// never echoed back in a response.
+    OpenAi {
+        api_url: String,
+        api_key: String,
+        model: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        temperature: Option<f32>,
+    },
+    /// Replays a canned conversation: no network, no key. Used by tests and by
+    /// canvas/UI work that needs a live transcript without spending tokens.
+    Scripted { turns: Vec<ScriptedTurnConfig> },
+}
+
+/// One canned model call for [`AgentProviderConfig::Scripted`].
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct ScriptedTurnConfig {
+    #[serde(default)]
+    pub text: String,
+    /// `(tool name, arguments)` the scripted turn should ask for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool: Option<(String, serde_json::Value)>,
+    /// Stream the text in pieces with this delay between them, so a UI under
+    /// test has something to render.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chunk_delay_ms: Option<u64>,
+}
+
+/// Which tool calls a new agent may run.
+///
+/// Defaults to [`Self::ReadOnly`]: an unattended agent should not be able to
+/// change the workspace until the caller says so explicitly. An interactive
+/// approval gate is a future variant of this, not a change to the others.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum AgentPermissionConfig {
+    /// Only tools that observe the workspace.
+    #[default]
+    ReadOnly,
+    AllowAll,
+    DenyAll,
+    AllowList {
+        tools: Vec<String>,
+    },
+    /// Ask the attached clients before every call, and run it only if one
+    /// answers yes.
+    ///
+    /// The gate waits on the session's worker thread, so the agent's turn is
+    /// paused rather than the daemon. A call nobody answers within
+    /// `timeout_ms`, or a call asked while no client is attached, is denied —
+    /// the fail-safe direction.
+    Interactive {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout_ms: Option<u64>,
+    },
+}
+
+/// `AgentCreate` — start a new agent session in the daemon.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentCreateRequest {
+    /// Card name, unique among live agents.
+    pub name: String,
+    /// Workspace root every tool path is resolved against.
+    pub cwd: String,
+    pub provider: AgentProviderConfig,
+    #[serde(default)]
+    pub permission: AgentPermissionConfig,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub system_prompt: Option<String>,
+    /// When set, only these tools exist for the session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled_tools: Option<Vec<String>>,
+}
+
+/// `AgentCreate` response.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentCreatedResponse {
+    pub agent_id: u64,
+    /// The runtime's own session id, for cursors and logs.
+    pub session_id: u64,
+    pub epoch: u64,
+    /// The last sequence number already emitted, so a client that reconnects
+    /// can ask for only what it is missing.
+    pub seq: u64,
+}
+
+/// `AgentAttach` — subscribe to an existing agent's event stream.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentAttachRequest {
+    pub agent_id: u64,
+    /// Events at or below this sequence are skipped, so a client that already
+    /// rendered part of the transcript does not render it twice.
+    #[serde(default)]
+    pub after_seq: u64,
+}
+
+/// `AgentAttach` response — what the client missed, then live events.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentAttachedResponse {
+    pub agent_id: u64,
+    pub session_id: u64,
+    pub epoch: u64,
+    pub name: String,
+    pub cwd: String,
+    pub busy: bool,
+    /// Replayed events, oldest first. Any of these may also arrive again on the
+    /// live stream, so the client applies them by sequence number.
+    pub replay: Vec<Sequenced<AgentEvent>>,
+}
+
+/// `AgentPrompt` / `AgentSteer`.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentInputRequest {
+    pub agent_id: u64,
+    pub text: String,
+}
+
+/// `AgentCancel` / `AgentKill`.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentIdRequest {
+    pub agent_id: u64,
+}
+
+/// `AgentPermissionReply` — the client's answer to an
+/// [`Frame::AgentPermissionRequest`].
+///
+/// A reply for an id the daemon no longer tracks (the gate already timed out,
+/// or the turn was cancelled) is ignored rather than reported: clicking a
+/// prompt a moment after it expired is normal, not an error.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentPermissionReplyRequest {
+    pub approval_id: u64,
+    pub allow: bool,
+    /// Shown to the model in place of "denied". Defaults to a plain refusal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// One entry of the `AgentList` response.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentInfo {
+    pub agent_id: u64,
+    pub session_id: u64,
+    pub epoch: u64,
+    pub name: String,
+    pub cwd: String,
+    pub busy: bool,
+    pub alive: bool,
+    /// The last sequence number emitted so far.
+    pub seq: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentListResponse {
+    pub agents: Vec<AgentInfo>,
+}
+
 // ── typed envelopes ────────────────────────────────────────────────────────
 
 /// A client→daemon message.
@@ -129,6 +330,14 @@ pub enum Request {
     Kill(KillRequest),
     Rename(RenameRequest),
     List,
+    AgentCreate(Box<AgentCreateRequest>),
+    AgentAttach(AgentAttachRequest),
+    AgentPrompt(AgentInputRequest),
+    AgentSteer(AgentInputRequest),
+    AgentCancel(AgentIdRequest),
+    AgentKill(AgentIdRequest),
+    AgentPermissionReply(AgentPermissionReplyRequest),
+    AgentList,
 }
 
 /// A daemon→client message.
@@ -148,6 +357,30 @@ pub enum Frame {
     },
     Ended {
         session_id: u64,
+    },
+    AgentCreated(AgentCreatedResponse),
+    AgentAttached(Box<AgentAttachedResponse>),
+    AgentList(AgentListResponse),
+    /// One agent event, in sequence order. `agent_id` stays out of the payload
+    /// because it is needed for routing before the body is decoded.
+    AgentEvent {
+        agent_id: u64,
+        item: Sequenced<AgentEvent>,
+    },
+    /// An agent is blocked waiting for a human to allow or refuse a tool call.
+    /// Sent to every attached client; the first reply wins.
+    AgentPermissionRequest {
+        agent_id: u64,
+        /// Identifies this prompt in the reply. Minted by the daemon, so it is
+        /// unique across agents and turns — unlike the model's own tool-call id.
+        approval_id: u64,
+        /// The model's tool-call id, so a client can tie the prompt to the
+        /// `ToolCallRequested` event it already rendered.
+        call_id: String,
+        name: String,
+        arguments: serde_json::Value,
+        /// How long the gate will wait before denying.
+        timeout_ms: u64,
     },
     Error(ErrorResponse),
 }
@@ -245,6 +478,35 @@ pub async fn write_request<W: AsyncWrite + Unpin>(w: &mut W, req: &Request) -> i
             write_frame_raw(w, TAG_RENAME_REQ, &p).await
         }
         Request::List => write_frame_raw(w, TAG_LIST_REQ, &[]).await,
+        Request::AgentCreate(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_CREATE_REQ, &p).await
+        }
+        Request::AgentAttach(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_ATTACH_REQ, &p).await
+        }
+        Request::AgentPrompt(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_PROMPT_REQ, &p).await
+        }
+        Request::AgentSteer(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_STEER_REQ, &p).await
+        }
+        Request::AgentCancel(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_CANCEL_REQ, &p).await
+        }
+        Request::AgentKill(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_KILL_REQ, &p).await
+        }
+        Request::AgentPermissionReply(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_PERMISSION_REPLY_REQ, &p).await
+        }
+        Request::AgentList => write_frame_raw(w, TAG_AGENT_LIST_REQ, &[]).await,
     }
 }
 
@@ -267,6 +529,16 @@ pub async fn read_request<R: AsyncRead + Unpin>(r: &mut R) -> io::Result<Option<
         TAG_KILL_REQ => Request::Kill(serde_json::from_slice(&p)?),
         TAG_RENAME_REQ => Request::Rename(serde_json::from_slice(&p)?),
         TAG_LIST_REQ => Request::List,
+        TAG_AGENT_CREATE_REQ => Request::AgentCreate(Box::new(serde_json::from_slice(&p)?)),
+        TAG_AGENT_ATTACH_REQ => Request::AgentAttach(serde_json::from_slice(&p)?),
+        TAG_AGENT_PROMPT_REQ => Request::AgentPrompt(serde_json::from_slice(&p)?),
+        TAG_AGENT_STEER_REQ => Request::AgentSteer(serde_json::from_slice(&p)?),
+        TAG_AGENT_CANCEL_REQ => Request::AgentCancel(serde_json::from_slice(&p)?),
+        TAG_AGENT_KILL_REQ => Request::AgentKill(serde_json::from_slice(&p)?),
+        TAG_AGENT_PERMISSION_REPLY_REQ => {
+            Request::AgentPermissionReply(serde_json::from_slice(&p)?)
+        }
+        TAG_AGENT_LIST_REQ => Request::AgentList,
         _ => return Err(io_invalid(&format!("unknown request tag {tag:#x}"))),
     };
     Ok(Some(req))
@@ -308,6 +580,48 @@ pub async fn write_frame<W: AsyncWrite + Unpin>(w: &mut W, frame: &Frame) -> io:
         }
         Frame::Ended { session_id } => {
             write_frame_raw(w, TAG_ENDED, &session_id.to_be_bytes()).await
+        }
+        Frame::AgentCreated(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_CREATED_RES, &p).await
+        }
+        Frame::AgentAttached(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_ATTACHED_RES, &p).await
+        }
+        Frame::AgentList(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_LIST_RES, &p).await
+        }
+        Frame::AgentEvent { agent_id, item } => {
+            // [agent_id u64][event json]: routing stays cheap, and the event
+            // body keeps the exact shape `agent-core` already round-trips.
+            let body = serde_json::to_vec(item)?;
+            let mut p = Vec::with_capacity(8 + body.len());
+            p.extend_from_slice(&agent_id.to_be_bytes());
+            p.extend_from_slice(&body);
+            write_frame_raw(w, TAG_AGENT_EVENT, &p).await
+        }
+        Frame::AgentPermissionRequest {
+            agent_id,
+            approval_id,
+            call_id,
+            name,
+            arguments,
+            timeout_ms,
+        } => {
+            let body = serde_json::json!({
+                "approvalId": approval_id,
+                "callId": call_id,
+                "name": name,
+                "arguments": arguments,
+                "timeoutMs": timeout_ms,
+            });
+            let body = serde_json::to_vec(&body)?;
+            let mut p = Vec::with_capacity(8 + body.len());
+            p.extend_from_slice(&agent_id.to_be_bytes());
+            p.extend_from_slice(&body);
+            write_frame_raw(w, TAG_AGENT_PERMISSION_REQUEST, &p).await
         }
         Frame::Error(r) => {
             let p = serde_json::to_vec(r)?;
@@ -356,6 +670,29 @@ pub async fn read_frame<R: AsyncRead + Unpin>(r: &mut R) -> io::Result<Option<Fr
         TAG_ENDED => {
             let (id, _) = take_u64(&p)?;
             Frame::Ended { session_id: id }
+        }
+        TAG_AGENT_CREATED_RES => Frame::AgentCreated(serde_json::from_slice(&p)?),
+        TAG_AGENT_ATTACHED_RES => Frame::AgentAttached(Box::new(serde_json::from_slice(&p)?)),
+        TAG_AGENT_LIST_RES => Frame::AgentList(serde_json::from_slice(&p)?),
+        TAG_AGENT_EVENT => {
+            let (agent_id, rest) = take_u64(&p)?;
+            Frame::AgentEvent {
+                agent_id,
+                item: serde_json::from_slice(rest)?,
+            }
+        }
+        TAG_AGENT_PERMISSION_REQUEST => {
+            let (agent_id, rest) = take_u64(&p)?;
+            let body: serde_json::Value = serde_json::from_slice(rest)?;
+            let field = |key: &str| body.get(key).cloned().unwrap_or(serde_json::Value::Null);
+            Frame::AgentPermissionRequest {
+                agent_id,
+                approval_id: field("approvalId").as_u64().unwrap_or_default(),
+                call_id: field("callId").as_str().unwrap_or_default().to_owned(),
+                name: field("name").as_str().unwrap_or_default().to_owned(),
+                arguments: field("arguments"),
+                timeout_ms: field("timeoutMs").as_u64().unwrap_or_default(),
+            }
         }
         TAG_ERROR => Frame::Error(serde_json::from_slice(&p)?),
         _ => return Err(io_invalid(&format!("unknown response tag {tag:#x}"))),

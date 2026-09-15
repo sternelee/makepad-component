@@ -8,7 +8,7 @@ use crate::ipc;
 /// Shared tokio runtime. One per process.
 static RT: std::sync::OnceLock<tokio::runtime::Runtime> = std::sync::OnceLock::new();
 
-fn runtime() -> &'static tokio::runtime::Runtime {
+pub(crate) fn runtime() -> &'static tokio::runtime::Runtime {
     RT.get_or_init(|| {
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
@@ -23,7 +23,7 @@ type ReadHalf = Box<dyn tokio::io::AsyncRead + Unpin + Send>;
 type WriteHalf = Box<dyn tokio::io::AsyncWrite + Unpin + Send>;
 
 /// Resolve the daemon endpoint and connect a byte stream to it.
-async fn connect_stream() -> Result<(ReadHalf, WriteHalf), String> {
+pub(crate) async fn connect_stream() -> Result<(ReadHalf, WriteHalf), String> {
     let endpoint =
         rmux_ipc::endpoint_for_label(ipc::LABEL).map_err(|e| format!("resolve endpoint: {e}"))?;
 
@@ -60,7 +60,7 @@ async fn probe_connect() -> bool {
 /// Spawn the writer task that drains queued requests over the daemon's write
 /// half. Returns the request sender (for callers to enqueue on) plus the task
 /// handle so the session keeps it alive for its lifetime.
-fn spawn_writer_task(
+pub(crate) fn spawn_writer_task(
     mut w: WriteHalf,
 ) -> (
     tokio::sync::mpsc::Sender<ipc::Request>,
@@ -138,7 +138,7 @@ fn spawn_daemon_process() -> Result<(), String> {
 }
 
 /// Ensure a daemon is reachable, launching it detached if necessary.
-fn ensure_daemon() -> Result<(), String> {
+pub(crate) fn ensure_daemon() -> Result<(), String> {
     let rt = runtime();
     if rt.block_on(probe_connect()) {
         return Ok(());

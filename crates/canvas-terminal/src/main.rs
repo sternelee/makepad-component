@@ -1,6 +1,7 @@
 pub use makepad_widgets;
 use makepad_widgets::*;
 
+mod agent;
 mod camera;
 mod canvas;
 mod command;
@@ -239,6 +240,20 @@ script_mod! {
             width: 0
             height: 0
             is_multiline: true
+            empty_text: ""
+            draw_text +: { color: #00000000 }
+            draw_cursor +: { color: #00000000 }
+            draw_selection +: { color: #00000000 }
+        }
+
+        // ── Hidden agent composer (IME/text-input sink) ──
+        // Same mechanism as note_editor: a zero-size TextInput owns focus and
+        // IME composition while the canvas draws the input line itself. Enter
+        // submits (prompt, or steer when the agent is running), Escape cancels.
+        agent_composer := TextInput{
+            width: 0
+            height: 0
+            is_multiline: false
             empty_text: ""
             draw_text +: { color: #00000000 }
             draw_cursor +: { color: #00000000 }
@@ -727,6 +742,14 @@ pub fn app_main() {
         cx.borrow_mut().in_makepad_studio = true;
     }
     cx.borrow_mut().init_cx_os();
+    // `--remote`: a localhost HTTP control surface for agents / tests.
+    //
+    // `app_main!` calls this for you, but this crate hand-rolls its entry
+    // point to insert the CEF bootstrap/initialize steps, so the call has to
+    // be repeated here — without it `canvas-terminal --remote` silently
+    // exposes no control surface at all. Same placement as the macro: after
+    // `init_cx_os`, before the event loop.
+    makepad_widgets::makepad_platform::remote::start_if_requested();
     Cx::event_loop(cx);
     makepad_cef::shutdown();
 }
