@@ -8,6 +8,7 @@ mod command;
 mod daemon;
 mod ipc;
 mod items;
+mod persist;
 mod terminal;
 
 use canvas::CanvasPanel;
