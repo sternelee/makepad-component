@@ -11,6 +11,7 @@
 pub mod button;
 pub mod controls;
 pub mod foundation;
+pub mod icon;
 pub mod input;
 pub mod layout;
 pub mod loaders;
@@ -40,6 +41,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     input::script_mod(vm);
     overlay::script_mod(vm);
     popover::script_mod(vm);
+    icon::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -130,6 +132,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/popover.rs",
         blurb: "A floating panel, opened by a click",
     },
+    Page {
+        title: "Icon",
+        path: "mod.gallery.pages.icon",
+        source: "crates/gallery/src/pages/icon.rs",
+        blurb: "The bundled glyph face on the size ladder",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -202,6 +210,7 @@ mod tests {
             ("crates/gallery/src/pages/input.rs", "input"),
             ("crates/gallery/src/pages/overlay.rs", "overlay"),
             ("crates/gallery/src/pages/popover.rs", "popover"),
+            ("crates/gallery/src/pages/icon.rs", "icon"),
         ]
         .into_iter()
         .collect();

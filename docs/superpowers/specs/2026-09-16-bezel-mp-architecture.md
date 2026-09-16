@@ -139,6 +139,7 @@ build on).
 | `mp/slider.rs` | `MpSlider`, and the four free functions that turn a pointer into a value. |
 | `mp/tooltip.rs` | `MpTooltip` — the overlay mechanism, verified; the gallery's hover wiring for it is proven by signal, not by capture. See below. |
 | `mp/popover.rs` | `MpPopover` — verified: the panel opens at its trigger's bottom edge and draws over the content below. |
+| `mp/icon.rs` | `MpIcon` — a glyph from Makepad's bundled FontAwesome, sized from the control ladder. The smallest component and the one most others want. |
 | `mp/input.rs` | `MpTextInput`, `MpField`, `MpTextInputSearch`. The one component with no Rust: the caret, selection, IME, scroll-into-view and platform keys are Makepad's `TextInput`, so this styles it rather than reimplementing it. |
 
 `MpButton` is the demonstration — the v2 button against this one:
