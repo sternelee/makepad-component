@@ -13,9 +13,12 @@ use crate::terminal::state::{Cell, DEFAULT_BG};
 
 /// Grid spacing in world units.
 const GRID_SIZE: f64 = 24.0;
-/// Terminal font metrics.
-const TERM_CELL_W: f64 = 8.0;
-const TERM_CELL_H: f64 = 17.3;
+/// Seed mono cell metrics (logical px at zoom 1) for the frames before the
+/// face has been measured, and for hit-tests that run before the first draw.
+/// The live numbers come from [`CanvasPanel::refresh_cell_metrics`]: the grid
+/// follows the font instead of a hand-picked guess.
+const CELL_W_SEED: f64 = 8.0;
+const CELL_H_SEED: f64 = 17.3;
 
 /// Image widget slots backing dropped-image previews.
 const IMAGE_SLOTS: usize = 8;
@@ -38,9 +41,8 @@ const AGENT_ROW_REASONING: [f32; 4] = [0.55, 0.57, 0.66, 1.0];
 const AGENT_ROW_NOTICE: [f32; 4] = [0.62, 0.66, 0.74, 1.0];
 const AGENT_ROW_OK: [f32; 4] = [0.42, 0.80, 0.55, 1.0];
 const AGENT_ROW_FAIL: [f32; 4] = [0.95, 0.55, 0.52, 1.0];
-/// Wrapping width used for transcript rows, in pixels at font_scale 1.
-const AGENT_CHAR_W: f64 = 7.5;
-/// Per-row line height multiplier.
+/// Per-row line height multiplier (composer strip chrome only; transcript
+/// rows use the measured cell height).
 const AGENT_LINE_H: f64 = 1.45;
 /// Approval buttons at the bottom of the card.
 const AGENT_BTN_W: f64 = 84.0;
@@ -156,6 +158,10 @@ const MUSIC_BAR: [f32; 4] = [0.30, 0.62, 0.98, 1.0];
 /// Title-bar control buttons (minimize / close).
 const BTN_W: f64 = 22.0;
 const BTN_H: f64 = 18.0;
+/// Top of a card's title text, as an offset from the card's top edge. Every
+/// title-bar text (card title, presence label) uses this one number so they
+/// cannot drift onto different baselines.
+const TITLE_TEXT_DY: f64 = 6.0;
 const BTN_BG: [f32; 4] = [0.16, 0.19, 0.26, 1.0];
 const BTN_BORDER: [f32; 4] = [0.28, 0.32, 0.42, 1.0];
 const BTN_HOVER: [f32; 4] = [0.22, 0.28, 0.40, 1.0];
@@ -443,6 +449,17 @@ pub struct CanvasPanel {
     draw_cell_bg: DrawColor,
     #[live]
     draw_cell_text: DrawText,
+    /// Measured mono cell (`advance`, line box) in logical px at zoom 1;
+    /// `None` until the first draw pass measures `draw_cell_text`'s face.
+    #[rust]
+    cell_metrics: Option<(f64, f64)>,
+    /// Cache key for `cell_metrics` (font size + dpi factor).
+    #[rust]
+    cell_metrics_key: Option<(u32, u64)>,
+    /// Shrink factor for fallback glyphs wider than their cell, keyed by
+    /// `(char, cells)` — 1.0 when the glyph already fits.
+    #[rust]
+    glyph_fit_cache: HashMap<(char, u8), f32>,
     #[live]
     draw_cursor: DrawColor,
     /// Browser page area (used to anchor the system WebView window).
@@ -1829,10 +1846,102 @@ impl CanvasPanel {
         );
     }
 
+    /// World-space grid for a card of `w`×`h` world units. World space is
+    /// zoom-independent, so this uses the base (zoom 1) cell metrics.
     fn term_grid_size_from(&self, w: f64, h: f64) -> (usize, usize) {
-        let cols = ((w - 12.0) / TERM_CELL_W).floor().max(10.0) as usize;
-        let rows = ((h - 34.0) / TERM_CELL_H).floor().max(3.0) as usize;
+        let (cell_w, cell_h) = self.cell_metrics();
+        let cols = ((w - 12.0) / cell_w).floor().max(10.0) as usize;
+        let rows = ((h - 34.0) / cell_h).floor().max(3.0) as usize;
         (cols, rows)
+    }
+
+    /// Monospace cell (`advance`, line box) in logical px at zoom 1, measured
+    /// from the face by [`Self::refresh_cell_metrics`]; falls back to the seed
+    /// until the first draw pass.
+    fn cell_metrics(&self) -> (f64, f64) {
+        self.cell_metrics.unwrap_or((CELL_W_SEED, CELL_H_SEED))
+    }
+
+    /// Cell width in screen px at the current camera zoom.
+    fn cell_w(&self) -> f64 {
+        self.cell_metrics().0 * self.camera.zoom as f64
+    }
+
+    /// Cell height in screen px at the current camera zoom.
+    fn cell_h(&self) -> f64 {
+        self.cell_metrics().1 * self.camera.zoom as f64
+    }
+
+    /// Measure the mono cell from the face in `draw_cell_text`, so the grid
+    /// follows the font instead of a hand-picked guess — makepad's own terminal
+    /// does exactly this (`apps/terminal/src/widget.rs`, `refresh_metrics`).
+    ///
+    /// The distinction is load-bearing: makepad sizes text in POINTS
+    /// (`font_size_in_lpxs = font_size_in_pts * 96 / 72`, see
+    /// `draw/src/text/layouter.rs`), while this canvas lays cards out in
+    /// pixels. Reading `font_size: 12.5` as "12.5px" is what put a ~10px glyph
+    /// into an 8px cell and squeezed every column into its neighbour.
+    ///
+    /// Measured with `font_scale = 1`, so the result is cached at zoom 1 and
+    /// scaled by [`Self::cell_w`] / [`Self::cell_h`] at the call sites.
+    fn refresh_cell_metrics(&mut self, cx: &mut Cx2d) {
+        let font_size = self.draw_cell_text.text_style.font_size;
+        let line_spacing = self.draw_cell_text.text_style.line_spacing as f64;
+        let key = (font_size.to_bits(), cx.current_dpi_factor().to_bits());
+        if self.cell_metrics_key == Some(key) {
+            return;
+        }
+        let saved_scale = self.draw_cell_text.font_scale;
+        self.draw_cell_text.font_scale = 1.0;
+        let measured = self.draw_cell_text.prepare_single_line_run(cx, "M");
+        self.draw_cell_text.font_scale = saved_scale;
+        let Some(run) = measured else {
+            return;
+        };
+        let Some(advance) = run.glyphs.first().map(|g| g.advance_in_lpxs as f64) else {
+            return;
+        };
+        let line_box = (run.ascender_in_lpxs - run.descender_in_lpxs) as f64 * line_spacing;
+        if advance <= 0.0 || line_box <= 0.0 {
+            return;
+        }
+        if self.cell_metrics != Some((advance, line_box)) {
+            log!(
+                "canvas: terminal cell {advance:.2}x{line_box:.2}px (font_size {font_size:.1}pt) — grid follows the face"
+            );
+        }
+        self.cell_metrics = Some((advance, line_box));
+        self.cell_metrics_key = Some(key);
+    }
+
+    /// How much one glyph must shrink to stay inside its cell(s); 1.0 when it
+    /// already fits. Only fallback faces need this (emoji and rare symbols are
+    /// proportional) — a real monospace Latin face advances exactly one cell.
+    /// Measured once per `(char, cells)` and cached, like makepad's terminal
+    /// `cached_glyph`.
+    fn glyph_fit(&mut self, cx: &mut Cx2d, ch: char, cells: u8) -> f32 {
+        if let Some(fit) = self.glyph_fit_cache.get(&(ch, cells)) {
+            return *fit;
+        }
+        let available = self.cell_metrics().0 * cells as f64;
+        let saved_scale = self.draw_cell_text.font_scale;
+        self.draw_cell_text.font_scale = 1.0;
+        let mut buf = [0u8; 4];
+        let advance = self
+            .draw_cell_text
+            .prepare_single_line_run(cx, ch.encode_utf8(&mut buf))
+            .map(|run| run.width_in_lpxs as f64)
+            .unwrap_or(0.0);
+        self.draw_cell_text.font_scale = saved_scale;
+        // Small rounding differences between the grid advance and the glyph's
+        // own advance must not shrink normal text.
+        let fit = if advance > available * 1.05 {
+            (available / advance) as f32
+        } else {
+            1.0
+        };
+        self.glyph_fit_cache.insert((ch, cells), fit);
+        fit
     }
 
     fn status(&mut self, cx: &mut Cx, text: &str) {
@@ -2041,16 +2150,128 @@ impl CanvasPanel {
         self.save_canvas();
     }
 
-    /// Draw the view-switch button (◎ on terminals, ▮ on chat cards).
+    /// Draw the view-switch button: a chat bubble on terminal cards (click to
+    /// read the transcript) and a shell prompt on chat cards (click to go back
+    /// to the grid).
+    ///
+    /// Drawn as geometry, not as a glyph: the icons used to come out of
+    /// `draw_cell_text`, so they inherited the *grid's* font, size and scale —
+    /// and `▮` is covered by no shipped face, so it rendered as a missing-glyph
+    /// box twice the size of the slot it sat in.
     fn draw_chat_switch(&mut self, cx: &mut Cx2d, screen: Rect, to_chat: bool) {
         let rect = Self::chat_switch_rect(screen);
         self.draw_item_bg_rect(cx, rect, BTN_BG);
         self.draw_border_rect(cx, rect, BTN_BORDER);
-        self.draw_cell_text.color = vec4f([0.70, 0.75, 0.85, 1.0]);
-        self.draw_cell_text.draw_abs(
+        let ink = [0.70, 0.75, 0.85, 1.0];
+        // A 12×10 icon centred in the 22×18 slot.
+        let icon = Vec2d {
+            x: rect.pos.x + (rect.size.x - 12.0) * 0.5,
+            y: rect.pos.y + (rect.size.y - 10.0) * 0.5,
+        };
+        if to_chat {
+            // Speech bubble: outlined body with a pixel-art tail.
+            self.draw_border_rect(
+                cx,
+                Rect {
+                    pos: icon,
+                    size: Vec2d { x: 12.0, y: 7.0 },
+                },
+                ink,
+            );
+            self.draw_item_bg_rect(
+                cx,
+                Rect {
+                    pos: Vec2d {
+                        x: icon.x + 2.0,
+                        y: icon.y + 7.0,
+                    },
+                    size: Vec2d { x: 3.0, y: 3.0 },
+                },
+                ink,
+            );
+        } else {
+            // Shell prompt: a `>` chevron with a trailing underscore.
+            self.draw_segment(cx, icon, Vec2d { x: icon.x + 4.5, y: icon.y + 3.0 }, 1.6, ink);
+            self.draw_segment(
+                cx,
+                Vec2d { x: icon.x + 4.5, y: icon.y + 3.0 },
+                Vec2d { x: icon.x, y: icon.y + 6.0 },
+                1.6,
+                ink,
+            );
+            self.draw_segment(
+                cx,
+                Vec2d { x: icon.x + 7.0, y: icon.y + 8.0 },
+                Vec2d { x: icon.x + 11.5, y: icon.y + 8.0 },
+                1.6,
+                ink,
+            );
+        }
+    }
+
+    /// Draw a card's presence indicator (dot + label) in the title bar, clear of
+    /// every title-bar slot. Shared by terminal and chat cards so the two cannot
+    /// drift apart.
+    ///
+    /// Pinning `draw_title.font_scale` here is load-bearing: `draw_title` is
+    /// shared and its scale is set all over this file (empty-hint 1.2/1.5, note
+    /// titles `font_size / 13.0`, …), so the label used to inherit whatever the
+    /// previous drawer left — several times too large, on top of the buttons.
+    fn draw_presence(
+        &mut self,
+        cx: &mut Cx2d,
+        screen: Rect,
+        label: &str,
+        dot_color: [f32; 4],
+        label_color: [f32; 4],
+    ) {
+        self.draw_title.font_scale = 1.0;
+        // Clear the *leftmost* slot: the view-switch button sits left of
+        // minimize, so reserving only the two control buttons still let the
+        // label slide under it.
+        let (_, min_r, _) = Self::control_button_rects(screen, true);
+        let switch_r = Self::chat_switch_rect(screen);
+        let slots_left = min_r.pos.x.min(switch_r.pos.x) - screen.pos.x;
+        // Measure the label: `len() * 8.0` assumed an average advance the bold
+        // title face does not have.
+        let run = self.draw_title.prepare_single_line_run(cx, label);
+        let (label_w, line_h) = match &run {
+            Some(run) => (
+                run.width_in_lpxs as f64,
+                (run.ascender_in_lpxs - run.descender_in_lpxs) as f64,
+            ),
+            None => (0.0, 0.0),
+        };
+        let dot = 8.0;
+        let gap = 5.0;
+        // The dot and the gap are part of the group and were previously left
+        // out of the reservation.
+        let status_x = (slots_left - 14.0 - label_w - dot - gap).max(60.0);
+        // The label shares the card title's text top, so both sit on one
+        // baseline (they are drawn with the same `draw_title` style).
+        let text_y = screen.pos.y + TITLE_TEXT_DY;
+        // Centre the dot on the label's *line box* — the box runs from the text
+        // top to `top + ascender - descender`, which is where the eye puts the
+        // text line. The old code centred it on the control-button line
+        // instead, a few pixels above the label.
+        let dot_cy = text_y + line_h * 0.5;
+        self.draw_filled_disc(
             cx,
-            rect.pos + Vec2d { x: 6.0, y: 4.0 },
-            if to_chat { "◎" } else { "▮" },
+            Vec2d {
+                x: screen.pos.x + status_x + dot * 0.5,
+                y: dot_cy,
+            },
+            dot * 0.5,
+            dot_color,
+        );
+        self.draw_title.color = vec4f(label_color);
+        self.draw_title.draw_abs(
+            cx,
+            Vec2d {
+                x: screen.pos.x + status_x + dot + gap,
+                y: text_y,
+            },
+            label,
         );
     }
 
@@ -2374,8 +2595,8 @@ impl CanvasPanel {
         let grid = state.lock().ok()?;
         let cols = grid.cols.max(1);
         let rows = grid.rows.max(1);
-        let char_w = TERM_CELL_W * self.camera.zoom as f64;
-        let line_h = TERM_CELL_H * self.camera.zoom as f64;
+        let char_w = self.cell_w();
+        let line_h = self.cell_h();
         let dx = screen.x - origin.x;
         let dy = screen.y - origin.y;
         if dx < 0.0 || dy < 0.0 {
@@ -3290,6 +3511,8 @@ impl CanvasPanel {
             .collect::<String>()
             .to_uppercase();
         if !initial.is_empty() {
+            // Fixed-size chrome (SIZE above): never scale with the camera.
+            self.draw_title.font_scale = 1.0;
             self.draw_title.color = vec4f([1.0, 1.0, 1.0, 0.92]);
             self.draw_title
                 .draw_abs(cx, pos + Vec2d { x: 6.0, y: 3.0 }, &initial);
@@ -3890,6 +4113,7 @@ impl CanvasPanel {
             }
             NoteTool::Text => {
                 // "A" glyph flanked by a text I-beam (reference style).
+                self.draw_title.font_scale = 1.0;
                 self.draw_title.color = vec4f(color);
                 self.draw_title
                     .draw_abs(cx, r.pos + Vec2d { x: 8.0, y: 3.0 }, "A");
@@ -4049,6 +4273,9 @@ impl CanvasPanel {
             }
             NoteShape::Text { pos, text } => {
                 let p = to_screen(*pos);
+                // World-space content: scales with the camera like the shapes
+                // around it.
+                self.draw_title.font_scale = self.camera.zoom;
                 self.draw_title.color = vec4f(color);
                 // Show a blinking caret while the in-progress text shape is
                 // being edited (empty text still shows the caret).
@@ -4458,8 +4685,15 @@ impl CanvasPanel {
             };
             let label = format!("{kind_label} {title}");
             self.draw_cell_text.color = vec4f(TITLE_TEXT);
+            // Fixed-size chrome: the tray does not scale with the camera, so
+            // pin the scale instead of inheriting the last drawer's. Centre the
+            // label's line box in the chip — parking it at a fixed `+6` left the
+            // text hanging off the chip's bottom edge.
+            self.draw_cell_text.font_scale = 1.0;
+            let line_box = self.cell_metrics().1;
+            let text_y = rect.pos.y + ((rect.size.y - line_box) * 0.5).max(1.0);
             self.draw_cell_text
-                .draw_abs(cx, rect.pos + Vec2d { x: 8.0, y: 6.0 }, &label);
+                .draw_abs(cx, Vec2d { x: rect.pos.x + 8.0, y: text_y }, &label);
         }
     }
 
@@ -4475,6 +4709,9 @@ impl CanvasPanel {
         };
         self.draw_item_bg_rect(cx, bar_rect, TAB_BG);
         self.draw_border_rect(cx, bar_rect, TAB_BORDER);
+        // Fixed-size chrome: pin the text scale so camera zoom (left behind by
+        // the last card drawn) cannot leak into the tab bar.
+        self.draw_title.font_scale = 1.0;
 
         let mut x = 8.0;
         let tab_h = TAB_BAR_H - 8.0;
@@ -4657,8 +4894,30 @@ impl CanvasPanel {
                 }
                 let cx_pos = x0 + (i + k) as f64 * char_w;
                 let cs = cell.ch.to_string();
-                self.draw_cell_text
-                    .draw_abs(cx, Vec2d { x: cx_pos, y }, &cs);
+                // A fallback face can hand back a glyph wider than its cell
+                // (emoji, rare symbols). Shrink it into its slot instead of
+                // letting it run over its neighbour — the "fit" makepad's
+                // terminal applies in `cached_glyph`. ASCII skips the check:
+                // the mono face advances exactly one cell for it.
+                let fit = if cell.ch.is_ascii() {
+                    1.0
+                } else {
+                    // A wide glyph owns its trailing padding cell too.
+                    let cells = if row.get(i + k + 1).is_some_and(|c| c.wide_padding) {
+                        2u8
+                    } else {
+                        1u8
+                    };
+                    self.glyph_fit(cx, cell.ch, cells)
+                };
+                if fit < 1.0 {
+                    let scale = self.draw_cell_text.font_scale;
+                    self.draw_cell_text.font_scale = scale * fit;
+                    self.draw_cell_text.draw_abs(cx, Vec2d { x: cx_pos, y }, &cs);
+                    self.draw_cell_text.font_scale = scale;
+                } else {
+                    self.draw_cell_text.draw_abs(cx, Vec2d { x: cx_pos, y }, &cs);
+                }
             }
             i = j;
         }
@@ -4706,56 +4965,29 @@ impl CanvasPanel {
         });
         self.draw_title.draw_abs(
             cx,
-            screen.pos + Vec2d { x: 32.0, y: 6.0 },
+            screen.pos + Vec2d {
+                x: 32.0,
+                y: TITLE_TEXT_DY,
+            },
             &format!("{} — {}", title, command),
         );
 
         // Agent status dot + label on the right side of the title bar.
-        // Anchored right so it doesn't collide with the min/close buttons.
-        let status_label = status.label();
-        let status_color = status.color();
-        let dot_size = 8.0;
-        // Clearance for the two control buttons (2*BTN_W + gap + margin).
-        // Measure the reserved right edge from the same rects the control
-        // buttons draw with (three slots worst case), so the presence label
-        // can never slide under them; the old `.max(size.x * 0.5)` forced
-        // the label into the buttons on narrow cards.
-        let (_, min_r, _) = Self::control_button_rects(screen, true);
-        let buttons_left = min_r.pos.x - screen.pos.x;
-        let label_w = status_label.len() as f64 * 8.0;
-        let status_x = (buttons_left - 14.0 - label_w).max(60.0);
-        let status_y = screen.pos.y + 9.0;
-        self.draw_item_bg_rect(
+        self.draw_presence(
             cx,
-            Rect {
-                pos: Vec2d {
-                    x: screen.pos.x + status_x,
-                    y: status_y,
-                },
-                size: Vec2d {
-                    x: dot_size,
-                    y: dot_size,
-                },
+            screen,
+            status.label(),
+            status.color(),
+            if is_sel {
+                MUSIC_SECONDARY
+            } else {
+                [
+                    MUSIC_SECONDARY[0] * 0.7,
+                    MUSIC_SECONDARY[1] * 0.7,
+                    MUSIC_SECONDARY[2] * 0.7,
+                    1.0,
+                ]
             },
-            status_color,
-        );
-        self.draw_title.color = vec4f(if is_sel {
-            MUSIC_SECONDARY
-        } else {
-            [
-                MUSIC_SECONDARY[0] * 0.7,
-                MUSIC_SECONDARY[1] * 0.7,
-                MUSIC_SECONDARY[2] * 0.7,
-                1.0,
-            ]
-        });
-        self.draw_title.draw_abs(
-            cx,
-            Vec2d {
-                x: screen.pos.x + status_x + dot_size + 5.0,
-                y: status_y - 2.0,
-            },
-            status_label,
         );
 
         let grid = match state.lock() {
@@ -4790,8 +5022,8 @@ impl CanvasPanel {
         // resized by draw_walk), never stretching glyphs.
         let cols = grid.cols.max(1);
         let rows = grid.rows.max(1);
-        let char_w = TERM_CELL_W * self.camera.zoom as f64;
-        let line_h = TERM_CELL_H * self.camera.zoom as f64;
+        let char_w = self.cell_w();
+        let line_h = self.cell_h();
         // Scale the font with zoom so glyph width matches char_w (prevents
         // horizontal overlap when zooming out; glyphs would otherwise stay at
         // fixed size and collide).
@@ -4973,6 +5205,9 @@ impl CanvasPanel {
             avatar_color,
         );
         self.draw_title.color = vec4f(if is_sel { TITLE_TEXT } else { DIM_TEXT });
+        // Card chrome is fixed-size (title bar offsets below are in pixels), so
+        // pin the scale rather than inheriting the last drawer's.
+        self.draw_title.font_scale = 1.0;
         let sub = if provider.is_empty() {
             cwd.to_string()
         } else {
@@ -4980,7 +5215,10 @@ impl CanvasPanel {
         };
         self.draw_title.draw_abs(
             cx,
-            screen.pos + Vec2d { x: 32.0, y: 6.0 },
+            screen.pos + Vec2d {
+                x: 32.0,
+                y: TITLE_TEXT_DY,
+            },
             &format!("{title} — {sub}"),
         );
 
@@ -4990,34 +5228,12 @@ impl CanvasPanel {
         } else {
             ("ready", crate::items::AgentStatus::Online.color())
         };
-        // Measure the reserved right edge from the same rects the control
-        // buttons draw with (three slots worst case), so the presence label
-        // can never slide under them; the old `.max(size.x * 0.5)` forced
-        // the label into the buttons on narrow cards.
-        let (_, min_r, _) = Self::control_button_rects(screen, true);
-        let buttons_left = min_r.pos.x - screen.pos.x;
-        let label_w = status_label.len() as f64 * 8.0;
-        let status_x = (buttons_left - 14.0 - label_w).max(60.0);
-        let status_y = screen.pos.y + 9.0;
-        self.draw_item_bg_rect(
+        self.draw_presence(
             cx,
-            Rect {
-                pos: Vec2d {
-                    x: screen.pos.x + status_x,
-                    y: status_y,
-                },
-                size: Vec2d { x: 8.0, y: 8.0 },
-            },
-            status_color,
-        );
-        self.draw_title.color = vec4f(if is_sel { MUSIC_SECONDARY } else { DIM_TEXT });
-        self.draw_title.draw_abs(
-            cx,
-            Vec2d {
-                x: screen.pos.x + status_x + 13.0,
-                y: status_y - 2.0,
-            },
+            screen,
             status_label,
+            status_color,
+            if is_sel { MUSIC_SECONDARY } else { DIM_TEXT },
         );
 
         // Divider between the title bar and the transcript.
@@ -5045,8 +5261,10 @@ impl CanvasPanel {
             },
         };
         cx.push_clip_rect(body_rect);
-        let char_w = AGENT_CHAR_W * self.camera.zoom as f64;
-        let line_h = 13.0 * AGENT_LINE_H * self.camera.zoom as f64;
+        // Transcript content scales with the camera, like the terminal grid.
+        self.draw_cell_text.font_scale = self.camera.zoom;
+        let char_w = self.cell_w();
+        let line_h = self.cell_h();
         let max_chars = ((body_rect.size.x / char_w).floor().max(8.0)) as usize;
         let max_lines = (body_rect.size.y / line_h).floor().max(1.0) as usize;
 
@@ -5300,6 +5518,8 @@ impl CanvasPanel {
             "W",
             [0.30, 0.62, 0.98, 1.0],
         );
+        // Fixed-size browser chrome: pin the text scale to the card's own.
+        self.draw_title.font_scale = 1.0;
         self.draw_title.color = vec4f(TITLE_TEXT);
         self.draw_title
             .draw_abs(cx, bar_rect.pos + Vec2d { x: 32.0, y: 7.0 }, url);
@@ -5417,6 +5637,8 @@ impl CanvasPanel {
             kind.avatar(),
             accent,
         );
+        // Fixed-size media chrome: pin the text scale to the card's own.
+        self.draw_title.font_scale = 1.0;
         self.draw_title.color = vec4f(TITLE_TEXT);
         self.draw_title.draw_abs(
             cx,
@@ -5518,10 +5740,12 @@ impl CanvasPanel {
         let content = self.text_docs.get(&id).cloned().unwrap_or_default();
         let scroll = self.text_scroll.get(&id).copied().unwrap_or(0.0);
 
-        // Monospace grid shared with terminal rendering.
-        const CELL_W: f64 = 8.0;
-        const CELL_H: f64 = 17.3;
-        let rows = ((rect.size.y / CELL_H).floor() as usize).max(1);
+        // Monospace grid shared with terminal rendering; measured from the
+        // face like the terminal grid (the old 8×17.3 constants were the
+        // terminal's guess and never matched the font).
+        let cell_w = self.cell_w();
+        let cell_h = self.cell_h();
+        let rows = ((rect.size.y / cell_h).floor() as usize).max(1);
         let lines: Vec<&str> = content.lines().collect();
         let max_scroll = lines.len().saturating_sub(rows) as f64;
         let scroll = scroll.clamp(0.0, max_scroll);
@@ -5531,17 +5755,19 @@ impl CanvasPanel {
         // Keep the card's dark paper under the text (the card bg is already
         // dark; draw text a row at a time).
         self.draw_cell_text.color = vec4f([0.86, 0.89, 0.94, 1.0]);
+        // Scale the face with the camera, like the terminal grid does.
+        self.draw_cell_text.font_scale = self.camera.zoom;
         let baseline = rect.pos + Vec2d { x: 8.0, y: 4.0 };
         for (row, line) in lines.iter().skip(first).take(rows + 1).enumerate() {
             // Trim trailing \r from CRLF files.
             let line = line.strip_suffix('\r').unwrap_or(line);
             // Rough horizontal clip: skip drawing rows that fall below the rect.
-            let y = baseline.y + row as f64 * CELL_H;
+            let y = baseline.y + row as f64 * cell_h;
             if y > rect.pos.y + rect.size.y {
                 break;
             }
             // Horizontal cull: drop leading chars that scroll out of view.
-            let max_chars = ((rect.size.x - 16.0) / CELL_W).floor().max(1.0) as usize;
+            let max_chars = ((rect.size.x - 16.0) / cell_w).floor().max(1.0) as usize;
             let line = if line.chars().count() > max_chars {
                 let cropped: String = line.chars().take(max_chars).collect();
                 cropped
@@ -5553,7 +5779,7 @@ impl CanvasPanel {
                 baseline
                     + Vec2d {
                         x: 0.0,
-                        y: row as f64 * CELL_H,
+                        y: row as f64 * cell_h,
                     },
                 &line,
             );
@@ -5743,6 +5969,7 @@ impl CanvasPanel {
     fn draw_slot_busy(&mut self, cx: &mut Cx2d, rect: Rect) {
         self.draw_item_bg_rect(cx, rect, [0.09, 0.10, 0.13, 1.0]);
         self.draw_cell_text.color = vec4f([0.55, 0.60, 0.72, 1.0]);
+        self.draw_cell_text.font_scale = self.camera.zoom;
         self.draw_cell_text.draw_abs(
             cx,
             rect.pos
@@ -5775,6 +6002,9 @@ impl CanvasPanel {
             self.draw_glow_border(cx, screen, SEL_BORDER);
         }
         self.draw_item_bg_rect(cx, screen, MUSIC_BG);
+        self.draw_border_rect(cx, screen, if is_sel { SEL_BORDER } else { MUSIC_BORDER });
+        // Fixed-size card chrome: pin the text scale like the other cards.
+        self.draw_title.font_scale = 1.0;
         self.draw_border_rect(cx, screen, if is_sel { SEL_BORDER } else { MUSIC_BORDER });
 
         // Avatar + title.
@@ -7285,6 +7515,9 @@ impl Widget for CanvasPanel {
         }
 
         self.ensure_workspace();
+        // Measure the mono cell from the face before anything lays out text:
+        // the grid, the PTY resize and the hit-tests all read it.
+        self.refresh_cell_metrics(cx);
         self.draw_grid(cx, rect);
         self.draw_empty_hint(cx, rect);
         if self.drop_hover {
@@ -7428,12 +7661,8 @@ impl Widget for CanvasPanel {
                     {
                         let content_w = (item_screen.size.x - 12.0).max(1.0);
                         let content_h = (item_screen.size.y - 34.0).max(1.0);
-                        let cols = (content_w / (TERM_CELL_W * self.camera.zoom as f64))
-                            .floor()
-                            .max(10.0) as usize;
-                        let rows = (content_h / (TERM_CELL_H * self.camera.zoom as f64))
-                            .floor()
-                            .max(3.0) as usize;
+                        let cols = (content_w / self.cell_w()).floor().max(10.0) as usize;
+                        let rows = (content_h / self.cell_h()).floor().max(3.0) as usize;
                         session.resize(cols, rows);
                     }
                     if let Some(state) = state {

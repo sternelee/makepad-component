@@ -116,14 +116,30 @@ script_mod! {
         draw_cell_text +: {
             text_style: TextStyle{
                 font_family: FontFamily{
-                    // Menlo is monospace AND covers Dingbats (➜✗⌘);
-                    // CJK + emoji fall back to the bundled fonts.
-                    latin := FontMember{res: crate_resource("makepad_widgets:resources/Menlo-Regular.ttf") asc: 0.0 desc: 0.0}
-                    chinese := FontMember{res: crate_resource("makepad_widgets:resources/LXGWWenKaiRegular.ttf") asc: 0.0 desc: 0.0}
-                    emoji := FontMember{res: crate_resource("makepad_widgets:resources/NotoColorEmoji.ttf") asc: 0.0 desc: 0.0}
+                    // JetBrains Mono is the face makepad's own terminal ships
+                    // on: it covers everything this grid draws — the shell's
+                    // ➜ ✗ ❯ ⌘ ▸ ◎ and box-drawing — at exactly one cell of
+                    // advance. The old `latin` pointed at
+                    // `resources/Menlo-Regular.ttf`, which exists nowhere in
+                    // the makepad tree: the family then loaded incompletely and
+                    // ASCII fell through to the CJK member, whose proportional
+                    // glyphs are wider than a cell (the horizontal squeeze) and
+                    // cover no prompt symbol (the tofu boxes).
+                    latin := FontMember{
+                        res: crate_resource("makepad_widgets:resources/jetbrains_mono_variable.ttf")
+                        asc: 0.0 desc: 0.0 weight: 400.0
+                    }
+                    // Symbols the mono face is missing (✗ ⌘ ⚠ …).
+                    symbols := FontMember{res: crate_resource("makepad_widgets:resources/Inter.ttf") asc: 0.0 desc: 0.0}
+                    icons := FontMember{res: crate_resource("makepad_widgets:resources/fa-solid-900.ttf") asc: 0.0 desc: 0.0}
+                    // `lazy` (1 = CJK, 2 = emoji) keeps the large faces out of
+                    // the eager family: they are requested only after a real
+                    // glyph miss, so they can never become the Latin fallback.
+                    chinese := FontMember{lazy: 1.0 res: crate_resource("makepad_widgets:resources/LXGWWenKaiRegular.ttf") asc: 0.0 desc: 0.0}
+                    emoji := FontMember{lazy: 2.0 res: crate_resource("makepad_widgets:resources/NotoColorEmoji.ttf") asc: 0.0 desc: 0.0}
                 }
                 font_size: 12.5
-                line_spacing: 1.2
+                line_spacing: 1.0
             }
             color: #xe2e6efff
         }
@@ -654,6 +670,33 @@ fn main() {
     }
     app_main();
 }
+
+/// Fonts this app ships, as a `makepad.font-assets.v1` payload. The
+/// `app_main!` macro emits this section for crates that can use the macro;
+/// this crate hand-rolls its entry point for the CEF bootstrap, so the
+/// manifest is spelled out here: the cell face, its symbol fallbacks, and the
+/// two large faces that load only after a glyph miss.
+#[cfg(not(any(target_arch = "wasm32", target_os = "android", target_env = "ohos")))]
+const CANVAS_FONT_ASSETS: &[&str] = &[
+    "makepad_widgets/resources/jetbrains_mono_variable.ttf",
+    "makepad_widgets/resources/fa-solid-900.ttf",
+    "makepad_widgets/resources/Inter.ttf",
+    "makepad_widgets/resources/LXGWWenKaiRegular.ttf",
+    "makepad_widgets/resources/NotoColorEmoji.ttf",
+];
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "android", target_env = "ohos")))]
+#[used]
+#[cfg_attr(target_vendor = "apple", link_section = "__DATA,__mp_font_v1")]
+#[cfg_attr(not(target_vendor = "apple"), link_section = ".makepad.font-assets.v1")]
+static MAKEPAD_FONT_ASSETS_V1: [u8;
+    makepad_widgets::makepad_platform::font_policy::font_asset_manifest_len(
+        makepad_widgets::makepad_platform::font_policy::INTERNATIONAL_FONT_ASSET_MANIFEST,
+        CANVAS_FONT_ASSETS,
+    )] = makepad_widgets::makepad_platform::font_policy::extend_font_asset_manifest(
+    makepad_widgets::makepad_platform::font_policy::INTERNATIONAL_FONT_ASSET_MANIFEST,
+    CANVAS_FONT_ASSETS,
+);
 
 /// Desktop entry point with CEF bootstrap (embedded browser support).
 ///
