@@ -56,6 +56,7 @@ pub mod input;
 pub mod keys;
 pub mod layout;
 pub mod list;
+pub mod markdown;
 pub mod loaders;
 pub mod pagination;
 pub mod palette;
@@ -113,6 +114,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::avatar::script_mod(vm);
     crate::mp::tree::script_mod(vm);
     crate::mp::list::script_mod(vm);
+    crate::mp::markdown::script_mod(vm);
     // **After `list`.** `MpPalette` composes an `MpMenu`, which `list.rs` defines,
     // and this crate has now hit that ordering rule twice: a widget that references
     // another widget's prototype in its own `script_mod!` must register later. The

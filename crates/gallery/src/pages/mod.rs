@@ -14,6 +14,7 @@ pub mod button;
 pub mod calendar;
 pub mod content;
 pub mod controls;
+pub mod document;
 pub mod feedback;
 pub mod foundation;
 pub mod floating;
@@ -69,6 +70,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     floating::script_mod(vm);
     history::script_mod(vm);
     hover_card::script_mod(vm);
+    document::script_mod(vm);
     icon::script_mod(vm);
     status::script_mod(vm);
     table::script_mod(vm);
@@ -318,6 +320,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/code.rs",
         blurb: "Source classified, coloured and painted",
     },
+    Page {
+        title: "Document",
+        path: "mod.gallery.pages.document",
+        source: "crates/gallery/src/pages/document.rs",
+        blurb: "A markdown document, laid out and painted",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -396,6 +404,7 @@ mod tests {
             ("crates/gallery/src/pages/floating.rs", "floating"),
             ("crates/gallery/src/pages/history.rs", "history"),
             ("crates/gallery/src/pages/hover_card.rs", "hover_card"),
+            ("crates/gallery/src/pages/document.rs", "document"),
             ("crates/gallery/src/pages/icon.rs", "icon"),
             ("crates/gallery/src/pages/status.rs", "status"),
             ("crates/gallery/src/pages/table.rs", "table"),

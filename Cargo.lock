@@ -1474,6 +1474,7 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "makepad-component",
+ "makepad-markdown",
  "makepad-motion",
  "makepad-syntax",
  "makepad-theme",
@@ -2462,6 +2463,7 @@ name = "makepad-component"
 version = "0.1.0"
 dependencies = [
  "log",
+ "makepad-markdown",
  "makepad-motion",
  "makepad-plot",
  "makepad-theme",

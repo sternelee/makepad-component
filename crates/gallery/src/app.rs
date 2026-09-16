@@ -32,6 +32,7 @@ use makepad_component::mp::{
     switch::MpSwitchWidgetRefExt,
     floating::MpFloatingWidgetRefExt,
     code::MpCodeBlockWidgetRefExt,
+    markdown::MpMarkdownWidgetRefExt,
     date::MpDateWidgetRefExt,
 };
 
@@ -128,6 +129,7 @@ script_mod! {
                         rail_page_32 := RailRow{text: ""}
                         rail_page_33 := RailRow{text: ""}
                         rail_page_34 := RailRow{text: ""}
+                        rail_page_35 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -197,6 +199,7 @@ script_mod! {
                             page_32 := mod.gallery.pages.hover_card{}
                             page_33 := mod.gallery.pages.floating{}
                             page_34 := mod.gallery.pages.code{}
+                            page_35 := mod.gallery.pages.document{}
                         }
                     }
                 }
@@ -210,7 +213,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 35] = [
+const PAGE_SLOTS: [&[LiveId]; 36] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -246,10 +249,11 @@ const PAGE_SLOTS: [&[LiveId]; 35] = [
     ids!(page_32),
     ids!(page_33),
     ids!(page_34),
+    ids!(page_35),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 35] = [
+const RAIL_ROWS: [&[LiveId]; 36] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -285,6 +289,7 @@ const RAIL_ROWS: [&[LiveId]; 35] = [
     ids!(rail_page_32),
     ids!(rail_page_33),
     ids!(rail_page_34),
+    ids!(rail_page_35),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1162,6 +1167,104 @@ use makepad_component::mp::hover_card::HoverIntent;
         );
     }
 
+    /// Give the document pages their source and report what the model and the layout produced.
+    ///
+    /// The **fixed point is checked here, on the document being displayed** — the tests check it over a
+    /// corpus, and this checks the one a reader is looking at. That is the strongest thing this page can
+    /// say without a screenshot, which this session does not have.
+    fn seed_document(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::markdown::MpMarkdownWidgetRefExt;
+
+        let source = "# A document\n\n\
+            A paragraph with **bold**, *italic* and `code` in it, long enough that it wraps onto a\n\
+            second line in a narrow column.\n\n\
+            - a bullet\n\
+            - another bullet\n\
+            \u{20} - a nested one\n\n\
+            3. ordered, starting at three\n\
+            4. and continuing\n\n\
+            - [ ] a task\n\
+            - [x] a finished task\n\n\
+            > a quote, which is one block however many lines it has\n\
+            > like this\n\n\
+            ```rust\n\
+            fn main() {\n\
+                println!(\"not *markdown* inside a fence\");\n\
+            }\n\
+            ```\n\n\
+            ---\n\n\
+            A last paragraph, so the divider has something on both sides.\n";
+
+        // The model's own property, on this document.
+        let first = makepad_markdown::parse(source);
+        let written = makepad_markdown::serialize(&first);
+        let second = makepad_markdown::parse(&written);
+        let holds = first == second;
+        let stable = written == makepad_markdown::serialize(&second);
+        println!(
+            "DOCUMENT blocks={} fixed_point={holds} stable_after_one_write={stable} wire_bytes={}",
+            first.blocks.len(),
+            written.len()
+        );
+        for (index, block) in first.blocks.iter().enumerate() {
+            let kind = match &block.kind {
+                makepad_markdown::BlockKind::Paragraph(_) => "paragraph",
+                makepad_markdown::BlockKind::Heading { .. } => "heading",
+                makepad_markdown::BlockKind::Bullet(_) => "bullet",
+                makepad_markdown::BlockKind::Ordered { .. } => "ordered",
+                makepad_markdown::BlockKind::Task { .. } => "task",
+                makepad_markdown::BlockKind::Quote(_) => "quote",
+                makepad_markdown::BlockKind::Code { .. } => "code",
+                makepad_markdown::BlockKind::Divider => "divider",
+            };
+            println!("DOCUMENT   [{index}] indent={} {kind}", block.indent);
+        }
+
+        // Two columns, so the wrap is doing something a reader can see the effect of.
+        for (id, measure) in [(ids!(doc_full), 620.0f64), (ids!(doc_narrow), 300.0f64)] {
+            let view = self.ui.mp_markdown(cx, id);
+            view.set_measure(cx, measure);
+            view.set_source(cx, source);
+        }
+
+        self.ui.label(cx, ids!(doc_stats)).set_text(
+            cx,
+            &format!(
+                "{} blocks, {} of them with a marker; the narrow column wraps the same {} blocks \\
+                 into more lines \u{2014} printed on the next run of the page",
+                first.blocks.len(),
+                first.blocks
+                    .iter()
+                    .filter(|block| matches!(
+                        block.kind,
+                        makepad_markdown::BlockKind::Bullet(_)
+                            | makepad_markdown::BlockKind::Ordered { .. }
+                            | makepad_markdown::BlockKind::Task { .. }
+                            | makepad_markdown::BlockKind::Quote(_)
+                    ))
+                    .count(),
+                first.blocks.len(),
+            ),
+        );
+        self.ui.label(cx, ids!(doc_fixed_point)).set_text(
+            cx,
+            &format!(
+                "the fixed point holds on the document above: parse \u{2192} serialize \u{2192} parse is the \
+                 same document ({holds}), and a second write is byte-identical ({stable}). The wire form is \
+                 {} bytes.",
+                written.len()
+            ),
+        );
+        // The wire form, painted by the code block — so the round trip is visible as text as well as
+        // asserted as a boolean.
+        if let Some(spans) = makepad_syntax::classify(&written, "json") {
+            let _ = spans;
+        }
+        self.ui
+            .mp_code_block(cx, ids!(doc_wire))
+            .set_highlighted(cx, &written, &[]);
+    }
+
     /// Declare a keymap and fill the sheet from it.
     ///
     /// **Nothing below writes a chord.** Each row's trailing text is
@@ -1613,6 +1716,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_hover_card(cx);
         self.seed_floating(cx);
         self.seed_code(cx);
+        self.seed_document(cx);
     }
 
     /// Fill the table page's tables.
@@ -2239,7 +2343,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 35] = [
+    const SLOT_PAGES: [&str; 36] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -2275,6 +2379,7 @@ mod tests {
         "mod.gallery.pages.hover_card",
         "mod.gallery.pages.floating",
         "mod.gallery.pages.code",
+        "mod.gallery.pages.document",
     ];
 
     #[test]

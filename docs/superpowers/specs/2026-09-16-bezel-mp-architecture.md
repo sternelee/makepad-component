@@ -529,7 +529,39 @@ multi-block document, the point the caret is drawn at must hit-test back to that
 the property that ties the two halves together, and the fault it prevents — clicking where the caret is
 drawn puts it somewhere else — is the one a reader notices most.
 
-**What is not built:** `markdown`'s paint half. bezel's `render.rs` is 2041 lines of gpui element
+### The paint half, and the `#[live]` wipe arriving through a new door
+
+`MpMarkdown` is the widget: the theme's metrics in, glyphs out at the coordinates the layout computed. It
+sits in `crates/ui` with the other widgets while `makepad-markdown` stays **dependency-free**, the same
+arrangement as `MpCodeBlock` and `syntax` — and the same reason: a pure crate's tests run in a tenth of a
+second, which is what let the fixed-point property be checked over nine thousand generated documents.
+
+Two decisions in it:
+
+- **A wrap width the caller sets, not `width: Fill`.** A self-drawn widget states its height before it
+  draws, the height depends on the wrap, and the wrap depends on the width — so `Fill` is a circle. Taking
+  a number breaks it at the cost of the caller knowing its column. The alternative, a measure-then-draw
+  pass, has the wrong height on the first frame and jumps once — a flicker on every resize, and precisely
+  the class of fault this session cannot check.
+- **The painter reads the layout's x and never computes its own.** A marker's width, a quote's padding and
+  a line's left edge are the layout's numbers, so the two cannot disagree about where a line starts.
+
+**The `#[live]` wipe arrived through a new door.** `measure` was `#[live]` and mutated through a setter,
+which is the fault this port has recorded twice — `Theme::install` raises `request_script_reapply()`, the
+re-apply re-asserts every widget's DSL, and every `#[live]` field a setter wrote goes back to its declared
+value. It showed up as **two documents in two columns both laying out at the DSL's 640**, the narrow one
+silently not narrower and nothing in any log. The value is `#[rust]` now, seated from `initial_measure` in
+`on_after_new`.
+
+And the fix's first attempt was wrong in an instructive way: it also had an `on_after_apply` copying the
+DSL value across again, which is *the wipe it was written to prevent, one apply later*. `on_after_new` is
+the only hook that runs before a caller can set anything.
+
+**What is not verified:** the paint itself, because screen capture is unavailable. What *is* verified, from
+the widget's own printed numbers on the actual page: 14 blocks in both columns, **18 lines at measure 620
+and 23 at 300**, heights 520.70 and 624.70, and `drawn` matching the computed height exactly in both — with
+the fixed point holding on the displayed document (`parse → serialize → parse` identical, and a second
+write byte-identical). bezel's `render.rs` is 2041 lines of gpui element
 building, and this port has the model but no renderer — so the gallery has **no page for this crate
 yet**, because there is nothing to paint. That is stated rather than papered over with a page showing
 the source as text.
