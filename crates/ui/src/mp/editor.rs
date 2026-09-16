@@ -114,6 +114,33 @@ pub struct DrawMpEditor {
 }
 
 /// The padding inside the plate, on each side.
+/// The slash menu's plate geometry. Named rather than inline, because a menu's proportions are a decision: a reader
+/// comparing two menus needs the numbers to have a place to live.
+const SLASH_PLATE_PAD: f64 = 6.0;
+/// The gap between the caret and the plate.
+const SLASH_GAP: f64 = 6.0;
+/// A row's text, as a fraction of the block's body size — so the menu grows when the text does.
+const SLASH_ROW_SCALE: f64 = 0.85;
+/// A row's hint, as a fraction of the menu's own text: the hint is a reference, not a label.
+const SLASH_HINT_SCALE: f64 = 0.8;
+/// The gap between a label and its hint.
+const SLASH_HINT_GAP: f64 = 10.0;
+/// How far a hint sits below its row's text top, to sit on the same baseline.
+const SLASH_HINT_BASELINE: f64 = 1.0;
+/// The accent's width, which the plate reserves in its own padding.
+const SLASH_ACCENT_W: f64 = 3.0;
+const SLASH_ACCENT_X: f64 = 5.0;
+const SLASH_ACCENT_RADIUS: f32 = 1.5;
+const SLASH_ACCENT_INSET: f64 = 6.0;
+/// Fractions of the widget's own corner radius, so a menu is consistent with what it opens from.
+const SLASH_PLATE_RADIUS: f32 = 0.75;
+const SLASH_ROW_RADIUS: f32 = 0.5;
+
+/// The row height a menu uses, from the theme's layout numbers rather than a literal here.
+fn theme_row_height(cx: &mut Cx) -> f64 {
+    makepad_theme::Theme::of(cx).layout.row_height as f64
+}
+
 const PAD: f64 = 14.0;
 /// How wide the caret is.
 const CARET_W: f64 = 2.0;
@@ -903,23 +930,158 @@ impl Widget for MpEditor {
         }
 
         // **The caret last**, so nothing paints over it.
+        let mut caret_rect: Option<Rect> = None;
         if let Some((line_index, x)) = self.caret_position(&laid) {
             if let Some(block_box) = laid.blocks.iter().find(|b| b.block == self.selection.block) {
                 if let Some(line) = block_box.lines.get(line_index) {
                     let line_height = metrics.line_height_for(&self.doc.blocks[block_box.block].kind);
+                    let rect = Rect {
+                        pos: origin + dvec2(x, line.y),
+                        size: dvec2(CARET_W, line_height),
+                    };
+                    caret_rect = Some(rect);
                     self.draw_bg.fill = caret_ink;
                     self.draw_bg.border_width = 0.0;
                     self.draw_bg.radius = 0.0;
-                    self.draw_bg.draw_abs(
-                        cx,
-                        Rect {
-                            pos: origin + dvec2(x, line.y),
-                            size: dvec2(CARET_W, line_height),
-                        },
-                    );
+                    self.draw_bg.draw_abs(cx, rect);
                     self.draw_bg.border_width = 1.0;
                     self.draw_bg.fill = panel;
                 }
+            }
+        }
+
+        // **The slash menu, painted after the caret so nothing covers it.**
+        //
+        // Until this existed the menu worked and showed nothing — a menu whose rows are never painted is
+        // indistinguishable from a menu that is not there, which is the failure that reads as success in a log.
+        //
+        // Three things about the geometry are decisions rather than arithmetic:
+        //
+        // - **The plate is as wide as its widest row, measured by the renderer.** `text::measured_width` asks the
+        //   draw list, so the plate fits the text rather than an estimate of it — the same reason a selection's
+        //   rectangle uses the layout's own widths.
+        // - **It opens below the caret and flips above when it would leave the editor**, because a menu that is
+        //   half outside its own widget is a menu with rows you cannot read.
+        // - **Nothing is drawn when no row matches.** A plate with no rows says less than the text a person is
+        //   already looking at, and the block's own text still shows the query.
+        if let Some(caret) = caret_rect {
+            let row_h = theme_row_height(cx);
+            // Copied out of the menu first: `self.slash` borrows `self` immutably, and the draw calls below need it
+            // mutably. The labels are `&'static str` because the menu's items are `const`, so this copies pointers.
+            let rows: Vec<(&'static str, &'static str)> = match self.slash.as_ref() {
+                Some(menu) => menu.matches().map(|item| (item.label, item.hint)).collect(),
+                None => Vec::new(),
+            };
+            let active = self.slash.as_ref().map_or(0, |menu| menu.active());
+            if !rows.is_empty() {
+                let pad = SLASH_PLATE_PAD;
+                let font = metrics.body_size * SLASH_ROW_SCALE;
+                let mut widest = 0.0f64;
+                for (label, hint) in &rows {
+                    self.draw_body.text_style.font_size = font as f32;
+                    let mut row = text::measured_width(&self.draw_body, cx, label);
+                    if !hint.is_empty() {
+                        self.draw_marker.text_style.font_size = (font * SLASH_HINT_SCALE) as f32;
+                        row += text::measured_width(&self.draw_marker, cx, hint) + SLASH_HINT_GAP;
+                    }
+                    widest = widest.max(row);
+                }
+                let plate_w = widest + pad * 2.0 + SLASH_ACCENT_W;
+                let plate_h = rows.len() as f64 * row_h + pad * 2.0;
+
+                // Below the caret, or above it when below would leave the widget. `height` is this widget's own, so
+                // the flip is decided against the box the menu has to live in.
+                let mut y = caret.pos.y + caret.size.y + SLASH_GAP;
+                if y + plate_h > origin.y + height {
+                    y = (caret.pos.y - plate_h - SLASH_GAP).max(origin.y);
+                }
+                let x = caret.pos.x.min(origin.x + self.measure - plate_w).max(origin.x);
+                let plate = Rect {
+                    pos: dvec2(x, y),
+                    size: dvec2(plate_w, plate_h),
+                };
+
+                // The plate, then the chosen row's wash, then the rows — in that order, so the wash is under its text.
+                self.draw_bg.fill = panel;
+                self.draw_bg.radius = radius * SLASH_PLATE_RADIUS;
+                self.draw_bg.draw_abs(cx, plate);
+                self.draw_bg.fill = wash;
+                self.draw_bg.radius = radius * SLASH_ROW_RADIUS;
+                self.draw_bg.draw_abs(
+                    cx,
+                    Rect {
+                        pos: dvec2(plate.pos.x + 1.0, plate.pos.y + pad + active as f64 * row_h),
+                        size: dvec2(plate.size.x - 2.0, row_h),
+                    },
+                );
+                // The accent beside the chosen row, which is what says *this is what Enter takes* without a cursor
+                // glyph: the row a person is about to apply is the one thing this menu must never leave ambiguous.
+                self.draw_bg.fill = caret_ink;
+                self.draw_bg.radius = SLASH_ACCENT_RADIUS;
+                self.draw_bg.draw_abs(
+                    cx,
+                    Rect {
+                        pos: dvec2(plate.pos.x + SLASH_ACCENT_X, plate.pos.y + pad + active as f64 * row_h + SLASH_ACCENT_INSET),
+                        size: dvec2(SLASH_ACCENT_W, row_h - SLASH_ACCENT_INSET * 2.0),
+                    },
+                );
+
+                for (index, (label, hint)) in rows.iter().enumerate() {
+                    let row_y = plate.pos.y + pad + index as f64 * row_h;
+                    let row_ink = if index == active { body_ink } else { muted_ink };
+                    self.draw_body.text_style.font_size = font as f32;
+                    self.draw_body.color = row_ink;
+                    self.draw_body.draw_walk(
+                        cx,
+                        Walk::fit().with_abs_pos(dvec2(plate.pos.x + pad + SLASH_ACCENT_W, row_y + (row_h - font) * 0.5)),
+                        Align::default(),
+                        label,
+                    );
+                    if !hint.is_empty() {
+                        let hint_w = {
+                            self.draw_marker.text_style.font_size = (font * SLASH_HINT_SCALE) as f32;
+                            text::measured_width(&self.draw_marker, cx, hint)
+                        };
+                        self.draw_marker.text_style.font_size = (font * SLASH_HINT_SCALE) as f32;
+                        self.draw_marker.color = muted_ink;
+                        self.draw_marker.draw_walk(
+                            cx,
+                            Walk::fit().with_abs_pos(dvec2(
+                                plate.pos.x + plate.size.x - pad - hint_w,
+                                row_y + (row_h - font) * 0.5 + SLASH_HINT_BASELINE,
+                            )),
+                            Align::default(),
+                            hint,
+                        );
+                    }
+                }
+                // **The geometry, printed, because a screenshot is not always available.** This environment's
+                // `screencapture` returns a blank screen (two distinct colours), so a paint path cannot be confirmed
+                // by looking. Printing what the paint path **computed** is the next best evidence and it catches the
+                // commonest paint fault: a plate placed outside the box it has to live in. Every number here is
+                // checkable against the widget's own box, printed on the same line.
+                if std::env::var("MP_EDITOR_DEBUG").is_ok() {
+                    println!(
+                        "SLASH paint plate=({:.1},{:.1} {:.1}x{:.1}) rows={} active={} inside_x={} inside_y={} box=({:.1},{:.1} {:.1}x{:.1})",
+                        plate.pos.x,
+                        plate.pos.y,
+                        plate.size.x,
+                        plate.size.y,
+                        rows.len(),
+                        active,
+                        plate.pos.x >= origin.x && plate.pos.x + plate.size.x <= origin.x + self.measure + 0.5,
+                        plate.pos.y >= origin.y && plate.pos.y + plate.size.y <= origin.y + height + 0.5,
+                        origin.x,
+                        origin.y,
+                        self.measure,
+                        height,
+                    );
+                }
+                // Restore the plate properties, because every other draw above depends on them: the border belongs to
+                // the widget's own frame and the radius to its own corners.
+                self.draw_bg.fill = panel;
+                self.draw_bg.border_width = 1.0;
+                self.draw_bg.radius = radius;
             }
         }
 

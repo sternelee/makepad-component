@@ -1298,7 +1298,7 @@ use makepad_component::mp::hover_card::HoverIntent;
             // slash menu: `/`, a query that narrows it, a walk down it, and Enter to take the row.
             "end,type: one,type: two,enter,type:next,home,tab,left,left,type:X,undo,undo,\
              enter,type:/,slash,type:head,slash,slash-down,slash,slash-down,slash,\
-             slash-up,slash,slash-enter,slash"
+             slash-up,slash,slash-enter,slash,enter,type:/,type:co,slash"
                 .to_string()
         });
 
