@@ -374,12 +374,32 @@ rather than the hover.
 What that implies for the hover: the trigger must *signal* the one tooltip, via a
 hover action from `mp::control` — and that work is not done.
 
-**Also recorded: a synthetic pointer warp does not produce a hover event in this
-app**, so the hover path cannot be verified from a capture script at all. The
-evidence is that a ghost button under the warped pointer shows none of its hover
-wash. `GALLERY_TOOLTIP=1` exists because of it.
+The trigger signals it now. `mp::control` gained a **shared** `ControlHover`
+action (`Entered`/`Left`) emitted by every control straight after `handle` — one
+shared type rather than one per widget, because the listener is a single tooltip
+and it does not care *which* control was hovered, only that one was and where it
+is. The gallery listens on the action batch and anchors to the trigger that
+reported.
 
-**The gallery's hover detection asks
+That change also removed the last copy of the hit contract: `mp/button.rs` still
+carried its own hand-written pointer/keyboard block, because it was written
+before `control.rs` existed. It uses `control::handle` now, so all five controls
+have one implementation, and a button can be a tooltip trigger for the same
+reason a checkbox can.
+
+**Recorded: a synthetic pointer warp does not produce a hover event in this app**,
+so the hover path cannot be verified from a capture script. The evidence is that
+a ghost button under the warped pointer shows none of its hover wash.
+`GALLERY_TOOLTIP=1` exists because of it — it exercises the plate and the
+anchoring without a pointer. What *is* unit-tested is the signal's plumbing
+(`control::hover_tests`: the action is shared, an unrelated action in the batch
+is not a hover, and the uid rides along so a listener can anchor). What is not
+verified end to end is the link a real pointer takes:
+`Hit::FingerHoverIn` → `Signals::hover_in` → `ControlHover::Entered` → the plate.
+Every link but the first is covered; the first is the same branch that drives the
+hover washes on every control in the crate.
+
+**The gallery's hover detection asked
 `event.hits(cx, trigger_area)` from the app for a button it does not own, and
 Makepad resolves one hit per event — the widget under the pointer consumes it, so
 the second call reports nothing. The first version did something worse

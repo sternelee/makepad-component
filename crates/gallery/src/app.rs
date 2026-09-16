@@ -248,6 +248,7 @@ impl MatchEvent for App {
             );
         }
 
+        self.handle_hover_tooltips(cx, actions);
         self.handle_controls(cx, actions);
         self.handle_sliders(cx, actions);
         self.handle_input(cx, actions);
@@ -330,29 +331,46 @@ impl App {
     /// Called for every event rather than only for `MouseMove`, because the
     /// signal wanted is the *transition* — hover-in shows, hover-out hides — and
     /// a transition only appears on the event that caused it.
-    fn handle_hover_tooltips(&mut self, cx: &mut Cx, event: &Event) {
+    fn handle_hover_tooltips(&mut self, cx: &mut Cx, actions: &Actions) {
+        // The control family's shared hover signal, read from the action batch.
+        //
+        // This is the fix for the page's original mistake. It used to ask
+        // `event.hits` for buttons it did not own, and by hand-rolled geometry
+        // before that (`area.rect(cx).contains(me.abs)` — a pass-relative rect
+        // against a screen-absolute pointer, which only agrees when the window
+        // sits at the origin). Now the *trigger* reports its own hover, which is
+        // the only widget that can, and this listens.
+        //
+        // The tooltip still lives here rather than in a trigger, and not by
+        // choice: an overlay draw list clips to its widget's rectangle, so a
+        // tooltip cannot be owned by a trigger-sized wrapper. See `mp/tooltip.rs`.
+        let hovers = makepad_component::mp::control::hovers(actions);
+        if hovers.is_empty() {
+            return;
+        }
         const TRIGGERS: [(&[LiveId], &str); 5] = [
             (ids!(tip_primary), "Runs the primary action"),
             (ids!(tip_default), "Saves without closing"),
             (ids!(tip_ghost), "Dismisses what you were doing"),
             (ids!(tip_danger), "Cannot be undone"),
-            (ids!(tip_one), "Anchored from the trigger's own Area"),
+            (ids!(tip_one), "Anchored from the trigger that reported"),
         ];
-        for (trigger, text) in TRIGGERS {
-            let area = self.ui.widget(cx, trigger).area();
-            match event.hits(cx, area) {
-                Hit::FingerHoverIn(_) | Hit::FingerHoverOver(_) => {
-                    self.ui.mp_tooltip(cx, ids!(tip)).show_for(cx, area, text);
-                    return;
+        for (path, text) in TRIGGERS {
+            let trigger = self.ui.widget(cx, path);
+            let uid = trigger.widget_uid();
+            for (hover_uid, hover) in &hovers {
+                if *hover_uid != uid {
+                    continue;
                 }
-                // Leaving is the other half, and it is a transition too — so it
-                // is read here rather than inferred from "nothing is hovered",
-                // which would also fire on every unrelated event.
-                Hit::FingerHoverOut(_) => {
-                    self.ui.mp_tooltip(cx, ids!(tip)).hide(cx);
-                    return;
+                match hover {
+                    makepad_component::mp::control::ControlHover::Entered => {
+                        let area = self.ui.widget(cx, path).area();
+                        self.ui.mp_tooltip(cx, ids!(tip)).show_for(cx, area, text);
+                    }
+                    makepad_component::mp::control::ControlHover::Left => {
+                        self.ui.mp_tooltip(cx, ids!(tip)).hide(cx);
+                    }
                 }
-                _ => {}
             }
         }
     }
@@ -486,7 +504,6 @@ impl AppMain for App {
             }
         }
         self.match_event(cx, event);
-        self.handle_hover_tooltips(cx, event);
         // Tab and Shift-Tab traversal. Makepad has a single key-focus area on
         // `Cx` and no traversal, so the app owns the pass.
         makepad_component::widgets::focus::handle_key(cx, event);

@@ -20,7 +20,7 @@ use makepad_widgets::*;
 
 use makepad_theme::ControlSize;
 
-use crate::mp::action;
+use crate::mp::{action, control};
 
 script_mod! {
     use mod.prelude.widgets_internal.*
@@ -366,54 +366,36 @@ impl ScriptHook for MpButton {
 
 impl Widget for MpButton {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
-        if self.animator_handle_event(cx, event).must_redraw() {
+        // The shared contract, like every other control in the crate. This
+        // widget was written before `control.rs` existed and kept its own copy
+        // of the hit handling — the last duplication of the thing that module
+        // was created to remove, and the reason a tooltip could not treat a
+        // button the way it treats a checkbox.
+        let signals = control::handle(&mut self.animator, cx, event, self.area);
+        // Tell whoever owns the one tooltip that this control is under the
+        // pointer. A control cannot own a tooltip itself; see `mp/tooltip.rs`.
+        control::emit_hover(cx, self.widget_uid(), signals);
+        // Tell whoever owns the one tooltip that this control is under the
+        // pointer. A control cannot own a tooltip itself; see `mp/tooltip.rs`.
+        control::emit_hover(cx, self.widget_uid(), signals);
+        if signals.redraw {
             self.redraw(cx);
         }
-
-        // Focus is read, never mirrored: the v2 button cached `has_key_focus`
-        // in a field and could be a frame stale, which showed as a ring that
-        // appeared one frame after the click that caused it.
-        let focused = cx.has_key_focus(self.area);
-        self.animator_toggle(cx, focused, Animate::Yes, ids!(focus.on), ids!(focus.off));
-
         if self.disabled {
             return;
         }
 
-        match event.hits(cx, self.area) {
-            Hit::FingerHoverIn(_) => {
-                cx.set_cursor(MouseCursor::Hand);
-                self.animator_play(cx, ids!(hover.on));
-            }
-            Hit::FingerHoverOut(_) => {
-                cx.set_cursor(MouseCursor::Default);
-                self.animator_play(cx, ids!(hover.off));
-            }
-            Hit::FingerDown(_) => {
-                self.animator_play(cx, ids!(press.on));
-                // Claim key focus on click, so the ring follows the pointer and
-                // a following Tab continues from here.
-                cx.set_key_focus(self.area);
-                cx.widget_action(self.widget_uid(), MpButtonAction::Pressed);
-            }
-            Hit::FingerUp(fe) => {
-                self.animator_play(cx, ids!(press.off));
-                if fe.is_over {
-                    cx.widget_action(self.widget_uid(), MpButtonAction::Clicked);
-                }
-                cx.widget_action(self.widget_uid(), MpButtonAction::Released);
-            }
-            _ => {}
+        // `Pressed` and `Released` bracket the gesture; `activate` is the press
+        // that landed, or Enter/Space while focused — which is why there is no
+        // separate keyboard block here any more.
+        if signals.down {
+            cx.widget_action(self.widget_uid(), MpButtonAction::Pressed);
         }
-
-        if focused {
-            if let Event::KeyDown(ke) = event {
-                if !ke.is_repeat
-                    && matches!(ke.key_code, KeyCode::ReturnKey | KeyCode::Space)
-                {
-                    cx.widget_action(self.widget_uid(), MpButtonAction::Clicked);
-                }
-            }
+        if signals.up {
+            cx.widget_action(self.widget_uid(), MpButtonAction::Released);
+        }
+        if signals.activate {
+            cx.widget_action(self.widget_uid(), MpButtonAction::Clicked);
         }
     }
 

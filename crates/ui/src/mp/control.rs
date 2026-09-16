@@ -342,6 +342,50 @@ fn set_state(
     }
 }
 
+/// A control's pointer enter/leave.
+///
+/// **A shared action rather than one per widget**, and the reason is the whole
+/// design: the listener is a single tooltip, one per overlay region (see
+/// `mp/tooltip.rs` for why it cannot be one per control), and it does not care
+/// *which* control was hovered — only that one was, and where it is. A
+/// per-widget action would force the listener to know every widget's action enum.
+#[derive(Clone, Debug)]
+pub enum ControlHover {
+    /// The pointer entered the control.
+    Entered,
+    /// The pointer left it.
+    Left,
+}
+
+/// Emit the hover transition, if this event was one.
+///
+/// Called by every control immediately after [`handle`] — one line, so a control
+/// cannot differ from its neighbours by forgetting it. A control that omits it
+/// still works; it simply cannot be a tooltip's trigger.
+pub fn emit_hover(cx: &mut Cx, uid: WidgetUid, signals: Signals) {
+    if signals.hover_in {
+        cx.widget_action(uid, ControlHover::Entered);
+    }
+    if signals.hover_out {
+        cx.widget_action(uid, ControlHover::Left);
+    }
+}
+
+/// Every hover transition in the batch, with the uid that emitted it.
+///
+/// Read through the same walk as [`crate::mp::action`] rather than
+/// `find_widget_action`, for the reason recorded there: the first action for a
+/// uid is routinely not the one being asked about.
+pub fn hovers(actions: &Actions) -> Vec<(WidgetUid, ControlHover)> {
+    let mut found = Vec::new();
+    for action in actions.iter().filter_map(|a| a.downcast_ref::<WidgetAction>()) {
+        if let Some(hover) = action.action.downcast_ref::<ControlHover>() {
+            found.push((action.widget_uid, hover.clone()));
+        }
+    }
+    found
+}
+
 /// Plate tones, so a control's hover does not have to know how a wash
 /// composites.
 pub mod plates {
@@ -502,5 +546,59 @@ mod tests {
                 assert_eq!(pair.len(), 2);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod hover_tests {
+    use super::*;
+
+    fn uid(n: u64) -> WidgetUid {
+        WidgetUid(n)
+    }
+
+    fn action<T: Clone + std::fmt::Debug + Send + Sync + 'static>(
+        uid: WidgetUid,
+        value: T,
+    ) -> Action {
+        Box::new(WidgetAction {
+            data: None,
+            action: Box::new(value),
+            widget_uid: uid,
+            group: None,
+        })
+    }
+
+    #[test]
+    fn test_the_hover_action_is_shared_across_controls() {
+        // One type, so a listener does not have to know five action enums.
+        let batch: Vec<Action> = vec![
+            action(uid(1), ControlHover::Entered),
+            action(uid(2), ControlHover::Left),
+        ];
+        let found = hovers(&batch);
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].0, uid(1));
+        assert!(matches!(found[0].1, ControlHover::Entered));
+        assert_eq!(found[1].0, uid(2));
+        assert!(matches!(found[1].1, ControlHover::Left));
+    }
+
+    #[test]
+    fn test_a_batch_with_no_hover_is_empty() {
+        // Every event carries actions — focus, clicks — and a hover listener
+        // that treated any of them as a hover would show a tooltip on a click.
+        #[derive(Clone, Debug)]
+        struct Other;
+        let batch: Vec<Action> = vec![action(uid(1), Other)];
+        assert!(hovers(&batch).is_empty());
+    }
+
+    #[test]
+    fn test_the_uid_rides_along_so_a_listener_can_anchor() {
+        // The listener needs the emitter's `Area` to place a plate, and the uid
+        // is what it matches against its own table of triggers.
+        let batch: Vec<Action> = vec![action(uid(77), ControlHover::Entered)];
+        assert_eq!(hovers(&batch)[0].0, uid(77));
     }
 }

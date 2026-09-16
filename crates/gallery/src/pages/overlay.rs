@@ -1,15 +1,19 @@
 //! The overlay: a tooltip that has to paint above everything below it.
 //!
-//! **Hovering a button on this page shows nothing, and that is a known gap.**
-//! The page detects the hover in the app, and the fix is not the obvious one: an
-//! `MpTooltipArea` wrapper was built and cannot work, because an overlay draw
-//! list clips to its widget's rectangle and a tooltip's plate sits *outside* a
-//! trigger-sized box. One tooltip per overlay region is the constraint, so a
-//! trigger has to signal it rather than own it. See `mp/tooltip.rs`.
+//! **The hover is a signal, not a lookup.** The page used to detect it in the
+//! app — first by hand-rolled geometry (`area.rect(cx).contains(me.abs)`, a
+//! pass-relative rect against a screen-absolute pointer, which only agrees when
+//! the window sits at the origin), then through `event.hits` for buttons it did
+//! not own, which fails because Makepad resolves one hit per event and the
+//! button consumes it. Both are the hand-rolled hit testing that got v2 into
+//! trouble.
 //!
-//! `GALLERY_TOOLTIP=1` pins the plate open: a synthetic pointer warp does not
-//! produce a hover in this app, so a capture script cannot hover, and this is how
-//! the plate and its anchoring are checked instead.
+//! What it does now is the only thing that can work: the **trigger reports its
+//! own hover** — `mp::control::hovers` reads it off the action batch — and the
+//! app shows the one tooltip, anchored to the trigger that reported. The tooltip
+//! lives here rather than in a trigger and not by choice: an overlay draw list
+//! clips to its widget's rectangle, so a tooltip cannot be owned by a
+//! trigger-sized wrapper. See `mp/tooltip.rs`.
 //!
 //! The arrangement matters and is the page's other lesson: the tooltip is a
 //! `Fill`/`Fill` overlay *sibling* of the content, not a child of it. Inside the

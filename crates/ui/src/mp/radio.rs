@@ -299,6 +299,9 @@ impl ScriptHook for MpRadio {
 impl Widget for MpRadio {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, _scope: &mut Scope) {
         let signals = control::handle(&mut self.animator, cx, event, self.area);
+        // Tell whoever owns the one tooltip that this control is under the
+        // pointer. A control cannot own a tooltip itself; see `mp/tooltip.rs`.
+        control::emit_hover(cx, self.widget_uid(), signals);
         if signals.redraw {
             self.redraw(cx);
         }
