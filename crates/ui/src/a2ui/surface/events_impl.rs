@@ -127,7 +127,10 @@ impl Widget for A2uiSurface {
         // Check color picker actions (write hex string back to the binding)
         for (idx, cp) in self.mp_color_pickers.iter().enumerate() {
             if let Some(action) = actions.find_widget_action(cp.widget_uid()) {
-                if let MpColorPickerAction::Picked(c) = action.cast::<MpColorPickerAction>() {
+                // **The index is ignored here and carried for a caller that needs it.** A palette may repeat a colour, so `Picked`
+    // carries which swatch as well as what colour — the v2 action carried only the colour, which is ambiguous exactly
+    // when a palette repeats itself. The data model is keyed by the hex value, so this site wants the colour.
+                if let MpColorPickerAction::Picked(c, _index) = action.cast::<MpColorPickerAction>() {
                     if let Some((_, binding_path, _)) = self.color_picker_meta.get(idx) {
                         if let Some(path) = binding_path {
                             let hex = format!(

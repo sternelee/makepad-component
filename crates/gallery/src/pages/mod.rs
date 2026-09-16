@@ -48,6 +48,7 @@ pub mod overlay;
 pub mod numbers;
 pub mod pagination;
 pub mod palette;
+pub mod picking;
 pub mod popover;
 
 use makepad_widgets::*;
@@ -73,6 +74,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     slider::script_mod(vm);
     input::script_mod(vm);
     overlay::script_mod(vm);
+    picking::script_mod(vm);
     popover::script_mod(vm);
     floating::script_mod(vm);
     history::script_mod(vm);
@@ -382,6 +384,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/searching.rs",
         blurb: "A list narrowed by typing, and a selection that cannot move",
     },
+    Page {
+        title: "Picking",
+        path: "mod.gallery.pages.picking",
+        source: "crates/gallery/src/pages/picking.rs",
+        blurb: "A swatch grid, and the gaps that pick nothing",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -485,6 +493,7 @@ mod tests {
             ("crates/gallery/src/pages/scroll.rs", "scroll"),
             ("crates/gallery/src/pages/searching.rs", "searching"),
             ("crates/gallery/src/pages/search.rs", "search"),
+            ("crates/gallery/src/pages/picking.rs", "picking"),
         ]
         .into_iter()
         .collect();

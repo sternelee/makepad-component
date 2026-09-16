@@ -19,7 +19,6 @@ use crate::a2ui::{
 use crate::widgets::{
     avatar_group::MpAvatarGroup,
     calendar::MpCalendar,
-    color_picker::{MpColorPicker, MpColorPickerAction},
 };
 
 use super::draw_types::*;
@@ -39,6 +38,7 @@ use super::draw_types::*;
 use crate::mp::button::MpButton;
 use crate::mp::checkbox::{MpCheckbox, MpCheckboxAction};
 use crate::mp::description_list::{DescriptionItem, MpDescriptionList};
+use crate::mp::color_picker::{MpColorPicker, MpColorPickerAction};
 use crate::mp::icon::MpIcon;
 use crate::mp::searchable_list::{MpSearchableList, MpSearchableListAction};
 use crate::mp::number_input::{self, MpNumberInput, MpNumberInputAction};

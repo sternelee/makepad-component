@@ -839,3 +839,66 @@ pub(crate) fn get_sample_search() -> String {
         items.join(", ")
     )
 }
+
+/// A fixture whose only job is to reach the **colour picker**, named `A2UI_SAMPLE=colors`.
+///
+/// The sixth, and the last of these — with it, every pool the A2UI renderer owns has a sample that reaches it, which is
+/// what makes the next migration verifiable rather than hopeful. Nine swatches in rows of four, so the last row is
+/// **partial**: two full rows and one holding a single swatch, which is the case where an off-by-one in the grid's rows
+/// would show as a missing swatch or an empty row.
+pub(crate) fn get_sample_colors() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "picker"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Accent"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {
+                        "id": "picker",
+                        "component": {
+                            "ColorPicker": {
+                                "colors": [
+                                    "#E5484D",
+                                    "#F76B15",
+                                    "#FFB224",
+                                    "#46A758",
+                                    "#12A594",
+                                    "#0090FF",
+                                    "#3E63DD",
+                                    "#8E4EC6",
+                                    "#E93D82"
+                                ],
+                                "value": {"literalString": "#12A594"}
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}

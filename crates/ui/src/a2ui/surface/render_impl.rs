@@ -979,8 +979,18 @@ impl A2uiSurface {
         });
 
         let widget = self.pool_color_picker(cx, idx);
-        widget.set_colors(cx, palette.clone());
-        widget.set_selected(cx, selected);
+        // The two calls take a `&mut Cx`, as every v3 pool has needed.
+        widget.set_colors(cx.cx, palette.clone());
+        widget.set_selected(cx.cx, selected);
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            println!(
+                "A2UI v3_color_picker swatches={} columns={} selected={:?} row_px={} from=mp::color_picker::MpColorPicker",
+                widget.colors().len(),
+                widget.columns(),
+                widget.selected(),
+                crate::mp::color_picker::grid_width(widget.columns()),
+            );
+        }
         let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
 
         self.color_picker_meta

@@ -43,6 +43,7 @@ pub mod button;
 pub mod canvas;
 pub mod checkbox;
 pub mod code;
+pub mod color_picker;
 pub mod combobox;
 pub mod control;
 pub mod date;
@@ -154,6 +155,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     // prototype in its own `script_mod!` registers after it.** The three failures are what
     // makes the ordering a rule rather than a preference, and `tests/registration_order.rs`
     // now checks it statically so a fourth one cannot happen.
+    crate::mp::color_picker::script_mod(vm);
     crate::mp::combobox::script_mod(vm);
     crate::mp::code::script_mod(vm);
 }

@@ -139,6 +139,7 @@ script_mod! {
                         rail_page_40 := RailRow{text: ""}
                         rail_page_41 := RailRow{text: ""}
                         rail_page_42 := RailRow{text: ""}
+                        rail_page_43 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -216,6 +217,7 @@ script_mod! {
                             page_40 := mod.gallery.pages.steps{}
                             page_41 := mod.gallery.pages.numbers{}
                             page_42 := mod.gallery.pages.searching{}
+                            page_43 := mod.gallery.pages.picking{}
                         }
                     }
                 }
@@ -229,7 +231,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 43] = [
+const PAGE_SLOTS: [&[LiveId]; 44] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -273,10 +275,11 @@ const PAGE_SLOTS: [&[LiveId]; 43] = [
     ids!(page_40),
     ids!(page_41),
     ids!(page_42),
+    ids!(page_43),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 43] = [
+const RAIL_ROWS: [&[LiveId]; 44] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -320,6 +323,7 @@ const RAIL_ROWS: [&[LiveId]; 43] = [
     ids!(rail_page_40),
     ids!(rail_page_41),
     ids!(rail_page_42),
+    ids!(rail_page_43),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1515,6 +1519,55 @@ use makepad_component::mp::hover_card::HoverIntent;
             .set_highlighted(cx, &written, &[]);
     }
 
+    /// Fill the swatch grids on the picking page, and print the grid's shape and what a few points pick.
+    ///
+    /// **The points are the point.** A picture shows a grid; only the printed hit tests show that the gaps pick nothing
+    /// and that the space past a partial row's last column does either — which is the logic this component exists to get
+    /// right.
+    fn seed_picking(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::color_picker::{
+            cell_index, grid_height, grid_width, rows, MpColorPickerWidgetRefExt, DEFAULT_COLUMNS, GAP, SWATCH,
+        };
+
+        let hexes = [
+            "#E5484D", "#F76B15", "#FFB224", "#46A758", "#12A594", "#0090FF", "#3E63DD", "#8E4EC6", "#E93D82",
+        ];
+        let palette: Vec<Vec4f> = hexes
+            .iter()
+            .map(|hex| {
+                let channel = |at: usize| {
+                    u8::from_str_radix(&hex[at..at + 2], 16).unwrap_or(0) as f32 / 255.0
+                };
+                vec4(channel(1), channel(3), channel(5), 1.0)
+            })
+            .collect();
+
+        for (id, columns) in [
+            (ids!(picking_one_col), DEFAULT_COLUMNS),
+            (ids!(picking_four), 4usize),
+            (ids!(picking_column), 1usize),
+        ] {
+            let view = self.ui.mp_color_picker(cx, id);
+            view.set_colors(cx, palette.clone());
+            view.set_columns(cx, columns);
+            // The middle swatch selected, so the inner ring is on screen rather than only in the code.
+            view.set_selected(cx, Some(palette.len() / 2));
+            let count = palette.len();
+            let stride = SWATCH + GAP;
+            // Aim at three points and report what each picks: a cell's centre, the gap to its right, and the point where
+            // a column past the last one would be.
+            let centre = cell_index(SWATCH * 0.5, SWATCH * 0.5, count, columns);
+            let in_the_gap = cell_index(SWATCH + GAP * 0.5, SWATCH * 0.5, count, columns);
+            let past_the_row = cell_index(columns as f64 * stride, SWATCH * 0.5, count, columns);
+            println!(
+                "PICKING swatches={count} columns={columns} rows={} grid={}x{} centre={centre:?} gap={in_the_gap:?} past_row={past_the_row:?}",
+                rows(count, columns),
+                grid_width(columns),
+                grid_height(count, columns),
+            );
+        }
+    }
+
     /// Fill the searchable lists on the searching page, and print what each holds and shows.
     ///
     /// The third case is the one that matters: **select a row, then narrow the list**, and print the selection before and
@@ -2339,6 +2392,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_picking(cx);
         self.seed_searching(cx);
         self.seed_numbers(cx);
         self.seed_steps(cx);
@@ -2972,7 +3026,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 43] = [
+    const SLOT_PAGES: [&str; 44] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3016,6 +3070,7 @@ mod tests {
         "mod.gallery.pages.steps",
         "mod.gallery.pages.numbers",
         "mod.gallery.pages.searching",
+        "mod.gallery.pages.picking",
     ];
 
     #[test]
