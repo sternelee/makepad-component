@@ -14,6 +14,7 @@ makepad-theme = { workspace = true }
 makepad-motion = { workspace = true }
 makepad-markdown = { path = "../markdown" }
 makepad-editor = { path = "../editor" }
+makepad-canvas = { path = "../canvas" }
 makepad-plot = { workspace = true, optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

@@ -34,6 +34,7 @@ pub mod slider;
 pub mod status;
 pub mod surface;
 pub mod table;
+pub mod canvas;
 pub mod code;
 pub mod combobox;
 pub mod tree;
@@ -76,6 +77,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     icon::script_mod(vm);
     status::script_mod(vm);
     table::script_mod(vm);
+    canvas::script_mod(vm);
     code::script_mod(vm);
     combobox::script_mod(vm);
     tree::script_mod(vm);
@@ -334,6 +336,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/editor.rs",
         blurb: "Keys, a caret, a selection and undo",
     },
+    Page {
+        title: "Canvas",
+        path: "mod.gallery.pages.canvas",
+        source: "crates/gallery/src/pages/canvas.rs",
+        blurb: "A JSON Canvas document, painted",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -417,6 +425,7 @@ mod tests {
             ("crates/gallery/src/pages/icon.rs", "icon"),
             ("crates/gallery/src/pages/status.rs", "status"),
             ("crates/gallery/src/pages/table.rs", "table"),
+            ("crates/gallery/src/pages/canvas.rs", "canvas"),
             ("crates/gallery/src/pages/code.rs", "code"),
             ("crates/gallery/src/pages/combobox.rs", "combobox"),
             ("crates/gallery/src/pages/tree.rs", "tree"),

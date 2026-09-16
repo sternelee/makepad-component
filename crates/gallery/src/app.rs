@@ -34,6 +34,7 @@ use makepad_component::mp::{
     code::MpCodeBlockWidgetRefExt,
     markdown::MpMarkdownWidgetRefExt,
     editor::MpEditorWidgetRefExt,
+    canvas::MpCanvasWidgetRefExt,
     date::MpDateWidgetRefExt,
 };
 
@@ -132,6 +133,7 @@ script_mod! {
                         rail_page_34 := RailRow{text: ""}
                         rail_page_35 := RailRow{text: ""}
                         rail_page_36 := RailRow{text: ""}
+                        rail_page_37 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -203,6 +205,7 @@ script_mod! {
                             page_34 := mod.gallery.pages.code{}
                             page_35 := mod.gallery.pages.document{}
                             page_36 := mod.gallery.pages.editor{}
+                            page_37 := mod.gallery.pages.canvas{}
                         }
                     }
                 }
@@ -216,7 +219,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 37] = [
+const PAGE_SLOTS: [&[LiveId]; 38] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -254,10 +257,11 @@ const PAGE_SLOTS: [&[LiveId]; 37] = [
     ids!(page_34),
     ids!(page_35),
     ids!(page_36),
+    ids!(page_37),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 37] = [
+const RAIL_ROWS: [&[LiveId]; 38] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -295,6 +299,7 @@ const RAIL_ROWS: [&[LiveId]; 37] = [
     ids!(rail_page_34),
     ids!(rail_page_35),
     ids!(rail_page_36),
+    ids!(rail_page_37),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1346,6 +1351,120 @@ use makepad_component::mp::hover_card::HoverIntent;
         );
     }
 
+    /// Parse a JSON Canvas document, check it, and paint it.
+    ///
+    /// The **fixed point is checked on the document being displayed** rather than over a corpus — the corpus is the
+    /// crate's own test — and a **deliberately broken** document is validated too, because a report that only ever
+    /// prints nothing is indistinguishable from a report that does not work.
+    fn seed_canvas(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::canvas::MpCanvasWidgetRefExt;
+
+        // A document with every node type, a group, four presets, two hex colours, and edges whose sides and ends
+        // exercise the spec's asymmetric defaults.
+        let source = r##"{
+  "nodes": [
+    { "id": "group", "type": "group", "x": -40, "y": -50, "width": 620, "height": 330,
+      "label": "A group", "color": "5" },
+    { "id": "text", "type": "text", "x": 0, "y": 0, "width": 180, "height": 90,
+      "text": "A text node with **markdown** in it", "color": "1" },
+    { "id": "file", "type": "file", "x": 240, "y": 0, "width": 160, "height": 80,
+      "file": "notes/canvas.md", "subpath": "#json-canvas", "color": "4" },
+    { "id": "link", "type": "link", "x": 0, "y": 160, "width": 180, "height": 70,
+      "url": "https://jsoncanvas.org", "color": "2" },
+    { "id": "hex", "type": "text", "x": 240, "y": 160, "width": 160, "height": 70,
+      "text": "A hex colour, not a preset", "color": "#FF66CC" }
+  ],
+  "edges": [
+    { "id": "e1", "fromNode": "text", "fromSide": "right", "toNode": "file", "toSide": "left",
+      "color": "1", "label": "writes" },
+    { "id": "e2", "fromNode": "text", "fromSide": "bottom", "toNode": "link", "toSide": "top" },
+    { "id": "e3", "fromNode": "file", "fromSide": "bottom", "fromEnd": "arrow",
+      "toNode": "hex", "toSide": "top", "toEnd": "none" },
+    { "id": "e4", "fromNode": "hex", "fromSide": "right", "toNode": "text", "toSide": "right",
+      "toSide_note": "an elbow that goes back around", "color": "#8899FF" }
+  ]
+}
+"##;
+
+        let canvas = makepad_canvas::parse(source).expect("the document parses");
+        let problems = canvas.validate();
+        let written = makepad_canvas::serialize(&canvas);
+        let reread = makepad_canvas::parse(&written).expect("what we wrote parses");
+        let holds = reread == canvas;
+        let stable = makepad_canvas::serialize(&reread) == written;
+        println!(
+            "CANVAS nodes={} edges={} problems={} fixed_point={holds} stable={stable} wire_bytes={}",
+            canvas.nodes.len(),
+            canvas.edges.len(),
+            problems.len(),
+            written.len()
+        );
+
+        // A document with the faults the format allows: a duplicate id and an edge to a node that is not there.
+        let broken_source = r##"{
+  "nodes": [
+    { "id": "same", "type": "text", "x": 0, "y": 0, "width": 10, "height": 10, "text": "a" },
+    { "id": "same", "type": "file", "x": 0, "y": 0, "width": 10, "height": 10, "file": "a.md", "subpath": "nohash" }
+  ],
+  "edges": [ { "id": "e", "fromNode": "ghost", "toNode": "same" } ]
+}"##;
+        let broken = makepad_canvas::parse(broken_source).expect("it parses, faults and all");
+        let broken_problems = broken.validate();
+        for problem in &broken_problems {
+            println!("CANVAS problem: {problem:?}");
+        }
+
+        let view = self.ui.mp_canvas(cx, ids!(canvas_view));
+        view.set_canvas(cx, canvas.clone());
+
+        let presets = makepad_canvas::Preset::ALL
+            .iter()
+            .map(|preset| format!("{}={}", preset.index(), preset.type_name()))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        self.ui.label(cx, ids!(canvas_stats)).set_text(
+            cx,
+            &format!(
+                "{} nodes, {} edges, {} bytes of wire form \u{b7} the six presets in the spec's order: {presets}",
+                canvas.nodes.len(),
+                canvas.edges.len(),
+                written.len()
+            ),
+        );
+        self.ui.label(cx, ids!(canvas_fixed_point)).set_text(
+            cx,
+            &format!(
+                "the fixed point holds on the document above: parse \u{2192} serialize \u{2192} parse is the same \
+                 document ({holds}), and a second write is byte-identical ({stable})"
+            ),
+        );
+        self.ui.label(cx, ids!(canvas_problems)).set_text(
+            cx,
+            &format!(
+                "the good document reports {} problems \u{2014} a writer never produces any. The three faults the \
+                 format allows are reported rather than refused, because a reader that dropped a document with a \
+                 dangling edge would delete a user's work over a fault it can still display.",
+                problems.len()
+            ),
+        );
+        self.ui.label(cx, ids!(canvas_broken)).set_text(
+            cx,
+            &format!(
+                "a deliberately broken document reports {}: {}\u{2003}",
+                broken_problems.len(),
+                broken_problems
+                    .iter()
+                    .map(|problem| format!("{problem:?}"))
+                    .collect::<Vec<_>>()
+                    .join(" \u{b7} ")
+            ),
+        );
+        self.ui
+            .mp_code_block(cx, ids!(canvas_wire))
+            .set_highlighted(cx, &written, &[]);
+    }
+
     /// Declare a keymap and fill the sheet from it.
     ///
     /// **Nothing below writes a chord.** Each row's trailing text is
@@ -1799,6 +1918,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_canvas(cx);
     }
 
     /// Fill the table page's tables.
@@ -2425,7 +2545,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 37] = [
+    const SLOT_PAGES: [&str; 38] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -2463,6 +2583,7 @@ mod tests {
         "mod.gallery.pages.code",
         "mod.gallery.pages.document",
         "mod.gallery.pages.editor",
+        "mod.gallery.pages.canvas",
     ];
 
     #[test]

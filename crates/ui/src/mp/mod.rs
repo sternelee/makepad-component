@@ -40,6 +40,7 @@ pub mod action;
 pub mod avatar;
 pub mod bars;
 pub mod button;
+pub mod canvas;
 pub mod checkbox;
 pub mod code;
 pub mod combobox;
@@ -106,6 +107,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::scaffolding::script_mod(vm);
     crate::mp::pagination::script_mod(vm);
     crate::mp::scroll::script_mod(vm);
+    crate::mp::canvas::script_mod(vm);
     crate::mp::segmented::script_mod(vm);
     crate::mp::search::script_mod(vm);
     crate::mp::table::script_mod(vm);

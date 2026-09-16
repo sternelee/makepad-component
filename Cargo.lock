@@ -1474,6 +1474,7 @@ name = "gallery"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "makepad-canvas",
  "makepad-component",
  "makepad-editor",
  "makepad-markdown",
@@ -2430,6 +2431,16 @@ name = "makepad-byteorder-lite"
 version = "0.1.0"
 
 [[package]]
+name = "makepad-canvas"
+version = "0.1.0"
+dependencies = [
+ "makepad-theme",
+ "makepad-widgets",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "makepad-cef"
 version = "0.1.0"
 dependencies = [
@@ -2465,6 +2476,7 @@ name = "makepad-component"
 version = "0.1.0"
 dependencies = [
  "log",
+ "makepad-canvas",
  "makepad-editor",
  "makepad-markdown",
  "makepad-motion",
