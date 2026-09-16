@@ -543,3 +543,75 @@ pub(crate) fn get_sample_music_player() -> String {
         }
     ]"##.to_string()
 }
+
+/// A fixture whose only job is to reach the **icon** path, named `A2UI_SAMPLE=icons`.
+///
+/// **Because nothing else did.** The catalog sample's three `addToCart` strings are the *button action's* name rather
+/// than an Icon component, so the moment the icon pool moved to `mp` it had no sample that would reach it — and a
+/// migration that nothing exercises is not verified, however green the build. That is the same lesson `[E]=0` taught
+/// earlier in this port: a log without errors is what a renderer that did nothing also produces.
+///
+/// It carries **both** answers on purpose. Four names resolve, and `not-a-real-icon` does not, so one run proves the
+/// glyph is drawn and that an unknown name draws **nothing** rather than a guessed box.
+pub(crate) fn get_sample_icons() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "row", "unknown-row"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Icons"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {
+                        "id": "row",
+                        "component": {
+                            "Row": {
+                                "children": {
+                                    "explicitList": ["i-settings", "i-check", "i-close", "i-cart"]
+                                }
+                            }
+                        }
+                    },
+                    {"id": "i-settings", "component": {"Icon": {"name": {"literalString": "settings"}}}},
+                    {"id": "i-check", "component": {"Icon": {"name": {"literalString": "check"}}}},
+                    {"id": "i-close", "component": {"Icon": {"name": {"literalString": "close"}}}},
+                    {"id": "i-cart", "component": {"Icon": {"name": {"literalString": "addToCart"}}}},
+                    {
+                        "id": "unknown-row",
+                        "component": {
+                            "Row": {
+                                "children": {
+                                    "explicitList": ["i-unknown"]
+                                }
+                            }
+                        }
+                    },
+                    {"id": "i-unknown", "component": {"Icon": {"name": {"literalString": "not-a-real-icon"}}}}
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}

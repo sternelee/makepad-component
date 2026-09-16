@@ -386,9 +386,8 @@ impl A2uiSurface {
             let label_idx = self.label_count;
             self.label_count += 1;
             let label = self.pool_label(cx, label_idx);
-            label.set_text(&text_value);
-            label.draw_text.text_style.font_size = font_size;
-            let _ = label.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+            label.text_style.font_size = font_size;
+            let _ = label.draw_walk(cx, Walk::fit(), Align::default(), &text_value);
         }
     }
 
@@ -721,9 +720,9 @@ impl A2uiSurface {
         let sl = self.pool_slider(cx, slider_idx);
 
         // Set range and value (but NOT during active drag - let user control position)
-        sl.set_range(min, max);
+        sl.set_range(cx.cx, min, max);
         if !sl.is_dragging() {
-            sl.set_single_value(cx, current_value);
+            sl.set_value(cx.cx, current_value);
         }
 
         // Draw the slider widget
@@ -972,9 +971,33 @@ impl A2uiSurface {
             data_model,
             self.current_scope.as_deref(),
         );
-        let widget = self.pool_icon(cx, idx);
-        widget.set_name(cx, &name);
-        let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+        // **The two icon vocabularies meet here.** The protocol names its icons with Material Symbols names and this
+        // library draws FontAwesome, so the name is resolved through `icons::by_name`.
+        //
+        // An unknown name draws **nothing**, and says so under the debug flag. The v2 icon resolved any name, because it
+        // loaded an SVG by name — so a name nothing had was a missing image. A glyph face has no such fallback: an
+        // unknown name would have to become a *guessed* glyph, which is a lie about what the document asked for.
+        match icons::by_name(&name) {
+            Some(glyph) => {
+                let widget = self.pool_icon(cx, idx);
+                widget.set_glyph(cx.cx, glyph);
+                let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+                if std::env::var("MP_A2UI_DEBUG").is_ok() {
+                    // **The resolved case prints too**, because "nothing was rejected" is not evidence that anything
+                    // was drawn — the same reason `[E]=0` was worth distrusting. Both branches report, so the log says
+                    // which of the two happened for every icon.
+                    println!(
+                        "A2UI icon name={name:?} glyph={:?} from=mp::icon::MpIcon",
+                        icons::codepoint(glyph),
+                    );
+                }
+            }
+            None => {
+                if std::env::var("MP_A2UI_DEBUG").is_ok() {
+                    println!("A2UI icon_unknown name={name:?} drew=nothing");
+                }
+            }
+        }
     }
 
     // ============================================================================
@@ -1123,8 +1146,12 @@ impl A2uiSurface {
                 let label_idx = self.label_count;
                 self.label_count += 1;
                 let label = self.pool_label(cx, label_idx);
-                label.set_text(&format!("{}: {}", key, value));
-                let _ = label.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+                let _ = label.draw_walk(
+                    cx,
+                    Walk::fit(),
+                    Align::default(),
+                    &format!("{}: {}", key, value),
+                );
             }
         }
 
@@ -1580,8 +1607,7 @@ impl A2uiSurface {
             let label_idx = self.label_count;
             self.label_count += 1;
             let label = self.pool_label(cx, label_idx);
-            label.set_text(&format!("[{}]", icon_name));
-            let _ = label.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+            let _ = label.draw_walk(cx, Walk::fit(), Align::default(), &format!("[{}]", icon_name));
         }
 
         // Render child content

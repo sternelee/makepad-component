@@ -357,3 +357,51 @@ fn test_the_cmap_parser_finds_codepoints_the_font_has_and_not_ones_it_does_not()
         codepoints.len()
     );
 }
+
+#[test]
+fn test_a_protocol_icon_name_resolves_to_a_glyph_in_the_font() {
+    // **The bridge between two vocabularies, and the codepoints are checked against the font file by the cmap test
+    // above.** A wrong codepoint is a tofu box — nothing in any log — so the table is only trustworthy because every
+    // entry is in `ALL`, which the cmap test walks. This test checks the *resolution* rules on top of that.
+    use makepad_component::mp::icons::{by_name, glyph};
+
+    // The sample the demo app actually renders.
+    assert_eq!(by_name("addToCart"), Some(glyph::CART_SHOPPING));
+    // The three the protocol's own doc names.
+    assert_eq!(by_name("settings"), Some(glyph::GEAR));
+    assert_eq!(by_name("check"), Some(glyph::CHECK));
+    assert_eq!(by_name("close"), Some(glyph::XMARK));
+    // Case and surrounding space are the model's business, not the document's.
+    assert_eq!(by_name("  ADD_TO_CART  "), Some(glyph::CART_SHOPPING));
+    assert_eq!(by_name("AddToCart"), Some(glyph::CART_SHOPPING));
+    // ...and a FontAwesome spelling this library uses for itself is reachable too.
+    assert_eq!(by_name("chevron-down"), Some(glyph::CHEVRON_DOWN));
+    assert_eq!(by_name("chevron_down"), Some(glyph::CHEVRON_DOWN));
+}
+
+#[test]
+fn test_an_unknown_icon_name_resolves_to_nothing_rather_than_a_guess() {
+    // **The rule, and the reason it is not a fallback.** The v2 icon loaded an SVG by name, so an unknown name was a
+    // missing image; a glyph face has no such fallback, and a guessed glyph would be a lie about what the document asked
+    // for. So an unknown name draws nothing — "a row that paints a broken box is worse than a row that is not there".
+    use makepad_component::mp::icons::by_name;
+
+    for unknown in ["", "   ", "not-an-icon", "addToCartExtra", "🎨", "settingss"] {
+        assert_eq!(by_name(unknown), None, "{unknown:?} resolved to a glyph");
+    }
+}
+
+#[test]
+fn test_every_name_in_the_table_resolves_to_a_glyph_that_is_in_the_declared_set() {
+    // The table and the declared set cannot drift: a name pointing at a glyph the cmap test does not check would be a
+    // name whose resolution is unverified.
+    use makepad_component::mp::icons::{by_name, ALL, NAMES};
+
+    for (name, glyph) in NAMES {
+        assert_eq!(by_name(name), Some(glyph), "{name} did not resolve");
+        assert!(
+            ALL.iter().any(|(_, codepoint)| *codepoint == glyph),
+            "{name}'s glyph is not in ALL, so the cmap test never checks it"
+        );
+    }
+}

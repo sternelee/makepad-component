@@ -57,13 +57,66 @@ pub mod glyph {
     pub const CIRCLE: &str = "\u{f111}";
     /// `right-from-bracket` — leaving, signing out, closing a session.
     pub const RIGHT_FROM_BRACKET: &str = "\u{f2f5}";
+
+    // **The A2UI icon set.** The protocol names its icons with Material Symbols names (`message.rs` says
+    // `"settings", "check", "close"`, and the samples use `addToCart`), while this library draws FontAwesome. So a
+    // name-to-glyph table is what bridges the two — and every codepoint here joins [`ALL`], which means the cmap test
+    // checks each one against the font file. **That is what makes the table trustworthy**: a wrong codepoint is a tofu
+    // box, invisible in every log, and the test is the only thing that sees it.
+    //
+    /// `gear` — settings, preferences.
+    pub const GEAR: &str = "\u{f013}";
+    /// `xmark` — close, dismiss.
+    pub const XMARK: &str = "\u{f00d}";
+    /// `plus` — add, create.
+    pub const PLUS: &str = "\u{f067}";
+    /// `cart-shopping` — a cart, and the "add to cart" affordance.
+    pub const CART_SHOPPING: &str = "\u{f07a}";
+    /// `trash` — delete.
+    pub const TRASH: &str = "\u{f2ed}";
+    /// `pen-to-square` — edit.
+    pub const PEN_TO_SQUARE: &str = "\u{f044}";
+    /// `star` — a rating, a favourite that is on.
+    pub const STAR: &str = "\u{f005}";
+    /// `heart` — a favourite.
+    pub const HEART: &str = "\u{f004}";
+    /// `bars` — a menu.
+    pub const BARS: &str = "\u{f0c9}";
+    /// `house` — home.
+    pub const HOUSE: &str = "\u{f015}";
+    /// `user` — a person.
+    pub const USER: &str = "\u{f007}";
+    /// `arrow-left` — back.
+    pub const ARROW_LEFT: &str = "\u{f060}";
+    /// `arrow-right` — forward.
+    pub const ARROW_RIGHT: &str = "\u{f061}";
+    /// `ellipsis-vertical` — more.
+    pub const ELLIPSIS_VERTICAL: &str = "\u{f142}";
+    /// `circle-info` — information.
+    pub const CIRCLE_INFO: &str = "\u{f129}";
+    /// `triangle-exclamation` — a warning.
+    pub const TRIANGLE_EXCLAMATION: &str = "\u{f071}";
+    /// `circle-exclamation` — an error.
+    pub const CIRCLE_EXCLAMATION: &str = "\u{f06a}";
+    /// `arrows-rotate` — refresh.
+    pub const ARROWS_ROTATE: &str = "\u{f021}";
+    /// `download` — download.
+    pub const DOWNLOAD: &str = "\u{f019}";
+    /// `upload` — upload.
+    pub const UPLOAD: &str = "\u{f093}";
+    /// `play` — play.
+    pub const PLAY: &str = "\u{f04b}";
+    /// `chevron-down` — expand.
+    pub const CHEVRON_DOWN: &str = "\u{f078}";
+    /// `chevron-up` — collapse.
+    pub const CHEVRON_UP: &str = "\u{f077}";
 }
 
 /// The declared set: every glyph, as `(FontAwesome name, codepoint)`.
 ///
 /// The list a test walks, and the list a glyph browser would show. Keeping it as data rather
 /// than as prose is what lets the check be mechanical.
-pub const ALL: [(&str, &str); 9] = [
+pub const ALL: [(&str, &str); 32] = [
     ("magnifying-glass", glyph::SEARCH),
     ("check", glyph::CHECK),
     ("chevron-left", glyph::CHEVRON_LEFT),
@@ -73,7 +126,101 @@ pub const ALL: [(&str, &str); 9] = [
     ("file-lines", glyph::FILE_LINES),
     ("circle", glyph::CIRCLE),
     ("right-from-bracket", glyph::RIGHT_FROM_BRACKET),
+    ("gear", glyph::GEAR),
+    ("xmark", glyph::XMARK),
+    ("plus", glyph::PLUS),
+    ("cart-shopping", glyph::CART_SHOPPING),
+    ("trash", glyph::TRASH),
+    ("pen-to-square", glyph::PEN_TO_SQUARE),
+    ("star", glyph::STAR),
+    ("heart", glyph::HEART),
+    ("bars", glyph::BARS),
+    ("house", glyph::HOUSE),
+    ("user", glyph::USER),
+    ("arrow-left", glyph::ARROW_LEFT),
+    ("arrow-right", glyph::ARROW_RIGHT),
+    ("ellipsis-vertical", glyph::ELLIPSIS_VERTICAL),
+    ("circle-info", glyph::CIRCLE_INFO),
+    ("triangle-exclamation", glyph::TRIANGLE_EXCLAMATION),
+    ("circle-exclamation", glyph::CIRCLE_EXCLAMATION),
+    ("arrows-rotate", glyph::ARROWS_ROTATE),
+    ("download", glyph::DOWNLOAD),
+    ("upload", glyph::UPLOAD),
+    ("play", glyph::PLAY),
+    ("chevron-down", glyph::CHEVRON_DOWN),
+    ("chevron-up", glyph::CHEVRON_UP),
 ];
+
+/// A name the A2UI protocol uses, and the glyph this library draws for it.
+///
+/// **The two vocabularies are different and neither is wrong**: the protocol is written against Material Symbols
+/// (`"settings"`, `"check"`, `"close"`, `addToCart`), and this library draws FontAwesome, because that is the icon face
+/// Makepad ships. So the bridge is a table, and the table is the only place the two names for one idea meet.
+///
+/// The names are matched **case-insensitively and after trimming**, because they arrive in JSON that a model wrote —
+/// `"addToCart"` and `"add_to_cart"` and `"ADD_TO_CART"` are one request. Both spellings are listed rather than derived:
+/// a rule that turned `addToCart` into `add_to_cart` would also turn `arrowBack` into `arrow_back`, which is right, and
+/// `moreVert` into `more_vert`, which is also right — but the rule is a guess about a third-party vocabulary, and the
+/// cost of listing a name twice is one line while the cost of guessing wrong is an icon that silently does not draw.
+///
+/// **An unknown name is `None` and the caller draws nothing.** A fallback glyph would be a lie about what the document
+/// asked for, and the rule this port follows is that a row which paints a broken box is worse than a row that is not
+/// there — the same rule that keeps an unknown image URL out of the paste menu's rows.
+pub const NAMES: [(&str, &str); 34] = [
+    ("settings", glyph::GEAR),
+    ("gear", glyph::GEAR),
+    ("check", glyph::CHECK),
+    ("done", glyph::CHECK),
+    ("close", glyph::XMARK),
+    ("cancel", glyph::XMARK),
+    ("add", glyph::PLUS),
+    ("addtocart", glyph::CART_SHOPPING),
+    ("add_to_cart", glyph::CART_SHOPPING),
+    ("shoppingcart", glyph::CART_SHOPPING),
+    ("delete", glyph::TRASH),
+    ("trash", glyph::TRASH),
+    ("edit", glyph::PEN_TO_SQUARE),
+    ("star", glyph::STAR),
+    ("favorite", glyph::HEART),
+    ("favorite_border", glyph::HEART),
+    ("menu", glyph::BARS),
+    ("home", glyph::HOUSE),
+    ("person", glyph::USER),
+    ("accountcircle", glyph::USER),
+    ("arrowback", glyph::ARROW_LEFT),
+    ("arrow_back", glyph::ARROW_LEFT),
+    ("arrowforward", glyph::ARROW_RIGHT),
+    ("arrow_forward", glyph::ARROW_RIGHT),
+    ("morevert", glyph::ELLIPSIS_VERTICAL),
+    ("more_vert", glyph::ELLIPSIS_VERTICAL),
+    ("info", glyph::CIRCLE_INFO),
+    ("warning", glyph::TRIANGLE_EXCLAMATION),
+    ("error", glyph::CIRCLE_EXCLAMATION),
+    ("refresh", glyph::ARROWS_ROTATE),
+    ("download", glyph::DOWNLOAD),
+    ("upload", glyph::UPLOAD),
+    ("playarrow", glyph::PLAY),
+    ("play_arrow", glyph::PLAY),
+];
+
+/// The glyph for a protocol icon name, or `None` when this library has no glyph for it.
+///
+/// Case-insensitive and trimmed. See [`NAMES`] for why unknown is `None` rather than a fallback, and why
+/// `chevron_down` is reachable under the FontAwesome spelling `chevron-down` — the names this library draws *for
+/// itself* and the names a protocol asks for are separate tables that happen to share codepoints.
+pub fn by_name(name: &str) -> Option<&'static str> {
+    let needle = name.trim().to_ascii_lowercase().replace('-', "_");
+    NAMES
+        .iter()
+        .find(|(candidate, _)| *candidate == needle)
+        .map(|(_, glyph)| *glyph)
+        .or_else(|| {
+            // The FontAwesome spellings, so a document that names a glyph the way this library names it also works.
+            ALL.iter()
+                .find(|(candidate, _)| candidate.replace('-', "_") == needle)
+                .map(|(_, glyph)| *glyph)
+        })
+}
 
 /// The face these codepoints belong to, as Makepad names it.
 ///
@@ -146,7 +293,28 @@ mod tests {
         }
         // And the table covers every constant, so a constant added without an entry in `ALL`
         // fails here rather than being silently unregistered.
-        assert_eq!(ALL.len(), 9, "a constant was added or removed without updating ALL");
+        //
+        // **This used to assert `ALL.len() == 9` — a hardcoded number, which does not check the claim above it.** It
+        // caught only "you changed `ALL`", and a constant added *without* an `ALL` entry left the length at 9 and the
+        // test green: the one case the comment names was the one case it could not see. Adding twenty-three glyphs is
+        // what exposed it — the constants and `ALL` were both updated, and the test failed anyway.
+        //
+        // So it counts the declarations in `glyph` out of the source, the way `tests/registration_order.rs` reads
+        // `src/mp/` for the same kind of rule. **The claim and the check are now the same claim.**
+        let source = std::fs::read_to_string("src/mp/icons.rs").expect("the source of this file");
+        let glyphs_section = source
+            .split_once("pub mod glyph {")
+            .and_then(|(_, rest)| rest.split_once("\n}"))
+            .map(|(body, _)| body)
+            .expect("the glyph module");
+        let declared = glyphs_section.matches("pub const ").count();
+        assert_eq!(
+            ALL.len(),
+            declared,
+            "there are {declared} constants in `glyph` but {} entries in `ALL` — one of them was added without the \
+             other",
+            ALL.len()
+        );
     }
 
     #[test]

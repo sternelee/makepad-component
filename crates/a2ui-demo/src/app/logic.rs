@@ -8,7 +8,7 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use super::audio_player::{decode_audio_file, start_audio_output, AudioPlaybackState};
-use super::sample_data::{get_sample_music_player, get_sample_product_catalog};
+use super::sample_data::{get_sample_icons, get_sample_music_player, get_sample_product_catalog};
 use super::theme::Theme;
 
 /// Compute the local cache path for an audio URL.
@@ -1033,6 +1033,28 @@ impl App {
         }
     }
 
+    /// Load an A2UI document given as a string, rather than from a file or a sample function.
+    ///
+    /// Extracted so a fixture can be processed without a file on disk — the icon fixture needs a sample that reaches a
+    /// component no shipped sample reaches, and writing it to a temporary file to read it back would be a file dance
+    /// around a borrow that is already free here.
+    fn load_a2ui_json(&mut self, cx: &mut Cx, json: &str, title: &str) {
+        self.host = None;
+        self.live_host = None;
+        self.is_streaming = false;
+        self.live_mode = false;
+        self.ui.label(cx, ids!(title_label)).set_text(cx, title);
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
+        if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
+            surface.clear();
+            match surface.process_json(json) {
+                Ok(events) => log!("A2UI fixture events: {}", events.len()),
+                Err(e) => log!("Error parsing A2UI fixture: {}", e),
+            }
+        }
+        self.ui.redraw(cx);
+    }
+
     fn load_a2ui_data(&mut self, cx: &mut Cx) {
         // Disconnect from server if connected
         if self.host.is_some() {
@@ -1421,6 +1443,8 @@ impl AppMain for App {
             match std::env::var("A2UI_SAMPLE").as_deref() {
                 Ok("catalog") => self.load_a2ui_data(cx),
                 Ok("cyber") => self.load_json_file(cx, "cyber_art.json", "🎨 Cyber Sound Art"),
+                // The icon fixture: see `get_sample_icons` for why it exists.
+                Ok("icons") => self.load_a2ui_json(cx, &get_sample_icons(), "🔣 Icons"),
                 Ok("music") => self.load_json_file(cx, "music_test.json", "🎵 Makepad Music Player"),
                 Ok(_) | Err(_) => {
                     if std::path::Path::new("music_test.json").exists() {

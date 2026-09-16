@@ -87,12 +87,11 @@ impl Widget for A2uiSurface {
                 if let MpSliderAction::Changed(slider_value) = action.cast::<MpSliderAction>() {
                     if let Some((_, binding_path, _, _, _)) = self.slider_meta.get(idx) {
                         if let Some(path) = binding_path {
-                            let value = match slider_value {
-                                crate::widgets::slider::SliderValue::Single(v) => serde_json::json!(v),
-                                crate::widgets::slider::SliderValue::Range(start, end) => {
-                                    serde_json::json!({"start": start, "end": end})
-                                }
-                            };
+                            // **v3's action carries the value directly.** v2 wrapped it in a `SliderValue` enum because
+                            // its slider had a range mode; the v3 slider has one value and one action that names it, so
+                            // the match became a plain value and the range arm — which nothing here emitted — is gone
+                            // rather than kept as dead code that reads like a supported feature.
+                            let value = serde_json::json!(slider_value);
                             cx.widget_action(self.widget_uid(), A2uiSurfaceAction::DataModelChanged {
                                     surface_id: surface_id.clone(),
                                     path: path.clone(),

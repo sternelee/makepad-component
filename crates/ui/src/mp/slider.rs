@@ -356,6 +356,37 @@ impl MpSlider {
     ///
     /// The single mutation path, so a drag, an arrow key and a programmatic
     /// `set_value` cannot disagree about what the current value is.
+    /// Set the range the slider spans.
+    ///
+    /// **Added because the A2UI renderer needs it, and a slider whose range cannot be set is a slider a JSON protocol
+    /// cannot drive.** The range is `#[live]` — the DSL sets `min` and `max` — and `#[live]` fields are written back to
+    /// their declared values whenever the script is re-applied (`Theme::install` does that on an appearance change), so
+    /// a caller's range has to be re-applied by the caller rather than remembered here. That is the same rule the rest
+    /// of this crate follows for state a host owns: **the DSL value is a declaration, and a host that overrides one
+    /// owns it**.
+    ///
+    /// The value is re-snapped, since a range that no longer contains it would leave the knob outside its own track.
+    pub fn set_range(&mut self, cx: &mut Cx, min: f64, max: f64) {
+        let (min, max) = if min <= max { (min, max) } else { (max, min) };
+        if self.min == min && self.max == max {
+            return;
+        }
+        self.min = min;
+        self.max = max;
+        self.value = clamp(self.value, min, max);
+        self.redraw(cx);
+    }
+
+    /// Whether a press is currently being dragged.
+    ///
+    /// **Owned by the widget and readable by a host**, because the two have different jobs: the widget knows a gesture
+    /// is in progress, and the host knows a data update has arrived. A host that writes the value *while the user is
+    /// dragging* fights the pointer — the handle jumps away from the finger — so the host asks this first. That is why
+    /// it is a question rather than the host guessing from the value it last sent.
+    pub fn is_dragging(&self) -> bool {
+        self.dragging
+    }
+
     pub fn set_value(&mut self, cx: &mut Cx, value: f64) {
         let value = snap(value, self.min, self.max, self.step);
         if (self.value - value).abs() < f64::EPSILON {
