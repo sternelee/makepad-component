@@ -77,6 +77,8 @@ script_mod! {
     mod.mpc = {}
     mod.mpc.tokens = #(crate::install::paint_namespace(vm, &crate::palette::dark()))
     mod.mpc.type = #(crate::install::type_namespace(vm))
+    mod.mpc.ControlSize = set_type_default() do #(crate::layout::ControlSize::script_api(vm))
+    mod.mpc.text = mod.mpc.type
     mod.mpc.layout = #(crate::install::layout_namespace(vm, &crate::layout::Layout::default()))
     mod.mpc.material = #(crate::install::material_namespace(vm, &crate::theme::Theme::dark()))
     mod.mpc_theme = #(crate::legacy::namespace(vm, &crate::palette::dark(), crate::Appearance::Dark))

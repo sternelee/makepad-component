@@ -112,12 +112,57 @@ clamping) with unit tests, mirroring `bezel/crates/motion/src/phase.rs`.
 | **0** | this spec | — | ✅ |
 | **1** | `theme` v3: color, brand, typography, layout, material, paint, `Theme`, install | `cargo test -p makepad-theme` green; contrast tests for light+dark; script namespace verified against a real VM | ✅ **117 tests** (104 unit + 13 script-VM integration + 1 doc) |
 | **2** | `motion` v2: catalog + phase math + the script/`Play` adapter | `cargo test -p makepad-motion` green | ✅ **53 tests** |
-| **3** | Core widgets rebuilt: button, input, checkbox, radio, switch, toggle, slider, select, popover, menu, tooltip, card, group_box, divider, table, tree, scroll_area | each has a gallery page and ≥1 behaviour test | ⬜ |
+| **3** | Core widgets rebuilt: button, input, checkbox, radio, switch, toggle, slider, select, popover, menu, tooltip, card, group_box, divider, table, tree, scroll_area | each has a gallery page and ≥1 behaviour test | 🚧 **started**: `mp::action`, `mp::surface`, `mp::button`, `crates/gallery` |
 | **4** | Extended widgets: combobox, date, pagination, stats, loaders, menubar, titlebar, control_bar, search, palette, floating, hover_card | idem | ⬜ |
 | **5** | Layers: markdown, blocks, editor, terminal, canvas | feature parity with bezel's layers, reusing makepad's syntax/code_editor | ⬜ |
-| **6** | `gallery` app: rail of per-component pages, one file per page, test asserting each row names an existing file | replaces `component-zoo` | ⬜ |
+| **6** | `gallery` app: rail of per-component pages, one file per page, test asserting each row names an existing file | replaces `component-zoo` | 🚧 **started** — `crates/gallery` exists with 5 pages and the file-exists test; `component-zoo` goes when the pages cover the v2 set |
 
 Old widgets are deleted as their replacement lands, never kept as aliases.
+
+## What Phase 3 has landed so far
+
+`crates/ui/src/mp/` — the v3 component tree, alongside the v2 widget set rather
+than replacing it yet (the v2 set is what `component-zoo` and `a2ui` still
+build on).
+
+| File | What it is |
+|---|---|
+| `mp/action.rs` | Reading a widget's own actions out of a batch. The v2 set used `find_widget_action(uid).cast()`, which returns the **first** action for a uid and then hides the mismatch by yielding `T::default()` — see `docs/WIDGETS_PROGRESS_CN.md` §3.2. Three widgets were patched by hand; the rest kept the bug. The walk lives here, once, over the framework's own `filter_widget_actions`. |
+| `mp/surface.rs` | `MpSurface` and its planes: page, panel, card, raised, dialog, overlay, sunken, plus the Gaussian-backed glass. |
+| `mp/button.rs` | `MpButton`, rebuilt. |
+
+`MpButton` is the demonstration — the v2 button against this one:
+
+| | v2 | v3 |
+|---|---|---|
+| Palette instance fields in the shader | 16 (`c_solid` … `border`), present only so Rust could read tokens back out | **0** — `Theme::of(cx)` |
+| Looks | 9 | **4** — bezel's closed set |
+| Durations | literal `0.15` / `0.09` in the animator block | `mod.motion.hover_fade` / `press` |
+| Size | a private `MpSize` ladder with its own font sizes | `ControlSize`, the same ladder the theme exports |
+| Action read | silently false behind any other action for the same uid | `action::is` |
+| Focus | cached in a field, so the ring could lag a frame | read from `cx.has_key_focus` |
+
+`crates/gallery` — the new documentation app. 5 pages (Palette, Type, Metrics,
+Motion, Button), a rail painted from `pages::PAGES`, and a test that every rail
+row names a source file that exists *and* is declared in the module tree.
+
+### Two findings from building it
+
+- **A container cannot read a global in Makepad.** `View::draw_bg` is a fixed
+  `DrawQuad` in Rust, so a DSL block naming a token has the value *copied* at
+  script-apply time. `Theme::install` therefore calls
+  `request_script_reapply()` as well as `redraw_all()`. This is not a
+  workaround — it is how Makepad's own `mod.theme` switch works — and it is why
+  the codebase has two update paths: a leaf widget that owns its shader resolves
+  the theme in Rust every paint, a container has its values re-applied.
+- **`instance(..)` in a custom `script_shader` block is wrong.** The storage
+  class comes from the Rust struct's `#[live]` fields; `instance()` there asks
+  for an object where a number is expected, producing 12 runtime errors of the
+  form `type mismatch for property hover: expected f32, got object`.
+  `instance()` is only for *overriding* an inherited field's storage class.
+- **`mod.mp` has to be created** before `mod.mp.Surface = …` — same rule as
+  `mod.mpc = {}` in the theme. Assigning into a missing module produced 215
+  runtime errors that all pointed at innocuous-looking lines.
 
 ## What Phase 1 and 2 actually verify
 

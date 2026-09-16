@@ -6,6 +6,8 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use makepad_widgets::*;
+
 use crate::{theme::Theme, typography::TextStyle};
 
 /// A control's size — SwiftUI's `ControlSize`.
@@ -14,16 +16,24 @@ use crate::{theme::Theme, typography::TextStyle};
 /// measured are [`ControlSize::Small`] and [`ControlSize::Regular`]; `Large` is
 /// the same rule carried one step further, and is marked as such rather than
 /// passed off as a reading.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+///
+/// Registered on the script heap as `mod.mpc.ControlSize`, so a DSL block writes
+/// `control: mod.mpc.ControlSize.Small` and the widget reads back the same rung
+/// the caller named rather than a private copy of it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Script, ScriptHook)]
 pub enum ControlSize {
     /// The chip: `Callout` on a `control_radius` corner. 20pt — measured.
+    #[live]
     Small,
     /// The form row: `Body` on a `button_radius` corner. 24pt — measured.
+    #[pick]
     #[default]
+    #[live]
     Regular,
     /// One step up from the form row, for a primary action standing alone.
     /// 28pt — derived by the same +4pt step the platform uses from `small` to
     /// `regular`, not separately measured.
+    #[live]
     Large,
 }
 
@@ -73,6 +83,21 @@ impl ControlSize {
         match self {
             ControlSize::Small => Theme::control_radius(),
             ControlSize::Regular | ControlSize::Large => Theme::button_radius(),
+        }
+    }
+
+    /// The role's metrics — where the size's line box comes from.
+    pub fn metrics(self) -> crate::typography::Metrics {
+        self.text().into()
+    }
+
+    /// The size's stable name, used for the `mod.mpc.layout.control.<name>`
+    /// entry and for diagnostics.
+    pub const fn name(self) -> &'static str {
+        match self {
+            ControlSize::Small => "small",
+            ControlSize::Regular => "regular",
+            ControlSize::Large => "large",
         }
     }
 }

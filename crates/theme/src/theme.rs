@@ -145,12 +145,25 @@ impl Theme {
     }
 
     /// Make this theme the one in force, update the script heap, and repaint.
+    ///
+    /// Two update paths, because the component set uses two, and both are
+    /// needed:
+    ///
+    /// - A widget that owns its shader resolves the theme in Rust every paint,
+    ///   so a redraw is enough. That is the leaf controls — a button, a field,
+    ///   a slider — where the state is mixed per frame anyway.
+    /// - A container that names a token in its DSL block has the value *copied*
+    ///   at script-apply time, so rewriting the heap does not reach it. Those
+    ///   need `request_script_reapply`. This is not a workaround: it is how
+    ///   Makepad's own appearance switch works, because a Makepad `View`'s
+    ///   `draw_bg` is a fixed `DrawQuad` and a container cannot read a global.
     pub fn install(theme: Theme, cx: &mut Cx) {
         set_base_radius(theme.brand.radius);
         CURRENT_APPEARANCE.store(theme.appearance as u32, Ordering::Relaxed);
         THEME_GENERATION.fetch_add(1, Ordering::Relaxed);
         crate::install::stamp(&theme, cx);
         cx.set_global(theme);
+        cx.request_script_reapply();
         cx.redraw_all();
     }
 

@@ -1,0 +1,12 @@
+[package]
+name = "gallery"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The documentation: a rail of every component, live"
+
+[dependencies]
+makepad-component = { workspace = true }
+makepad-theme = { workspace = true }
+makepad-motion = { workspace = true }
+makepad-widgets = { workspace = true }

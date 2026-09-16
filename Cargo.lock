@@ -1469,6 +1469,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gallery"
+version = "0.1.0"
+dependencies = [
+ "makepad-component",
+ "makepad-motion",
+ "makepad-theme",
+ "makepad-widgets",
+]
+
+[[package]]
 name = "gdk-pixbuf-sys"
 version = "0.17.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"

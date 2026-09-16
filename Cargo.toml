@@ -4,6 +4,7 @@ members = [
   "crates/motion",
   "crates/ui",
   "crates/component-zoo",
+  "crates/gallery",
   "crates/a2ui-demo",
   "crates/makepad-plot",
   "crates/raycast-launcher",

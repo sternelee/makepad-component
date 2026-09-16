@@ -133,6 +133,18 @@ pub fn layout_namespace(vm: &mut ScriptVm, layout: &Layout) -> ScriptValue {
         vm.bx
             .heap
             .set_value_def(entry, key("radius"), num(size.radius()));
+        // The line box rides along so a DSL block can reserve the right height
+        // without knowing which role the size paints in.
+        vm.bx.heap.set_value_def(
+            entry,
+            key("font_size"),
+            num(size.metrics().size()),
+        );
+        vm.bx.heap.set_value_def(
+            entry,
+            key("line_height"),
+            num(size.metrics().line_height()),
+        );
         let name = match size {
             ControlSize::Small => "small",
             ControlSize::Regular => "regular",
