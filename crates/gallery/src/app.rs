@@ -90,6 +90,7 @@ script_mod! {
                         rail_page_10 := RailRow{text: ""}
                         rail_page_11 := RailRow{text: ""}
                         rail_page_12 := RailRow{text: ""}
+                        rail_page_13 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -132,6 +133,7 @@ script_mod! {
                             page_10 := mod.gallery.pages.controls{}
                             page_11 := mod.gallery.pages.popover{}
                             page_12 := mod.gallery.pages.icon{}
+                            page_13 := mod.gallery.pages.status{}
                         }
                     }
                 }
@@ -145,7 +147,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 13] = [
+const PAGE_SLOTS: [&[LiveId]; 14] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -159,10 +161,11 @@ const PAGE_SLOTS: [&[LiveId]; 13] = [
     ids!(page_10),
     ids!(page_11),
     ids!(page_12),
+    ids!(page_13),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 13] = [
+const RAIL_ROWS: [&[LiveId]; 14] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -176,6 +179,7 @@ const RAIL_ROWS: [&[LiveId]; 13] = [
     ids!(rail_page_10),
     ids!(rail_page_11),
     ids!(rail_page_12),
+    ids!(rail_page_13),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -630,7 +634,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 13] = [
+    const SLOT_PAGES: [&str; 14] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -644,6 +648,7 @@ mod tests {
         "mod.gallery.pages.controls",
         "mod.gallery.pages.popover",
         "mod.gallery.pages.icon",
+        "mod.gallery.pages.status",
     ];
 
     #[test]

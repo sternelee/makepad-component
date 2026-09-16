@@ -16,6 +16,7 @@ pub mod input;
 pub mod layout;
 pub mod loaders;
 pub mod slider;
+pub mod status;
 pub mod motion;
 pub mod overlay;
 pub mod popover;
@@ -42,6 +43,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     overlay::script_mod(vm);
     popover::script_mod(vm);
     icon::script_mod(vm);
+    status::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -138,6 +140,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/icon.rs",
         blurb: "The bundled glyph face on the size ladder",
     },
+    Page {
+        title: "Status",
+        path: "mod.gallery.pages.status",
+        source: "crates/gallery/src/pages/status.rs",
+        blurb: "Badges and tags, six tones",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -211,6 +219,7 @@ mod tests {
             ("crates/gallery/src/pages/overlay.rs", "overlay"),
             ("crates/gallery/src/pages/popover.rs", "popover"),
             ("crates/gallery/src/pages/icon.rs", "icon"),
+            ("crates/gallery/src/pages/status.rs", "status"),
         ]
         .into_iter()
         .collect();

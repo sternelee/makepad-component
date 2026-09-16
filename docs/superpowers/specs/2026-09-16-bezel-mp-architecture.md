@@ -140,6 +140,23 @@ build on).
 | `mp/tooltip.rs` | `MpTooltip` — the overlay mechanism, verified; the gallery's hover wiring for it is proven by signal, not by capture. See below. |
 | `mp/popover.rs` | `MpPopover` — verified: the panel opens at its trigger's bottom edge and draws over the content below. |
 | `mp/icon.rs` | `MpIcon` — a glyph from Makepad's bundled FontAwesome, sized from the control ladder. The smallest component and the one most others want. |
+| `mp/status.rs` | `MpBadge`, `MpTag` — six tones, two assembled looks from one shader. A badge reports, a tag classifies. |
+
+### A conclusion that shapes the rest of the family
+
+**A floating surface cannot be composed into a trigger widget**, so higher-level
+components — select, combobox, date picker, menu — are **compositions plus app
+wiring** rather than single widgets. The reason is the overlay clip rule: a
+popover must be `Fill`/`Fill` inside a `Fill`/`Fill` overlay region, and a trigger
+lives in the flow at some arbitrary size. So `MpPopover` is always a *sibling* of
+its trigger in the page/window overlay region, and the trigger tells it to open.
+
+That is why the gallery's Popover page is the template for the family rather than
+a one-off demo: a select is a trigger face (a `MpButton` with a trailing
+`MpIcon` chevron), an `MpPopover` in the overlay region with option rows, and one
+line of app wiring. `MpTooltipArea` was an attempt to escape this and it could
+not work; the constraint is real, and the compositions are the answer rather than
+more widgets.
 | `mp/input.rs` | `MpTextInput`, `MpField`, `MpTextInputSearch`. The one component with no Rust: the caret, selection, IME, scroll-into-view and platform keys are Makepad's `TextInput`, so this styles it rather than reimplementing it. |
 
 `MpButton` is the demonstration — the v2 button against this one:

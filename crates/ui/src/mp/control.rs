@@ -408,6 +408,18 @@ pub mod plates {
         color::flatten(paint.element_active, rest)
     }
 
+    /// Whether a plate is pale enough that its label must be the page's dark
+    /// tone rather than the palette's body ink.
+    ///
+    /// Perceived lightness, not luminance: a status hue at 80% chroma reads much
+    /// lighter than its luminance suggests, and a badge's plate is exactly that
+    /// case. The threshold is where the sample set's pale plates sit, which is
+    /// how a status badge keeps a legible label without naming an ink.
+    pub fn relative_is_pale(plate: Vec4f) -> bool {
+        let l = 0.2126 * plate.x + 0.7152 * plate.y + 0.0722 * plate.z;
+        l > 0.5
+    }
+
     /// A *solid* plate's hover tone.
     ///
     /// A raised plate has a rung above it on the surface ladder to move to; a
