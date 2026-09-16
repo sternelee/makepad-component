@@ -137,6 +137,7 @@ build on).
 | `mp/layout.rs` | `Row`, `Column`, `Divider`, `DividerVertical`, `Spacer`. The system gap, carried by a prototype so a call site that wants 8pt writes no number. |
 | `mp/loaders.rs` | `MpSpinner`, `MpPulse`, `MpProgress`. The payoff for `motion::phase` — its constants are injected as instances from Rust rather than restated in the DSL. |
 | `mp/slider.rs` | `MpSlider`, and the four free functions that turn a pointer into a value. |
+| `mp/input.rs` | `MpTextInput`, `MpField`, `MpTextInputSearch`. The one component with no Rust: the caret, selection, IME, scroll-into-view and platform keys are Makepad's `TextInput`, so this styles it rather than reimplementing it. |
 
 `MpButton` is the demonstration — the v2 button against this one:
 
@@ -285,6 +286,32 @@ The gallery's slider page also seeds its readouts from the values the pages were
 built with, so the value path is visible in a screenshot rather than only after a
 drag — and a slider whose value never reaches its readout is a visible defect
 rather than a latent one.
+
+### The text field, and when not to write Rust
+
+Every other component here owns its shader and resolves the theme in Rust at
+paint. A text field is the exception and it is worth stating why: the hard parts
+of one are the caret, the selection, the IME composition, the scroll-into-view
+and the platform key handling, and Makepad already ships all of them. Writing a
+second one would be the largest file in the crate and the least interesting.
+
+So `mp/input.rs` is a table of token assignments — and the reason it is worth
+having is that the assignments are not obvious. Makepad's field has fourteen
+colour slots across four layers (`draw_bg`, `draw_text`, `draw_selection`,
+`draw_cursor`), each with `hover`/`focus`/`down`/`empty`/`disabled` variants, and
+a wrapper that fills in only the base `color` leaves the rest carrying the stock
+theme's colours, which show up as blue edges and a green caret on a neutral
+palette.
+
+Two more instances of a trap this codebase has now hit three times: **a glob
+import brings a module's members into scope, not its nested modules.** `use
+mod.mpc.layout.*` gives `space` and `row_height` but not `control`, so
+`height: control.regular.height` is the form that resolves and `regular.height`
+is not. The same mistake in `surface.rs` (`layout.space` vs `space`) and in
+`control.rs` (`motion.hover_fade` vs `hover_fade`) produced 112 and 215 runtime
+errors respectively; this one produced 45. The rule is worth writing down: in a
+`script_mod!` block, either write the whole path from `mod`, or import the exact
+module whose members you name — never a parent.
 
 ### Two findings from building it
 

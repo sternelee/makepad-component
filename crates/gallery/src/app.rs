@@ -84,6 +84,7 @@ script_mod! {
                         rail_page_6 := RailRow{text: ""}
                         rail_page_7 := RailRow{text: ""}
                         rail_page_8 := RailRow{text: ""}
+                        rail_page_9 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -121,7 +122,8 @@ script_mod! {
                             page_5 := mod.gallery.pages.layout{}
                             page_6 := mod.gallery.pages.loaders{}
                             page_7 := mod.gallery.pages.slider{}
-                            page_8 := mod.gallery.pages.controls{}
+                            page_8 := mod.gallery.pages.input{}
+                            page_9 := mod.gallery.pages.controls{}
                         }
                     }
                 }
@@ -135,7 +137,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 9] = [
+const PAGE_SLOTS: [&[LiveId]; 10] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -145,10 +147,11 @@ const PAGE_SLOTS: [&[LiveId]; 9] = [
     ids!(page_6),
     ids!(page_7),
     ids!(page_8),
+    ids!(page_9),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 9] = [
+const RAIL_ROWS: [&[LiveId]; 10] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -158,6 +161,7 @@ const RAIL_ROWS: [&[LiveId]; 9] = [
     ids!(rail_page_6),
     ids!(rail_page_7),
     ids!(rail_page_8),
+    ids!(rail_page_9),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -225,6 +229,7 @@ impl MatchEvent for App {
 
         self.handle_controls(cx, actions);
         self.handle_sliders(cx, actions);
+        self.handle_input(cx, actions);
     }
 }
 
@@ -288,6 +293,21 @@ impl App {
             self.ui
                 .label(cx, ids!(radio_readout))
                 .set_text(cx, labels.get(picked).copied().unwrap_or("?"));
+        }
+    }
+
+    /// Echo what the text field reports, which is the page's own check that the
+    /// action path reaches an app rather than only the widget.
+    fn handle_input(&mut self, cx: &mut Cx, actions: &Actions) {
+        let field = self.ui.text_input(cx, ids!(echo_input));
+        if let Some(text) = field.changed(actions) {
+            self.ui
+                .label(cx, ids!(echo_out))
+                .set_text(cx, &format!("Changed(\"{text}\")"));
+        } else if let Some((text, _)) = field.returned(actions) {
+            self.ui
+                .label(cx, ids!(echo_out))
+                .set_text(cx, &format!("Returned(\"{text}\")"));
         }
     }
 
@@ -427,7 +447,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 9] = [
+    const SLOT_PAGES: [&str; 10] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -436,6 +456,7 @@ mod tests {
         "mod.gallery.pages.layout",
         "mod.gallery.pages.loaders",
         "mod.gallery.pages.slider",
+        "mod.gallery.pages.input",
         "mod.gallery.pages.controls",
     ];
 

@@ -11,6 +11,7 @@
 pub mod button;
 pub mod controls;
 pub mod foundation;
+pub mod input;
 pub mod layout;
 pub mod loaders;
 pub mod slider;
@@ -34,6 +35,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     layout::script_mod(vm);
     loaders::script_mod(vm);
     slider::script_mod(vm);
+    input::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -99,6 +101,12 @@ pub const PAGES: &[Page] = &[
         path: "mod.gallery.pages.slider",
         source: "crates/gallery/src/pages/slider.rs",
         blurb: "Grab-anywhere drag, steps, arrows",
+    },
+    Page {
+        title: "Input",
+        path: "mod.gallery.pages.input",
+        source: "crates/gallery/src/pages/input.rs",
+        blurb: "The text field and its states",
     },
     Page {
         title: "Controls",
@@ -175,6 +183,7 @@ mod tests {
             ("crates/gallery/src/pages/layout.rs", "layout"),
             ("crates/gallery/src/pages/loaders.rs", "loaders"),
             ("crates/gallery/src/pages/slider.rs", "slider"),
+            ("crates/gallery/src/pages/input.rs", "input"),
         ]
         .into_iter()
         .collect();
