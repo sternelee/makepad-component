@@ -101,6 +101,7 @@ script_mod! {
                         rail_page_16 := RailRow{text: ""}
                         rail_page_17 := RailRow{text: ""}
                         rail_page_18 := RailRow{text: ""}
+                        rail_page_19 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -149,6 +150,7 @@ script_mod! {
                             page_16 := mod.gallery.pages.avatar{}
                             page_17 := mod.gallery.pages.surface{}
                             page_18 := mod.gallery.pages.list{}
+                            page_19 := mod.gallery.pages.select{}
                         }
                     }
                 }
@@ -162,7 +164,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 19] = [
+const PAGE_SLOTS: [&[LiveId]; 20] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -182,10 +184,11 @@ const PAGE_SLOTS: [&[LiveId]; 19] = [
     ids!(page_16),
     ids!(page_17),
     ids!(page_18),
+    ids!(page_19),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 19] = [
+const RAIL_ROWS: [&[LiveId]; 20] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -205,6 +208,7 @@ const RAIL_ROWS: [&[LiveId]; 19] = [
     ids!(rail_page_16),
     ids!(rail_page_17),
     ids!(rail_page_18),
+    ids!(rail_page_19),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -254,6 +258,7 @@ impl MatchEvent for App {
         self.seed_trees(cx);
         self.seed_avatars(cx);
         self.seed_lists(cx);
+        self.seed_selects(cx);
         // `GALLERY_TOOLTIP=1` pins the overlay open, anchored to the first
         // trigger. Same justification as `GALLERY_PAGE`: Makepad exposes no
         // accessibility tree, so a capture script cannot hover a button, and an
@@ -449,21 +454,33 @@ impl App {
         if !self.want_popover {
             return;
         }
-        // Same deference as the tooltip: an `Area` is empty until its widget has
-        // been laid out, and anchoring to an empty rect puts the panel in the
-        // window corner.
-        let trigger = self.ui.widget(cx, ids!(pop_form)).area();
-        let rect = trigger.rect(cx);
-        if rect.size.x > 0.0 && rect.size.y > 0.0 {
-            // **Re-asserted on every event, not fired once.** A popover closes on
-            // any press outside its panel, and a capture run is not a clean room:
-            // the act of raising the window, or a stray synthetic press, would
-            // dismiss it before the screenshot. Firing once made the capture
-            // non-deterministic — the panel was there in one run and gone in the
-            // next — and a verification affordance that only sometimes works is
-            // worse than none. `open_for` on an already-open popover is a no-op
-            // beyond re-anchoring, so this costs nothing.
-            self.ui.mp_popover(cx, ids!(pop_form_panel)).open_for(cx, trigger);
+        // Every (trigger, panel) pair any page declares. Only the current page's
+        // widgets are laid out, so the others' triggers have empty rects and are
+        // skipped — which is what lets one environment variable serve every page
+        // rather than one variable per page.
+        const PINS: [(&[LiveId], &[LiveId]); 6] = [
+            (ids!(pop_form), ids!(pop_form_panel)),
+            (ids!(pop_menu), ids!(pop_menu_panel)),
+            (ids!(pop_tall), ids!(pop_tall_panel)),
+            (ids!(select_face_a), ids!(select_panel_a)),
+            (ids!(select_face_b), ids!(select_panel_b)),
+            (ids!(select_face_c), ids!(select_panel_c)),
+        ];
+        // **Re-asserted on every event, not fired once.** A popover closes on any
+        // press outside its panel, and a capture run is not a clean room: raising
+        // the window, or a stray synthetic press, would dismiss it before the
+        // screenshot. Firing once made the capture non-deterministic — the panel
+        // present in one run and gone in the next — and a verification affordance
+        // that only sometimes works is worse than none. `open_for` on an
+        // already-open popover is a no-op beyond re-anchoring.
+        for (trigger, panel) in PINS {
+            let area = self.ui.widget(cx, trigger).area();
+            let rect = area.rect(cx);
+            // An `Area` is empty until its widget has been laid out, and anchoring
+            // to an empty rect puts the panel in the window corner.
+            if rect.size.x > 0.0 && rect.size.y > 0.0 {
+                self.ui.mp_popover(cx, panel).open_for(cx, area);
+            }
         }
     }
 
@@ -657,6 +674,53 @@ impl App {
         self.ui
             .mp_list(cx, ids!(empty_list))
             .set_items(cx, Vec::new());
+    }
+
+    /// Fill the select page's option lists, and show the value path.
+    ///
+    /// The third select is *selected programmatically* at startup, which is the
+    /// only way to demonstrate the path a click would take: a synthetic pointer
+    /// produces no hit at all in this app, so the selection cannot be delivered
+    /// from a capture script. What this proves is the half that matters — the
+    /// option reaching the face and the readout — and `mp/popover.rs` records why
+    /// the other half is unreachable from here.
+    fn seed_selects(&mut self, cx: &mut Cx) {
+        let intervals: Vec<ListItem> = vec![
+            ListItem::new("Every day"),
+            ListItem::new("Every week").detail("Mon"),
+            ListItem::new("Every month").detail("1st"),
+            ListItem::new("Never"),
+        ];
+        for path in [ids!(select_list_a), ids!(select_list_b)] {
+            self.ui.mp_list(cx, path).set_items(cx, intervals.clone());
+        }
+        let regions: Vec<ListItem> = vec![
+            ListItem::new("Auto"),
+            ListItem::new("us-east-1").detail("1"),
+            ListItem::new("eu-west-1").detail("2"),
+            ListItem::new("ap-northeast-1").detail("1"),
+        ];
+        self.ui
+            .mp_list(cx, ids!(select_list_c))
+            .set_items(cx, regions.clone());
+
+        // The faces start with a value, as a form would.
+        self.ui
+            .mp_button(cx, ids!(select_face_a))
+            .set_text(cx, "Every day");
+        self.ui
+            .mp_button(cx, ids!(select_face_b))
+            .set_text(cx, "Auto");
+
+        // The value path: select one, and show it reaching both the face and the
+        // readout beside it.
+        self.ui.mp_list(cx, ids!(select_list_c)).select(cx, 2);
+        self.ui
+            .mp_button(cx, ids!(select_face_c))
+            .set_text(cx, "eu-west-1");
+        self.ui
+            .label(cx, ids!(select_readout))
+            .set_text(cx, "chose eu-west-1 (option 2)");
     }
 
     /// Write each slider's starting value into its readout.
@@ -855,7 +919,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 19] = [
+    const SLOT_PAGES: [&str; 20] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -875,6 +939,7 @@ mod tests {
         "mod.gallery.pages.avatar",
         "mod.gallery.pages.surface",
         "mod.gallery.pages.list",
+        "mod.gallery.pages.select",
     ];
 
     #[test]

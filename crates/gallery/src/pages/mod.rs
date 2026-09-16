@@ -17,6 +17,7 @@ pub mod input;
 pub mod layout;
 pub mod list;
 pub mod loaders;
+pub mod select;
 pub mod slider;
 pub mod status;
 pub mod surface;
@@ -54,6 +55,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     avatar::script_mod(vm);
     surface::script_mod(vm);
     list::script_mod(vm);
+    select::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -186,6 +188,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/list.rs",
         blurb: "Rows of things, three shapes",
     },
+    Page {
+        title: "Select",
+        path: "mod.gallery.pages.select",
+        source: "crates/gallery/src/pages/select.rs",
+        blurb: "A face, a panel and the wiring between",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -265,6 +273,7 @@ mod tests {
             ("crates/gallery/src/pages/avatar.rs", "avatar"),
             ("crates/gallery/src/pages/surface.rs", "surface"),
             ("crates/gallery/src/pages/list.rs", "list"),
+            ("crates/gallery/src/pages/select.rs", "select"),
         ]
         .into_iter()
         .collect();

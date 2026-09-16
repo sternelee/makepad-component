@@ -147,6 +147,15 @@ build on).
 | `mp/text.rs` | Measuring and clipping one line, shared by the three row-painting widgets. |
 | `mp/list.rs` | `MpList` — a glyph, a label and a trailing detail. The third data widget and the simplest. |
 
+The Select page is the template the rest of the floating family follows, and the
+evidence that the overlay constraint is workable rather than merely limiting: a
+face (`MpButton` with a trailing chevron), a popover in the page's overlay region,
+an `MpList` of options inside it, and three lines of app wiring. Combobox, date
+picker and menu are the same three things with different contents — which is why
+none of them needs a widget, and why `MpList` being a real widget (hover,
+selection, arrow keys) is what makes the composition worth preferring over a
+hand-rolled set of buttons.
+
 ### A widget that is not a container drops its children silently
 
 The Icon page shipped a row captioned "In a button" containing
