@@ -38,7 +38,11 @@
 
 pub mod action;
 pub mod button;
+pub mod checkbox;
+pub mod control;
+pub mod radio;
 pub mod surface;
+pub mod switch;
 
 use makepad_widgets::*;
 
@@ -50,5 +54,11 @@ pub fn script_mod(vm: &mut ScriptVm) {
     // Surfaces first: every container and several leaf widgets paint one,
     // and a widget's DSL block names the prototype it inherits.
     crate::mp::surface::script_mod(vm);
+    // The shared animator prototype every control inherits. Before the
+    // controls, because their DSL blocks name it.
+    crate::mp::control::script_mod(vm);
     crate::mp::button::script_mod(vm);
+    crate::mp::checkbox::script_mod(vm);
+    crate::mp::switch::script_mod(vm);
+    crate::mp::radio::script_mod(vm);
 }

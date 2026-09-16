@@ -130,6 +130,10 @@ build on).
 | `mp/action.rs` | Reading a widget's own actions out of a batch. The v2 set used `find_widget_action(uid).cast()`, which returns the **first** action for a uid and then hides the mismatch by yielding `T::default()` — see `docs/WIDGETS_PROGRESS_CN.md` §3.2. Three widgets were patched by hand; the rest kept the bug. The walk lives here, once, over the framework's own `filter_widget_actions`. |
 | `mp/surface.rs` | `MpSurface` and its planes: page, panel, card, raised, dialog, overlay, sunken, plus the Gaussian-backed glass. |
 | `mp/button.rs` | `MpButton`, rebuilt. |
+| `mp/control.rs` | The shared contract of every interactive control: the pointer/keyboard signals, the four animator tracks, and the plate helpers. Replaces the thirty-line hit block the five v2 controls each carried a copy of. |
+| `mp/checkbox.rs` | `MpCheckbox` — two independent states. |
+| `mp/switch.rs` | `MpSwitch` — the same value as a position. |
+| `mp/radio.rs` | `MpRadio` — one choice, and the group is the caller's. |
 
 `MpButton` is the demonstration — the v2 button against this one:
 
@@ -142,9 +146,55 @@ build on).
 | Action read | silently false behind any other action for the same uid | `action::is` |
 | Focus | cached in a field, so the ring could lag a frame | read from `cx.has_key_focus` |
 
-`crates/gallery` — the new documentation app. 5 pages (Palette, Type, Metrics,
-Motion, Button), a rail painted from `pages::PAGES`, and a test that every rail
-row names a source file that exists *and* is declared in the module tree.
+`crates/gallery` — the new documentation app. 6 pages (Palette, Type, Metrics,
+Motion, Button, Controls), a rail painted from `pages::PAGES`, and a test that
+every rail row names a source file that exists *and* is declared in the module
+tree.
+
+`GALLERY_PAGE=<index or title>` pins the opening page. That is not a debug
+leftover: Makepad does not expose its widgets to the accessibility tree, so a
+capture script has no way to click a rail row, and an app that can only be
+driven by a pointer cannot be verified from a script.
+
+### The control family
+
+Five v2 controls averaged 450 lines each and most of that was the same
+thirty-line pointer/keyboard block written five times, already drifted:
+
+| v2 defect | Consequence |
+|---|---|
+| radio never claimed key focus on a pointer press | click a radio, press Space, nothing happens |
+| toggle set its hand cursor only on hover-*in* | the cursor stays a hand after the pointer leaves |
+| checkbox and switch disagreed about the activating keys | Tab then Space worked on one and not the other |
+| each control cached `focused: bool` | the focus ring appeared a frame after the click |
+
+All of it now comes from `mp::control`, and a control declares only what makes
+it itself. In the gallery's Controls page the whole family is 120 lines of
+behaviour each against the v2 set's 450.
+
+Three bugs the **screenshot** caught that no test would have:
+
+- A control built `checked: true` painted **unchecked**. The field was true from
+  construction but the animator was still in its default `off` state, and the
+  paint reads the animator. The symptom is the worst kind: the first click
+  appears to do nothing, because the value was already true and `set_checked`
+  correctly returns early. Fixed by `control::init_checked` from `on_after_new`,
+  using `cut` so a control that starts checked starts checked rather than
+  animating into it before the first frame.
+- The switch's knob **colour** came from the Rust bool while its **position**
+  came from the animator, so the two disagreed at construction — a near-black
+  knob on a near-black track, invisible. The shader now mixes `knob_off` toward
+  `knob_on` by the same `checked` number that places it, so they cannot drift.
+- `use mod.motion.*` does not make `motion.hover_fade` resolvable. A glob import
+  brings the *members* into scope, so the path has to be written out in full
+  (`mod.motion.hover_fade.duration`). Same trap as `layout.space` vs
+  `space` in the surface module, and it failed the same way: "variable motion
+  not found in scope", 112 errors deep.
+
+One more Makepad trap, recorded because it will bite again: **a module made from
+Rust with `ScriptHeap::new_module` is not reachable as `mod.<name>` from a
+script.** `mod.motion` had to be published through a `script_mod!` block
+(`mod.motion = #(...)`), the same form `makepad_theme` uses for `mod.mpc`.
 
 ### Two findings from building it
 

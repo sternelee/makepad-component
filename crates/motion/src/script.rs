@@ -17,6 +17,8 @@ use makepad_widgets::{
     makepad_script::{trap::NoTrap, ScriptApply},
     LiveId, ScriptValue, ScriptVm,
 };
+// `script_mod!` and the object helpers the namespace builder needs.
+use makepad_widgets::*;
 
 use crate::MotionSpec;
 
@@ -60,56 +62,56 @@ impl MotionSpec {
     }
 }
 
-/// Publish the catalog as `mod.motion.<name>`.
+/// The catalog as a heap object, one entry per [`MotionSpec::NAMED`] name.
 ///
 /// Each entry carries the raw numbers (`duration`, `delay`), the four control
 /// points, the ready `ease` and a ready `play`, so a widget can take whichever
 /// shape its animator needs without this module having to guess.
 ///
-/// **Call this after `makepad_widgets::script_mod`**: `Play` and `Ease` are
-/// script *types* registered by the widget layer, and converting one before its
-/// type exists panics inside the heap rather than reporting a missing module.
-pub fn script_mod(vm: &mut ScriptVm) {
-    let module = vm.bx.heap.new_module(LiveId::from_str("motion"));
-    for (name, spec) in MotionSpec::NAMED {
-        let entry = vm.bx.heap.new_object();
-        let put = |vm: &mut ScriptVm, key: &str, value: ScriptValue| {
-            vm.bx
-                .heap
-                .set_value_def(entry, LiveId::from_str(key).into(), value);
-        };
-        put(vm, "duration", (spec.duration_secs()).into());
-        put(vm, "delay", (spec.delay_ms as f64 / 1000.0).into());
-        let (cp0, cp1, cp2, cp3) = spec.curve.control_points();
-        for (key, value) in [
-            ("cp0", cp0),
-            ("cp1", cp1),
-            ("cp2", cp2),
-            ("cp3", cp3),
-        ] {
-            put(vm, key, (value as f64).into());
-        }
-        let ease = spec.ease().script_to_value(vm);
-        put(vm, "ease", ease);
-        let play = spec.play().script_to_value(vm);
-        put(vm, "play", play);
-        let looping = spec.loop_play().script_to_value(vm);
-        put(vm, "loop_play", looping);
+/// **Call `script_mod` after `makepad_widgets::script_mod`**: `Play` and `Ease`
+/// are script *types* registered by the widget layer, and converting one before
+/// its type exists panics inside the heap rather than reporting a missing
+/// module.
+pub fn namespace(vm: &mut ScriptVm) -> ScriptValue {
+    let root = vm.bx.heap.new_object();
+    let put = |vm: &mut ScriptVm, object: makepad_widgets::makepad_script::ScriptObject, key: &str, value: ScriptValue| {
         vm.bx
             .heap
-            .set_value_def(module, LiveId::from_str(name).into(), entry.into());
+            .set_value_def(object, LiveId::from_str(key).into(), value);
+    };
+    for (name, spec) in MotionSpec::NAMED {
+        let entry = vm.bx.heap.new_object();
+        put(vm, entry, "duration", (spec.duration_secs()).into());
+        put(vm, entry, "delay", (spec.delay_ms as f64 / 1000.0).into());
+        let (cp0, cp1, cp2, cp3) = spec.curve.control_points();
+        for (key, value) in [("cp0", cp0), ("cp1", cp1), ("cp2", cp2), ("cp3", cp3)] {
+            put(vm, entry, key, (value as f64).into());
+        }
+        let ease = spec.ease().script_to_value(vm);
+        put(vm, entry, "ease", ease);
+        let play = spec.play().script_to_value(vm);
+        put(vm, entry, "play", play);
+        let looping = spec.loop_play().script_to_value(vm);
+        put(vm, entry, "loop_play", looping);
+        put(vm, root, name, entry.into());
     }
     // The redraw rates, for a widget that drives its own clock.
-    vm.bx.heap.set_value_def(
-        module,
-        LiveId::from_str("pulse_fps").into(),
-        (crate::PULSE_FPS as f64).into(),
-    );
-    vm.bx.heap.set_value_def(
-        module,
-        LiveId::from_str("hover_fps").into(),
-        (crate::HOVER_FPS as f64).into(),
-    );
+    put(vm, root, "pulse_fps", (crate::PULSE_FPS as f64).into());
+    put(vm, root, "hover_fps", (crate::HOVER_FPS as f64).into());
+    root.into()
+}
+
+// The catalog, published as `mod.motion.<name>`.
+//
+// Created through `mod.motion = ...` rather than `ScriptHeap::new_module`: a
+// module made from Rust is a heap object but is not reachable as `mod.motion`
+// from a script, so `use mod.motion.*` in a widget's DSL block silently brings
+// nothing into scope and every later reference fails with "variable motion not
+// found". This is the same form `makepad_theme` uses for `mod.mpc`.
+script_mod! {
+    use mod.prelude.widgets_internal.*
+
+    mod.motion = #(crate::script::namespace(vm))
 }
 
 #[cfg(test)]
@@ -221,7 +223,7 @@ mod tests {
         // A rename in `NAMED` that skipped this module would leave a widget
         // naming an entry that is not there.
         let mut cx = vm_cx();
-        cx.with_vm(script_mod);
+        cx.with_vm(crate::script::script_mod);
         cx.with_vm(|vm| {
             let module = vm.bx.heap.module(LiveId::from_str("motion"));
             for (name, spec) in MotionSpec::NAMED {
@@ -255,7 +257,7 @@ mod tests {
     #[test]
     fn test_the_control_points_are_published_for_a_hand_written_ease() {
         let mut cx = vm_cx();
-        cx.with_vm(script_mod);
+        cx.with_vm(crate::script::script_mod);
         cx.with_vm(|vm| {
             let module = vm.bx.heap.module(LiveId::from_str("motion"));
             let entry = vm

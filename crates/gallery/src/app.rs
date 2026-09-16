@@ -11,7 +11,12 @@
 
 use makepad_widgets::*;
 
-use makepad_component::mp::button::{MpButtonStyle, MpButtonWidgetRefExt};
+use makepad_component::mp::{
+    button::{MpButtonStyle, MpButtonWidgetRefExt},
+    checkbox::MpCheckboxWidgetRefExt,
+    radio::MpRadioWidgetRefExt,
+    switch::MpSwitchWidgetRefExt,
+};
 
 use crate::pages::PAGES;
 
@@ -73,6 +78,7 @@ script_mod! {
                         rail_page_2 := RailRow{text: ""}
                         rail_page_3 := RailRow{text: ""}
                         rail_page_4 := RailRow{text: ""}
+                        rail_page_5 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -107,6 +113,7 @@ script_mod! {
                             page_2 := mod.gallery.pages.metrics{}
                             page_3 := mod.gallery.pages.motion{}
                             page_4 := mod.gallery.pages.button{}
+                            page_5 := mod.gallery.pages.controls{}
                         }
                     }
                 }
@@ -120,21 +127,23 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 5] = [
+const PAGE_SLOTS: [&[LiveId]; 6] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
     ids!(page_3),
     ids!(page_4),
+    ids!(page_5),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 5] = [
+const RAIL_ROWS: [&[LiveId]; 6] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
     ids!(rail_page_3),
     ids!(rail_page_4),
+    ids!(rail_page_5),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -162,7 +171,7 @@ impl MatchEvent for App {
                 .mp_button(cx, RAIL_ROWS[index])
                 .set_text(cx, page.title);
         }
-        self.show(cx, self.page);
+        self.show(cx, self.opening_page());
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -187,13 +196,81 @@ impl MatchEvent for App {
             self.clicks += 1;
             self.ui.label(cx, ids!(click_count)).set_text(
                 cx,
-                &format!("{} click{}", self.clicks, if self.clicks == 1 { "" } else { "s" }),
+                &format!(
+                    "{} click{}",
+                    self.clicks,
+                    if self.clicks == 1 { "" } else { "s" }
+                ),
             );
         }
+
+        self.handle_controls(cx, actions);
     }
 }
 
 impl App {
+    /// Which page to open on.
+    ///
+    /// `GALLERY_PAGE=<index or title>` pins it. The gallery is the thing the
+    /// screenshot workflow points at, and Makepad does not expose its widgets
+    /// to the accessibility tree — so a capture script has no way to click a
+    /// rail row, and an app that can only be driven by a pointer cannot be
+    /// verified in a script. Naming the page is the whole affordance.
+    fn opening_page(&self) -> usize {
+        let Some(want) = std::env::var("GALLERY_PAGE").ok() else {
+            return crate::pages::FIRST;
+        };
+        if let Ok(index) = want.parse::<usize>() {
+            return index;
+        }
+        PAGES
+            .iter()
+            .position(|p| p.title.eq_ignore_ascii_case(&want))
+            .unwrap_or(crate::pages::FIRST)
+    }
+
+    /// The controls page's readouts, and the radio group it demonstrates.
+    ///
+    /// The group is done *here* rather than in the widget on purpose: a radio
+    /// owns one value, the caller owns which one is chosen, and this is what
+    /// that contract looks like at a call site — three lines and no registry.
+    fn handle_controls(&mut self, cx: &mut Cx, actions: &Actions) {
+        if let Some(checked) = self.ui.mp_checkbox(cx, ids!(checkbox_one)).checked(actions) {
+            self.ui.label(cx, ids!(checkbox_readout)).set_text(
+                cx,
+                if checked { "checked" } else { "unchecked" },
+            );
+        }
+
+        if let Some(on) = self.ui.mp_switch(cx, ids!(switch_one)).checked(actions) {
+            self.ui
+                .label(cx, ids!(switch_readout))
+                .set_text(cx, if on { "on" } else { "off" });
+        }
+
+        let radios: [&[LiveId]; 4] = [
+            ids!(radio_0),
+            ids!(radio_1),
+            ids!(radio_2),
+            ids!(radio_3),
+        ];
+        let labels = ["Every day", "Weekly", "Never"];
+        if let Some(picked) = radios
+            .iter()
+            .position(|path| self.ui.mp_radio(cx, *path).selected(actions))
+        {
+            // Clear the others first, then confirm the one that was chosen —
+            // this is the whole "group" implementation.
+            for path in radios.iter() {
+                self.ui.mp_radio(cx, *path).set_selected(cx, false);
+            }
+            self.ui.mp_radio(cx, radios[picked]).set_selected(cx, true);
+            self.ui
+                .label(cx, ids!(radio_readout))
+                .set_text(cx, labels.get(picked).copied().unwrap_or("?"));
+        }
+    }
+
     /// Make `page` the visible one and mark its rail row selected.
     ///
     /// Visibility rather than rebuilding: a gallery page holds live widget

@@ -265,11 +265,8 @@ impl MpButton {
             },
             MpButtonStyle::Prominent => Plate {
                 fill: p.solid,
-                // A solid plate brightens toward the page rather than toward a
-                // second token: the plate is already at the top of the ladder,
-                // so the step has to come from ink, not from a rung above.
-                fill_hover: makepad_theme::color::mix(p.solid, p.on_solid, 0.12),
-                fill_press: makepad_theme::color::mix(p.solid, p.on_solid, 0.22),
+                fill_hover: crate::mp::control::plates::solid_hover(p.solid, p.on_solid),
+                fill_press: crate::mp::control::plates::solid_press(p.solid, p.on_solid),
                 border: transparent,
                 border_width: 0.0,
                 ink: p.on_solid,
@@ -286,8 +283,8 @@ impl MpButton {
                 // `danger_strong` is the plate the palette verified a label
                 // against; `danger` is the ink.
                 fill: p.danger_strong,
-                fill_hover: makepad_theme::color::mix(p.danger_strong, p.on_solid, 0.12),
-                fill_press: makepad_theme::color::mix(p.danger_strong, p.on_solid, 0.22),
+                fill_hover: crate::mp::control::plates::solid_hover(p.danger_strong, p.on_solid),
+                fill_press: crate::mp::control::plates::solid_press(p.danger_strong, p.on_solid),
                 border: transparent,
                 border_width: 0.0,
                 ink: p.on_solid,

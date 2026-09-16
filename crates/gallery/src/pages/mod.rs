@@ -9,6 +9,7 @@
 //! [`tests`] is what stops it drifting.
 
 pub mod button;
+pub mod controls;
 pub mod foundation;
 pub mod motion;
 
@@ -26,6 +27,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     foundation::script_mod(vm);
     motion::script_mod(vm);
     button::script_mod(vm);
+    controls::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -73,6 +75,12 @@ pub const PAGES: &[Page] = &[
         path: "mod.gallery.pages.button",
         source: "crates/gallery/src/pages/button.rs",
         blurb: "The four shipped looks",
+    },
+    Page {
+        title: "Controls",
+        path: "mod.gallery.pages.controls",
+        source: "crates/gallery/src/pages/controls.rs",
+        blurb: "Checkbox, switch, radio — one contract",
     },
 ];
 
@@ -139,6 +147,7 @@ mod tests {
             ("crates/gallery/src/pages/foundation.rs", "foundation"),
             ("crates/gallery/src/pages/motion.rs", "motion"),
             ("crates/gallery/src/pages/button.rs", "button"),
+            ("crates/gallery/src/pages/controls.rs", "controls"),
         ]
         .into_iter()
         .collect();
