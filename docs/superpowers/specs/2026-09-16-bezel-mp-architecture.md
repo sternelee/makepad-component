@@ -141,6 +141,21 @@ build on).
 | `mp/popover.rs` | `MpPopover` — verified: the panel opens at its trigger's bottom edge and draws over the content below. |
 | `mp/icon.rs` | `MpIcon` — a glyph from Makepad's bundled FontAwesome, sized from the control ladder. The smallest component and the one most others want. |
 | `mp/status.rs` | `MpBadge`, `MpTag` — six tones, two assembled looks from one shader. A badge reports, a tag classifies. |
+| `mp/table.rs` | `MpTable` — columns, rows, row hover and selection. One widget rather than one per cell, with the layout arithmetic in a single function the painter, the hover and the click all read. |
+
+### The third instance of one fault: a self-painted widget has nothing to size it
+
+`MpTable` drew **nothing** on its first run, with zero `[E]` lines. Its cells are
+painted by `draw_abs` inside its own turtle rather than laid out as children, so
+no layout pass can measure it — `height: Fit` measured zero, and the plate and
+every cell were drawn into a zero-height box. It sizes itself from
+`content_height()` now.
+
+That is the third time: the pulse loader (`width: Fit` measured zero, three
+invisible cells), the table, and — the same rule seen from the other side —
+`MpPopover`'s panel, where a `Fill` child contributes nothing to a `Fit` parent's
+width. The rule worth keeping: **a widget painted entirely by its own shader must
+state its size, and a `Fit` container cannot measure a `Fill` child.**
 
 ### A conclusion that shapes the rest of the family
 

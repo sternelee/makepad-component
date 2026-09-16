@@ -48,6 +48,7 @@ pub mod popover;
 pub mod radio;
 pub mod slider;
 pub mod status;
+pub mod table;
 pub mod surface;
 pub mod tooltip;
 pub mod switch;
@@ -75,6 +76,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::input::script_mod(vm);
     crate::mp::icon::script_mod(vm);
     crate::mp::status::script_mod(vm);
+    crate::mp::table::script_mod(vm);
     // The overlay family, whose z-order comes from a DrawList2d rather than
     // from where the author put it in the tree.
     crate::mp::popover::script_mod(vm);

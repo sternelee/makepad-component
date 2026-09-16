@@ -9,6 +9,7 @@
 //! installs it, and the rail's appearance switch replaces it. Nothing else in
 //! the app knows a colour.
 
+use makepad_component::mp::table::TableColumn;
 use makepad_widgets::*;
 
 use makepad_component::mp::{
@@ -17,6 +18,7 @@ use makepad_component::mp::{
     radio::MpRadioWidgetRefExt,
     loaders::MpProgressWidgetRefExt,
     popover::MpPopoverWidgetRefExt,
+    table::MpTableWidgetRefExt,
     tooltip::MpTooltipWidgetRefExt,
     slider::MpSliderWidgetRefExt,
     switch::MpSwitchWidgetRefExt,
@@ -91,6 +93,7 @@ script_mod! {
                         rail_page_11 := RailRow{text: ""}
                         rail_page_12 := RailRow{text: ""}
                         rail_page_13 := RailRow{text: ""}
+                        rail_page_14 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -134,6 +137,7 @@ script_mod! {
                             page_11 := mod.gallery.pages.popover{}
                             page_12 := mod.gallery.pages.icon{}
                             page_13 := mod.gallery.pages.status{}
+                            page_14 := mod.gallery.pages.table{}
                         }
                     }
                 }
@@ -147,7 +151,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 14] = [
+const PAGE_SLOTS: [&[LiveId]; 15] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -162,10 +166,11 @@ const PAGE_SLOTS: [&[LiveId]; 14] = [
     ids!(page_11),
     ids!(page_12),
     ids!(page_13),
+    ids!(page_14),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 14] = [
+const RAIL_ROWS: [&[LiveId]; 15] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -180,6 +185,7 @@ const RAIL_ROWS: [&[LiveId]; 14] = [
     ids!(rail_page_11),
     ids!(rail_page_12),
     ids!(rail_page_13),
+    ids!(rail_page_14),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -225,6 +231,7 @@ impl MatchEvent for App {
         // and so a slider whose value never reaches its readout is visible in a
         // screenshot rather than only after a drag.
         self.seed_readouts(cx);
+        self.seed_tables(cx);
         // `GALLERY_TOOLTIP=1` pins the overlay open, anchored to the first
         // trigger. Same justification as `GALLERY_PAGE`: Makepad exposes no
         // accessibility tree, so a capture script cannot hover a button, and an
@@ -438,6 +445,48 @@ impl App {
         }
     }
 
+    /// Fill the table page's tables.
+    ///
+    /// Rows come from Rust because that is where a table's data lives; a table
+    /// declared in the DSL with a hundred literal rows would be a table nobody
+    /// could use for anything.
+    fn seed_tables(&mut self, cx: &mut Cx) {
+        let table = self.ui.mp_table(cx, ids!(build_table));
+        table.set_columns(
+            cx,
+            vec![
+                TableColumn::new("space"),
+                TableColumn::new("kind").width(90.0),
+                TableColumn::new("priority").width(80.0).end(),
+                TableColumn::new("count").width(70.0).end(),
+            ],
+        );
+        let rows: Vec<Vec<String>> = [
+            ("agent-workbench", "terminal", "high", "3"),
+            ("nightly-sync", "cron", "low", "12"),
+            ("cef-browsers", "browser", "high", "2"),
+            ("design-notes", "note", "normal", "1"),
+            ("receipts-2026-q1", "media", "low", "48"),
+            ("a-very-long-space-name-that-must-clip-instead-of-overrunning", "note", "normal", "7"),
+        ]
+        .into_iter()
+        .map(|(a, b, c, d)| vec![a.to_string(), b.to_string(), c.to_string(), d.to_string()])
+        .collect();
+        table.set_rows(cx, rows);
+
+        // The empty table: columns and no rows, which is what a table looks like
+        // before its data arrives.
+        let empty = self.ui.mp_table(cx, ids!(empty_table));
+        empty.set_columns(
+            cx,
+            vec![
+                TableColumn::new("nothing").width(120.0),
+                TableColumn::new("here yet"),
+            ],
+        );
+        empty.set_rows(cx, Vec::new());
+    }
+
     /// Write each slider's starting value into its readout.
     fn seed_readouts(&mut self, cx: &mut Cx) {
         const PAIRS: [(&[LiveId], &[LiveId]); 7] = [
@@ -634,7 +683,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 14] = [
+    const SLOT_PAGES: [&str; 15] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -649,6 +698,7 @@ mod tests {
         "mod.gallery.pages.popover",
         "mod.gallery.pages.icon",
         "mod.gallery.pages.status",
+        "mod.gallery.pages.table",
     ];
 
     #[test]
