@@ -1078,6 +1078,8 @@ impl CanvasPanel {
         self.note_edit_id = None;
         let composer = self.view.text_input(cx, ids!(agent_composer));
         composer.set_text(cx, "");
+        // Focus is (re)taken for real at MouseUp: makepad's MouseUp rule
+        // clears whatever this sets, and set_key_focus is applied lazily.
         composer.set_key_focus(cx);
         self.redraw(cx);
     }
@@ -6759,6 +6761,26 @@ impl Widget for CanvasPanel {
             if me.button.contains(MouseButton::PRIMARY) {
                 self.drag = None;
                 self.panning = false;
+                // The hidden composer/note inputs are zero-size, and makepad
+                // clears key focus when a MouseUp lands outside the focused
+                // input's rect - which for an empty rect is every MouseUp,
+                // including the one ending the click that opened them. This
+                // handler runs after the widget dispatch (which already did
+                // the clearing) and nothing later in this event can clear
+                // again, so re-taking here is final - and it happens before
+                // the user can type, so no keystroke is lost to the repair.
+                if self.agent_composer_id.is_some() {
+                    self.view
+                        .text_input(cx, ids!(agent_composer))
+                        .take_key_focus(cx);
+                    self.redraw(cx);
+                }
+                if self.note_edit_id.is_some() {
+                    self.view
+                        .text_input(cx, ids!(note_editor))
+                        .take_key_focus(cx);
+                    self.redraw(cx);
+                }
                 // Commit a global whiteboard drawing session (draw shape / erase).
                 if let Some(_start) = self.note_draw.take() {
                     if self.tool == NoteTool::Eraser {
@@ -6963,6 +6985,12 @@ impl Widget for CanvasPanel {
             // The agent composer takes priority over terminal input, mirroring
             // the note editor: Return submits, Escape cancels.
             if self.agent_composer_id.is_some() {
+                let composer = self.view.text_input(cx, ids!(agent_composer));
+                if !composer.key_focus(cx) {
+                    // Safety net behind the MouseUp re-take: a key while
+                    // composing means the focus belongs to the composer.
+                    composer.take_key_focus(cx);
+                }
                 match key.key_code {
                     KeyCode::ReturnKey => {
                         self.finish_agent_composer(cx);
