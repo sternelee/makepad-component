@@ -160,6 +160,9 @@ build on).
 | `mp/floating.rs` | `Floating` / `MpFloating` / `MpFloatingLayer` — a panel the reader drags. |
 | `mp/icons.rs` | `glyph::*` / `ALL` / `codepoint` — the declared glyph set. |
 
+And in `crates/theme`: `syntax.rs` (the kind vocabulary, the palette, the span contract) and
+`terminal.rs` (the sixteen ANSI colours in both appearances).
+
 ### `floating` was not what its name suggested
 
 The audit listed bezel's `floating.rs` as a missing **positioning primitive**, and that was a
@@ -437,6 +440,58 @@ fence rather than a new `BlockKind`."* Its whole substance is `render(language, 
 routed from a fence tag that markdown produces. Porting it before `markdown` exists would build the
 dependent before the dependency, so it is deferred — the same "read it before assuming" rule that
 `stack`, `stats`, `menu` and `floating` each paid for once.
+
+### `terminal`: the emulator already exists, and its palette was the missing part
+
+`terminal` was next on the plan as "1296 lines in the reference". Reading it showed an
+`alacritty_terminal`-backed emulator — bytes in, grid out — and reading **this workspace** showed the
+same substance already here: `canvas-terminal/src/terminal/state.rs` is a **`vte`-driven
+`TerminalState`** with a `Cell` grid, `feed(bytes)`, `resize`, `scroll_display`, `cursor_visible` and
+`selected_text`, and `canvas-terminal` already depends on **`vte = "0.14"`**. Writing a second
+emulator would have been the fifth time this port duplicated something it already had (after `stack`,
+`stats`, `menu` and `floating`).
+
+What that file *does* have is a defect this port's first law forbids:
+
+```ignore
+const ANSI_COLORS: [[f32; 3]; 16] = [ /* a dark-background scheme */ ];
+pub const DEFAULT_FG: [f32; 3] = [0.86, 0.89, 0.94];
+pub const DEFAULT_BG: [f32; 3] = [0.10, 0.11, 0.14];
+```
+
+A **hardcoded palette at a call site**: the terminal cannot follow an appearance change and a brand
+cannot reach it. So the contribution is `TerminalPalette` — the sixteen ANSI colours, a foreground, a
+background, a cursor and a selection, in **both** appearances, with `rgb`/`ansi_rgb` conversions so
+that replacing that `const` is mechanical rather than a refactor.
+
+### An ANSI palette is judged by a different rule, and stating it took three attempts
+
+Every one of the sixteen is painted on the terminal's own background, so all sixteen are text colours
+— **except one**:
+
+**`black` erases.** A program paints it to hide something, so the *result* is that nothing changes,
+and it is the ground on a dark terminal and on a light one. The rule went two wrong ways before
+landing there, and both wrong turns are kept because each looked right:
+
+1. A floor of **3:1** for `black`, which contradicts its own doc comment. It failed at **1.14:1** on
+   the dark palette — correctly.
+2. Replaced with "`black` is the *darkest* slot", which failed on the light palette at **"bright white
+   is darker than black"**. **That failure was the useful one**: it showed the *palette* was wrong
+   rather than the rule — light's `black` had been built as dark ink at `L = 0.28`, giving **13.77:1**
+   against a light ground, when a terminal's `black` is the ground whatever the ground is. A terminal
+   on white **inverts**: the `white` slots are the ink.
+3. The rule came back, and the value was fixed.
+
+So the floors are per-slot and its own doc says which: [`GROUND_CEILING`] for `black` (it must be
+*close* to the ground), a floor and a ceiling for `bright black` (real dim text), and
+[`TEXT_FLOOR`] for the other fourteen.
+
+**The wiring is deferred, with the reason recorded.** `canvas-terminal`'s `Cell` carries
+`fg: [f32; 3]` and its palette is a `const`, so switching it ripples through `Cell::default()` and the
+grid initialisation in a 12,000-line crate with daemon end-to-end tests — and at the time of writing,
+screen capture in this session was returning black, so the terminal's rendering could not be checked
+after the change. The `rgb` conversions exist to make that change mechanical; doing it blind and
+calling it done would be the fault this port keeps recording.
 
 ### Three of bezel's modules were already covered in substance
 

@@ -33,6 +33,7 @@ pub mod material;
 pub mod paint;
 pub mod palette;
 pub mod syntax;
+pub mod terminal;
 pub mod theme;
 pub mod typography;
 
