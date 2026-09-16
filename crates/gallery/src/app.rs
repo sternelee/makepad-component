@@ -19,6 +19,7 @@ use makepad_component::mp::{
     loaders::MpProgressWidgetRefExt,
     popover::MpPopoverWidgetRefExt,
     table::MpTableWidgetRefExt,
+    tree::{MpTreeWidgetRefExt, TreeItem},
     tooltip::MpTooltipWidgetRefExt,
     slider::MpSliderWidgetRefExt,
     switch::MpSwitchWidgetRefExt,
@@ -94,6 +95,7 @@ script_mod! {
                         rail_page_12 := RailRow{text: ""}
                         rail_page_13 := RailRow{text: ""}
                         rail_page_14 := RailRow{text: ""}
+                        rail_page_15 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -138,6 +140,7 @@ script_mod! {
                             page_12 := mod.gallery.pages.icon{}
                             page_13 := mod.gallery.pages.status{}
                             page_14 := mod.gallery.pages.table{}
+                            page_15 := mod.gallery.pages.tree{}
                         }
                     }
                 }
@@ -151,7 +154,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 15] = [
+const PAGE_SLOTS: [&[LiveId]; 16] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -167,10 +170,11 @@ const PAGE_SLOTS: [&[LiveId]; 15] = [
     ids!(page_12),
     ids!(page_13),
     ids!(page_14),
+    ids!(page_15),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 15] = [
+const RAIL_ROWS: [&[LiveId]; 16] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -186,6 +190,7 @@ const RAIL_ROWS: [&[LiveId]; 15] = [
     ids!(rail_page_12),
     ids!(rail_page_13),
     ids!(rail_page_14),
+    ids!(rail_page_15),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -232,6 +237,7 @@ impl MatchEvent for App {
         // screenshot rather than only after a drag.
         self.seed_readouts(cx);
         self.seed_tables(cx);
+        self.seed_trees(cx);
         // `GALLERY_TOOLTIP=1` pins the overlay open, anchored to the first
         // trigger. Same justification as `GALLERY_PAGE`: Makepad exposes no
         // accessibility tree, so a capture script cannot hover a button, and an
@@ -487,6 +493,56 @@ impl App {
         empty.set_rows(cx, Vec::new());
     }
 
+    /// Fill the tree page's trees.
+    ///
+    /// The collapsed state is set from Rust for the same reason the rows are: it
+    /// is data. A capture run cannot click a chevron — a synthetic pointer
+    /// produces no hit at all in this app — so a page that could only be
+    /// expanded by hand would show one state and assume the rest.
+    fn seed_trees(&mut self, cx: &mut Cx) {
+        let source = |label: &str, depth: usize| TreeItem::new(label, depth);
+
+        // A small repository tree: two directories, files and a nested one.
+        let repo = vec![
+            source("src/", 0),
+            source("tree.rs", 1),
+            source("table.rs", 1),
+            source("widgets/", 1),
+            source("button.rs", 2),
+            source("slider.rs", 2),
+            source("tests/", 0),
+            source("tree.rs", 1),
+        ];
+        self.ui.mp_tree(cx, ids!(full_tree)).set_items(cx, repo.clone());
+
+        // The same list with `src/` shut and `tests/` open: the second subtree
+        // must survive the first one's collapse.
+        let collapsed = self.ui.mp_tree(cx, ids!(collapsed_tree));
+        collapsed.set_items(cx, repo.clone());
+        collapsed.set_collapsed(cx, 0, true);
+
+        let deep = vec![
+            source("workspace", 0),
+            source("crates", 1),
+            source("ui", 2),
+            source("src", 3),
+            source("mp", 4),
+            source("tree.rs", 5),
+            source("table.rs", 5),
+            source("gallery", 3),
+            source("pages", 4),
+            source("tree.rs", 5),
+        ];
+        self.ui.mp_tree(cx, ids!(deep_tree)).set_items(cx, deep);
+
+        let long = vec![
+            source("a-very-long-directory-name-that-will-not-fit-in-its-row/", 0),
+            source("an-equally-long-file-name-inside-it-that-also-cannot-fit.rs", 1),
+            source("short.rs", 1),
+        ];
+        self.ui.mp_tree(cx, ids!(long_tree)).set_items(cx, long);
+    }
+
     /// Write each slider's starting value into its readout.
     fn seed_readouts(&mut self, cx: &mut Cx) {
         const PAIRS: [(&[LiveId], &[LiveId]); 7] = [
@@ -683,7 +739,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 15] = [
+    const SLOT_PAGES: [&str; 16] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -699,6 +755,7 @@ mod tests {
         "mod.gallery.pages.icon",
         "mod.gallery.pages.status",
         "mod.gallery.pages.table",
+        "mod.gallery.pages.tree",
     ];
 
     #[test]

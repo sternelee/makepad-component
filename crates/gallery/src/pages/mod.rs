@@ -18,6 +18,7 @@ pub mod loaders;
 pub mod slider;
 pub mod status;
 pub mod table;
+pub mod tree;
 pub mod motion;
 pub mod overlay;
 pub mod popover;
@@ -46,6 +47,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     icon::script_mod(vm);
     status::script_mod(vm);
     table::script_mod(vm);
+    tree::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -154,6 +156,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/table.rs",
         blurb: "Columns, rows, and row selection",
     },
+    Page {
+        title: "Tree",
+        path: "mod.gallery.pages.tree",
+        source: "crates/gallery/src/pages/tree.rs",
+        blurb: "A flat list with a hierarchy",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -229,6 +237,7 @@ mod tests {
             ("crates/gallery/src/pages/icon.rs", "icon"),
             ("crates/gallery/src/pages/status.rs", "status"),
             ("crates/gallery/src/pages/table.rs", "table"),
+            ("crates/gallery/src/pages/tree.rs", "tree"),
         ]
         .into_iter()
         .collect();

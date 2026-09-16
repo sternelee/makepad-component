@@ -142,6 +142,7 @@ build on).
 | `mp/icon.rs` | `MpIcon` — a glyph from Makepad's bundled FontAwesome, sized from the control ladder. The smallest component and the one most others want. |
 | `mp/status.rs` | `MpBadge`, `MpTag` — six tones, two assembled looks from one shader. A badge reports, a tag classifies. |
 | `mp/table.rs` | `MpTable` — columns, rows, row hover and selection. One widget rather than one per cell, with the layout arithmetic in a single function the painter, the hover and the click all read. |
+| `mp/tree.rs` | `MpTree` — a flat list where each item carries its depth, with the collapsed set owned by the widget. Ten tests, all on the visibility model. |
 
 ### The third instance of one fault: a self-painted widget has nothing to size it
 
