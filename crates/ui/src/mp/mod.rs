@@ -41,6 +41,7 @@ pub mod avatar;
 pub mod button;
 pub mod checkbox;
 pub mod control;
+pub mod feedback;
 pub mod icon;
 pub mod input;
 pub mod layout;
@@ -79,6 +80,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::loaders::script_mod(vm);
     crate::mp::input::script_mod(vm);
     crate::mp::icon::script_mod(vm);
+    crate::mp::feedback::script_mod(vm);
     crate::mp::status::script_mod(vm);
     crate::mp::table::script_mod(vm);
     // After `status`: the avatar names `mod.mp.StatusTone` for its presence dot,

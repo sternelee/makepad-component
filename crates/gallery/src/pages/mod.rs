@@ -11,6 +11,7 @@
 pub mod avatar;
 pub mod button;
 pub mod controls;
+pub mod feedback;
 pub mod foundation;
 pub mod icon;
 pub mod input;
@@ -56,6 +57,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     surface::script_mod(vm);
     list::script_mod(vm);
     select::script_mod(vm);
+    feedback::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -194,6 +196,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/select.rs",
         blurb: "A face, a panel and the wiring between",
     },
+    Page {
+        title: "Feedback",
+        path: "mod.gallery.pages.feedback",
+        source: "crates/gallery/src/pages/feedback.rs",
+        blurb: "The ring and the skeleton",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -274,6 +282,7 @@ mod tests {
             ("crates/gallery/src/pages/surface.rs", "surface"),
             ("crates/gallery/src/pages/list.rs", "list"),
             ("crates/gallery/src/pages/select.rs", "select"),
+            ("crates/gallery/src/pages/feedback.rs", "feedback"),
         ]
         .into_iter()
         .collect();

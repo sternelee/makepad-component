@@ -16,6 +16,7 @@ use makepad_component::mp::{
     button::{MpButtonStyle, MpButtonWidgetRefExt},
     checkbox::MpCheckboxWidgetRefExt,
     radio::MpRadioWidgetRefExt,
+    feedback::MpProgressRingWidgetRefExt,
     loaders::MpProgressWidgetRefExt,
     popover::MpPopoverWidgetRefExt,
     list::{ListItem, MpListWidgetRefExt},
@@ -102,6 +103,7 @@ script_mod! {
                         rail_page_17 := RailRow{text: ""}
                         rail_page_18 := RailRow{text: ""}
                         rail_page_19 := RailRow{text: ""}
+                        rail_page_20 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -151,6 +153,7 @@ script_mod! {
                             page_17 := mod.gallery.pages.surface{}
                             page_18 := mod.gallery.pages.list{}
                             page_19 := mod.gallery.pages.select{}
+                            page_20 := mod.gallery.pages.feedback{}
                         }
                     }
                 }
@@ -164,7 +167,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 20] = [
+const PAGE_SLOTS: [&[LiveId]; 21] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -185,10 +188,11 @@ const PAGE_SLOTS: [&[LiveId]; 20] = [
     ids!(page_17),
     ids!(page_18),
     ids!(page_19),
+    ids!(page_20),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 20] = [
+const RAIL_ROWS: [&[LiveId]; 21] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -209,6 +213,7 @@ const RAIL_ROWS: [&[LiveId]; 20] = [
     ids!(rail_page_17),
     ids!(rail_page_18),
     ids!(rail_page_19),
+    ids!(rail_page_20),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -225,6 +230,17 @@ pub struct App {
     /// Whether to open the first popover on the first laid-out event.
     #[rust]
     want_popover: bool,
+    /// Whether the pages' data has been installed yet.
+    ///
+    /// **Not in `handle_startup`.** `Theme::install` calls
+    /// `request_script_reapply()`, and the re-apply that follows re-asserts every
+    /// widget's DSL and **wipes any `#[live]` field a Rust setter has written**.
+    /// Seeding in startup therefore looked like it worked and left every value at
+    /// its declared default — a ring at 0, a slider at whatever its DSL said —
+    /// with no error anywhere. Doing it on the first event puts it after the
+    /// apply has settled.
+    #[rust]
+    seeded: bool,
     /// Whether to pin the overlay open on the first event.
     ///
     /// A flag rather than a call in `handle_startup`, because startup runs
@@ -253,12 +269,7 @@ impl MatchEvent for App {
         // so the page shows the value path working before anyone touches it —
         // and so a slider whose value never reaches its readout is visible in a
         // screenshot rather than only after a drag.
-        self.seed_readouts(cx);
-        self.seed_tables(cx);
-        self.seed_trees(cx);
-        self.seed_avatars(cx);
-        self.seed_lists(cx);
-        self.seed_selects(cx);
+
         // `GALLERY_TOOLTIP=1` pins the overlay open, anchored to the first
         // trigger. Same justification as `GALLERY_PAGE`: Makepad exposes no
         // accessibility tree, so a capture script cannot hover a button, and an
@@ -482,6 +493,20 @@ impl App {
                 self.ui.mp_popover(cx, panel).open_for(cx, area);
             }
         }
+    }
+
+    /// Install every page's data.
+    ///
+    /// Called once, on the first event — see `App::seeded` for why it cannot be
+    /// `handle_startup`.
+    fn seed_all(&mut self, cx: &mut Cx) {
+        self.seed_readouts(cx);
+        self.seed_tables(cx);
+        self.seed_trees(cx);
+        self.seed_avatars(cx);
+        self.seed_lists(cx);
+        self.seed_selects(cx);
+        self.seed_feedback(cx);
     }
 
     /// Fill the table page's tables.
@@ -723,6 +748,24 @@ impl App {
             .set_text(cx, "chose eu-west-1 (option 2)");
     }
 
+    /// Set the feedback page's ring values, and its one live one.
+    fn seed_feedback(&mut self, cx: &mut Cx) {
+        for (path, value) in [
+            (ids!(ring_0), 0.0),
+            (ids!(ring_25), 0.25),
+            (ids!(ring_50), 0.5),
+            (ids!(ring_75), 0.75),
+            (ids!(ring_90), 0.9),
+            (ids!(ring_100), 1.0),
+            (ids!(ring_small), 0.66),
+            (ids!(ring_regular), 0.66),
+            (ids!(ring_large), 0.66),
+            (ids!(ring_row), 0.42),
+        ] {
+            self.ui.mp_progress_ring(cx, path).set_value(cx, value);
+        }
+    }
+
     /// Write each slider's starting value into its readout.
     fn seed_readouts(&mut self, cx: &mut Cx) {
         const PAIRS: [(&[LiveId], &[LiveId]); 7] = [
@@ -873,6 +916,10 @@ impl AppMain for App {
         // conclusion drawn from it was about a widget that had not been asked to
         // do anything.
         self.pin_popover(cx);
+        if !self.seeded {
+            self.seeded = true;
+            self.seed_all(cx);
+        }
         self.match_event(cx, event);
         // Tab and Shift-Tab traversal. Makepad has a single key-focus area on
         // `Cx` and no traversal, so the app owns the pass.
@@ -919,7 +966,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 20] = [
+    const SLOT_PAGES: [&str; 21] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -940,6 +987,7 @@ mod tests {
         "mod.gallery.pages.surface",
         "mod.gallery.pages.list",
         "mod.gallery.pages.select",
+        "mod.gallery.pages.feedback",
     ];
 
     #[test]
