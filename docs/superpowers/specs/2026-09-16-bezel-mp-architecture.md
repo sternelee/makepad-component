@@ -150,6 +150,48 @@ build on).
 | `mp/search.rs` | `rank` / `matches` / `MpSearch` — the match behind a command palette. |
 | `mp/bars.rs` | `MpTitlebar`, `MpControlBar`, `MpMenubar` — the three horizontal chrome strips. |
 | `mp/palette.rs` | `remap` / `step` / `original` / `MpPalette` — the query, the list, and the cursor. |
+| `mp/segmented.rs` | `slot_at` / `slot_span` / `valid` / `MpSegmented` — the track and the plate. |
+
+### A widget that must exist rather than be composed, and the two bugs its first render showed
+
+`MpSegmented` cannot be a composition the way `MpPopover` is. A segmented control's
+whole visual identity is that the segments are **adjacent** — one rounded track with a
+plate inside it — and three independent buttons have three rounded outlines with gaps
+between them. The Bars page had been using exactly that as a stated interim, and said
+in the page that it was one. This module replaced it.
+
+Its two pure functions are the hit test and the plate, and they have to describe the
+same slots, so the test that matters is that they **agree at every boundary**. Both
+were written before their guards, which paid off twice:
+
+1. **The NaN guard covered the position and not the box.** A `NaN` width passes
+   `width <= 0.0` (every comparison against NaN is false) and passes `x >= width`, so
+   the whole guard was skipped, `slot_w` became NaN, and `NaN.floor() as usize`
+   **saturates to 0** — a control whose layout had not settled reported a hit on slot 0
+   for any pointer position, including one outside it. The test was written first; the
+   guard was not.
+
+2. **The font size was written instead of read.** `MpSegmented` declares
+   `text_style: mod.mpc.type.body` and `MpSegmentedSmall` overrides it to `caption`,
+   and the first `draw_walk` assigned the Body size over the top of whatever the DSL had
+   chosen — so the small variant drew at the body size *and* the width estimate used a
+   different number than the paint. Reading `self.draw_label.text_style.font_size` back
+   fixes both at once, and it is the same rule `mp/pagination.rs` states: set the drawn
+   size from the rung the arithmetic uses, so the two cannot disagree.
+
+That second bug is the one a screenshot found and no log did: the control's box came
+out too narrow, so the Bars toolbar drew `Preview` as **`Previ`**.
+
+### The measurement is a heuristic, and one control has to pay for it
+
+`mp/text.rs::width` is a base advance with narrow and wide corrections — an estimate.
+It is good enough where this crate has used it so far, because a table cell or a
+pagination digit is clipped or centred by it and an error of a point is invisible. A
+segmented control is different: the estimate **is** the box, so an underestimate makes
+the last label overflow and be clipped. `SLOT_PAD_X` therefore carries the
+measurement's error margin as well as the label's air, and says so. A real text
+measurement would let it be chosen for the air alone; Makepad exposes one only
+internally, in the HUD.
 
 ### A cursor held as a position is wrong
 

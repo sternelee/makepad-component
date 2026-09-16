@@ -28,6 +28,7 @@ use makepad_component::mp::{
     tree::{MpTreeWidgetRefExt, TreeItem},
     tooltip::MpTooltipWidgetRefExt,
     slider::MpSliderWidgetRefExt,
+    segmented::MpSegmentedWidgetRefExt,
     switch::MpSwitchWidgetRefExt,
 };
 
@@ -372,6 +373,7 @@ impl MatchEvent for App {
         self.handle_popovers(cx, actions);
         self.handle_controls(cx, actions);
         self.handle_sliders(cx, actions);
+        self.handle_segmented(cx, actions);
         self.handle_palette(cx, actions);
         self.handle_input(cx, actions);
     }
@@ -497,6 +499,31 @@ impl App {
         }
     }
 
+    /// Report a segmented control's selection, so the page proves the action path
+    /// rather than only the paint.
+    fn handle_segmented(&mut self, cx: &mut Cx, actions: &Actions) {
+        for (path, name) in [
+            (ids!(view_mode), "view mode"),
+            (ids!(seg_wide), "wide"),
+            (ids!(seg_small), "small"),
+        ] {
+            if let Some(index) = self.ui.mp_segmented(cx, path).selected(actions) {
+                println!("SEGMENTED {name} -> {index}");
+                if name == "wide" {
+                    let label = self
+                        .ui
+                        .mp_segmented(cx, path)
+                        .borrow()
+                        .and_then(|inner| inner.segments().get(index).cloned())
+                        .unwrap_or_default();
+                    self.ui
+                        .label(cx, ids!(seg_readout))
+                        .set_text(cx, &format!("Selected({index}) = {label:?}"));
+                }
+            }
+        }
+    }
+
     /// Re-rank the palette, remap the cursor, and select it.
     ///
     /// The single place the palette's state changes — the `changed` handler and the
@@ -536,6 +563,26 @@ impl App {
             "PALETTE query={query:?} ranked={names:?} cursor_pos={position:?} active_original={:?}",
             self.palette_active
         );
+    }
+
+    /// Fill every segmented control on the pages that have one.
+    ///
+    /// Segments come from Rust, like `MpList`'s rows: a list of labels is not
+    /// expressible as a DSL literal.
+    fn seed_segmented(&mut self, cx: &mut Cx) {
+        let labels = |names: &[&str]| names.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        self.ui
+            .mp_segmented(cx, ids!(view_mode))
+            .set_segments(cx, labels(&["Source", "Split", "Preview"]));
+        self.ui.mp_segmented(cx, ids!(view_mode)).set_active(cx, Some(1));
+        self.ui
+            .mp_segmented(cx, ids!(seg_wide))
+            .set_segments(cx, labels(&["Day", "Week", "Month", "Year"]));
+        self.ui.mp_segmented(cx, ids!(seg_wide)).set_active(cx, Some(2));
+        self.ui
+            .mp_segmented(cx, ids!(seg_small))
+            .set_segments(cx, labels(&["On", "Off"]));
+        self.ui.mp_segmented(cx, ids!(seg_small)).set_active(cx, Some(0));
     }
 
     /// Fill the palette and, if asked, drive it from the environment.
@@ -729,6 +776,7 @@ impl App {
         self.seed_menus(cx);
         self.seed_search(cx);
         self.seed_palette(cx);
+        self.seed_segmented(cx);
     }
 
     /// Fill the table page's tables.

@@ -108,5 +108,18 @@ script_mod! {
                 mod.mp.MpSwitchSmall{}
             }
         }
+
+        View{
+            width: Fill, height: Fit, flow: Down, spacing: 10
+
+            Caption{ text: "Segmented — one of a few adjacent choices. The segments are not child widgets, so the slot under the pointer is arithmetic on the box, and the same arithmetic places the plate. Both are one tested function, and the test that matters is that the hit test and the span agree at every boundary" }
+            Row{
+                seg_small := mod.mp.MpSegmentedSmall{}
+                seg_wide := mod.mp.MpSegmented{}
+            }
+            Row{
+                seg_readout := Readout{}
+            }
+        }
     }
 }

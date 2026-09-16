@@ -82,15 +82,11 @@ script_mod! {
                 }
                 mod.mp.MpControlBar{
                     draw_bg +: {color: surface}
-                    // No segmented control exists in the library yet, so this is
-                    // the honest interim: three ghost buttons with the active one
-                    // promoted. Recorded rather than hidden, because a reader
-                    // looking for a segmented control should find a note saying
-                    // there is not one rather than a shape that looks like one.
                     controlbar_leading := mod.mp.Row{
-                        mod.mp.MpButtonSmall{style: mod.mp.ButtonStyle.Ghost, text: "Source"}
-                        mod.mp.MpButtonSmall{style: mod.mp.ButtonStyle.Prominent, text: "Split"}
-                        mod.mp.MpButtonSmall{style: mod.mp.ButtonStyle.Ghost, text: "Preview"}
+                        // This was three ghost buttons with the active one promoted,
+                        // because the library had no segmented control and the page
+                        // said so. `mp/segmented.rs` is that interim replaced.
+                        view_mode := mod.mp.MpSegmentedSmall{}
                     }
                     controlbar_trailing := mod.mp.Row{
                         mod.mp.MpTextInputSearch{
