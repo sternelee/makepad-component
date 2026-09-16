@@ -1469,6 +1469,76 @@ use makepad_component::mp::hover_card::HoverIntent;
             .set_highlighted(cx, &written, &[]);
     }
 
+    /// **The primitive phase 6 needs, proven at runtime.**
+    ///
+    /// The A2UI renderer builds widgets **from Rust** into a pool, because how many a surface needs is not known when
+    /// the DSL is written. That was recorded as the thing making a v3 port *architectural* — you would have to
+    /// instantiate a `script_mod!` widget dynamically, which was assumed not to exist.
+    ///
+    /// It exists, and this is it:
+    ///
+    /// - `cx.with_vm(T::script_new_with_default)` — a widget from Rust with its type's defaults, no DSL declaration
+    /// - `script_apply_eval!(cx, value, { ... })` — apply DSL properties to it
+    /// - `T::script_from_value(vm, vm.bx.heap.value(vm.module(id!(widgets)), id, NoTrap))` — a widget from a
+    ///   `script_mod!` **prototype by id** (the A2UI surface's `new_from_mod`)
+    ///
+    /// All three were already used by the renderer against **v2** widgets. What was never checked is whether a **v3**
+    /// (`mp`) widget answers the same three calls. So this checks it, and reads a value back through a public getter:
+    /// a property applied in script that comes back out in Rust is the whole path — instantiation, script
+    /// application, and the value landing.
+    ///
+    /// A `Cx` is needed for all of it, so this cannot be a unit test; it runs in the app and prints, which is why the
+    /// gate is the run's own output and not the green build.
+    fn seed_v3_pool(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::button::{MpButton, MpButtonStyle};
+
+        // (1) From Rust, with the type's defaults — no DSL declaration anywhere.
+        let mut button = cx.with_vm(MpButton::script_new_with_default);
+        // (2) A DSL property applied to it, including an enum from the shared `mod.mp` module.
+        script_apply_eval!(cx, button, {
+            style: mod.mp.ButtonStyle.Ghost
+            text: "from rust"
+        });
+        // (3) Read back through the public getter: if the script application had silently done nothing, this is
+        // where it shows, because the default is `Default` and not `Ghost`.
+        let landed = button.style() == MpButtonStyle::Ghost;
+        println!(
+            "V3POOL script_new_with_default=MpButton ok=true style_applied_from_script={landed} style={:?}",
+            button.style()
+        );
+
+        // And the same widget from a `script_mod!` prototype by id, which is the other half: `mp` widgets are
+        // registered under `mod.mp`, not `mod.widgets`, so the module has to be named.
+        let from_mod: Option<MpButton> = cx.with_vm(|vm| {
+            let mp = vm.module(id!(mp));
+            let value = vm.bx.heap.value(mp, id!(MpButton).into(), NoTrap);
+            if value.is_err() {
+                return None;
+            }
+            Some(MpButton::script_from_value(vm, value))
+        });
+        match from_mod {
+            Some(button) => println!(
+                "V3POOL instantiate_from_prototype mod.mp.MpButton ok=true style={:?}",
+                button.style()
+            ),
+            None => println!("V3POOL instantiate_from_prototype mod.mp.Button ok=false"),
+        }
+
+        // A second widget, and a different kind: a `#[live]` numeric property read back on a widget that is not a
+        // button. One widget working could be that widget's quirk.
+        let mut slider = cx.with_vm(makepad_component::mp::slider::MpSlider::script_new_with_default);
+        script_apply_eval!(cx, slider, {
+            min: 5.0
+            max: 25.0
+        });
+        println!(
+            "V3POOL script_new_with_default=MpSlider ok=true min={} max={}",
+            slider.min(),
+            slider.max()
+        );
+    }
+
     /// Parse a ```chart fence and drive a real plot with what it produced.
     ///
     /// The **fence drives the plot**, which is the whole point of the seam: the block returns series and the page
@@ -2026,6 +2096,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_v3_pool(cx);
         self.seed_canvas(cx);
         self.seed_blocks(cx);
     }
