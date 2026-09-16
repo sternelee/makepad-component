@@ -34,6 +34,8 @@
 //! does not would serialize to a jump the parser refuses to read back, and the fixed point would
 //! break. [`Doc::is_well_formed`] is the check, and the round-trip test runs it on every result.
 
+pub mod layout;
+
 use std::ops::Range;
 
 /// A markdown document: blocks in document order.

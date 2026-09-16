@@ -503,6 +503,32 @@ marks on overlapping ranges and both must survive — and the first version of t
 dropping**, which made the wrong behaviour look intended. `Text::normalize` keeps every nesting now,
 and the doc says why the two contracts differ.
 
+### The layout, because it is the half that can be verified
+
+`markdown`'s paint half is 2041 lines of element building, and **visual verification became
+unavailable this session** — `screencapture` stopped producing files entirely (`could not create image
+from rect`). Painting 2000 lines that cannot be looked at would be exactly the unverifiable work this
+port keeps recording, so the **layout** went first instead: line breaking, block positions, the caret
+and hit testing are pure arithmetic on a `Doc` and a `Metrics`, and a document's layout is where its
+faults actually are.
+
+Three decisions in it, each with a test:
+
+- **The width estimate errs high, on purpose.** A character is `advance`, doubled for the full-width
+  ranges. There is deliberately **no narrow correction**, so a line of `i` and `l` wraps earlier than it
+  has to — because the lesson `mp/text.rs` paid for twice is that an estimate coming out *under* puts
+  content past the edge it was laid out to, while one coming out *over* leaves a little air.
+- **A fence is not rewrapped.** Rewrapping code changes what the reader reads, so a code block's lines
+  are its own newlines however wide they are, and the paint half clips instead.
+- **A click in the gap between two blocks belongs to the block above it**, which is what an editor does
+  and what this module's own doc said — the first version tested `y < block.y + block.height` and
+  therefore fell through to the *next* block, so the doc was a lie. The test caught it.
+
+The strongest test is a **round-trip through the caret**: for every character boundary in a
+multi-block document, the point the caret is drawn at must hit-test back to that same offset. That is
+the property that ties the two halves together, and the fault it prevents — clicking where the caret is
+drawn puts it somewhere else — is the one a reader notices most.
+
 **What is not built:** `markdown`'s paint half. bezel's `render.rs` is 2041 lines of gpui element
 building, and this port has the model but no renderer — so the gallery has **no page for this crate
 yet**, because there is nothing to paint. That is stated rather than papered over with a page showing
