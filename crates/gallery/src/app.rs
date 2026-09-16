@@ -19,6 +19,7 @@ use makepad_component::mp::{
     feedback::MpProgressRingWidgetRefExt,
     loaders::MpProgressWidgetRefExt,
     popover::MpPopoverWidgetRefExt,
+    pagination::MpPaginationWidgetRefExt,
     scaffolding::MpKbdWidgetRefExt,
     list::{ListItem, MpListWidgetRefExt},
     table::MpTableWidgetRefExt,
@@ -106,6 +107,7 @@ script_mod! {
                         rail_page_19 := RailRow{text: ""}
                         rail_page_20 := RailRow{text: ""}
                         rail_page_21 := RailRow{text: ""}
+                        rail_page_22 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -157,6 +159,7 @@ script_mod! {
                             page_19 := mod.gallery.pages.select{}
                             page_20 := mod.gallery.pages.feedback{}
                             page_21 := mod.gallery.pages.content{}
+                            page_22 := mod.gallery.pages.pagination{}
                         }
                     }
                 }
@@ -170,7 +173,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 22] = [
+const PAGE_SLOTS: [&[LiveId]; 23] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -193,10 +196,11 @@ const PAGE_SLOTS: [&[LiveId]; 22] = [
     ids!(page_19),
     ids!(page_20),
     ids!(page_21),
+    ids!(page_22),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 22] = [
+const RAIL_ROWS: [&[LiveId]; 23] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -219,6 +223,7 @@ const RAIL_ROWS: [&[LiveId]; 22] = [
     ids!(rail_page_19),
     ids!(rail_page_20),
     ids!(rail_page_21),
+    ids!(rail_page_22),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -524,6 +529,7 @@ impl App {
         self.seed_selects(cx);
         self.seed_feedback(cx);
         self.seed_content(cx);
+        self.seed_pagination(cx);
     }
 
     /// Fill the table page's tables.
@@ -805,6 +811,27 @@ impl App {
             );
     }
 
+    /// Set the pagination page's four cases.
+    ///
+    /// From Rust, and that is deliberate: it exercises the setter path for a
+    /// `#[live]`-declared field, which is the property
+    /// `MpProgressRing` was found not to honour. A pagination whose page cannot be
+    /// set from Rust would render its DSL page and look correct.
+    fn seed_pagination(&mut self, cx: &mut Cx) {
+        for (path, page, total, siblings) in [
+            (ids!(pag_short), 3, 5, 1),
+            (ids!(pag_first), 1, 20, 1),
+            (ids!(pag_middle), 10, 20, 1),
+            (ids!(pag_last), 20, 20, 1),
+            (ids!(pag_wide), 10, 40, 2),
+        ] {
+            let p = self.ui.mp_pagination(cx, path);
+            p.set_total(cx, total);
+            p.set_page(cx, page);
+            let _ = siblings;
+        }
+    }
+
     /// Write each slider's starting value into its readout.
     fn seed_readouts(&mut self, cx: &mut Cx) {
         const PAIRS: [(&[LiveId], &[LiveId]); 7] = [
@@ -1005,7 +1032,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 22] = [
+    const SLOT_PAGES: [&str; 23] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -1028,6 +1055,7 @@ mod tests {
         "mod.gallery.pages.select",
         "mod.gallery.pages.feedback",
         "mod.gallery.pages.content",
+        "mod.gallery.pages.pagination",
     ];
 
     #[test]

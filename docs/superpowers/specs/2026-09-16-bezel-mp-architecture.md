@@ -148,6 +148,23 @@ build on).
 | `mp/list.rs` | `MpList` — a glyph, a label and a trailing detail. The third data widget and the simplest. |
 | `mp/feedback.rs` | `MpProgressRing`, `MpSkeleton` — the determinate ring and the shape of content that has not arrived. |
 | `mp/scaffolding.rs` | `MpGroupBox`, `MpGroupBoxPlain`, `MpKbd` — a titled card, and a key cap. |
+| `mp/pagination.rs` | `MpPagination` — **the arithmetic is tested and the row renders; the page numbers do not draw.** See below. |
+
+### The second self-painted row whose digits do not draw, and a coincidence
+
+`MpPagination` renders its plates and its current-page wash at the right widths
+and positions, and no numbers. Ruled out: the text is not off-screen, the colour
+is visible, the label is non-empty, and the same `draw_abs`-outside-the-turtle
+pattern renders in `mp/table.rs`. Setting the font size from Rust rather than
+relying on the DSL changed nothing.
+
+Two candidates are recorded in the module doc. The second is the one worth the next
+session's attention: **`MpPagination` and `MpProgressRing` are the only two widgets
+in the crate that never capture an `Area`**, and both have a fault no other widget
+has — a row that does not paint its text, and a `#[live]` write that was lost.
+That is the first shared property anyone has found between the ring's fault and
+anything else, and it is a one-experiment question: give the ring an `Area` and see
+whether its `#[live]` write survives.
 
 ### An `#[live]` field lost a Rust write, and the cause is still unknown
 

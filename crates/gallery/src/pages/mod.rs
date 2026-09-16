@@ -27,6 +27,7 @@ pub mod table;
 pub mod tree;
 pub mod motion;
 pub mod overlay;
+pub mod pagination;
 pub mod popover;
 
 use makepad_widgets::*;
@@ -60,6 +61,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     select::script_mod(vm);
     feedback::script_mod(vm);
     content::script_mod(vm);
+    pagination::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -210,6 +212,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/content.rs",
         blurb: "Group boxes and key caps",
     },
+    Page {
+        title: "Pagination",
+        path: "mod.gallery.pages.pagination",
+        source: "crates/gallery/src/pages/pagination.rs",
+        blurb: "One function, four cases",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -292,6 +300,7 @@ mod tests {
             ("crates/gallery/src/pages/select.rs", "select"),
             ("crates/gallery/src/pages/feedback.rs", "feedback"),
             ("crates/gallery/src/pages/content.rs", "content"),
+            ("crates/gallery/src/pages/pagination.rs", "pagination"),
         ]
         .into_iter()
         .collect();
