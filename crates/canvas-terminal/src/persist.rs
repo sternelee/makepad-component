@@ -70,6 +70,10 @@ pub enum SavedItem {
         body: String,
         font_size: f32,
         color_idx: usize,
+        /// Wall-clock ms of the last edit. Absent in canvases saved before the
+        /// note cards carried an "edited …" stamp.
+        #[serde(default)]
+        edited_ms: i64,
         rect: SavedRect,
     },
     Terminal {
@@ -345,6 +349,7 @@ mod tests {
                         body: "body".into(),
                         font_size: 13.0,
                         color_idx: 2,
+                        edited_ms: 1_773_329_520_000,
                         rect,
                     },
                     SavedItem::Terminal {

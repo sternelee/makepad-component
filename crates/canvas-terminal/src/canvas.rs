@@ -9,7 +9,66 @@ use crate::command::{self, Command};
 use crate::items::{
     path_file_name, AgentStatus, CanvasItem, DrawnShape, ItemKind, MediaKind, NoteShape, NoteTool,
 };
+use crate::note::{BlockKind, InlineStyle};
 use crate::terminal::state::{Cell, DEFAULT_BG};
+
+/// The source line of the checklist hit area containing `point` on card `id`.
+///
+/// Split out of the click handler so the lookup is testable without a window:
+/// the areas are published by the draw pass (see `CanvasPanel::note_check_rows`).
+fn note_check_line_at(rows: &[(u64, Rect, usize)], id: u64, point: Vec2d) -> Option<usize> {
+    rows.iter()
+        .find(|(row_id, rect, _)| *row_id == id && rect.contains(point))
+        .map(|(_, _, line)| *line)
+}
+
+/// One laid-out row of a note body: a source char range plus its measured runs.
+///
+/// Produced by [`CanvasPanel::note_rows`] and consumed by
+/// [`CanvasPanel::draw_note_row`] and the caret/checkbox hit-tests.
+struct NoteRow {
+    kind: BlockKind,
+    /// Card this row belongs to (checkbox hit areas are published per item).
+    item_id: u64,
+    /// Left edge of the row's text column (the card body's x).
+    x: f64,
+    /// Top of the row's line box.
+    y: f64,
+    /// Line box height; the text is centred in it.
+    height: f64,
+    /// Height of the face's ascender-to-descender box at this row's scale.
+    text_h: f64,
+    /// Face scale (relative to the 13pt note base) this row was measured at.
+    /// Drawing has to use the same value or the glyphs and the reserved
+    /// advance disagree — which is what left gaps after a heading.
+    scale: f32,
+    /// Hanging indent: the text starts this far right of `x`.
+    indent: f64,
+    /// Width available to the text column.
+    width: f64,
+    segments: Vec<NoteSegment>,
+    /// Char range of this row in the source, for caret mapping.
+    char_start: usize,
+    char_end: usize,
+    /// Source line, for checklist toggling.
+    src_line: usize,
+    /// First row of its block: where bullet/box/quote-bar chrome draws.
+    first: bool,
+}
+
+/// A measured run inside a note row.
+struct NoteSegment {
+    text: String,
+    style: InlineStyle,
+    /// x offset from the row's text column origin.
+    x: f64,
+    /// Measured advance of `text` (spaces included).
+    w: f64,
+    /// Char index of the run's first char in the source.
+    char_start: usize,
+    /// Trailing spaces trimmed from `text`; they still occupy caret space.
+    trailing: usize,
+}
 
 /// Grid spacing in world units.
 const GRID_SIZE: f64 = 24.0;
@@ -449,6 +508,14 @@ pub struct CanvasPanel {
     draw_cell_bg: DrawColor,
     #[live]
     draw_cell_text: DrawText,
+    /// Note body text: the regular face. The body used to borrow `draw_title`,
+    /// the bold title face, which left inline bold with nothing to stand out
+    /// against.
+    #[live]
+    draw_note_text: DrawText,
+    /// Note body italics (`*emphasis*`).
+    #[live]
+    draw_note_italic: DrawText,
     /// Measured mono cell (`advance`, line box) in logical px at zoom 1;
     /// `None` until the first draw pass measures `draw_cell_text`'s face.
     #[rust]
@@ -456,6 +523,11 @@ pub struct CanvasPanel {
     /// Cache key for `cell_metrics` (font size + dpi factor).
     #[rust]
     cell_metrics_key: Option<(u32, u64)>,
+    /// Checkbox hit areas from the last draw pass: (item id, screen rect, source
+    /// line). A click has no `Cx2d`, and measuring a row needs one, so the draw
+    /// pass publishes the geometry the click handler reads back.
+    #[rust]
+    note_check_rows: Vec<(u64, Rect, usize)>,
     /// Shrink factor for fallback glyphs wider than their cell, keyed by
     /// `(char, cells)` — 1.0 when the glyph already fits.
     #[rust]
@@ -900,6 +972,55 @@ impl CanvasPanel {
         None
     }
 
+    /// Source line of the checklist row under `point` on card `id`, if any.
+    /// Reads the hit areas the last draw pass published.
+    fn note_check_hit(&self, id: u64, point: Vec2d) -> Option<usize> {
+        note_check_line_at(&self.note_check_rows, id, point)
+    }
+
+    /// Replace a note's body from a canvas interaction (a checklist click, or an
+    /// inline edit committing) and keep the hidden editor, the edit stamp and
+    /// the saved canvas in step.
+    fn set_note_body(&mut self, cx: &mut Cx, id: u64, body: String) {
+        let mut changed = false;
+        if let Some(item) = self.items.iter_mut().find(|i| i.id() == id) {
+            if let Some(current) = item.body_mut() {
+                if *current != body {
+                    *current = body.clone();
+                    item.set_edited_now();
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            return;
+        }
+        if self.note_edit_id == Some(id) {
+            // The hidden editor owns IME and caret state while a note is open,
+            // so it has to see the same text.
+            let caret = self.note_edit_caret.min(body.chars().count());
+            let byte_index = body
+                .char_indices()
+                .nth(caret)
+                .map(|(i, _)| i)
+                .unwrap_or(body.len());
+            self.note_edit_buffer = body.clone();
+            self.note_edit_caret = caret;
+            let editor = self.view.text_input(cx, ids!(note_editor));
+            editor.set_text(cx, &body);
+            editor.set_cursor(
+                cx,
+                makepad_widgets::makepad_draw::text::selection::Cursor {
+                    index: byte_index,
+                    prefer_next_row: false,
+                },
+                false,
+            );
+        }
+        self.save_canvas();
+        self.redraw(cx);
+    }
+
     /// Enter inline-edit mode for the note `id`.
     fn start_note_edit(&mut self, cx: &mut Cx, id: u64) {
         if let Some(item) = self.items.iter().find(|i| i.id() == id) {
@@ -935,7 +1056,6 @@ impl CanvasPanel {
     /// Commit the inline edit buffer back to the note and exit edit mode.
     fn finish_note_edit(&mut self, cx: &mut Cx) {
         self.note_focus_repair = false;
-        self.save_canvas();
         if let Some(id) = self.note_edit_id.take() {
             // Prefer the hidden editor's text so the final IME composition is
             // captured; fall back to the cached buffer if the editor is gone.
@@ -950,11 +1070,10 @@ impl CanvasPanel {
             };
             self.note_edit_buffer.clear();
             self.note_edit_caret = 0;
-            if let Some(item) = self.items.iter_mut().find(|i| i.id() == id) {
-                if let Some(body) = item.body_mut() {
-                    *body = buffer;
-                }
-            }
+            // Write through `set_note_body` so the commit is stamped and saved:
+            // this used to save *before* writing the buffer, so the last edit
+            // only reached disk if something else saved later.
+            self.set_note_body(cx, id, buffer);
             // Release the hidden editor and return focus to the command bar
             // without changing the current selection.
             self.view.text_input(cx, ids!(note_editor)).set_text(cx, "");
@@ -970,6 +1089,7 @@ impl CanvasPanel {
                     ),
                 )
                 .set_key_focus(cx);
+            self.save_canvas();
             self.redraw(cx);
         }
     }
@@ -1010,6 +1130,7 @@ impl CanvasPanel {
             body: "Double-click to edit this note.\nUse the right panel to style it.".to_string(),
             font_size: 13.0,
             color_idx: 0,
+            edited_ms: crate::items::now_ms(),
         };
         self.next_item_id += 1;
         self.items.push(item);
@@ -1252,6 +1373,7 @@ impl CanvasPanel {
                     body,
                     font_size,
                     color_idx,
+                    edited_ms,
                     world: _,
                     ..
                 } => Some(crate::persist::SavedItem::Note {
@@ -1259,6 +1381,7 @@ impl CanvasPanel {
                     body: body.clone(),
                     font_size: *font_size,
                     color_idx: *color_idx,
+                    edited_ms: *edited_ms,
                     rect: to_rect(item),
                 }),
                 CanvasItem::Terminal {
@@ -1456,6 +1579,7 @@ impl CanvasPanel {
                     body,
                     font_size,
                     color_idx,
+                    edited_ms,
                     rect,
                 } => {
                     let world = to_world(rect);
@@ -1468,6 +1592,7 @@ impl CanvasPanel {
                         body: body.clone(),
                         font_size: *font_size,
                         color_idx: *color_idx,
+                        edited_ms: *edited_ms,
                     });
                 }
                 crate::persist::SavedItem::Browser { title, url, rect } => {
@@ -2502,6 +2627,7 @@ impl CanvasPanel {
                     body: extra,
                     font_size: 13.0,
                     color_idx: 0,
+                    edited_ms: crate::items::now_ms(),
                 });
             }
             ItemKind::MusicPlayer => {
@@ -3527,6 +3653,7 @@ impl CanvasPanel {
         body: &str,
         font_size: f32,
         color_idx: usize,
+        edited_ms: i64,
         screen: Rect,
         is_sel: bool,
         editing: bool,
@@ -3573,110 +3700,582 @@ impl CanvasPanel {
         self.draw_item_bg_rect(cx, tape, NOTE_TAPE);
         self.draw_sketch_rect_outline(cx, tape, 0.9, NOTE_TAPE_EDGE, seed ^ 0x7E57, 0.5);
 
-        // Title in dark handwriting ink.
+        // Title in dark handwriting ink. Card chrome is fixed-size, so pin the
+        // scale rather than inheriting the last drawer's.
+        self.draw_title.font_scale = 1.0;
         self.draw_title.color = vec4f(NOTE_TITLE_INK);
         self.draw_title
             .draw_abs(cx, screen.pos + Vec2d { x: 12.0, y: 7.0 }, title);
 
-        // Note body text, clipped to the card content area.
+        // Note body, clipped to the card content area. The bottom strip is
+        // reserved for the "edited …" stamp.
         let body_rect = Rect {
             pos: screen.pos + Vec2d { x: 10.0, y: 32.0 },
             size: Vec2d {
                 x: (screen.size.x - 20.0).max(1.0),
-                y: (screen.size.y - 40.0).max(1.0),
+                y: (screen.size.y - 52.0).max(1.0),
             },
         };
         cx.push_clip_rect(body_rect);
         let color = NOTE_TEXT_COLORS[color_idx.min(NOTE_TEXT_COLORS.len() - 1)];
-        self.draw_title.color = vec4f(color);
-        // Use a smaller font size for body; scale line height accordingly.
-        let font_scale = font_size / 13.0;
-        self.draw_title.font_scale = font_scale;
-        let line_h = font_size as f64 * 1.4;
-        let display_body = if editing {
-            &self.note_edit_buffer
+        // Owned: `note_rows` needs `&mut self` for the measuring calls, so the
+        // edited buffer cannot stay borrowed across them.
+        let display_body: String = if editing {
+            self.note_edit_buffer.clone()
         } else {
-            body
+            body.to_string()
         };
-        const CHAR_W: f64 = 7.5;
-        let max_chars = ((body_rect.size.x / (CHAR_W * font_scale as f64))
-            .floor()
-            .max(1.0) as usize)
-            .max(1);
-        let max_lines = (body_rect.size.y / line_h).max(1.0) as usize;
-
-        // Soft-wrap the body to the card width.
-        let mut wrapped: Vec<String> = Vec::new();
-        let mut current = String::new();
-        for ch in display_body.chars() {
-            if ch == '\n' {
-                wrapped.push(std::mem::take(&mut current));
-            } else {
-                if current.chars().count() >= max_chars {
-                    wrapped.push(std::mem::take(&mut current));
+        let rows = self.note_rows(cx, id, &display_body, body_rect, font_size);
+        for row in rows.iter() {
+            self.draw_note_row(cx, row, color, font_size);
+        }
+        // Blinking caret, placed by the same measured layout the rows came from.
+        if editing {
+            if let Some((caret_x, caret_y, caret_h)) =
+                self.note_caret_pos(cx, &rows, caret)
+            {
+                let blink = (cx.cx.time() * 2.0) as i32 % 2 == 0;
+                if blink {
+                    self.draw_cursor.color = Vec4f {
+                        x: color[0],
+                        y: color[1],
+                        z: color[2],
+                        w: 0.9,
+                    };
+                    self.draw_cursor.draw_abs(
+                        cx,
+                        Rect {
+                            pos: Vec2d {
+                                x: caret_x,
+                                y: caret_y,
+                            },
+                            size: Vec2d {
+                                x: 2.0,
+                                y: caret_h,
+                            },
+                        },
+                    );
                 }
-                current.push(ch);
             }
         }
-        if !current.is_empty() || wrapped.is_empty() {
-            wrapped.push(current);
-        }
-        for (i, line) in wrapped.iter().take(max_lines).enumerate() {
-            let y = body_rect.pos.y + i as f64 * line_h;
-            self.draw_title.draw_abs(
-                cx,
-                Vec2d {
-                    x: body_rect.pos.x,
-                    y,
-                },
-                line,
+        cx.pop_clip_rect();
+
+        // "edited 14:32" in the footer, dim: notes' list rows carry the same
+        // stamp under each preview.
+        let stamp = crate::note::format_edited(edited_ms, crate::items::now_ms());
+        if std::env::var_os("CANVAS_TRACE_NOTE").is_some() {
+            log!(
+                "note stamp {:?} edited_ms={edited_ms} card=({:.1},{:.1} {:.1}x{:.1})",
+                stamp,
+                screen.pos.x,
+                screen.pos.y,
+                screen.size.x,
+                screen.size.y
             );
         }
+        if !stamp.is_empty() {
+            self.draw_note_text.font_scale = font_size / 13.0 * 0.82;
+            self.draw_note_text.color = vec4f([
+                NOTE_TITLE_INK[0] * 0.85,
+                NOTE_TITLE_INK[1] * 0.85,
+                NOTE_TITLE_INK[2] * 0.85,
+                0.55,
+            ]);
+            let text = format!("edited {stamp}");
+            // Left-aligned under the body, like notes' row metadata, which also
+            // keeps it clear of the resize handle in the bottom-right corner.
+            self.draw_note_text.draw_abs(
+                cx,
+                Vec2d {
+                    x: screen.pos.x + 12.0,
+                    y: screen.pos.y + screen.size.y - 20.0,
+                },
+                &text,
+            );
+            self.draw_note_text.font_scale = 1.0;
+        }
+    }
 
-        // Blinking caret when the note is being edited inline.
-        if editing {
-            let mut line_idx = 0usize;
-            let mut col = 0usize;
-            let mut chars_on_line = 0usize;
-            for (i, c) in display_body.chars().enumerate() {
-                if i >= caret {
-                    break;
-                }
-                if c == '\n' {
-                    line_idx += 1;
-                    col = 0;
-                    chars_on_line = 0;
-                } else if chars_on_line >= max_chars {
-                    line_idx += 1;
-                    col = 1;
-                    chars_on_line = 1;
-                } else {
-                    col += 1;
-                    chars_on_line += 1;
+    /// Width of `text` in one of the note's inline faces, at `scale`.
+    ///
+    /// `scale` is relative to the note body base (13pt). `code` spans are drawn
+    /// in the cell face, whose base is 12.5pt, so they are rescaled to land on
+    /// the same point size as the prose.
+    fn note_text_width(&mut self, cx: &mut Cx2d, style: InlineStyle, text: &str, scale: f32) -> f64 {
+        let scale = if style == InlineStyle::Code {
+            scale * 13.0 / 12.5
+        } else {
+            scale
+        };
+        let draw = match style {
+            InlineStyle::Plain => &mut self.draw_note_text,
+            InlineStyle::Bold => &mut self.draw_title,
+            InlineStyle::Italic => &mut self.draw_note_italic,
+            InlineStyle::Code => &mut self.draw_cell_text,
+        };
+        let saved = draw.font_scale;
+        draw.font_scale = scale;
+        let width = draw
+            .prepare_single_line_run(cx, text)
+            .map(|run| run.width_in_lpxs as f64)
+            .unwrap_or(0.0);
+        draw.font_scale = saved;
+        width
+    }
+
+    /// Ascender-to-descender height of the prose face at `scale` (the line box a
+    /// row's text is centred in).
+    fn note_line_box(&mut self, cx: &mut Cx2d, scale: f32) -> f64 {
+        let saved = self.draw_note_text.font_scale;
+        self.draw_note_text.font_scale = scale;
+        let measured = self.draw_note_text.prepare_single_line_run(cx, "Mg");
+        self.draw_note_text.font_scale = saved;
+        measured
+            .map(|run| (run.ascender_in_lpxs - run.descender_in_lpxs) as f64)
+            .unwrap_or(0.0)
+    }
+
+    /// Lay out a note body into rows, measuring every word in the face it will
+    /// be drawn in.
+    ///
+    /// The blocks and inline runs come from [`crate::note`] (makepad's
+    /// `apps/notes` block split); the widths come from the text stack. The old
+    /// path wrapped on a character count against a hardcoded `CHAR_W = 7.5`,
+    /// which is the same guess that squeezed the terminal grid.
+    fn note_rows(
+        &mut self,
+        cx: &mut Cx2d,
+        item_id: u64,
+        source: &str,
+        body: Rect,
+        font_size: f32,
+    ) -> Vec<NoteRow> {
+        let blocks = crate::note::parse_blocks(source);
+        let base = font_size / 13.0;
+        let prose_lh = font_size as f64 * 1.36;
+        let mut rows: Vec<NoteRow> = Vec::new();
+        let mut y = body.pos.y;
+        for block in blocks.iter() {
+            // (face scale factor, hanging indent, space before, space after, line height)
+            let (factor, indent, before, after, line_h) = match block.kind {
+                BlockKind::Heading(1) => (1.5, 0.0, 5.0, 5.0, font_size as f64 * 1.5 * 1.18),
+                BlockKind::Heading(2) => (1.28, 0.0, 4.0, 4.0, font_size as f64 * 1.28 * 1.2),
+                BlockKind::Heading(_) => (1.12, 0.0, 3.0, 3.0, font_size as f64 * 1.12 * 1.25),
+                BlockKind::Bullet => (1.0, 16.0, 1.5, 1.5, prose_lh),
+                BlockKind::Numbered(_) => (1.0, 20.0, 1.5, 1.5, prose_lh),
+                BlockKind::Check { .. } => (1.0, 22.0, 2.5, 2.5, prose_lh),
+                BlockKind::Quote => (1.0, 14.0, 2.5, 2.5, prose_lh),
+                BlockKind::Rule => (1.0, 0.0, 6.0, 6.0, 6.0),
+                BlockKind::Code => (1.0, 10.0, 0.0, 0.0, font_size as f64 * 1.32),
+                BlockKind::Paragraph => (1.0, 0.0, if rows.is_empty() { 0.0 } else { 3.0 }, 0.0, prose_lh),
+            };
+            y += before;
+            let text_h = self.note_line_box(cx, base * factor);
+            if matches!(block.kind, BlockKind::Rule) {
+                rows.push(NoteRow {
+                    kind: block.kind,
+                    item_id,
+                    x: body.pos.x,
+                    y,
+                    height: line_h,
+                    indent,
+                    text_h,
+                    scale: base * factor,
+                    segments: Vec::new(),
+                    char_start: block.char_start,
+                    char_end: block.char_start,
+                    src_line: block.src_line,
+                    first: true,
+                    width: body.size.x - indent,
+                });
+                y += line_h + after;
+                continue;
+            }
+            // Words keep their trailing spaces, so no prefix ever has to be
+            // re-measured while wrapping.
+            let mut words: Vec<(String, InlineStyle, usize)> = Vec::new();
+            let mut char_idx = block.char_start;
+            let mut word = String::new();
+            let mut word_start = char_idx;
+            for span in block.spans.iter() {
+                for ch in span.text.chars() {
+                    if word.is_empty() {
+                        word_start = char_idx;
+                    }
+                    word.push(ch);
+                    char_idx += 1;
+                    if ch == ' ' {
+                        words.push((std::mem::take(&mut word), span.style, word_start));
+                    }
                 }
             }
-            let caret_x = body_rect.pos.x + col as f64 * CHAR_W * font_scale as f64;
-            let caret_y = body_rect.pos.y + line_idx as f64 * line_h;
-            let blink = (cx.cx.time() * 2.0) as i32 % 2 == 0;
-            if blink {
-                self.draw_cursor.color = Vec4f {
-                    x: color[0],
-                    y: color[1],
-                    z: color[2],
-                    w: 0.9,
-                };
-                let caret_rect = Rect {
-                    pos: Vec2d {
-                        x: caret_x,
-                        y: caret_y,
-                    },
-                    size: Vec2d { x: 2.0, y: line_h },
-                };
-                self.draw_cursor.draw_abs(cx, caret_rect);
+            if !word.is_empty() {
+                words.push((word, InlineStyle::Plain, word_start));
+            }
+            let avail = (body.size.x - indent).max(24.0);
+            let mut segments: Vec<NoteSegment> = Vec::new();
+            let mut used = 0.0f64;
+            let mut row_start: Option<usize> = None;
+            let mut row_end = block.char_start;
+            let mut first_row = true;
+            for (text, style, start) in words.iter() {
+                let width = self.note_text_width(cx, *style, text, base * factor);
+                let len = text.chars().count();
+                if row_start.is_some() && used + width > avail {
+                    let segments = std::mem::take(&mut segments);
+                    rows.push(NoteRow {
+                        kind: block.kind,
+                        item_id,
+                        x: body.pos.x,
+                        y,
+                        height: line_h,
+                        indent,
+                        text_h,
+                        scale: base * factor,
+                        segments,
+                        char_start: row_start.unwrap_or(*start),
+                        char_end: row_end,
+                        src_line: block.src_line,
+                        first: first_row,
+                        width: avail,
+                    });
+                    y += line_h;
+                    first_row = false;
+                    used = 0.0;
+                    row_start = None;
+                }
+                if row_start.is_none() {
+                    row_start = Some(*start);
+                }
+                let x = used;
+                used += width;
+                row_end = *start + len;
+                // Trailing spaces do not push the caret past the word.
+                segments.push(NoteSegment {
+                    text: text.trim_end_matches(' ').to_string(),
+                    style: *style,
+                    x,
+                    w: width,
+                    char_start: *start,
+                    trailing: len - text.trim_end_matches(' ').chars().count(),
+                });
+            }
+            rows.push(NoteRow {
+                kind: block.kind,
+                item_id,
+                x: body.pos.x,
+                y,
+                height: line_h,
+                indent,
+                text_h,
+                scale: base * factor,
+                segments,
+                char_start: row_start.unwrap_or(block.char_start),
+                char_end: row_end,
+                src_line: block.src_line,
+                first: first_row,
+                width: avail,
+            });
+            y += line_h + after;
+        }
+        if std::env::var_os("CANVAS_TRACE_NOTE").is_some() {
+            // Debug aid, same shape as MAKEPAD_TRACE_FONT_LOAD: dump the measured
+            // rows so a wrapping bug can be read off instead of eyeballed.
+            for row in rows.iter() {
+                let spans: Vec<String> = row
+                    .segments
+                    .iter()
+                    .map(|s| format!("{:?}@{:.1} {:.1}px {:?}", s.style, s.x, s.w, s.text))
+                    .collect();
+                log!(
+                    "note row {:?} y={:.1} h={:.1} indent={:.1} scale={:.2} chars={}..{} first={} | {}",
+                    row.kind,
+                    row.y,
+                    row.height,
+                    row.indent,
+                    row.scale,
+                    row.char_start,
+                    row.char_end,
+                    row.first,
+                    spans.join("  ")
+                );
             }
         }
-        self.draw_title.font_scale = 1.0;
-        cx.pop_clip_rect();
+        rows
+    }
+
+    /// Draw one laid-out note row: block chrome (bullet, box, quote bar, code
+    /// tint, rule) then its measured text runs.
+    fn draw_note_row(&mut self, cx: &mut Cx2d, row: &NoteRow, ink: [f32; 4], font_size: f32) {
+        let text_x = row.x + row.indent;
+        // Rows are centred in their line box so mixed sizes share a baseline grid.
+        let text_y = row.y + (row.height - row.text_h) * 0.5;
+        let lead = [ink[0] * 0.35, ink[1] * 0.35, ink[2] * 0.35, 1.0];
+        let mark = [ink[0] * 0.8, ink[1] * 0.8, ink[2] * 0.8, 1.0];
+        match row.kind {
+            BlockKind::Bullet if row.first => {
+                self.draw_filled_disc(
+                    cx,
+                    Vec2d {
+                        x: text_x - 9.0,
+                        y: row.y + row.height * 0.5,
+                    },
+                    2.2,
+                    mark,
+                );
+            }
+            BlockKind::Numbered(number) if row.first => {
+                let label = format!("{number}.");
+                let scale = row.scale;
+                let w = self.note_text_width(cx, InlineStyle::Plain, &label, scale);
+                self.draw_note_text.font_scale = scale;
+                self.draw_note_text.color = vec4f(mark);
+                self.draw_note_text.draw_abs(
+                    cx,
+                    Vec2d {
+                        x: text_x - 6.0 - w,
+                        y: text_y,
+                    },
+                    &label,
+                );
+                self.draw_note_text.font_scale = 1.0;
+            }
+            BlockKind::Check { checked } => {
+                let size = font_size as f64 * 0.86;
+                let box_rect = Rect {
+                    pos: Vec2d {
+                        x: text_x - size - 8.0,
+                        y: row.y + (row.height - size) * 0.5,
+                    },
+                    size: Vec2d { x: size, y: size },
+                };
+                // Publish the click area: the box plus the label, and every row
+                // of a wrapped item — notes toggles the whole row, not just the
+                // box. A click has no `Cx2d`, so it reads this back.
+                self.note_check_rows.push((
+                    row.item_id,
+                    Rect {
+                        pos: Vec2d {
+                            x: box_rect.pos.x,
+                            y: row.y,
+                        },
+                        size: Vec2d {
+                            x: (text_x + row.width - box_rect.pos.x).max(size),
+                            y: row.height,
+                        },
+                    },
+                    row.src_line,
+                ));
+                if std::env::var_os("CANVAS_TRACE_NOTE").is_some() {
+                    let (_, hit, line) = self.note_check_rows.last().unwrap();
+                    log!(
+                        "note check row line={line} hit=({:.1},{:.1} {:.1}x{:.1})",
+                        hit.pos.x,
+                        hit.pos.y,
+                        hit.size.x,
+                        hit.size.y
+                    );
+                }
+                if row.first {
+                    self.draw_item_bg_rect(
+                        cx,
+                        box_rect,
+                        if checked {
+                            [mark[0], mark[1], mark[2], 0.18]
+                        } else {
+                            [0.0, 0.0, 0.0, 0.0]
+                        },
+                    );
+                    self.draw_border_rect(cx, box_rect, mark);
+                    if checked {
+                        // Tick: two strokes, sized to the box.
+                        let a = box_rect.pos + Vec2d { x: size * 0.22, y: size * 0.52 };
+                        let b = box_rect.pos + Vec2d { x: size * 0.42, y: size * 0.74 };
+                        let c = box_rect.pos + Vec2d { x: size * 0.8, y: size * 0.26 };
+                        self.draw_segment(cx, a, b, 1.6, mark);
+                        self.draw_segment(cx, b, c, 1.6, mark);
+                    }
+                }
+            }
+            BlockKind::Quote => {
+                self.draw_item_bg_rect(
+                    cx,
+                    Rect {
+                        pos: Vec2d {
+                            x: text_x - 8.0,
+                            y: row.y,
+                        },
+                        size: Vec2d {
+                            x: 2.5,
+                            y: row.height,
+                        },
+                    },
+                    mark,
+                );
+            }
+            BlockKind::Code => {
+                self.draw_item_bg_rect(
+                    cx,
+                    Rect {
+                        pos: Vec2d {
+                            x: text_x - 5.0,
+                            y: row.y,
+                        },
+                        size: Vec2d {
+                            x: row.width + 10.0,
+                            y: row.height,
+                        },
+                    },
+                    [lead[0] * 0.25, lead[1] * 0.25, lead[2] * 0.3, 0.35],
+                );
+            }
+            BlockKind::Rule => {
+                self.draw_item_bg_rect(
+                    cx,
+                    Rect {
+                        pos: Vec2d {
+                            x: text_x,
+                            y: row.y + row.height * 0.5,
+                        },
+                        size: Vec2d {
+                            x: row.width,
+                            y: 1.0,
+                        },
+                    },
+                    mark,
+                );
+                return;
+            }
+            _ => {}
+        }
+        let muted = matches!(row.kind, BlockKind::Check { checked: true });
+        for segment in row.segments.iter() {
+            if segment.text.is_empty() {
+                continue;
+            }
+            let scale = row.scale;
+            let color = match segment.style {
+                _ if muted => [ink[0] * 0.55, ink[1] * 0.55, ink[2] * 0.55, 0.85],
+                InlineStyle::Code => [ink[0] * 0.75, ink[1] * 0.75, ink[2] * 0.8, 1.0],
+                _ => ink,
+            };
+            match segment.style {
+                InlineStyle::Plain => {
+                    self.draw_note_text.font_scale = scale;
+                    self.draw_note_text.color = vec4f(color);
+                    self.draw_note_text.draw_abs(
+                        cx,
+                        Vec2d {
+                            x: text_x + segment.x,
+                            y: text_y,
+                        },
+                        &segment.text,
+                    );
+                    self.draw_note_text.font_scale = 1.0;
+                }
+                InlineStyle::Bold => {
+                    self.draw_title.font_scale = scale;
+                    self.draw_title.color = vec4f(color);
+                    self.draw_title.draw_abs(
+                        cx,
+                        Vec2d {
+                            x: text_x + segment.x,
+                            y: text_y,
+                        },
+                        &segment.text,
+                    );
+                    self.draw_title.font_scale = 1.0;
+                }
+                InlineStyle::Italic => {
+                    self.draw_note_italic.font_scale = scale;
+                    self.draw_note_italic.color = vec4f(color);
+                    self.draw_note_italic.draw_abs(
+                        cx,
+                        Vec2d {
+                            x: text_x + segment.x,
+                            y: text_y,
+                        },
+                        &segment.text,
+                    );
+                    self.draw_note_italic.font_scale = 1.0;
+                }
+                InlineStyle::Code => {
+                    let scale = scale * 13.0 / 12.5;
+                    self.draw_cell_text.font_scale = scale;
+                    self.draw_cell_text.color = vec4f(color);
+                    self.draw_cell_text.draw_abs(
+                        cx,
+                        Vec2d {
+                            x: text_x + segment.x,
+                            y: text_y,
+                        },
+                        &segment.text,
+                    );
+                    self.draw_cell_text.font_scale = 1.0;
+                }
+            }
+        }
+        // A checked item is struck through, the way notes strikes done rows.
+        if muted {
+            let last = row.segments.last();
+            let width = last
+                .map(|s| s.x + self.note_text_width(cx, s.style, &s.text, row.scale))
+                .unwrap_or(0.0);
+            self.draw_item_bg_rect(
+                cx,
+                Rect {
+                    pos: Vec2d {
+                        x: text_x,
+                        y: text_y + row.text_h * 0.5,
+                    },
+                    size: Vec2d {
+                        x: width.max(8.0),
+                        y: 1.0,
+                    },
+                },
+                [ink[0] * 0.6, ink[1] * 0.6, ink[2] * 0.6, 0.7],
+            );
+        }
+    }
+
+    /// Where the caret sits for `caret` (a char index into the body), using the
+    /// same measured rows the body was drawn from: `(x, y, height)`.
+    fn note_caret_pos(
+        &mut self,
+        cx: &mut Cx2d,
+        rows: &[NoteRow],
+        caret: usize,
+    ) -> Option<(f64, f64, f64)> {
+        let row = rows
+            .iter()
+            .find(|r| caret >= r.char_start && caret <= r.char_end && !r.segments.is_empty())
+            .or_else(|| rows.iter().find(|r| !r.segments.is_empty()))
+            .or_else(|| rows.first())?;
+        let text_x = row.x + row.indent;
+        let text_y = row.y + (row.height - row.text_h) * 0.5;
+        let mut x = text_x;
+        for segment in row.segments.iter() {
+            let len = segment.text.chars().count();
+            let prefix = if caret <= segment.char_start {
+                0
+            } else if caret >= segment.char_start + len + segment.trailing {
+                len + segment.trailing
+            } else {
+                (caret - segment.char_start).min(len + segment.trailing)
+            };
+            let sliced: String = segment.text.chars().take(prefix).collect();
+            let width = self.note_text_width(cx, segment.style, &segment.text, row.scale);
+            if prefix < len {
+                let partial = self.note_text_width(cx, segment.style, &sliced, row.scale);
+                return Some((text_x + segment.x + partial, text_y, row.text_h));
+            }
+            x = text_x + segment.x + width;
+            if caret >= segment.char_start + len {
+                continue;
+            }
+            return Some((x, text_y, row.text_h));
+        }
+        Some((x, text_y, row.text_h))
     }
 
     /// Draw a straight stroke from `a` to `b` as overlapping unit squares
@@ -6596,6 +7195,24 @@ impl Widget for CanvasPanel {
                     }
                     self.redraw(cx);
                 } else if let Some(id) = self.hit_test(me.abs) {
+                    // A click on a note's checklist box toggles that item in
+                    // place — notes' `toggle_checkbox`: the markdown source *is*
+                    // the document, so the edit happens there and the card
+                    // re-renders from it. Published by the last draw pass, since
+                    // measuring a row needs the `Cx2d` only drawing has.
+                    if let Some(src_line) = self.note_check_hit(id, me.abs) {
+                        if let Some(next) = self
+                            .items
+                            .iter()
+                            .find(|i| i.id() == id)
+                            .and_then(|i| i.body())
+                            .and_then(|body| crate::note::toggle_checkbox(body, src_line))
+                        {
+                            self.set_note_body(cx, id, next);
+                            self.selected = Some(id);
+                            return;
+                        }
+                    }
                     self.selected = Some(id);
                     // Selecting a non-terminal item must clear any stale
                     // terminal focus so the property panel keys don't leak
@@ -7551,10 +8168,14 @@ impl Widget for CanvasPanel {
             Option<std::sync::Arc<std::sync::Mutex<crate::chat::ChatCardState>>>,
             String,
             String,
+            i64,
         );
         let mut chat_sigs: HashMap<u64, (Option<String>, Option<String>)> = HashMap::new();
         let n_items = self.items.len();
         let mut draw_queue: Vec<DrawItem> = Vec::new();
+        // Fresh every frame: the note draws below publish their checkbox hit
+        // areas for this frame's click handling.
+        self.note_check_rows.clear();
         for idx in 0..n_items {
             let item = &self.items[idx];
             let screen = self.item_screen_rect(item);
@@ -7577,14 +8198,15 @@ impl Widget for CanvasPanel {
             }
             let agent_cwd = item.agent_cwd().unwrap_or("").to_string();
             let agent_provider = item.agent_provider().unwrap_or("").to_string();
-            let (body, font_size, color_idx) = match item {
+            let (body, font_size, color_idx, edited_ms) = match item {
                 CanvasItem::Note {
                     body,
                     font_size,
                     color_idx,
+                    edited_ms,
                     ..
-                } => (body.clone(), *font_size, *color_idx),
-                _ => (String::new(), 13.0, 0),
+                } => (body.clone(), *font_size, *color_idx, *edited_ms),
+                _ => (String::new(), 13.0, 0, 0),
             };
             let (progress, playing) = match item {
                 CanvasItem::MusicPlayer {
@@ -7617,6 +8239,7 @@ impl Widget for CanvasPanel {
                 agent_state,
                 agent_cwd,
                 agent_provider,
+                edited_ms,
             ));
         }
 
@@ -7642,6 +8265,7 @@ impl Widget for CanvasPanel {
             agent_state,
             agent_cwd,
             agent_provider,
+            edited_ms,
         ) in draw_queue
         {
             // Subtle hover backlight so the card under the mouse is clear,
@@ -7692,6 +8316,7 @@ impl Widget for CanvasPanel {
                         &body,
                         font_size,
                         color_idx,
+                        edited_ms,
                         item_screen,
                         is_sel,
                         editing,
@@ -7904,6 +8529,43 @@ mod tests {
         assert_eq!((w, h), (200.0, 400.0));
         // Degenerate input: no size.
         assert_eq!(fitted_content_size(0.0, 0.0), None);
+    }
+
+    #[test]
+    fn checklist_click_lookup_matches_row_and_card() {
+        let rows = vec![
+            (
+                7u64,
+                Rect {
+                    pos: Vec2d { x: 10.0, y: 20.0 },
+                    size: Vec2d { x: 100.0, y: 18.0 },
+                },
+                3usize,
+            ),
+            (
+                8u64,
+                Rect {
+                    pos: Vec2d { x: 10.0, y: 40.0 },
+                    size: Vec2d { x: 100.0, y: 18.0 },
+                },
+                5usize,
+            ),
+        ];
+        // Inside the first row's band, on that card.
+        assert_eq!(
+            note_check_line_at(&rows, 7, Vec2d { x: 50.0, y: 28.0 }),
+            Some(3)
+        );
+        // Same point, other card: that card's own row answers.
+        assert_eq!(
+            note_check_line_at(&rows, 8, Vec2d { x: 50.0, y: 48.0 }),
+            Some(5)
+        );
+        // Between rows (row 1 ends at y=38, row 2 starts at 40), outside the
+        // card, and a card with no check rows.
+        assert_eq!(note_check_line_at(&rows, 7, Vec2d { x: 50.0, y: 39.0 }), None);
+        assert_eq!(note_check_line_at(&rows, 7, Vec2d { x: 200.0, y: 28.0 }), None);
+        assert_eq!(note_check_line_at(&rows, 9, Vec2d { x: 50.0, y: 28.0 }), None);
     }
 
     #[test]

@@ -2,6 +2,14 @@ use makepad_widgets::*;
 
 use crate::terminal::session::TerminalSession;
 
+/// Wall-clock milliseconds since the epoch, for note edit stamps.
+pub fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
 /// What a canvas item can be.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ItemKind {
@@ -349,6 +357,9 @@ pub enum CanvasItem {
         font_size: f32,
         /// Index into a color palette for the note body text.
         color_idx: usize,
+        /// Wall-clock ms of the last body edit, for the "edited …" stamp
+        /// (notes' `format_note_date`). 0 = never stamped.
+        edited_ms: i64,
     },
     MusicPlayer {
         id: u64,
@@ -556,6 +567,26 @@ impl CanvasItem {
         match self {
             CanvasItem::Note { body, .. } => Some(body),
             _ => None,
+        }
+    }
+
+    /// When this note was last edited (wall-clock ms), 0 when unknown or when
+    /// this is not a note card.
+    pub fn edited_ms(&self) -> i64 {
+        match self {
+            CanvasItem::Note { edited_ms, .. } => *edited_ms,
+            _ => 0,
+        }
+    }
+
+    /// Stamp an edit: also the dirty signal the caller persists on.
+    pub fn set_edited_now(&mut self) -> bool {
+        match self {
+            CanvasItem::Note { edited_ms, .. } => {
+                *edited_ms = now_ms();
+                true
+            }
+            _ => false,
         }
     }
 

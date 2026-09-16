@@ -8,6 +8,7 @@ mod command;
 mod daemon;
 mod ipc;
 mod items;
+mod note;
 mod persist;
 mod terminal;
 
@@ -109,6 +110,17 @@ script_mod! {
         draw_title +: {
             text_style: theme.font_bold{font_size: 13.0}
             color: #xe2e6efff
+        }
+        // Note card body: regular for prose, italic for `*emphasis*`. Bold runs
+        // reuse `draw_title` and `code` spans reuse `draw_cell_text`, matching
+        // the faces the theme already ships.
+        draw_note_text +: {
+            text_style: theme.font_regular{font_size: 13.0}
+            color: #x2a2620ff
+        }
+        draw_note_italic +: {
+            text_style: theme.font_italic{font_size: 13.0}
+            color: #x2a2620ff
         }
         draw_cell_bg +: {
             color: #xff0000ff
