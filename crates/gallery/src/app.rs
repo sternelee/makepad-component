@@ -30,6 +30,7 @@ use makepad_component::mp::{
     slider::MpSliderWidgetRefExt,
     segmented::MpSegmentedWidgetRefExt,
     switch::MpSwitchWidgetRefExt,
+    floating::MpFloatingWidgetRefExt,
     date::MpDateWidgetRefExt,
 };
 
@@ -124,6 +125,7 @@ script_mod! {
                         rail_page_30 := RailRow{text: ""}
                         rail_page_31 := RailRow{text: ""}
                         rail_page_32 := RailRow{text: ""}
+                        rail_page_33 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -191,6 +193,7 @@ script_mod! {
                             page_30 := mod.gallery.pages.history{}
                             page_31 := mod.gallery.pages.combobox{}
                             page_32 := mod.gallery.pages.hover_card{}
+                            page_33 := mod.gallery.pages.floating{}
                         }
                     }
                 }
@@ -204,7 +207,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 33] = [
+const PAGE_SLOTS: [&[LiveId]; 34] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -238,10 +241,11 @@ const PAGE_SLOTS: [&[LiveId]; 33] = [
     ids!(page_30),
     ids!(page_31),
     ids!(page_32),
+    ids!(page_33),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 33] = [
+const RAIL_ROWS: [&[LiveId]; 34] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -275,6 +279,7 @@ const RAIL_ROWS: [&[LiveId]; 33] = [
     ids!(rail_page_30),
     ids!(rail_page_31),
     ids!(rail_page_32),
+    ids!(rail_page_33),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -916,6 +921,116 @@ use makepad_component::mp::hover_card::HoverIntent;
         );
     }
 
+    /// Run a scripted drag through the panel's machine.
+    ///
+    /// `GALLERY_FLOAT` is a list of `press:x,y`, `move:x,y` and `release` steps separated by
+    /// `;`, because `,` belongs to the coordinate. Every decision
+    /// is printed, because "the panel did not move" and "the panel moved by the right amount"
+    /// are indistinguishable in a screenshot of a box — and a synthetic pointer produces no
+    /// press in this app, so the gesture has to be scripted.
+    fn seed_floating(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::floating::Floating;
+
+        // The panel starts here, and the default script's first press lands 20 across and 10
+        // down inside it, so the grab offset is visible in the numbers rather than merely
+        // claimed.
+        let start = dvec2(20.0, 10.0);
+        self.ui.mp_floating(cx, ids!(float_panel)).set_pos(cx, start);
+        let mut machine = Floating::new(start);
+
+        let script = std::env::var("GALLERY_FLOAT").unwrap_or_else(|_| {
+            // Sub-threshold, then a real drag, then back. The second step must decide nothing:
+            // that is the shaky-click rule.
+            // `;` between steps and `,` inside a coordinate. The first version used `,` for
+            // both, so `press:40,20` split into the steps `press:40` and `20` — every step then
+            // failed to parse and the log came out **empty**, which is exactly what the
+            // "print every decision" rule is for: a gesture that decided nothing and a script
+            // that ran nothing look identical in a screenshot.
+            "press:40,20;move:41,21;move:240,120;move:40,20;release".to_string()
+        });
+        let mut log: Vec<String> = Vec::new();
+        for step in script.split(';').map(str::trim).filter(|s| !s.is_empty()) {
+            let (verb, coords) = match step.split_once(':') {
+                Some((verb, coords)) => (verb, Some(coords)),
+                None => (step, None),
+            };
+            let point = || -> Option<Vec2d> {
+                let coords = coords?;
+                let (x, y) = coords.split_once(',')?;
+                Some(dvec2(x.trim().parse().ok()?, y.trim().parse().ok()?))
+            };
+            match verb {
+                "press" => match point() {
+                    Some(at) => {
+                        machine.press(at);
+                        log.push(format!("press at ({:.0},{:.0})", at.x, at.y));
+                        println!("FLOAT press at ({:.0},{:.0}) held", at.x, at.y);
+                    }
+                    None => log.push(format!("ignoring {step:?}")),
+                },
+                "move" => match point() {
+                    Some(at) => {
+                        let moved = machine.move_to(at);
+                        log.push(format!(
+                            "move to ({:.0},{:.0}) -> {}",
+                            at.x,
+                            at.y,
+                            if moved { "moved" } else { "did not move" }
+                        ));
+                        println!(
+                            "FLOAT move to ({:.0},{:.0}) moved={moved} pos=({:.0},{:.0}) dragging={}",
+                            at.x,
+                            at.y,
+                            machine.pos().x,
+                            machine.pos().y,
+                            machine.is_dragging()
+                        );
+                    }
+                    None => log.push(format!("ignoring {step:?}")),
+                },
+                "release" => {
+                    machine.release();
+                    log.push("release".to_string());
+                }
+                other => log.push(format!("ignoring unknown step {other:?}")),
+            }
+        }
+        // The panel the reader sees is placed where the machine ended, so the picture and the
+        // log agree — the same rule the combobox page follows with its field.
+        self.ui
+            .mp_floating(cx, ids!(float_panel))
+            .set_pos(cx, machine.pos());
+        println!(
+            "FLOAT final pos=({:.0},{:.0}) dragging={}",
+            machine.pos().x,
+            machine.pos().y,
+            machine.is_dragging()
+        );
+
+        self.ui.label(cx, ids!(float_log)).set_text(
+            cx,
+            &format!(
+                "{} steps: {}",
+                log.len(),
+                if log.is_empty() {
+                    "none".to_string()
+                } else {
+                    log.join(" \u{b7} ")
+                }
+            ),
+        );
+        self.ui.label(cx, ids!(float_state)).set_text(
+            cx,
+            &format!(
+                "script: {script}. Final position ({:.0}, {:.0}), grabbed 20 across and 10 down. \
+                 Nothing clamps: a panel dragged half off the window stays there, and the grab \
+                 offset means it can always be dragged back.",
+                machine.pos().x,
+                machine.pos().y,
+            ),
+        );
+    }
+
     /// Declare a keymap and fill the sheet from it.
     ///
     /// **Nothing below writes a chord.** Each row's trailing text is
@@ -1365,6 +1480,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_history(cx);
         self.seed_combobox(cx);
         self.seed_hover_card(cx);
+        self.seed_floating(cx);
     }
 
     /// Fill the table page's tables.
@@ -1919,6 +2035,11 @@ impl AppMain for App {
             self.seed_all(cx);
         }
         self.match_event(cx, event);
+        // The floating panel's drag, heard on the page's layer rather than on the panel's own
+        // box — a pointer that outruns a frame lands outside the box, and a panel listening on
+        // itself would stop hearing moves there.
+        let layer = self.ui.widget(cx, ids!(float_layer)).area();
+        self.ui.mp_floating(cx, ids!(float_panel)).drag(cx, event, layer);
         // Tab and Shift-Tab traversal. Makepad has a single key-focus area on
         // `Cx` and no traversal, so the app owns the pass.
         // The v3 traversal, which owns the one registry the v2 widgets also feed.
@@ -1986,7 +2107,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 33] = [
+    const SLOT_PAGES: [&str; 34] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -2020,6 +2141,7 @@ mod tests {
         "mod.gallery.pages.history",
         "mod.gallery.pages.combobox",
         "mod.gallery.pages.hover_card",
+        "mod.gallery.pages.floating",
     ];
 
     #[test]

@@ -16,6 +16,7 @@ pub mod content;
 pub mod controls;
 pub mod feedback;
 pub mod foundation;
+pub mod floating;
 pub mod history;
 pub mod hover_card;
 pub mod icon;
@@ -64,6 +65,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     input::script_mod(vm);
     overlay::script_mod(vm);
     popover::script_mod(vm);
+    floating::script_mod(vm);
     history::script_mod(vm);
     hover_card::script_mod(vm);
     icon::script_mod(vm);
@@ -302,6 +304,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/hover_card.rs",
         blurb: "A card on hover, and its timing",
     },
+    Page {
+        title: "Floating Panel",
+        path: "mod.gallery.pages.floating",
+        source: "crates/gallery/src/pages/floating.rs",
+        blurb: "A panel the reader drags",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -377,6 +385,7 @@ mod tests {
             ("crates/gallery/src/pages/input.rs", "input"),
             ("crates/gallery/src/pages/overlay.rs", "overlay"),
             ("crates/gallery/src/pages/popover.rs", "popover"),
+            ("crates/gallery/src/pages/floating.rs", "floating"),
             ("crates/gallery/src/pages/history.rs", "history"),
             ("crates/gallery/src/pages/hover_card.rs", "hover_card"),
             ("crates/gallery/src/pages/icon.rs", "icon"),

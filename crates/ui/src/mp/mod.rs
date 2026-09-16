@@ -45,6 +45,7 @@ pub mod combobox;
 pub mod control;
 pub mod date;
 pub mod feedback;
+pub mod floating;
 pub mod focus;
 pub mod history;
 pub mod hover_card;
@@ -83,6 +84,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::surface::script_mod(vm);
     crate::mp::keys::script_mod(vm);
     crate::mp::layout::script_mod(vm);
+    crate::mp::floating::script_mod(vm);
     crate::mp::date::script_mod(vm);
     // The shared animator prototype every control inherits. Before the
     // controls, because their DSL blocks name it.

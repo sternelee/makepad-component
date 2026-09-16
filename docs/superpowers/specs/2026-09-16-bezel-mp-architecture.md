@@ -157,6 +157,68 @@ build on).
 | `mp/combobox.rs` | `Combobox` / `MpCombobox` / `MpComboboxPanel` — a field over a list. |
 | `mp/focus.rs` | `FocusRegistry` / `register` / `handle_key` — tab traversal. |
 | `mp/hover_card.rs` | `HoverIntent` / `Presence` / `Change` / `MpHoverCard` — a card on hover. |
+| `mp/floating.rs` | `Floating` / `MpFloating` / `MpFloatingLayer` — a panel the reader drags. |
+
+### `floating` was not what its name suggested
+
+The audit listed bezel's `floating.rs` as a missing **positioning primitive**, and that was a
+guess. Reading it showed something else: a **draggable panel** — a meter, an inspector, a
+detached preview — and the guess had been wrong in a way worth recording, because it is the third
+time in this port that a filename stood for a concept I had assumed rather than read.
+
+The design insight it carries is the reason it is a component rather than a `View` with a drag
+handler: **the drag has to be heard on a layer larger than the thing being dragged.** A panel
+that listens on itself stalls the moment the pointer outruns a frame — the pointer lands outside
+a box-sized hitbox, the panel stops hearing moves, and the box is stranded behind the cursor.
+`mp/scroll.rs`'s thumb already does the same against its track.
+
+So the gesture is split, and the split is the API:
+
+- **The press is heard on the box**, because a press has to be inside the panel or a click
+  anywhere on the page would start dragging it.
+- **The moves and the release are heard on a layer the app names**:
+  `mp_floating(..).drag(cx, event, layer)`. Naming it is what makes the requirement explicit
+  rather than a comment about a widget that draws an invisible full-size box and hopes.
+
+### The grab offset, and why nothing is clamped
+
+A drag that put the panel's top-left at the pointer would **snap** the moment it started: grab a
+panel by its title bar and it would jump so the pointer held its corner. So the press records
+where *inside the panel* it landed, and every move keeps that point under the pointer.
+
+That is also why **nothing is clamped**. A panel dragged half off the window stays there, and
+because the offset is preserved it can always be dragged back — clamping would fight the reader
+for no benefit. Verified at runtime: `move:-500,-500` gives `pos=(-520,-510)`, and dragging back
+works.
+
+### The threshold is the difference between a drag and a shaky click
+
+A press that moves one pixel is a click with a hand tremor in it, and a panel that moves on one
+shifts every time its title bar is clicked. `DRAG_THRESHOLD` is 3.0 — the order of gpui's own
+`DRAG_THRESHOLD`, which bezel adopts; the number matters far less than there being one.
+
+The measurement is from the **press**, not from the previous move, so slow drift across many
+small moves accumulates to a drag. Measuring per-move would let a pointer crawl across the panel
+forever without ever starting the gesture — which is exactly how a reader drags something slowly.
+
+Runtime evidence, from the default script:
+
+```
+FLOAT press at (40,20) held
+FLOAT move to (41,21) moved=false pos=(20,10) dragging=false
+FLOAT move to (240,120) moved=true  pos=(220,110) dragging=true
+FLOAT move to (40,20)  moved=true  pos=(20,10)  dragging=true
+```
+
+The second line is the shaky-click rule; the third shows the offset (`240-20, 120-10`).
+
+### A parsing bug the logging rule caught immediately
+
+The script's first version separated steps with `,` and coordinates with `,`, so `press:40,20`
+split into the steps `press:40` and `20`. Every step then failed to parse and **the log came out
+empty** — which is exactly what "print every decision" is for, because a gesture that decided
+nothing and a script that ran nothing look identical in a screenshot of a box. Steps are
+separated by `;` now.
 
 ### The timing is the module, because Makepad owns none of it
 
