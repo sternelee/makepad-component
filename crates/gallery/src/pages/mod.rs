@@ -31,6 +31,7 @@ pub mod scroll;
 pub mod search;
 pub mod select;
 pub mod shortcuts;
+pub mod searching;
 pub mod slider;
 pub mod status;
 pub mod steps;
@@ -99,6 +100,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     palette::script_mod(vm);
     menu::script_mod(vm);
     scroll::script_mod(vm);
+    searching::script_mod(vm);
     search::script_mod(vm);
 }
 
@@ -374,6 +376,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/numbers.rs",
         blurb: "A number, and the cases where it disagrees with its input",
     },
+    Page {
+        title: "Searching",
+        path: "mod.gallery.pages.searching",
+        source: "crates/gallery/src/pages/searching.rs",
+        blurb: "A list narrowed by typing, and a selection that cannot move",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -475,6 +483,7 @@ mod tests {
             ("crates/gallery/src/pages/palette.rs", "palette"),
             ("crates/gallery/src/pages/menu.rs", "menu"),
             ("crates/gallery/src/pages/scroll.rs", "scroll"),
+            ("crates/gallery/src/pages/searching.rs", "searching"),
             ("crates/gallery/src/pages/search.rs", "search"),
         ]
         .into_iter()

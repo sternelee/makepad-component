@@ -862,9 +862,29 @@ impl A2uiSurface {
             .map(|p| resolve_string_value_scoped(p, data_model, scope))
             .unwrap_or_else(|| "Search...".to_string());
         let widget = self.pool_searchable_list(cx, idx);
-        widget.set_items(cx, items);
-        widget.set_query(cx, &placeholder);
+        widget.set_items(cx.cx, items);
+        // **An empty query, not the placeholder — and the line this replaces was a defect.**
+        //
+        // It read `set_query(cx, &placeholder)`, which *filters by* the placeholder: with `placeholder` being
+        // `"Search..."`, a searchable list was narrowed to the items containing that text, which is none of them — so
+        // every `SearchableList` this renderer drew was **empty**. The placeholder is the field's own empty-text, not a
+        // filter, and the v3 widget's field carries one.
+        //
+        // The `cx.cx` is the other half: v3's `set_items` and `set_query` take a `&mut Cx` rather than a `&mut Cx2d`,
+        // which is the same one-word difference every pool has needed.
+        widget.set_query(cx.cx, "");
+        // ...and the placeholder goes where a placeholder goes, which is the setter this migration had to add.
+        widget.set_placeholder(cx.cx, &placeholder);
         let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            println!(
+                "A2UI v3_searchable_list items={} query={:?} shown={} placeholder={:?} from=mp::searchable_list::MpSearchableList",
+                widget.items().len(),
+                widget.query(),
+                widget.rows().len(),
+                placeholder,
+            );
+        }
     }
 
     fn render_status_bar(

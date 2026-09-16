@@ -138,6 +138,7 @@ script_mod! {
                         rail_page_39 := RailRow{text: ""}
                         rail_page_40 := RailRow{text: ""}
                         rail_page_41 := RailRow{text: ""}
+                        rail_page_42 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -214,6 +215,7 @@ script_mod! {
                             page_39 := mod.gallery.pages.details{}
                             page_40 := mod.gallery.pages.steps{}
                             page_41 := mod.gallery.pages.numbers{}
+                            page_42 := mod.gallery.pages.searching{}
                         }
                     }
                 }
@@ -227,7 +229,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 42] = [
+const PAGE_SLOTS: [&[LiveId]; 43] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -270,10 +272,11 @@ const PAGE_SLOTS: [&[LiveId]; 42] = [
     ids!(page_39),
     ids!(page_40),
     ids!(page_41),
+    ids!(page_42),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 42] = [
+const RAIL_ROWS: [&[LiveId]; 43] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -316,6 +319,7 @@ const RAIL_ROWS: [&[LiveId]; 42] = [
     ids!(rail_page_39),
     ids!(rail_page_40),
     ids!(rail_page_41),
+    ids!(rail_page_42),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1511,6 +1515,69 @@ use makepad_component::mp::hover_card::HoverIntent;
             .set_highlighted(cx, &written, &[]);
     }
 
+    /// Fill the searchable lists on the searching page, and print what each holds and shows.
+    ///
+    /// The third case is the one that matters: **select a row, then narrow the list**, and print the selection before and
+    /// after — because the defect this widget was written around is exactly a selection that moves when the filter does,
+    /// and it is invisible until you type.
+    fn seed_searching(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::searchable_list::{
+            rows, total_matches, MpSearchableListWidgetRefExt, SLOTS,
+        };
+
+        let six: Vec<String> = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta"]
+            .iter()
+            .map(|item| item.to_string())
+            .collect();
+        let many: Vec<String> = (1..=SLOTS + 8)
+            .map(|index| format!("Component {index}"))
+            .collect();
+
+        for (id, items) in [
+            (ids!(searching_six), &six),
+            (ids!(searching_selected), &six),
+            (ids!(searching_many), &many),
+        ] {
+            let view = self.ui.mp_searchable_list(cx, id);
+            view.set_items(cx, items.clone());
+            println!(
+                "SEARCHING items={} shown={} total={} at query=\"\"",
+                items.len(),
+                rows(items, "", None).len(),
+                total_matches(items, ""),
+            );
+        }
+
+        // **The selection test, on the page.** Select item 2 (`Gamma`) and narrow to `et`, which **hides `Gamma`** —
+        // `Alpha` and `Gamma` both contain `a`, so a query of `a` would have left it on screen and proved nothing. What
+        // the run has to show is that the selection is still `Gamma` while `Gamma` is not among the rows. The v2 widget
+        // would have reported whatever landed at position 2 of the narrowed list; this one reports `Gamma`.
+        let view = self.ui.mp_searchable_list(cx, ids!(searching_selected));
+        view.set_selected(cx, Some(2));
+        let before = view.selected_text();
+        view.set_query(cx, "et");
+        // The selected item must be **absent from the rows** for this to be evidence at all.
+        assert!(
+            !view.rows().iter().any(|row| row.text == "Gamma"),
+            "the narrowed list still shows the selection, so the case proves nothing"
+        );
+        let narrowed = view.rows();
+        let after = view.selected_text();
+        println!(
+            "SEARCHING select=2 before={before:?} narrowed_to={:?} after={after:?} still_gamma={}",
+            narrowed.iter().map(|row| row.text.as_str()).collect::<Vec<_>>(),
+            after.as_deref() == Some("Gamma"),
+        );
+        // ...and cleared, so the next thing typed is the reader's own query rather than this one.
+        view.set_query(cx, "");
+        let wide = view.rows();
+        println!(
+            "SEARCHING cleared shown={} still_selected={:?}",
+            wide.len(),
+            view.selected_text()
+        );
+    }
+
     /// Fill the number inputs on the numbers page, and print what each holds after it disagreed with its input.
     ///
     /// **Every case prints the value the widget landed on, not the value it was sent** — because three of the four are
@@ -2272,6 +2339,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_searching(cx);
         self.seed_numbers(cx);
         self.seed_steps(cx);
         self.seed_details(cx);
@@ -2904,7 +2972,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 42] = [
+    const SLOT_PAGES: [&str; 43] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -2947,6 +3015,7 @@ mod tests {
         "mod.gallery.pages.details",
         "mod.gallery.pages.steps",
         "mod.gallery.pages.numbers",
+        "mod.gallery.pages.searching",
     ];
 
     #[test]

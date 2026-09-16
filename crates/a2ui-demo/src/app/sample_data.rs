@@ -782,3 +782,60 @@ pub(crate) fn get_sample_number() -> String {
     ]"##
     .to_string()
 }
+
+/// A fixture whose only job is to reach the **searchable list**, named `A2UI_SAMPLE=search`.
+///
+/// The fifth of these. It carries **more items than the ten slots** on purpose, so the run's output shows the count and
+/// the shown rows differing — which is the case the ported widget's `more` line exists for, and the case a fixture with
+/// three items would hide.
+pub(crate) fn get_sample_search() -> String {
+    let items: Vec<String> = (1..=15)
+        .map(|index| format!("{{\"literalString\": \"Component {index}\"}}"))
+        .collect();
+    format!(
+        r##"[
+        {{
+            "beginRendering": {{
+                "surfaceId": "main",
+                "root": "root-column"
+            }}
+        }},
+        {{
+            "surfaceUpdate": {{
+                "surfaceId": "main",
+                "components": [
+                    {{
+                        "id": "root-column",
+                        "component": {{
+                            "Column": {{
+                                "children": {{
+                                    "explicitList": ["title", "searchable"]
+                                }}
+                            }}
+                        }}
+                    }},
+                    {{
+                        "id": "title",
+                        "component": {{
+                            "Text": {{
+                                "text": {{"literalString": "Components"}},
+                                "usageHint": "h1"
+                            }}
+                        }}
+                    }},
+                    {{
+                        "id": "searchable",
+                        "component": {{
+                            "SearchableList": {{
+                                "items": [{}],
+                                "placeholder": {{"literalString": "Filter components"}}
+                            }}
+                        }}
+                    }}
+                ]
+            }}
+        }}
+    ]"##,
+        items.join(", ")
+    )
+}
