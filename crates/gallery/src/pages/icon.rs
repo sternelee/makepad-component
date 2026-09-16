@@ -65,11 +65,12 @@ script_mod! {
         }
 
         Section{
-            Caption{ text: "In a button — the size a button's own rung implies, with no number written" }
+            Caption{ text: "In a button — a `glyph` property rather than a child `MpIcon`, because a button is not a container: a child is never drawn and never errors. This page shipped for a while with icons that rendered as plain buttons and logged nothing. Leading by default; `glyph_trailing: true` puts it after the label, which is what a select's chevron is" }
             Row{
-                mod.mp.MpButton{ mod.mp.MpIcon{ width: 14, height: 14, control: mod.mpc.ControlSize.Small, glyph: "\u{f067}" } text: "New" }
-                mod.mp.MpButton{ style: mod.mp.ButtonStyle.Prominent, mod.mp.MpIcon{ glyph: "\u{f0c7}" } text: "Save" }
-                mod.mp.MpButton{ style: mod.mp.ButtonStyle.Ghost, mod.mp.MpIcon{ glyph: "\u{f00d}" } text: "Close" }
+                mod.mp.MpButton{ glyph: "\u{f067}", text: "New" }
+                mod.mp.MpButton{ style: mod.mp.ButtonStyle.Prominent, glyph: "\u{f0c7}", text: "Save" }
+                mod.mp.MpButton{ style: mod.mp.ButtonStyle.Ghost, glyph: "\u{f00d}", text: "Close" }
+                mod.mp.MpButton{ glyph: "\u{f0d7}", glyph_trailing: true, text: "Options" }
             }
         }
 

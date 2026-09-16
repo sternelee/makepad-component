@@ -111,6 +111,22 @@ script_mod! {
             color: #x00000000
         }
 
+        // The leading or trailing glyph, as the character itself.
+        //
+        // **A property, not a child `MpIcon`.** This widget is not a container —
+        // it has no `#[deref] view` — so a child is never drawn and never errors,
+        // which is the worst of both: the Icon page shipped for a while with
+        // "icons in buttons" that rendered as plain buttons and logged nothing.
+        // A glyph belongs to the button's own row, like its label.
+        draw_icon +: {
+            text_style: theme.font_icons{font_size: 11.0}
+            color: #x00000000
+        }
+        glyph: ""
+        // `true` puts the glyph after the label, which is what a select's
+        // disclosure chevron is.
+        glyph_trailing: false
+
         text: "Button"
     }
 
@@ -212,6 +228,14 @@ pub struct MpButton {
     control: ControlSize,
     #[live]
     text: ArcStringMut,
+    /// The leading or trailing glyph. See the DSL comment for why this is a
+    /// property rather than a child widget.
+    #[live]
+    glyph: ArcStringMut,
+    #[live]
+    glyph_trailing: bool,
+    #[live]
+    draw_icon: DrawText,
     #[live]
     disabled: bool,
 
@@ -308,6 +332,15 @@ impl MpButton {
     pub fn set_text(&mut self, cx: &mut Cx, text: &str) {
         self.text.as_mut_empty().push_str(text);
         self.redraw(cx);
+    }
+
+    pub fn set_glyph(&mut self, cx: &mut Cx, glyph: &str) {
+        self.glyph.as_mut_empty().push_str(glyph);
+        self.redraw(cx);
+    }
+
+    pub fn glyph(&self) -> &str {
+        self.glyph.as_ref()
     }
 
     pub fn style(&self) -> MpButtonStyle {
@@ -427,13 +460,29 @@ impl Widget for MpButton {
         self.draw_text.text_style.line_spacing = metrics.leading;
         self.draw_text.color = plate.ink;
 
+        // Both the glyph and the label are drawn inside the button's own turtle,
+        // whose `flow: Right` and `spacing` place them as one row — the same
+        // reason `MpTree` and `MpList` draw their glyphs rather than hosting them.
+        self.draw_icon.color = plate.ink;
+        self.draw_icon.text_style.font_size = (metrics.size() * 1.05) as f32;
+        let glyph = self.glyph.as_ref();
+        let has_glyph = !glyph.is_empty();
+
         self.draw_bg.begin(cx, walk, self.layout);
+        if has_glyph && !self.glyph_trailing {
+            self.draw_icon
+                .draw_walk(cx, Walk::fit(), Align::default(), glyph);
+        }
         self.draw_text.draw_walk(
             cx,
             Walk::fit(),
             Align::default(),
             self.text.as_ref(),
         );
+        if has_glyph && self.glyph_trailing {
+            self.draw_icon
+                .draw_walk(cx, Walk::fit(), Align::default(), glyph);
+        }
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
 
@@ -456,6 +505,12 @@ impl MpButtonRef {
     pub fn set_text(&self, cx: &mut Cx, text: &str) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.set_text(cx, text);
+        }
+    }
+
+    pub fn set_glyph(&self, cx: &mut Cx, glyph: &str) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.set_glyph(cx, glyph);
         }
     }
 

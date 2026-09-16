@@ -147,6 +147,28 @@ build on).
 | `mp/text.rs` | Measuring and clipping one line, shared by the three row-painting widgets. |
 | `mp/list.rs` | `MpList` — a glyph, a label and a trailing detail. The third data widget and the simplest. |
 
+### A widget that is not a container drops its children silently
+
+The Icon page shipped a row captioned "In a button" containing
+`MpButton{ MpIcon{..} text: "New" }`, and the glyphs **never drew**. `MpButton` has
+no `#[deref] view`, so it is not a container: a child is never drawn, never
+errors, and leaves zero `[E]` lines. Re-reading my own earlier screenshot is what
+caught it — the buttons rendered as plain buttons and I had described the row as
+working.
+
+The fix is a `glyph` **property** on the button (drawn in the button's own row,
+which already has `flow: Right` and a `spacing`), plus `glyph_trailing` for the
+chevron a select's face needs. Same shape as the tree's chevron and the list's
+leading glyph: **a row is a string and a glyph, not a composition**, and hosting a
+widget to get one is the widget-per-row cost coming back through the door.
+
+The general lesson, and it is the hardest one in this document to act on: **a
+silent failure and a working feature look identical in a log.** Three of this
+port's faults produced zero errors and drew nothing — the zero-sized overlay, the
+`Fit`-measured self-painted widget, and this. All three were found by looking at a
+screenshot rather than at a log, and one of them was found by looking at a
+screenshot *again*, months of commits later.
+
 ### One arithmetic, three widgets
 
 `MpTable` and `MpTree` each grew their own line-measurement — one with a
