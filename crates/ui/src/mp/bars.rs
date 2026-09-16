@@ -111,10 +111,22 @@ script_mod! {
         }
 
         controlbar_leading := mod.mp.Row{
+            // **`Fit`, and there must be only one `Fill` among a bar's children.**
+            //
+            // A segmented control painted two of its three labels, and the cause was structural rather than in
+            // the control: this group and the spacer below were **both** `Fill`, so they **split** the bar's
+            // remaining space — the group got half, and a child drawing wider than its cell is clipped to it.
+            // Which it is: `draw_abs` from inside a widget is clipped to the parent's cell as well as `begin`,
+            // so nothing the child draws can escape it.
+            //
+            // `Fit` and a declared width is the combination that works: `mp/segmented.rs` sets its own
+            // `Fixed` walk in `set_segments`, which runs between frames, so the parent's next layout pass reads a
+            // number instead of a `Fit` it cannot resolve.
             width: Fit
             height: Fit
             spacing: 4
         }
+        // The **only** `Fill` in the bar. A second one splits the leftover space with the leading group.
         controlbar_spacer := View{
             width: Fill
             height: Fill

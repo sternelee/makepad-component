@@ -812,6 +812,32 @@ multiplied by `DPI` like everything else. Without it the measured label came out
 returned by a different route. **That is the third time this factor has been the answer**, so it now has one
 home and a doc comment naming the two ways it is met.
 
+### Six attempts on the clipped panel, and the four things it is *not*
+
+The segmented control's panel paints ~193 while its walk says 276.3, and `Preview` is invisible. Six attempts:
+
+1. **A bigger pad** (`SLOT_PAD_X` 14 → 16) to absorb an estimate's error. No change.
+2. **A glyph correction** in `mp/text.rs` for symbols. No change.
+3. **The DPI factor** the estimate had always been missing. No change.
+4. **Removing the estimate entirely** — `DrawText::layout` *is* public and returns the renderer's own number, so
+   `text::measured_width` replaced it (and cost a screenshot to find that `size_in_lpxs` needs the same DPI
+   conversion). The geometry got **more** correct and the paint did not change.
+5. **Moving the width decision from draw time to `set_segments`** — a parent reads its children's *declared*
+   walks before calling their `draw_walk`, so a widget that sets its own width while drawing is a frame too late
+   every frame. Kept, because it is right, and it did not fix this.
+6. **`width: 400` in the DSL.** This one is decisive: the **labels spread out** (following `rect.size.x`) and the
+   **panel stayed at ~193**. So the panel is not drawn from the walk the widget is given.
+
+What that bought, and why it is recorded: the fault is **not the measurement**, **not the declared width**, and
+**everything a child draws is clipped to its parent's cell** — `draw_abs` as well as `begin`, since the magenta
+slot markers lost their third bar for the same reason. The one structural fact verified on the way is that **two
+`Fill` siblings in a bar split the remaining space**, which is now written into `mp/bars.rs` beside the spacer.
+
+**Not isolated**: with one `Fill`, a `Fit` leading group and a declared `Fixed` width, the cell is still ~193. So
+the rule being tripped is Makepad's `View{flow: Right}` cell sizing for `Fit` children, and the next step is to
+read *that* rather than to touch the control again. Recorded with the four things it is not, because that is what
+six attempts bought and it is the part that saves the seventh.
+
 ### One thing the measurement did *not* fix, recorded as an open issue
 
 With the labels measured, the control's geometry is **provably right**. `MP_SEG_DEBUG` printed the measured

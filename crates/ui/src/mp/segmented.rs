@@ -64,18 +64,32 @@ use crate::mp::text;
 /// point conversion), so this is air and nothing else: 14 points of it, which is where it started before it was
 /// asked to hide an error.
 ///
-/// ## One thing the measurement did not fix, recorded rather than left as a mystery
+/// ## What the measurement did *not* fix, narrowed by six attempts
 ///
-/// With the labels measured, the control's geometry is **provably right**: `MP_SEG_DEBUG` printed the three
-/// measured widths (`Source=55.9 Split=36.7 Preview=64.1`), the box at `276.3`, each label's x, and the area
-/// each draw landed in — all three inside the box, `Preview` ending at 262.3 of 276.3. And the **painted** box
-/// measures about 195 from the screenshot, with `Preview` not visible at all.
+/// The labels are measured now, so this control's geometry is **provably right**: `MP_SEG_DEBUG` printed the
+/// measured widths (`Source=55.9 Split=36.7 Preview=64.1`), the box at `276.3`, each label's x, and the area each
+/// draw landed in — all three inside the box, `Preview` ending at 262.3 of 276.3. The **painted** panel is about
+/// **193**, and `Preview` is invisible.
 ///
-/// So the walk this widget computes is not the box it draws, by about 80 points, and the fault is **not in this
-/// file**: the numbers it hands the renderer are self-consistent. It is recorded here because it is the second
-/// time this port has met the same shape — `mp/markdown.rs` set a width and read back a different one — and the
-/// next person should start from "the walk is truncated between the widget and the paint" rather than from
-/// "the measurement is wrong", which is where three earlier attempts went.
+/// Six attempts narrowed it to this:
+///
+/// - **It is not the measurement.** Three attempts went after the estimate; the fourth replaced it with
+///   `DrawText::layout`'s own number. The geometry got *more* correct and the paint did not change.
+/// - **It is not the declared width.** Setting `width: 400` in the DSL moved the **labels** (they spread out,
+///   following `rect.size.x` = 400) and left the **panel** at ~193. So the panel is not drawn from the walk the
+///   widget is given.
+/// - **Everything this widget draws is clipped to its parent's cell** — not just `begin`, but `draw_abs` too.
+///   The magenta slot markers were missing their third bar for the same reason: nothing a child draws escapes its
+///   cell.
+/// - **Two `Fill` siblings in a bar split the remaining space.** Verified by making the bar's leading group `Fill`
+///   alongside the spacer: the group's allocation changed, so the group and the spacer were sharing. `mp/bars.rs`
+///   now says a bar may have **one** `Fill`, which is a real finding even though it did not fix this.
+///
+/// **Not isolated**: with one `Fill`, a `Fit` leading group, and a declared `Fixed` width, the cell is still ~193.
+/// So the allocation rule this control falls foul of is in Makepad's `View{flow: Right}` cell sizing for `Fit`
+/// children — and the next step is to read that, not to touch this file. Recorded rather than left as a mystery,
+/// and recorded with the four things it is *not*, because that is what six attempts bought and it is the part that
+/// saves the seventh.
 const SLOT_PAD_X: f64 = 14.0;
 
 /// How far the plate is inset from its slot.
@@ -289,6 +303,20 @@ impl MpSegmented {
         self.segments = segments;
         self.active = valid(self.active, self.segments.len());
         self.hovered = None;
+        // **The width is decided here, on the way in, and not in `draw_walk`.**
+        //
+        // A parent lays its children out by reading their **declared** `walk`, and only then calls their
+        // `draw_walk`. So a widget that sets its own width *while drawing* is a frame too late every frame: the
+        // parent allocated nothing, and everything the child drew — including its `draw_abs` markers and
+        // labels — was clipped to that. A segmented control painted two of its three labels, and three attempts
+        // to fix it went after the *measurement* rather than after **when** the measurement was applied.
+        //
+        // `set_segments` has a `Cx`, which is what measuring a label needs, and it runs between frames. So the
+        // size is known before the next layout pass and the parent reads a `Fixed` walk.
+        if !self.segments.is_empty() {
+            let width = self.content_width(cx);
+            self.walk.width = Size::Fixed(width);
+        }
         self.redraw(cx);
     }
 
@@ -497,49 +525,6 @@ impl Widget for MpSegmented {
         self.area = self.draw_bg.area();
         let count = self.segments.len();
         let line_box = font * 1.2;
-
-        // The plate, under every label so a label is never covered by it.
-        if let Some(index) = self.active {
-            if let Some((left, width)) = slot_span(index, count, rect.size.x) {
-                self.draw_bg.fill = plate;
-                self.draw_bg.border_width = 0.0;
-                self.draw_bg.radius = (radius - PLATE_INSET as f32).max(1.0);
-                self.draw_bg.draw_abs(
-                    cx,
-                    Rect {
-                        pos: rect.pos
-                            + dvec2(left + PLATE_INSET, PLATE_INSET),
-                        size: dvec2(width - PLATE_INSET * 2.0, rect.size.y - PLATE_INSET * 2.0),
-                    },
-                );
-                self.draw_bg.border_width = 1.0;
-                self.draw_bg.fill = track;
-            }
-        }
-
-        // A wash on the segment under the pointer, but never on the selected one —
-        // a hover that changed the plate's colour would read as a second selection.
-        if let Some(index) = self.hovered {
-            if Some(index) != self.active {
-                if let Some((left, width)) = slot_span(index, count, rect.size.x) {
-                    self.draw_bg.fill = hover_wash;
-                    self.draw_bg.border_width = 0.0;
-                    self.draw_bg.radius = (radius - PLATE_INSET as f32).max(1.0);
-                    self.draw_bg.draw_abs(
-                        cx,
-                        Rect {
-                            pos: rect.pos + dvec2(left + PLATE_INSET, PLATE_INSET),
-                            size: dvec2(
-                                width - PLATE_INSET * 2.0,
-                                rect.size.y - PLATE_INSET * 2.0,
-                            ),
-                        },
-                    );
-                    self.draw_bg.border_width = 1.0;
-                    self.draw_bg.fill = track;
-                }
-            }
-        }
 
         for (index, label) in self.segments.iter().enumerate() {
             let Some((left, width)) = slot_span(index, count, rect.size.x) else {
