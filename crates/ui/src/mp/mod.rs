@@ -50,6 +50,7 @@ pub mod focus;
 pub mod history;
 pub mod hover_card;
 pub mod icon;
+pub mod icons;
 pub mod input;
 pub mod keys;
 pub mod layout;

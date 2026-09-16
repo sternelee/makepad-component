@@ -718,13 +718,28 @@ impl Widget for MpDate {
             &title,
         );
 
-        // The arrows are **guillemets from the text face, not chevrons from the icon
-        // face**, and that is a finding rather than a preference: `\u{f053}` and
-        // `\u{f054}` — FontAwesome's chevron-left and chevron-right — are not in this
-        // port's icon subset, so the first render drew two tofu boxes either side of the
-        // month. Nothing errored. The glyphs that *are* in the subset are the ones
-        // already used elsewhere (`f002`, `f067`, `f00c`), and a single glyph that is
-        // missing looks exactly like a glyph that is present until you look at it.
+        // The arrows are **guillemets from the text face**, and the reason is not the one
+        // this comment first gave.
+        //
+        // What it said: that `\u{f053}` and `\u{f054}` — FontAwesome's chevron-left and
+        // chevron-right — "are not in this port's icon subset", so the first render drew two
+        // tofu boxes either side of the month. **That was wrong**, and it was checked later by
+        // parsing the font: `fa-solid-900.ttf` carries **1976** glyphs and both chevrons are
+        // among them.
+        //
+        // The real cause is the **face this draw target uses.** `draw_weekday` declares
+        // `text_style: mod.mpc.type.caption`, which is the *text* face — so a FontAwesome
+        // codepoint drawn through it is a character the font does not have, and a character a
+        // font does not have is tofu. Not an error, not a warning, not a missing glyph box in
+        // any log.
+        //
+        // So the rule is not "is this glyph in FontAwesome" but **"is this glyph in the face
+        // that draws it"**, and the two are different questions with the same symptom. The
+        // fix could have been either answer: a text-face mark (what this is — `‹` and `›` are
+        // in IBM Plex), or a second `DrawText` carrying `theme.font_icons` for the two arrows.
+        // The text face is cheaper for two marks in a header, and `tests/icons.rs` now checks
+        // the other half mechanically: a file that writes a FontAwesome codepoint must reach
+        // the icon face, one way or the other.
         self.draw_weekday.color = if self.hovered_nav == Some(0) {
             strong
         } else {

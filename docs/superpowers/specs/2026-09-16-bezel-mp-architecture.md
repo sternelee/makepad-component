@@ -158,6 +158,7 @@ build on).
 | `mp/focus.rs` | `FocusRegistry` / `register` / `handle_key` — tab traversal. |
 | `mp/hover_card.rs` | `HoverIntent` / `Presence` / `Change` / `MpHoverCard` — a card on hover. |
 | `mp/floating.rs` | `Floating` / `MpFloating` / `MpFloatingLayer` — a panel the reader drags. |
+| `mp/icons.rs` | `glyph::*` / `ALL` / `codepoint` — the declared glyph set. |
 
 ### `floating` was not what its name suggested
 
@@ -545,14 +546,38 @@ the pre-epoch sign case where `div_euclid` floors and `/` would truncate.
 Verified after the fix: the app prints `today=2026-09-17 (offset +28800s)`, matching the
 system's local date.
 
-### A glyph that is missing looks exactly like a glyph that is present
+### A glyph in the wrong face is tofu — and the first explanation of this was wrong
 
-The calendar's month arrows were `\u{f053}` and `\u{f054}` — FontAwesome's
-chevron-left and chevron-right — which are **not in this port's icon subset**, so the
-first render drew two tofu boxes either side of the month name. Nothing errored. They
-are now `‹` and `›` from the text face. The glyphs that *are* in the subset are the ones
-already used elsewhere (`f002`, `f067`, `f00c`), which is why this had never come up
-before.
+The calendar's month arrows were `\u{f053}` and `\u{f054}` and drew as two tofu boxes. The
+note written at the time said FontAwesome's chevrons "are not in this port's icon subset".
+
+**That was false, and it stayed in the spec until it was checked.** Parsing
+`fa-solid-900.ttf` — the face Makepad ships as `theme.font_icons` — shows **1976** codepoints
+with both chevrons among them. The real cause is the **face the draw target uses**:
+`draw_weekday` declares `text_style: mod.mpc.type.caption`, the *text* face, and a character a
+font does not have is tofu — no error, no warning, nothing in any log.
+
+So there are two questions with one symptom, and `mp/icons.rs` plus `tests/icons.rs` now answer
+both mechanically:
+
+1. **Is the glyph in FontAwesome?** `icons::ALL` is the declared set, and the test parses the
+   font's `cmap` table — the table a renderer consults — and asserts every entry is present.
+2. **Is it drawn with the face that carries it?** A file that writes a FontAwesome codepoint must
+   reach `theme.font_icons` either directly or through `MpIcon`. A file with neither is drawing an
+   icon glyph with a text face.
+
+Both were **falsified before being trusted**. Planting the calendar's original mistake — a
+`\u{f053}` in a file whose only face is the text face — makes the second check report
+`["date.rs"]`. Planting an undeclared `\u{f999}` makes the first report `["date.rs: U+F999"]`.
+
+The falsification also found a **gap in the check itself**: the first version restricted its scan
+to the Private Use Area, `0xE000..=0xF8FF`, so a planted `F999` was **skipped entirely** — it is
+above the ceiling. FontAwesome's base is `F000`, not the PUA's, and Pro draws above `F8FF`; the
+bound is `>= F000` now. A check that only looks where it expects to find something is a check
+that cannot find the thing it is for.
+
+The arrows themselves are still `‹` and `›`: they are two marks in a header, and a text-face mark
+is cheaper than a second `DrawText` carrying the icon face.
 
 ### A widget that must exist rather than be composed, and the two bugs its first render showed
 
