@@ -145,7 +145,7 @@ build on).
 | `mp/tree.rs` | `MpTree` — a flat list where each item carries its depth, with the collapsed set owned by the widget. Ten tests, all on the visibility model. |
 | `mp/avatar.rs` | `MpAvatar`, `MpAvatarGroup` — initials with a plate derived from the name, presence reusing the badge tones, and an overlapped group. |
 | `mp/text.rs` | Measuring and clipping one line, shared by the three row-painting widgets. |
-| `mp/list.rs` | `MpList` — a glyph, a label and a trailing detail. The third data widget and the simplest. |
+| `mp/list.rs` | `MpList`, `MpMenu` — a glyph, a label and a trailing detail; a menu is the same widget with one flag. |
 | `mp/feedback.rs` | `MpProgressRing`, `MpSkeleton` — the determinate ring and the shape of content that has not arrived. |
 | `mp/scaffolding.rs` | `MpGroupBox`, `MpGroupBoxPlain`, `MpKbd`, `MpStatCard`, `MpStatRow`, `MpEmptyState` — the assembly-only components: no Rust, and each is a rhythm rather than a drawing. |
 | `mp/pagination.rs` | `MpPagination` — **the arithmetic is tested and the row renders; the page numbers do not draw.** See below. |

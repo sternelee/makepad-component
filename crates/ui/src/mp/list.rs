@@ -62,6 +62,7 @@ script_mod! {
     mod.mp.MpList = set_type_default() do mod.mp.MpListBase{
         width: Fill
         height: Fit
+        show_row_lines: true
 
         draw_label +: {
             text_style: mod.mpc.type.body
@@ -76,6 +77,13 @@ script_mod! {
             text_style: theme.font_icons{font_size: 11.0}
             color: #x00000000
         }
+    }
+    /// A menu, or a command palette's list: rows whose lines appear only where a
+    /// group starts. Same widget, one flag — because a menu *is* a list of rows
+    /// that happen to be commands, and a second widget would be a second copy of
+    /// the row layout, the glyph, the detail and the hit test.
+    mod.mp.MpMenu = set_type_default() do mod.mp.MpList{
+        show_row_lines: false
     }
 }
 
@@ -104,6 +112,17 @@ pub struct ListItem {
     /// no glyph, and the label moves left to where the glyph would have been —
     /// which is what keeps a list of mixed rows from having two left edges.
     pub glyph: String,
+    /// Draw a hairline **above** this row, separating it from the group before it.
+    ///
+    /// A menu's rows are grouped and a palette's are not, and the difference is
+    /// where the lines go: between every row reads as a table, between groups
+    /// reads as sections. So the separator belongs to the row that *starts* a
+    /// group rather than to the list, which is also what lets a caller build a
+    /// menu from data without a second structure for the groups.
+    pub separator: bool,
+    /// Draw the label in the danger tone. A destructive action has to be visible
+    /// as one before it is read, because a menu is scanned and then chosen.
+    pub danger: bool,
 }
 
 impl ListItem {
@@ -112,6 +131,8 @@ impl ListItem {
             label: label.into(),
             detail: String::new(),
             glyph: String::new(),
+            separator: false,
+            danger: false,
         }
     }
 
@@ -122,6 +143,18 @@ impl ListItem {
 
     pub fn glyph(mut self, glyph: impl Into<String>) -> Self {
         self.glyph = glyph.into();
+        self
+    }
+
+    /// Start a group: a hairline above this row.
+    pub fn starts_group(mut self) -> Self {
+        self.separator = true;
+        self
+    }
+
+    /// Mark this row destructive.
+    pub fn destructive(mut self) -> Self {
+        self.danger = true;
         self
     }
 }
@@ -161,6 +194,14 @@ pub struct MpList {
     walk: Walk,
     #[layout]
     layout: Layout,
+
+    /// Whether to draw a hairline between every row.
+    ///
+    /// `true` is a list — a table of things whose rows are peers. `false` is a
+    /// menu or a palette, where only the explicit group separators draw, because a
+    /// line between every command reads as a grid rather than as a menu.
+    #[live]
+    show_row_lines: bool,
 
     #[rust]
     items: Vec<ListItem>,
@@ -300,7 +341,7 @@ impl Widget for MpList {
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
         // Copied out before any mutable use of `cx`; see the note in
         // `mp/table.rs`, which is where this was learned.
-        let (panel, border, hover_wash, selected_wash, muted, body, divider, radius, font, small) = {
+        let (panel, border, hover_wash, selected_wash, muted, body, danger, divider, radius, font, small) = {
             let theme = makepad_theme::Theme::of(cx.cx);
             let p = &theme.paint;
             (
@@ -312,6 +353,7 @@ impl Widget for MpList {
                 p.element_active,
                 p.text_muted,
                 p.text,
+                p.danger,
                 p.divider,
                 makepad_theme::Theme::panel_radius() as f32,
                 theme.metrics(makepad_theme::TextStyle::Body).size() as f64,
@@ -371,7 +413,10 @@ impl Widget for MpList {
                 );
             }
 
-            self.draw_label.color = if is_selected { body } else { body };
+            // The danger tone, not a coloured glyph beside it: a destructive row
+            // is scanned before it is read, and a red mark on the right of a row
+            // is read after the label.
+            self.draw_label.color = if item.danger { danger } else { body };
             self.draw_label
                 .draw_abs(cx, origin + dvec2(Self::label_x(), text_y), &label);
 
@@ -388,12 +433,22 @@ impl Widget for MpList {
                 );
             }
 
-            if index + 1 < self.items.len() {
+            // Between every row for a list, and only where a group starts for a
+            // menu. The separator is drawn at this row's *top*, which is why the
+            // two cases do not share a branch.
+            let line_y = if !self.show_row_lines && item.separator {
+                Some(y)
+            } else if self.show_row_lines && index + 1 < self.items.len() {
+                Some(y + ROW_H - 1.0)
+            } else {
+                None
+            };
+            if let Some(line_y) = line_y {
                 self.draw_bg.fill = divider;
                 self.draw_bg.draw_abs(
                     cx,
                     Rect {
-                        pos: origin + dvec2(0.0, y + ROW_H - 1.0),
+                        pos: origin + dvec2(0.0, line_y),
                         size: dvec2(width, 1.0),
                     },
                 );
@@ -513,5 +568,31 @@ mod tests {
     fn test_an_empty_list_has_no_height_and_no_rows() {
         let items: Vec<ListItem> = Vec::new();
         assert_eq!(items.len() as f64 * ROW_H, 0.0);
+    }
+
+    #[test]
+    fn test_a_group_separator_belongs_to_the_row_that_starts_it() {
+        // Which is what lets a caller build a menu from data without a second
+        // structure for the groups: the separator is a row's own flag, not the
+        // list's map from index to section.
+        let items = vec![
+            ListItem::new("New terminal"),
+            ListItem::new("Duplicate"),
+            ListItem::new("Delete").destructive().starts_group(),
+        ];
+        assert!(!items[0].separator && !items[0].danger);
+        assert!(!items[1].separator && !items[1].danger);
+        assert!(items[2].separator, "the destructive row starts the last group");
+        assert!(items[2].danger);
+    }
+
+    #[test]
+    fn test_the_builders_are_independent() {
+        // A destructive row in the middle of a group, and a group whose rows are
+        // all harmless, are both normal.
+        let danger_only = ListItem::new("Delete").destructive();
+        assert!(danger_only.danger && !danger_only.separator);
+        let group_only = ListItem::new("Settings").starts_group();
+        assert!(group_only.separator && !group_only.danger);
     }
 }

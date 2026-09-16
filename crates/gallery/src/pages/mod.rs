@@ -25,6 +25,7 @@ pub mod status;
 pub mod surface;
 pub mod table;
 pub mod tree;
+pub mod menu;
 pub mod motion;
 pub mod overlay;
 pub mod pagination;
@@ -62,6 +63,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     feedback::script_mod(vm);
     content::script_mod(vm);
     pagination::script_mod(vm);
+    menu::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -218,6 +220,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/pagination.rs",
         blurb: "One function, four cases",
     },
+    Page {
+        title: "Menu",
+        path: "mod.gallery.pages.menu",
+        source: "crates/gallery/src/pages/menu.rs",
+        blurb: "Commands, grouped, with shortcuts",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -301,6 +309,7 @@ mod tests {
             ("crates/gallery/src/pages/feedback.rs", "feedback"),
             ("crates/gallery/src/pages/content.rs", "content"),
             ("crates/gallery/src/pages/pagination.rs", "pagination"),
+            ("crates/gallery/src/pages/menu.rs", "menu"),
         ]
         .into_iter()
         .collect();

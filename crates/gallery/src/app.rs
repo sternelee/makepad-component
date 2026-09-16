@@ -109,6 +109,7 @@ script_mod! {
                         rail_page_20 := RailRow{text: ""}
                         rail_page_21 := RailRow{text: ""}
                         rail_page_22 := RailRow{text: ""}
+                        rail_page_23 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -161,6 +162,7 @@ script_mod! {
                             page_20 := mod.gallery.pages.feedback{}
                             page_21 := mod.gallery.pages.content{}
                             page_22 := mod.gallery.pages.pagination{}
+                            page_23 := mod.gallery.pages.menu{}
                         }
                     }
                 }
@@ -174,7 +176,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 23] = [
+const PAGE_SLOTS: [&[LiveId]; 24] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -198,10 +200,11 @@ const PAGE_SLOTS: [&[LiveId]; 23] = [
     ids!(page_20),
     ids!(page_21),
     ids!(page_22),
+    ids!(page_23),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 23] = [
+const RAIL_ROWS: [&[LiveId]; 24] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -225,6 +228,7 @@ const RAIL_ROWS: [&[LiveId]; 23] = [
     ids!(rail_page_20),
     ids!(rail_page_21),
     ids!(rail_page_22),
+    ids!(rail_page_23),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -480,13 +484,18 @@ impl App {
         // widgets are laid out, so the others' triggers have empty rects and are
         // skipped — which is what lets one environment variable serve every page
         // rather than one variable per page.
-        const PINS: [(&[LiveId], &[LiveId]); 6] = [
+        const PINS: [(&[LiveId], &[LiveId]); 7] = [
             (ids!(pop_form), ids!(pop_form_panel)),
             (ids!(pop_menu), ids!(pop_menu_panel)),
             (ids!(pop_tall), ids!(pop_tall_panel)),
             (ids!(select_face_a), ids!(select_panel_a)),
             (ids!(select_face_b), ids!(select_panel_b)),
             (ids!(select_face_c), ids!(select_panel_c)),
+            // Only the first menu on the menu page: its panel is the tallest of
+            // the three, and pinning all three at once overlays them so completely
+            // that the destructive row at its bottom cannot be seen — which makes
+            // the capture useless for the one thing that page exists to check.
+            (ids!(menu_face_a), ids!(menu_panel_a)),
         ];
         // **Re-asserted on every event, not fired once.** A popover closes on any
         // press outside its panel, and a capture run is not a clean room: raising
@@ -531,6 +540,7 @@ impl App {
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_menus(cx);
     }
 
     /// Fill the table page's tables.
@@ -851,6 +861,45 @@ impl App {
         }
     }
 
+    /// Fill the menu page's three menus.
+    ///
+    /// Built from data, which is the point of the separator being a *row's* flag:
+    /// a menu is assembled from a list of commands and their group starts, with no
+    /// second structure for the sections and no call per line.
+    fn seed_menus(&mut self, cx: &mut Cx) {
+        self.ui.mp_list(cx, ids!(menu_list_a)).set_items(
+            cx,
+            vec![
+                ListItem::new("New Terminal").glyph("\u{f120}").detail("⌘T"),
+                ListItem::new("Split Right").glyph("\u{f0db}").detail("⌘D"),
+                ListItem::new("Rename…").glyph("\u{f044}").starts_group(),
+                ListItem::new("Duplicate").glyph("\u{f24d}").detail("⌘⇧D"),
+                ListItem::new("Move to Space…").glyph("\u{f0c9}").starts_group(),
+                ListItem::new("Delete").glyph("\u{f1f8}").detail("⌘⌫").destructive(),
+            ],
+        );
+
+        self.ui.mp_list(cx, ids!(menu_list_b)).set_items(
+            cx,
+            vec![
+                ListItem::new("Single").detail("⌘1"),
+                ListItem::new("Two columns").detail("⌘2"),
+                ListItem::new("Three columns").detail("⌘3"),
+                ListItem::new("Focus mode").detail("⌘⇧F"),
+            ],
+        );
+
+        self.ui.mp_list(cx, ids!(menu_list_c)).set_items(
+            cx,
+            vec![
+                ListItem::new("Small"),
+                ListItem::new("Regular"),
+                ListItem::new("Large").starts_group(),
+                ListItem::new("Fill the window"),
+            ],
+        );
+    }
+
     /// Write each slider's starting value into its readout.
     fn seed_readouts(&mut self, cx: &mut Cx) {
         const PAIRS: [(&[LiveId], &[LiveId]); 7] = [
@@ -1051,7 +1100,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 23] = [
+    const SLOT_PAGES: [&str; 24] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -1075,6 +1124,7 @@ mod tests {
         "mod.gallery.pages.feedback",
         "mod.gallery.pages.content",
         "mod.gallery.pages.pagination",
+        "mod.gallery.pages.menu",
     ];
 
     #[test]
