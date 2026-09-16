@@ -8,6 +8,7 @@
 //! So the table below is the contract, the rail is painted from it, and
 //! [`tests`] is what stops it drifting.
 
+pub mod avatar;
 pub mod button;
 pub mod controls;
 pub mod foundation;
@@ -48,6 +49,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     status::script_mod(vm);
     table::script_mod(vm);
     tree::script_mod(vm);
+    avatar::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -162,6 +164,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/tree.rs",
         blurb: "A flat list with a hierarchy",
     },
+    Page {
+        title: "Avatar",
+        path: "mod.gallery.pages.avatar",
+        source: "crates/gallery/src/pages/avatar.rs",
+        blurb: "Initials, presence, and the group",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -238,6 +246,7 @@ mod tests {
             ("crates/gallery/src/pages/status.rs", "status"),
             ("crates/gallery/src/pages/table.rs", "table"),
             ("crates/gallery/src/pages/tree.rs", "tree"),
+            ("crates/gallery/src/pages/avatar.rs", "avatar"),
         ]
         .into_iter()
         .collect();

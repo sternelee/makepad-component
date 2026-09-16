@@ -19,6 +19,7 @@ use makepad_component::mp::{
     loaders::MpProgressWidgetRefExt,
     popover::MpPopoverWidgetRefExt,
     table::MpTableWidgetRefExt,
+    avatar::MpAvatarWidgetRefExt,
     tree::{MpTreeWidgetRefExt, TreeItem},
     tooltip::MpTooltipWidgetRefExt,
     slider::MpSliderWidgetRefExt,
@@ -96,6 +97,7 @@ script_mod! {
                         rail_page_13 := RailRow{text: ""}
                         rail_page_14 := RailRow{text: ""}
                         rail_page_15 := RailRow{text: ""}
+                        rail_page_16 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -141,6 +143,7 @@ script_mod! {
                             page_13 := mod.gallery.pages.status{}
                             page_14 := mod.gallery.pages.table{}
                             page_15 := mod.gallery.pages.tree{}
+                            page_16 := mod.gallery.pages.avatar{}
                         }
                     }
                 }
@@ -154,7 +157,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 16] = [
+const PAGE_SLOTS: [&[LiveId]; 17] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -171,10 +174,11 @@ const PAGE_SLOTS: [&[LiveId]; 16] = [
     ids!(page_13),
     ids!(page_14),
     ids!(page_15),
+    ids!(page_16),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 16] = [
+const RAIL_ROWS: [&[LiveId]; 17] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -191,6 +195,7 @@ const RAIL_ROWS: [&[LiveId]; 16] = [
     ids!(rail_page_13),
     ids!(rail_page_14),
     ids!(rail_page_15),
+    ids!(rail_page_16),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -238,6 +243,7 @@ impl MatchEvent for App {
         self.seed_readouts(cx);
         self.seed_tables(cx);
         self.seed_trees(cx);
+        self.seed_avatars(cx);
         // `GALLERY_TOOLTIP=1` pins the overlay open, anchored to the first
         // trigger. Same justification as `GALLERY_PAGE`: Makepad exposes no
         // accessibility tree, so a capture script cannot hover a button, and an
@@ -543,6 +549,62 @@ impl App {
         self.ui.mp_tree(cx, ids!(long_tree)).set_items(cx, long);
     }
 
+    /// Give the avatar page's faces their names.
+    ///
+    /// `set_name` sets the initials *and* the plate, in one call, because the two
+    /// cannot be allowed to disagree — which is the whole reason the tone is
+    /// derived from the name rather than chosen.
+    fn seed_avatars(&mut self, cx: &mut Cx) {
+        for (path, name) in [
+            (ids!(avatar_small), "Ada Lovelace"),
+            (ids!(avatar_regular), "Grace Brewster Hopper"),
+            (ids!(avatar_large), "Alan Turing"),
+            (ids!(av_a), "Ada Lovelace"),
+            (ids!(av_b), "Grace Hopper"),
+            (ids!(av_c), "Alan Turing"),
+            (ids!(av_d), "Barbara Liskov"),
+            (ids!(av_e), "Ken Thompson"),
+            // The second row repeats the first, in order: the page's own check
+            // that a derived colour is stable rather than assigned.
+            (ids!(av_a2), "Ada Lovelace"),
+            (ids!(av_b2), "Grace Hopper"),
+            (ids!(av_c2), "Alan Turing"),
+            (ids!(av_d2), "Barbara Liskov"),
+            (ids!(av_e2), "Ken Thompson"),
+            (ids!(av_row_a), "Ada Lovelace"),
+            (ids!(av_row_b), "Grace Brewster Hopper"),
+            (ids!(av_row_c), "Alan Turing"),
+        ] {
+            self.ui.mp_avatar(cx, path).set_name(cx, name);
+        }
+
+        use makepad_component::mp::status::StatusTone;
+        for (path, tone) in [
+            (ids!(pres_off), StatusTone::Neutral),
+            (ids!(pres_ok), StatusTone::Success),
+            (ids!(pres_away), StatusTone::Warning),
+            (ids!(pres_failed), StatusTone::Danger),
+            (ids!(pres_busy), StatusTone::Busy),
+        ] {
+            self.ui.mp_avatar(cx, path).set_name(cx, "Ada Lovelace");
+            self.ui.mp_avatar(cx, path).set_presence(cx, tone);
+        }
+        // The one with no dot at all: a person who is simply not tracked for
+        // presence, which is different from one who is offline.
+        self.ui.mp_avatar(cx, ids!(pres_none)).set_name(cx, "Alan Turing");
+
+        let group = self.ui.view(cx, ids!(avatar_group));
+        for (path, name) in [
+            (ids!(one), "Ada Lovelace"),
+            (ids!(two), "Grace Hopper"),
+            (ids!(three), "Alan Turing"),
+            (ids!(four), "Barbara Liskov"),
+        ] {
+            group.mp_avatar(cx, path).set_name(cx, name);
+        }
+        group.mp_avatar(cx, ids!(tail)).set_text(cx, "+3");
+    }
+
     /// Write each slider's starting value into its readout.
     fn seed_readouts(&mut self, cx: &mut Cx) {
         const PAIRS: [(&[LiveId], &[LiveId]); 7] = [
@@ -739,7 +801,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 16] = [
+    const SLOT_PAGES: [&str; 17] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -756,6 +818,7 @@ mod tests {
         "mod.gallery.pages.status",
         "mod.gallery.pages.table",
         "mod.gallery.pages.tree",
+        "mod.gallery.pages.avatar",
     ];
 
     #[test]

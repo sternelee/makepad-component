@@ -408,6 +408,56 @@ pub mod plates {
         color::flatten(paint.element_active, rest)
     }
 
+    /// Whichever of the palette's two ink extremes reads better on `plate`.
+    ///
+    /// The two extremes are `solid` (the light plate tone) and `on_solid` (the
+    /// dark label tone); both are verified against the palette's own plates, so
+    /// picking the one with more contrast is a choice between two colours that
+    /// are known to work rather than an invented third. A threshold on lightness
+    /// — which the first version used — is wrong at both ends: the page's
+    /// background is near-black in dark and *white* in light, so "use the page's
+    /// dark tone on a pale plate" inverts in light and puts white on white.
+    /// **Never returns an unreadable label.** A saturated plate at the
+    /// *crossover* lightness — where black and white give equal contrast, sRGB
+    /// luminance ≈ 0.179 — caps at 4.58:1 for pure black, and the palette's own
+    /// extremes are not pure, so neither reaches 4.5. Light's `busy` pink is
+    /// exactly there: 4.35. When the palette cannot do it, the ink goes to
+    /// whichever pure end reads better, which always clears the floor.
+    ///
+    /// The same rule the theme's brand plate uses for the same reason; a plate
+    /// that cannot carry a label is not a plate.
+    pub fn ink_on(plate: Vec4f, paint: &Paint) -> Vec4f {
+        let dark = paint.on_solid;
+        let light = paint.solid;
+        let (ink, ratio) = if makepad_theme::color::contrast_ratio(dark, plate)
+            >= makepad_theme::color::contrast_ratio(light, plate)
+        {
+            (dark, makepad_theme::color::contrast_ratio(dark, plate))
+        } else {
+            (light, makepad_theme::color::contrast_ratio(light, plate))
+        };
+        if ratio >= 4.5 {
+            return ink;
+        }
+        let (white, black) = (
+            makepad_theme::color::grey(0xff),
+            makepad_theme::color::grey(0x00),
+        );
+        let pure = if makepad_theme::color::contrast_ratio(white, plate)
+            >= makepad_theme::color::contrast_ratio(black, plate)
+        {
+            white
+        } else {
+            black
+        };
+        debug_assert!(
+            makepad_theme::color::contrast_ratio(pure, plate) >= 4.5,
+            "no ink can label this plate: {}",
+            makepad_theme::color::contrast_ratio(pure, plate)
+        );
+        pure
+    }
+
     /// Whether a plate is pale enough that its label must be the page's dark
     /// tone rather than the palette's body ink.
     ///
@@ -612,5 +662,48 @@ mod hover_tests {
         // is what it matches against its own table of triggers.
         let batch: Vec<Action> = vec![action(uid(77), ControlHover::Entered)];
         assert_eq!(hovers(&batch)[0].0, uid(77));
+    }
+}
+
+#[cfg(test)]
+mod ink_tests {
+    use super::*;
+    use makepad_theme::{Appearance, Theme};
+
+    #[test]
+    fn test_ink_on_never_returns_an_unreadable_label() {
+        // The property, over a spread of plates across both appearances: whatever
+        // a caller paints, the label on it clears AA. The failure this caught was
+        // a saturated pink at the crossover lightness where neither of the
+        // palette's own extremes reaches 4.5.
+        let mut plates = Vec::new();
+        for appearance in [Appearance::Dark, Appearance::Light] {
+            let theme = Theme::for_appearance(appearance);
+            let p = &theme.paint;
+            plates.extend([
+                p.surface_raised,
+                p.solid,
+                p.accent_strong,
+                p.success_muted,
+                p.warning_muted,
+                p.danger_muted,
+                p.busy,
+                p.bg,
+                p.text,
+                p.surface_card,
+            ]);
+        }
+        // Plus the crossover itself, where a plate is hardest to label.
+        plates.push(makepad_theme::color::oklch(0.58, 0.16, 25.0));
+        plates.push(makepad_theme::color::oklch(0.592, 0.249, 0.584));
+
+        for plate in plates {
+            for appearance in [Appearance::Dark, Appearance::Light] {
+                let theme = Theme::for_appearance(appearance);
+                let ink = plates::ink_on(plate, &theme.paint);
+                let ratio = makepad_theme::color::contrast_ratio(ink, plate);
+                assert!(ratio >= 4.5, "{appearance:?} on {plate:?}: {ratio}");
+            }
+        }
     }
 }

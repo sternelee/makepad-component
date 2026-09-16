@@ -172,17 +172,20 @@ pub enum StatusTone {
 
 /// One tone's resolved paint, before it is written to the shader.
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct Plate {
-    fill: Vec4f,
-    border: Vec4f,
-    border_width: f32,
-    ink: Vec4f,
-    dot: Vec4f,
+pub(crate) struct Plate {
+    pub(crate) fill: Vec4f,
+    pub(crate) border: Vec4f,
+    pub(crate) border_width: f32,
+    pub(crate) ink: Vec4f,
+    pub(crate) dot: Vec4f,
 }
 
 impl StatusTone {
     /// This tone as a filled plate — what a badge paints.
-    fn badge(self, theme: &makepad_theme::Theme) -> Plate {
+    ///
+    /// `pub(crate)` because the avatar reuses it for its presence dot, so a
+    /// person's state and a badge's state are the same six tones.
+    pub(crate) fn badge(self, theme: &makepad_theme::Theme) -> Plate {
         let p = &theme.paint;
         match self {
             StatusTone::Neutral => Plate {
@@ -251,15 +254,11 @@ fn status_plate(muted: Vec4f, p: &makepad_theme::Paint) -> Plate {
         fill: muted,
         border: muted,
         border_width: 0.0,
-        // Status plates are pale by construction, so the ink is the page's own
-        // darkest tone rather than the hue: a hue on its own pale tint is the
-        // pairing a palette cannot hold a contrast floor for.
-        ink: if crate::mp::control::plates::relative_is_pale(muted) {
-            p.bg
-        } else {
-            p.text
-        },
-        dot: p.text,
+        // The better of the palette's two ink extremes, not the hue: a hue on
+        // its own tint is the pairing a palette cannot hold a floor for, and a
+        // lightness threshold inverts in light mode.
+        ink: crate::mp::control::plates::ink_on(muted, p),
+        dot: crate::mp::control::plates::ink_on(muted, p),
     }
 }
 
@@ -485,11 +484,22 @@ mod tests {
     }
 
     #[test]
-    fn test_a_badge_reads_at_aa_on_its_own_plate() {
+    fn test_every_badge_tone_reads_at_aa_on_its_own_plate() {
         // The property the tone enum exists to promise: a caller picks a tone and
-        // gets a legible plate, without choosing an ink.
+        // gets a legible plate, without choosing an ink. Every tone, not the
+        // three the first version checked — the status plates are the ones where
+        // a lightness threshold on the ink goes wrong, and they were the ones
+        // left out.
         for theme in themes() {
-            for tone in [StatusTone::Neutral, StatusTone::Solid, StatusTone::Accent] {
+            for tone in [
+                StatusTone::Neutral,
+                StatusTone::Solid,
+                StatusTone::Accent,
+                StatusTone::Success,
+                StatusTone::Warning,
+                StatusTone::Danger,
+                StatusTone::Busy,
+            ] {
                 let plate = tone.badge(&theme);
                 let ratio = color::contrast_ratio(plate.ink, plate.fill);
                 assert!(

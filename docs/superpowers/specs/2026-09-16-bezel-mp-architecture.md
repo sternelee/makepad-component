@@ -143,6 +143,30 @@ build on).
 | `mp/status.rs` | `MpBadge`, `MpTag` — six tones, two assembled looks from one shader. A badge reports, a tag classifies. |
 | `mp/table.rs` | `MpTable` — columns, rows, row hover and selection. One widget rather than one per cell, with the layout arithmetic in a single function the painter, the hover and the click all read. |
 | `mp/tree.rs` | `MpTree` — a flat list where each item carries its depth, with the collapsed set owned by the widget. Ten tests, all on the visibility model. |
+| `mp/avatar.rs` | `MpAvatar`, `MpAvatarGroup` — initials with a plate derived from the name, presence reusing the badge tones, and an overlapped group. |
+
+### The ink rule, and the bug that widening a test found
+
+`mp::control::plates::ink_on` picks a plate's label ink, and its first version
+chose between the palette's two extremes by a *lightness threshold*. Broadening
+the badge test from the three tones it checked to all seven **failed**: light
+`busy`, a saturated pink, measures **4.35:1** — under AA — because it sits near
+the crossover lightness where black and white give equal contrast and the
+palette's own extremes are not pure. The rule now falls back to whichever pure
+end reads better, which always clears the floor, and a property test covers ten
+plates × both appearances. The same rule the theme's brand plate already used,
+for the same reason: a plate that cannot carry a label is not a plate.
+
+Two more traps, both the same one: **`#[derive(Script)]`'s field parser rejects a
+fully-qualified path in a field type.** `crate::mp::status::StatusTone` failed
+where `StatusTone` behind a `use` parses, exactly as `HashSet<usize>` failed in
+`mp/tree.rs`. AGENTS.md's note says commas in generics are the problem; the real
+restriction is any non-trivial path — alias it or import it.
+
+And a registration ordering rule with teeth: **a widget that names another
+widget's enum in its DSL must register after it.** `MpAvatar` names
+`mod.mp.StatusTone` for its presence dot and was registered before `status`,
+which is three runtime errors per use site and nothing at compile time.
 
 ### The third instance of one fault: a self-painted widget has nothing to size it
 

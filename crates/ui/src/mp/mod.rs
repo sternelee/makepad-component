@@ -37,6 +37,7 @@
 //! - **Never `find_widget_action(uid).cast()`.** See [`action`].
 
 pub mod action;
+pub mod avatar;
 pub mod button;
 pub mod checkbox;
 pub mod control;
@@ -78,6 +79,9 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::icon::script_mod(vm);
     crate::mp::status::script_mod(vm);
     crate::mp::table::script_mod(vm);
+    // After `status`: the avatar names `mod.mp.StatusTone` for its presence dot,
+    // and a type that is not registered yet is 3 runtime errors per use site.
+    crate::mp::avatar::script_mod(vm);
     crate::mp::tree::script_mod(vm);
     // The overlay family, whose z-order comes from a DrawList2d rather than
     // from where the author put it in the tree.
