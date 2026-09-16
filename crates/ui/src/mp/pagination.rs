@@ -20,12 +20,11 @@
 //!    The table draws inside a plate tall enough to hold its cells either way; this
 //!    row is 28pt with 12pt of line box in it, so a clip is possible here and not
 //!    there. Drawing the cells before `draw_bg.end` would answer it.
-//! 2. Whether `#[redraw]` on a `draw_bg` whose area is never captured matters.
-//!    This widget and `MpProgressRing` are the only two that never store their
-//!    `Area`, and both have had a fault the other widgets have not.
-//!
-//! That second coincidence is worth the next session's attention: it is the first
-//! candidate this port has for the ring's lost `#[live]` write as well.
+//! 2. Nothing about the `Area`: this widget captures one in its `draw_walk`, and
+//!    that was checked rather than assumed. `MpProgressRing` is the crate's only
+//!    widget with no `Area` at all, and it was briefly recorded here as a shared
+//!    explanation for both faults — the grep says otherwise, and the false
+//!    coincidence is removed rather than left as a lead.
 //!
 //! The arithmetic is still the component's content, and it is exhaustively tested
 //! (eleven tests: no ellipsis when the list fits, ends always shown, constant row
