@@ -117,6 +117,7 @@ script_mod! {
                         rail_page_26 := RailRow{text: ""}
                         rail_page_27 := RailRow{text: ""}
                         rail_page_28 := RailRow{text: ""}
+                        rail_page_29 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -180,6 +181,7 @@ script_mod! {
                             page_26 := mod.gallery.pages.bars{}
                             page_27 := mod.gallery.pages.command_palette{}
                             page_28 := mod.gallery.pages.calendar{}
+                            page_29 := mod.gallery.pages.shortcuts{}
                         }
                     }
                 }
@@ -193,7 +195,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 29] = [
+const PAGE_SLOTS: [&[LiveId]; 30] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -223,10 +225,11 @@ const PAGE_SLOTS: [&[LiveId]; 29] = [
     ids!(page_26),
     ids!(page_27),
     ids!(page_28),
+    ids!(page_29),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 29] = [
+const RAIL_ROWS: [&[LiveId]; 30] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -256,6 +259,7 @@ const RAIL_ROWS: [&[LiveId]; 29] = [
     ids!(rail_page_26),
     ids!(rail_page_27),
     ids!(rail_page_28),
+    ids!(rail_page_29),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -503,6 +507,98 @@ impl App {
                 }
             }
         }
+    }
+
+    /// Declare a keymap and fill the sheet from it.
+    ///
+    /// **Nothing below writes a chord.** Each row's trailing text is
+    /// `Keymap::label(action, platform)`, so the two columns are two views of one
+    /// declaration and a rebinding moves both at once.
+    fn seed_keys(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::keys::{Keymap, Platform};
+
+        let mut keys = Keymap::new();
+        for (action, text) in [
+            ("file.new", "cmd+n"),
+            ("file.open", "cmd+o"),
+            ("file.save", "cmd+s"),
+            ("file.saveAs", "shift+cmd+s"),
+            ("edit.undo", "cmd+z"),
+            ("edit.redo", "shift+cmd+z"),
+            ("edit.find", "cmd+f"),
+            ("view.palette", "shift+cmd+p"),
+            ("view.split", "cmd+d"),
+            ("view.terminal", "ctrl+`"),
+            ("nav.file", "cmd+p"),
+            ("nav.line", "cmd+l"),
+            ("window.close", "cmd+w"),
+        ] {
+            keys.declare(action, text).expect("every binding is a chord");
+        }
+
+        // The labels are resolved, so these lists cannot drift from the bindings.
+        let rows = |platform: Platform| -> Vec<ListItem> {
+            keys.bindings()
+                .iter()
+                .map(|(action, _)| {
+                    ListItem::new(action)
+                        .detail(keys.label(action, platform).unwrap_or_else(|| "(unbound)".into()))
+                })
+                .collect()
+        };
+        self.ui
+            .mp_list(cx, ids!(keys_mac))
+            .set_items(cx, rows(Platform::Macos));
+        self.ui
+            .mp_list(cx, ids!(keys_other))
+            .set_items(cx, rows(Platform::Other));
+
+        // A deliberately broken keymap, because a report that prints nothing is
+        // indistinguishable from one that does not work.
+        let mut broken = Keymap::new();
+        for (action, text) in [
+            ("view.split", "cmd+shift+d"),
+            ("edit.duplicate", "\u{21e7}\u{2318}D"),
+            ("file.save", "cmd+s"),
+            ("file.saveAll", "cmd+s"),
+            ("nav.next", "ctrl+tab"),
+            ("tab.next", "ctrl+tab"),
+        ] {
+            broken
+                .declare(action, text)
+                .expect("every binding is a chord");
+        }
+        let found = broken.conflicts();
+        let conflicts: Vec<ListItem> = found
+            .iter()
+            .map(|(left, right, chord)| {
+                ListItem::new(format!("{left}  \u{2194}  {right}")).detail(chord.clone())
+            })
+            .collect();
+        println!(
+            "KEYS declared {} in the clean map ({} conflicts), {} in the broken map ({} conflicts)",
+            keys.len(),
+            keys.conflicts().len(),
+            broken.len(),
+            found.len()
+        );
+        for (left, right, chord) in &found {
+            println!("KEYS conflict {chord}: {left} and {right}");
+        }
+        self.ui
+            .mp_list(cx, ids!(keys_conflicts))
+            .set_items(cx, conflicts);
+
+        self.ui.label(cx, ids!(keys_note)).set_text(
+            cx,
+            &format!(
+                "{} actions declared \u{b7} {} conflicts \u{b7} file.saveAs prints {} on macOS and {} elsewhere, from one binding",
+                keys.len(),
+                keys.conflicts().len(),
+                keys.label("file.saveAs", Platform::Macos).unwrap_or_default(),
+                keys.label("file.saveAs", Platform::Other).unwrap_or_default(),
+            ),
+        );
     }
 
     /// Give the calendars a real today and an initial selection.
@@ -856,6 +952,7 @@ impl App {
         self.seed_palette(cx);
         self.seed_segmented(cx);
         self.seed_date(cx);
+        self.seed_keys(cx);
     }
 
     /// Fill the table page's tables.
@@ -1476,7 +1573,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 29] = [
+    const SLOT_PAGES: [&str; 30] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -1506,6 +1603,7 @@ mod tests {
         "mod.gallery.pages.bars",
         "mod.gallery.pages.command_palette",
         "mod.gallery.pages.calendar",
+        "mod.gallery.pages.shortcuts",
     ];
 
     #[test]

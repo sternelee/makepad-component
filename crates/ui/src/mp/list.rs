@@ -171,6 +171,22 @@ pub enum MpListAction {
 const ROW_H: f64 = 28.0;
 /// The leading inset, and the room a glyph takes when there is one.
 const PAD: f64 = 10.0;
+
+/// Extra room the row's **trailing** text keeps from the panel's edge.
+///
+/// The detail is right-aligned, and its position is arithmetic on an *estimate* of its
+/// width ([`crate::mp::text`]). An estimate cannot be exact for every string, and the
+/// direction that hurts is an under-estimate: the text runs past the edge instead of
+/// stopping short of it. That is what the Shortcuts page showed — `⇧⌘S` with its `S`
+/// drawn under the page's scroll bar, which **overlays** the panel's right edge.
+///
+/// Raising the estimator's symbol correction as far as the measurements justified (see
+/// `mp/text.rs`) closed most of the gap; this closes the rest, and it is the same
+/// decision `mp/segmented.rs` reached for the same reason: **a slot that carries the
+/// measurement's error margin is better than a label that collides.** Fourteen points is
+/// the residual for a three-glyph chord, and it reads as a wider gap before the panel's
+/// edge, which is a change nobody minds.
+const DETAIL_SLACK: f64 = 14.0;
 const GLYPH_W: f64 = 22.0;
 
 #[derive(Script, ScriptHook, Widget)]
@@ -341,7 +357,7 @@ impl Widget for MpList {
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
         // Copied out before any mutable use of `cx`; see the note in
         // `mp/table.rs`, which is where this was learned.
-        let (panel, border, hover_wash, selected_wash, muted, body, danger, divider, radius, font, small) = {
+        let (panel, border, hover_wash, selected_wash, muted, body, danger, divider, radius) = {
             let theme = makepad_theme::Theme::of(cx.cx);
             let p = &theme.paint;
             (
@@ -356,10 +372,24 @@ impl Widget for MpList {
                 p.danger,
                 p.divider,
                 makepad_theme::Theme::panel_radius() as f32,
-                theme.metrics(makepad_theme::TextStyle::Body).size() as f64,
-                theme.metrics(makepad_theme::TextStyle::Caption).size() as f64,
             )
         };
+
+        // **The font sizes are read back from the draw targets, not taken from the
+        // theme.** The arithmetic below clips and right-aligns, and the paint below that
+        // uses whatever `text_style` the DSL gave each `DrawText`; measuring with
+        // `theme.metrics(...)` instead means measuring with a *different number* than is
+        // painted, and the two only agree if the DSL's `mod.mpc.type.*` happens to resolve
+        // to the theme's own metrics.
+        //
+        // They did not agree, and this is the second widget to pay for it — the fix is
+        // the one `mp/segmented.rs` records, applied here. The symptom was a row's
+        // trailing chord drawn with its last character **past the panel**, on top of the
+        // page's scroll bar, because a right-aligned string was placed by an estimate
+        // that was too small. Naming the size once, from the thing that paints, is what
+        // makes the measurement and the paint incapable of disagreeing.
+        let font = self.draw_label.text_style.font_size as f64;
+        let small = self.draw_detail.text_style.font_size as f64;
 
         self.draw_bg.fill = panel;
         self.draw_bg.border = border;
@@ -421,12 +451,26 @@ impl Widget for MpList {
                 .draw_abs(cx, origin + dvec2(Self::label_x(), text_y), &label);
 
             if !detail.is_empty() {
+                // Temporary evidence, gated so it costs nothing in normal runs: a
+                // right-alignment fault is invisible in a log and a screenshot only
+                // shows the symptom, so the numbers have to come out of the widget.
+                if std::env::var("MP_LIST_DEBUG").is_ok() {
+                    println!(
+                        "LIST row {:?} rect_w={width} pad={PAD} font={small} body={font} \
+                         detail={detail:?} est_w={} x={} end={}",
+                        item.label,
+                        text::width(&detail, small),
+                        text::right_aligned_x(&detail, 0.0, width, PAD + DETAIL_SLACK, small),
+                        text::right_aligned_x(&detail, 0.0, width, PAD + DETAIL_SLACK, small)
+                            + text::width(&detail, small),
+                    );
+                }
                 self.draw_detail.color = muted;
                 self.draw_detail.draw_abs(
                     cx,
                     origin
                         + dvec2(
-                            text::right_aligned_x(&detail, 0.0, width, PAD, small),
+                            text::right_aligned_x(&detail, 0.0, width, PAD + DETAIL_SLACK, small),
                             y + (ROW_H - small) * 0.5,
                         ),
                     &detail,

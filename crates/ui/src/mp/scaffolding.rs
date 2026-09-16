@@ -365,39 +365,19 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_the_mono_face_is_what_makes_a_row_of_caps_align() {
-        // A row of caps is only a row if every cap is the same width, and the
-        // proportional faces this crate bundles give `⌘` and `A` different widths.
-        // The mono face is the component's decision, not a call site's.
-        //
-        // Asserted through the shared measurement: at one character each, `A` and
-        // a full-width glyph must estimate to the same width, which is what the
-        // mono face guarantees and what the estimator's corrections must not
-        // undo by treating `⌘` as narrow or wide.
-        let font = 10.0;
-        let a = crate::mp::text::width("A", font);
-        let command = crate::mp::text::width("\u{2318}", font);
-        assert!(
-            (a - command).abs() < 1e-9,
-            "A {a} vs command {command}: the estimator's corrections are not classing the glyph as average"
-        );
-    }
-
-    #[test]
-    fn test_the_estimator_treats_a_modifier_glyph_as_average() {
-        // The concrete claim behind the test above: `⌘` and `⌥` are in neither the
-        // narrow nor the wide set, so they estimate as average characters. If one
-        // were added to either list, a chord's width would change and a row of
-        // caps would stop lining up.
-        for glyph in ['\u{2318}', '\u{2325}', '\u{21e7}', '\u{2303}'] {
-            let text = glyph.to_string();
-            let plain = crate::mp::text::width(&text, 10.0);
-            let average = crate::mp::text::width("a", 10.0);
-            assert!(
-                (plain - average).abs() < 1e-9,
-                "{glyph} estimates to {plain}, an average character to {average}"
-            );
-        }
-    }
+    // Two tests used to live here asserting that `text::width` gives a modifier glyph
+    // and a capital the same estimate, "because the mono face makes a row of caps
+    // align". **The proxy was the wrong thing to assert, and it came apart.**
+    //
+    // `MpKbd` does not measure anything. It draws its text with `Walk::fit()` and lets
+    // Makepad lay it out in `theme.font_code`, so the advance that aligns a row of caps
+    // is the **font's** and this crate's estimator is not involved. When the estimator
+    // gained a symbol correction — because a *proportional* placement was overshooting,
+    // as `mp/text.rs` records — both tests went red while the property they stood for
+    // was untouched. The estimator was never the reason a `MpKbd` lined up.
+    //
+    // The property itself cannot be asserted from here: it is a fact about a font file
+    // and about Makepad's text layout, neither of which a unit test in this crate can
+    // see. What is asserted instead is in `mp/text.rs`, where the estimator's own
+    // behaviour belongs.
 }

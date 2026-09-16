@@ -152,6 +152,74 @@ build on).
 | `mp/palette.rs` | `remap` / `step` / `original` / `MpPalette` — the query, the list, and the cursor. |
 | `mp/segmented.rs` | `slot_at` / `slot_span` / `valid` / `MpSegmented` — the track and the plate. |
 | `mp/date.rs` | `is_leap` / `weekday` / `month_grid` / `shift_month` / `MpDate` — the calendar. |
+| `mp/keys.rs` | `parse` / `format` / `Keymap` — the chord behind a printed shortcut. |
+
+### A hand-typed accelerator is a claim nothing checks
+
+Every shortcut the library prints — a menu row's trailing `⇧⌘P`, a list item's `detail`, a
+tooltip — is a **claim about the keymap**. A claim written by hand is one that nothing
+verifies: bind `cmd-b` elsewhere and the control still says `⌘B`. So the label is
+resolved from a declared `Keymap` rather than typed beside the thing it describes, and an
+action with nothing declared prints **nothing** rather than a chord that is no longer
+true. `Keymap::conflicts` closes the other half: two actions on one chord is a bug where
+one silently loses and which one depends on dispatch order.
+
+**The half everyone gets wrong is the modifier order.** Apple writes `⌃⌥⇧⌘` regardless of
+how the chord was typed, so `cmd+shift+p` prints `⇧⌘P` and not `⌘⇧P` — a formatter that
+preserves the input order gets every Mac shortcut subtly wrong, in a way that looks fine
+until two of them sit side by side. Windows has its own order, pinned by two examples that
+disagree with each other: `Win+Shift+S` (the platform key leads) and `Ctrl+Alt+Del` (Ctrl
+before Alt). Neither is Apple's and neither is alphabetical, so this is not one formatter
+with the letters swapped.
+
+Verified at runtime: a 13-action sheet declares with **0 conflicts**, and a deliberately
+broken map of 6 reports **3**, including `⇧⌘D` found from `cmd+shift+d` and the glyph run
+`⇧⌘D` — a config spelling and a menu paste recognized as one chord.
+
+### An estimate cannot be exact, and the direction that hurts is *under*
+
+`mp/text.rs::width` estimates rather than measures, and that is right for **clipping**
+(being a point either way is invisible). It is wrong for **placement**, where an
+under-estimate puts text past the edge it was aligned to. This port paid for it twice:
+
+1. `mp/segmented.rs` — an underestimated label made a control's box too narrow and the
+   Bars toolbar drew `Preview` as **`Previ`**.
+2. The Shortcuts page — a list's trailing chord is right-aligned, and `⇧⌘S` was drawn
+   with its `S` **past the panel**, under the page's scroll bar.
+
+Both had one cause: **a glyph is not an average character.** `⌘`, `⇧`, `⌥` and `⌃` were
+each counted at the average Latin advance when their real advance is about **1.25 em**
+against `ADVANCE = 0.508 em`. The correction that reaches it is `1.45`, and it is derived
+rather than guessed. That closed most of the gap; `DETAIL_SLACK` closes the rest, and it
+is the same decision `mp/segmented.rs` reached — **a slot carrying the measurement's error
+margin beats a label that collides.**
+
+### A test that asserted a proxy for a property it could not see
+
+Raising the symbol correction turned two tests in `mp/scaffolding.rs` red. They asserted
+that `text::width` gives `⌘` and `A` the same estimate, "because the mono face is what
+makes a row of caps align".
+
+**The proxy was the wrong thing to assert, and it came apart.** `MpKbd` does not measure
+anything: it draws with `Walk::fit()` and lets Makepad lay the text out in
+`theme.font_code`, so the advance that aligns a row of caps is the **font's** and this
+crate's estimator is not involved. The property the tests stood for was untouched while
+both went red. They are removed, with a note saying why, and what is asserted instead is
+the estimator's own behaviour in `mp/text.rs` — where it belongs.
+
+### The estimate's font size must be the painted one
+
+`mp/list.rs` measured its rows with `theme.metrics(Body)` / `theme.metrics(Caption)` while
+*painting* them with whatever `text_style` the DSL gave each `DrawText`. Those agree only
+if `mod.mpc.type.*` happens to resolve to the theme's own metrics. They did not, and the
+fix is the one `mp/segmented.rs` already records: **read the size back from the draw
+target.** Naming the size once, from the thing that paints, is what makes the measurement
+and the paint incapable of disagreeing.
+
+`MP_LIST_DEBUG=1` prints a row's rect width, padding, both font sizes, the clipped detail,
+its estimated width and the aligned x — because a right-alignment fault is invisible in a
+log and a screenshot only shows the symptom, so the numbers have to come out of the
+widget. That is how the fault above was located.
 
 ### A right calendar is wrong on a small fraction of dates
 

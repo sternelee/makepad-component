@@ -23,15 +23,49 @@
 //! estimate of *this string* rather than a fudge factor applied to every string
 //! alike. A one-sided correction would clip every row of `illll` short and let
 //! every row of `WWWW` overflow.
+//!
+//! ## Placement needs an upper bound, and symbols were the case that broke it
+//!
+//! Two-sided is right for **clipping**, where the string is cut to fit and being a
+//! point either way is invisible. It is wrong for **placement**, where an estimate
+//! that comes out *under* the painted width puts the text past the edge it was
+//! aligned to.
+//!
+//! That is not hypothetical, and it is the second time this crate has paid for it.
+//! `mp/segmented.rs` recorded the first: an underestimated label made a control's box
+//! too narrow and the Bars toolbar drew `Preview` as **`Previ`**. The second was the
+//! Shortcuts page, where a matching list's trailing chord is right-aligned and
+//! `⇧⌘S` was drawn with its `S` **past the panel**, on top of the page's scroll bar.
+//!
+//! Both had one cause: **a glyph is not an average character.** `⌘`, `⇧` and `⌥` were
+//! each counted at the average Latin advance, when their real advance is close to
+//! double it. So non-ASCII characters now get [`SYMBOL`] instead, which is the
+//! string-specific correction the rest of this module already does, extended to the
+//! characters it had missed. Symbols are exactly what a shortcut label is made of,
+//! which is why the fault showed up there first.
 
 /// The advance of an average character, as a fraction of the font size, for the
-/// faces this crate bundles.
+/// proportional faces this crate bundles.
 const ADVANCE: f64 = 0.508;
 
 /// How far a narrow or wide character moves the estimate, as a fraction of the
 /// average advance.
 const NARROW: f64 = 0.45;
 const WIDE: f64 = 0.25;
+
+/// What a non-ASCII character adds, as a fraction of the average advance.
+///
+/// **A glyph is not an average character.** A modifier glyph (`⌘`, `⇧`, `⌥`, `⌃`) is
+/// drawn at about **1.25 em** — measured off the rendered sheet, and the same order as
+/// the em-width a symbol face reserves. [`ADVANCE`] is 0.508 em, so the correction that
+/// reaches 1.25 em is `0.508 × (1 + SYMBOL) = 1.25`, which is **1.45**.
+///
+/// Getting this wrong in the *under* direction is what put a shortcut's last character
+/// past the edge it was aligned to, under the page's scroll bar. Under is the direction
+/// that collides; over is a few points of extra air. The first version of this
+/// correction used 1.0 — double the average, which still came out under — and the
+/// Shortcuts page showed `⇧⌘S` with its `S` on the scroll bar.
+const SYMBOL: f64 = 1.45;
 
 /// The ellipsis a clipped string ends with.
 const ELLIPSIS: char = '…';
@@ -59,10 +93,18 @@ fn is_narrow(ch: char) -> bool {
 }
 
 fn is_wide(ch: char) -> bool {
-    matches!(
-        ch,
-        'm' | 'w' | 'M' | 'W' | '@' | '%' | '&' | '—' | ELLIPSIS
-    )
+    matches!(ch, 'm' | 'w' | 'M' | 'W' | '@' | '%' | '&')
+}
+
+/// Whether a character is a symbol, a glyph or an ideograph rather than a Latin
+/// letter — the characters whose advance this module's average does not describe.
+///
+/// Everything outside ASCII, which covers the modifier glyphs a shortcut is written
+/// with (`⌘⇧⌥⌃`), the box-drawing and arrow glyphs an icon face draws, and CJK. It is
+/// a category rather than an exact table because the alternative is a table of every
+/// codepoint the bundled faces carry.
+fn is_symbol(ch: char) -> bool {
+    !ch.is_ascii()
 }
 
 /// How wide `text` paints at `font_size`, in points.
@@ -74,7 +116,11 @@ pub fn width(text: &str, font_size: f64) -> f64 {
     let mut w = 0.0;
     for ch in text.chars() {
         w += base;
-        if is_narrow(ch) {
+        if is_symbol(ch) {
+            // Checked before the Latin corrections, because `—` and `…` are neither
+            // narrow nor merely wide and used to be caught by the wide table.
+            w += base * SYMBOL;
+        } else if is_narrow(ch) {
             w -= base * NARROW;
         } else if is_wide(ch) {
             w += base * WIDE;
@@ -122,6 +168,35 @@ pub fn right_aligned_x(text: &str, box_x: f64, box_w: f64, pad: f64, font_size: 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_a_glyph_is_wider_than_any_latin_letter() {
+        // The correction that fixed the Shortcuts page. A modifier glyph was counted at
+        // an average Latin advance, which is roughly half its real width, so a
+        // right-aligned chord overshot the panel it was aligned to.
+        let font = 11.0;
+        let glyph = width("\u{2318}", font); // ⌘
+        assert!(glyph > width("m", font), "a glyph should beat a wide letter");
+        assert!(glyph > width("W", font));
+        assert!(glyph > width("M", font));
+        // And a real chord is wider than its three Latin characters would be.
+        assert!(
+            width("\u{21e7}\u{2318}S", font) > width("XXX", font),
+            "a chord is wider than three capitals"
+        );
+    }
+
+    #[test]
+    fn test_all_non_ascii_is_treated_as_wide_rather_than_merely_a_list_of_glyphs() {
+        // A category rather than a table: the modifier glyphs, a CJK ideograph, an
+        // arrow and an em dash all take the symbol correction.
+        for ch in ['\u{2318}', '\u{21e7}', '\u{4e2d}', '\u{2192}', '\u{2014}'] {
+            assert!(is_symbol(ch), "{ch:?} should be a symbol");
+        }
+        for ch in ['a', 'Z', '9', '-', ' ', '@'] {
+            assert!(!is_symbol(ch), "{ch:?} is ASCII and should not be a symbol");
+        }
+    }
 
     #[test]
     fn test_the_width_grows_with_the_string() {

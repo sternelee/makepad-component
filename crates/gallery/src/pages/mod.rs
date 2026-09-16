@@ -24,6 +24,7 @@ pub mod loaders;
 pub mod scroll;
 pub mod search;
 pub mod select;
+pub mod shortcuts;
 pub mod slider;
 pub mod status;
 pub mod surface;
@@ -55,6 +56,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     controls::script_mod(vm);
     layout::script_mod(vm);
     loaders::script_mod(vm);
+    shortcuts::script_mod(vm);
     slider::script_mod(vm);
     input::script_mod(vm);
     overlay::script_mod(vm);
@@ -270,6 +272,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/calendar.rs",
         blurb: "The month grid and its arithmetic",
     },
+    Page {
+        title: "Shortcuts",
+        path: "mod.gallery.pages.shortcuts",
+        source: "crates/gallery/src/pages/shortcuts.rs",
+        blurb: "Chords resolved from a keymap",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -340,6 +348,7 @@ mod tests {
             ("crates/gallery/src/pages/controls.rs", "controls"),
             ("crates/gallery/src/pages/layout.rs", "layout"),
             ("crates/gallery/src/pages/loaders.rs", "loaders"),
+            ("crates/gallery/src/pages/shortcuts.rs", "shortcuts"),
             ("crates/gallery/src/pages/slider.rs", "slider"),
             ("crates/gallery/src/pages/input.rs", "input"),
             ("crates/gallery/src/pages/overlay.rs", "overlay"),

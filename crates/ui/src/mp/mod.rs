@@ -46,6 +46,7 @@ pub mod date;
 pub mod feedback;
 pub mod icon;
 pub mod input;
+pub mod keys;
 pub mod layout;
 pub mod list;
 pub mod loaders;
@@ -76,6 +77,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     // Surfaces first: every container and several leaf widgets paint one,
     // and a widget's DSL block names the prototype it inherits.
     crate::mp::surface::script_mod(vm);
+    crate::mp::keys::script_mod(vm);
     crate::mp::layout::script_mod(vm);
     crate::mp::date::script_mod(vm);
     // The shared animator prototype every control inherits. Before the
