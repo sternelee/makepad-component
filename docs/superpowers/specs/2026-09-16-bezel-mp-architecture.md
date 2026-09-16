@@ -441,6 +441,73 @@ routed from a fence tag that markdown produces. Porting it before `markdown` exi
 dependent before the dependency, so it is deferred — the same "read it before assuming" rule that
 `stack`, `stats`, `menu` and `floating` each paid for once.
 
+### `markdown`: the document half, and a fixed point rather than an inverse
+
+`editor` was next on the plan (2906 lines) and **reading it moved the order again**: its own doc says
+*"`markdown` holds the document, its markdown wire form, and the painting — all of it testable without
+a window. What lives here is the half that needs one."* So `editor` depends on `markdown`, and porting
+it first would be the `blocks` mistake a second time. That is the sixth time reading a reference
+changed what this port did next, after `stack`, `stats`, `menu`, `floating` and `terminal`.
+
+`makepad-markdown` is the **document half**: the model, `parse`, `serialize`. The shape is Notion's
+rather than CommonMark's, and bezel's reasoning is why — *a flat list of blocks with an indent level*,
+because editing a flat list means Enter splits, Backspace merges and Tab indents (list operations on
+one `Vec`), while on a nested tree "the previous block" is a traversal and every edit is a restructure.
+
+The trade is stated rather than hidden: **arbitrarily nested CommonMark does not survive** — a list
+inside a quote inside a list flattens, and there are no tables or reference links. What *is* guaranteed
+is the property the crate is built around:
+
+> `parse(serialize(parse(s))) == parse(s)` for every input `s`.
+
+**Weaker than "`serialize` is the inverse of `parse`", and it has to be.** `_italic_` parses to an
+italic mark and serializes as `*italic*`, so the *text* changes on the first save; what cannot change
+is the **document**, which is the thing an editor holds. The tests make the distinction explicit:
+`test_the_fixed_point_is_not_byte_equality_and_underscore_italic_proves_it` asserts both halves.
+
+Two rules carry it, and both are decisions rather than consequences:
+
+- **One canonical spelling per construct.** `***` and `___` serialize as `---`; `_italic_` as
+  `*italic*`; `+ item` and `* item` as `- item`. The document is unchanged by each, which is the whole
+  advantage of a fixed point over byte equality.
+- **A blank line between blocks, except between two list items.** Requiring *equal indents* rather than
+  "both are list items" put a blank line between `- outer` and its indented child — which ends the list
+  on the next parse, and broke every nested list in the corpus at once.
+
+`Doc::is_well_formed` checks the **indent invariant** the serializer relies on — the first block is at
+0 and no block is more than one level deeper than the block before it — and the round-trip test asserts
+it on every result rather than trusting the parser to establish it.
+
+### Six real bugs the property test found, and one of mine
+
+Writing the property first and then making it hold found faults that no example would have:
+
+1. **Consecutive list items came out as `- a- b`** — the serializer pushed only the blank line between
+   blocks and never the *line break* that always ends one. Every list in the corpus failed at once.
+2. **`Quote` dropped its marks** — `> quote with \`code\`` came back as `> quote with code`, because the
+   quote writer used `text.text` instead of going through `write_inline`.
+3. **An unmatched `**` was deleted from the text.** `a ** marker` parsed to `a  marker`: the delimiter
+   had been *consumed* and never written back, which is content loss rather than a cosmetic fault. The
+   fix is a two-pass scan — find the pairs with a stack, remove only those.
+4. **The second version of that scan looped forever** (`cargo test` hung past a 20-minute timeout): it
+   looked a byte up with `position(..)` and had a branch where neither a skip nor a copy ran, so the
+   cursor stopped moving. The shape now copies a character **or** skips a known delimiter range and
+   nothing else, with an `debug_assert` that the cursor reached the end.
+5. **Nested lists gained a blank line** between a parent and its child.
+6. **An indented first block violated the invariant** — `"  indented paragraph"` parsed at level 1, which
+   cannot be written back faithfully. The first block is now forced to 0.
+
+And one of mine: **marks were given the highlight-span contract**, where overlaps are resolved because
+two foreground colours cannot compose. Marks are the opposite — `**bold with _italic_ inside**` is two
+marks on overlapping ranges and both must survive — and the first version of the test **asserted the
+dropping**, which made the wrong behaviour look intended. `Text::normalize` keeps every nesting now,
+and the doc says why the two contracts differ.
+
+**What is not built:** `markdown`'s paint half. bezel's `render.rs` is 2041 lines of gpui element
+building, and this port has the model but no renderer — so the gallery has **no page for this crate
+yet**, because there is nothing to paint. That is stated rather than papered over with a page showing
+the source as text.
+
 ### `terminal`: the emulator already exists, and its palette was the missing part
 
 `terminal` was next on the plan as "1296 lines in the reference". Reading it showed an

@@ -2,6 +2,7 @@
 members = [
   "crates/theme",
   "crates/motion",
+  "crates/markdown",
   "crates/syntax",
   "crates/ui",
   "crates/component-zoo",
