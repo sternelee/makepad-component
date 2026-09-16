@@ -16,6 +16,7 @@ pub mod content;
 pub mod controls;
 pub mod feedback;
 pub mod foundation;
+pub mod history;
 pub mod icon;
 pub mod input;
 pub mod layout;
@@ -61,6 +62,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     input::script_mod(vm);
     overlay::script_mod(vm);
     popover::script_mod(vm);
+    history::script_mod(vm);
     icon::script_mod(vm);
     status::script_mod(vm);
     table::script_mod(vm);
@@ -278,6 +280,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/shortcuts.rs",
         blurb: "Chords resolved from a keymap",
     },
+    Page {
+        title: "History",
+        path: "mod.gallery.pages.history",
+        source: "crates/gallery/src/pages/history.rs",
+        blurb: "Undo and redo, as a stack",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -353,6 +361,7 @@ mod tests {
             ("crates/gallery/src/pages/input.rs", "input"),
             ("crates/gallery/src/pages/overlay.rs", "overlay"),
             ("crates/gallery/src/pages/popover.rs", "popover"),
+            ("crates/gallery/src/pages/history.rs", "history"),
             ("crates/gallery/src/pages/icon.rs", "icon"),
             ("crates/gallery/src/pages/status.rs", "status"),
             ("crates/gallery/src/pages/table.rs", "table"),

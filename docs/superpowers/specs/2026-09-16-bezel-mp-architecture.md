@@ -153,6 +153,64 @@ build on).
 | `mp/segmented.rs` | `slot_at` / `slot_span` / `valid` / `MpSegmented` — the track and the plate. |
 | `mp/date.rs` | `is_leap` / `weekday` / `month_grid` / `shift_month` / `MpDate` — the calendar. |
 | `mp/keys.rs` | `parse` / `format` / `Keymap` — the chord behind a printed shortcut. |
+| `mp/history.rs` | `History<T>` — undo/redo as a value, not a widget. |
+
+### Three of bezel's modules were already covered in substance
+
+The audit compares *filenames*, which over-reports the gap. Three of bezel's `ui` modules
+were already present under another name:
+
+| bezel | here |
+|---|---|
+| `stack.rs` — "the two stacks, at the system gap" | `mp/layout.rs::Row` / `Column` — same semantics, including that a row centres across and a column stretches |
+| `stats.rs` | `mp/scaffolding.rs::MpStatCard` / `MpStatRow` |
+| `menu.rs` | `mp/list.rs::MpMenu` (a list with `show_row_lines: false`) |
+
+So the honest remaining count is smaller than the filename diff says, and the spec records
+which of the differences are names rather than behaviour.
+
+### An undo stack is wrong in a way nobody reports
+
+The button lights up and the document goes somewhere it was never in. Every fault is a
+**state-order** fault, so none shows in a screenshot and none throws. Two actually happen,
+and both are performed at runtime on the History page rather than described:
+
+1. **A push after an undo must abandon the redo branch.** Undo twice, edit again, and the
+   forward history is gone — a stack that kept it lets redo walk into a state that never
+   followed from what is on screen. Runtime evidence, from the default script:
+   ```
+   HISTORY undo -> Some("doc:3")
+   HISTORY push "doc:9" -> "doc:9"
+   HISTORY buffer=["doc:0","doc:1","doc:2","doc:3","doc:9"] cursor=4 depth=(4 back, 0 forward)
+   ```
+   `doc:4` and `doc:5` are gone and redo is closed.
+2. **A bounded history must move the cursor when it drops the front.** Ten pushes into a
+   capacity of eight:
+   ```
+   HISTORY buffer=["n3".."n10"] cursor=5 depth=(5 back, 2 forward)
+   HISTORY undo -> Some("n9")
+   HISTORY undo -> Some("n8")
+   ```
+   The cursor is genuinely wherever it was, so undo steps one state at a time. Without the
+   `cursor -= dropped` the cursor would be out of bounds and `current()` would silently fall
+   back to `entries[0]` — the one fault here that produces a **wrong document** rather than a
+   wrong button.
+
+**One `Vec` with a cursor, not two stacks.** The two-stack shape makes the truncation rule
+an operation on two things that must stay consistent, and the bounded case an operation on
+one of them while the other holds the states that were just dropped. A `Vec` plus a cursor
+keeps the current state, the undoable depth and the redoable depth as three readings of one
+number.
+
+The property test is a **400-step walk across five capacities** that asserts the invariants
+after *every* operation — the cursor is a valid index, the buffer never exceeds its
+capacity, `current()` is the entry at the cursor, and `back + forward + 1 == len` — then
+walks to the floor and the ceiling and back. That covers the boundary cases nobody writes a
+test for.
+
+It does **not** coalesce (ten keystrokes are ten steps here) and has no transactions: both
+are policies layered on top and both need to know what a state *means*, which is the
+caller's business.
 
 ### A hand-typed accelerator is a claim nothing checks
 

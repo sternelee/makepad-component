@@ -34,6 +34,7 @@ use makepad_component::mp::{
 };
 
 use crate::pages::PAGES;
+use makepad_component::mp::history::History;
 
 script_mod! {
     use mod.prelude.widgets_internal.*
@@ -118,6 +119,7 @@ script_mod! {
                         rail_page_27 := RailRow{text: ""}
                         rail_page_28 := RailRow{text: ""}
                         rail_page_29 := RailRow{text: ""}
+                        rail_page_30 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -182,6 +184,7 @@ script_mod! {
                             page_27 := mod.gallery.pages.command_palette{}
                             page_28 := mod.gallery.pages.calendar{}
                             page_29 := mod.gallery.pages.shortcuts{}
+                            page_30 := mod.gallery.pages.history{}
                         }
                     }
                 }
@@ -195,7 +198,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 30] = [
+const PAGE_SLOTS: [&[LiveId]; 31] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -226,10 +229,11 @@ const PAGE_SLOTS: [&[LiveId]; 30] = [
     ids!(page_27),
     ids!(page_28),
     ids!(page_29),
+    ids!(page_30),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 30] = [
+const RAIL_ROWS: [&[LiveId]; 31] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -260,6 +264,7 @@ const RAIL_ROWS: [&[LiveId]; 30] = [
     ids!(rail_page_27),
     ids!(rail_page_28),
     ids!(rail_page_29),
+    ids!(rail_page_30),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -276,6 +281,13 @@ pub struct App {
     /// Whether to open the first popover on the first laid-out event.
     #[rust]
     want_popover: bool,
+    // The undo/redo stack the History page shows.
+    //
+    // A `//` comment and a `use` alias, not a `///` and a full path: the script
+    // derive's field parser rejects doc comments on fields and full paths in types,
+    // which is a trap this port has recorded and has now hit twice.
+    #[rust]
+    history: History<String>,
     /// The palette's command list, in its **original** order.
     ///
     /// The indices `rank` returns are into this, and they are what a selection
@@ -384,6 +396,7 @@ impl MatchEvent for App {
         self.handle_sliders(cx, actions);
         self.handle_segmented(cx, actions);
         self.handle_date(cx, actions);
+        self.handle_history(cx, actions);
         self.handle_palette(cx, actions);
         self.handle_input(cx, actions);
     }
@@ -506,6 +519,139 @@ impl App {
                     }
                 }
             }
+        }
+    }
+
+    /// Run a scripted undo/redo session and show the resulting stack.
+    ///
+    /// The script comes from `GALLERY_HISTORY` so the two faults this type exists to
+    /// prevent can be *performed* at runtime rather than described: `push:a,push:b,undo,
+    /// push:x` abandons `b`, and enough pushes past the capacity drop the oldest state and
+    /// move the cursor with it. Each step is printed, because a state-order fault is
+    /// invisible in a screenshot.
+    fn seed_history(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::history::History;
+
+        // Eight states of capacity: enough that a script can exceed it and still have a
+        // readable stack.
+        let mut history: History<String> = History::with_capacity("doc:0".to_string(), 8);
+        let script = std::env::var("GALLERY_HISTORY").unwrap_or_else(|_| {
+            // The default session: five edits, undo twice, then a different edit — which
+            // is the shape that abandons a redo branch.
+            "push:doc:1,push:doc:2,push:doc:3,push:doc:4,push:doc:5,undo,undo,push:doc:9"
+                .to_string()
+        });
+        for step in script.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            match step.split_once(':') {
+                Some(("push", value)) => {
+                    history.push(value.to_string());
+                    println!("HISTORY push {value:?} -> {:?}", history.current());
+                }
+                _ if step == "undo" => {
+                    let moved = history.undo().cloned();
+                    println!("HISTORY undo -> {moved:?}");
+                }
+                _ if step == "redo" => {
+                    let moved = history.redo().cloned();
+                    println!("HISTORY redo -> {moved:?}");
+                }
+                _ => println!("HISTORY ignoring unrecognised step {step:?}"),
+            }
+        }
+
+        let (undoable, redoable) = history.depth();
+        println!(
+            "HISTORY buffer={:?} cursor={} depth=({undoable} back, {redoable} forward)",
+            history.entries(),
+            history.cursor()
+        );
+
+        let items: Vec<ListItem> = history
+            .entries()
+            .iter()
+            .enumerate()
+            .map(|(index, state)| {
+                let mut item = ListItem::new(state.clone());
+                if index == history.cursor() {
+                    item = item.detail("current");
+                } else if index > history.cursor() {
+                    // Ahead of the cursor: reachable by redo, and receding while it is.
+                    item = item.detail("redo");
+                }
+                item
+            })
+            .collect();
+        self.history = history;
+        self.ui.mp_list(cx, ids!(history_states)).set_items(cx, items);
+        self.ui.label(cx, ids!(history_depth)).set_text(
+            cx,
+            &format!(
+                "{undoable} to undo, {redoable} to redo \u{b7} {} states retained of a capacity of 8 \u{b7} current {:?}",
+                self.history.len(),
+                self.history.current(),
+            ),
+        );
+        self.ui.label(cx, ids!(history_note)).set_text(
+            cx,
+            &format!(
+                "script: {script}. Set GALLERY_HISTORY to change it \u{2014} push:a,push:b,undo,push:x abandons b, and eight pushes past the capacity drop the front and move the cursor with it.",
+            ),
+        );
+        self.buttons(cx);
+    }
+
+    /// Show what the two history buttons would do, so the page reports whether each is
+    /// available rather than only painting them.
+    fn buttons(&mut self, cx: &mut Cx) {
+        let (undoable, redoable) = self.history.depth();
+        self.ui
+            .mp_button(cx, ids!(history_undo))
+            .set_disabled(cx, undoable == 0);
+        self.ui
+            .mp_button(cx, ids!(history_redo))
+            .set_disabled(cx, redoable == 0);
+    }
+
+    /// Undo and redo from the page's buttons.
+    fn handle_history(&mut self, cx: &mut Cx, actions: &Actions) {
+        let mut moved = false;
+        if self.ui.mp_button(cx, ids!(history_undo)).clicked(actions) {
+            let state = self.history.undo().cloned();
+            println!("HISTORY button undo -> {state:?}");
+            moved = true;
+        }
+        if self.ui.mp_button(cx, ids!(history_redo)).clicked(actions) {
+            let state = self.history.redo().cloned();
+            println!("HISTORY button redo -> {state:?}");
+            moved = true;
+        }
+        if moved {
+            let (undoable, redoable) = self.history.depth();
+            let items: Vec<ListItem> = self
+                .history
+                .entries()
+                .iter()
+                .enumerate()
+                .map(|(index, state)| {
+                    let mut item = ListItem::new(state.clone());
+                    if index == self.history.cursor() {
+                        item = item.detail("current");
+                    } else if index > self.history.cursor() {
+                        item = item.detail("redo");
+                    }
+                    item
+                })
+                .collect();
+            self.ui.mp_list(cx, ids!(history_states)).set_items(cx, items);
+            self.ui.label(cx, ids!(history_depth)).set_text(
+                cx,
+                &format!(
+                    "{undoable} to undo, {redoable} to redo \u{b7} {} states retained of a capacity of 8 \u{b7} current {:?}",
+                    self.history.len(),
+                    self.history.current(),
+                ),
+            );
+            self.buttons(cx);
         }
     }
 
@@ -953,6 +1099,7 @@ impl App {
         self.seed_segmented(cx);
         self.seed_date(cx);
         self.seed_keys(cx);
+        self.seed_history(cx);
     }
 
     /// Fill the table page's tables.
@@ -1573,7 +1720,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 30] = [
+    const SLOT_PAGES: [&str; 31] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -1604,6 +1751,7 @@ mod tests {
         "mod.gallery.pages.command_palette",
         "mod.gallery.pages.calendar",
         "mod.gallery.pages.shortcuts",
+        "mod.gallery.pages.history",
     ];
 
     #[test]
