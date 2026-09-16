@@ -833,10 +833,19 @@ What that bought, and why it is recorded: the fault is **not the measurement**, 
 slot markers lost their third bar for the same reason. The one structural fact verified on the way is that **two
 `Fill` siblings in a bar split the remaining space**, which is now written into `mp/bars.rs` beside the spacer.
 
-**Not isolated**: with one `Fill`, a `Fit` leading group and a declared `Fixed` width, the cell is still ~193. So
-the rule being tripped is Makepad's `View{flow: Right}` cell sizing for `Fit` children, and the next step is to
-read *that* rather than to touch the control again. Recorded with the four things it is not, because that is what
-six attempts bought and it is the part that saves the seventh.
+7. **Reading Makepad's source instead of guessing again.** `View::walk_from_previous_size` resolves a `Fit`
+   dimension from that **view's own** last measured size (`view_size`, written at the end of `View::draw_walk`) —
+   which is how a `Fit` view converges and why a `Fit` view inside a `Row` works. **A custom `Widget` is not a
+   `View` and has no `view_size`**, so as a `Fit` child it was allocated nothing and everything it drew was
+   clipped to an empty cell. That mechanism is real and this widget now does its own version of it — **and it did
+   not fix this either**, which is itself a narrowing: `last_size` converges on the *requested* size (276.3),
+   because `draw_bg.area()` reports the walk rather than the painted box. So the resolution is already correct and
+   **the clip happens after it**.
+
+**Still not isolated**: the clip is applied after this widget's walk resolution, to everything it draws —
+`draw_abs` as well as `begin` — and the parent's cell is ~193 whatever the child asks for. The next step is to
+trace where a cell is clipped for a non-`View` child, not to touch this control again. Recorded with the table of
+seven attempts because that is what they bought, and the table is the part that saves the eighth.
 
 ### One thing the measurement did *not* fix, recorded as an open issue
 

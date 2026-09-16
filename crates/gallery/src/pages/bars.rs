@@ -83,9 +83,8 @@ script_mod! {
                 mod.mp.MpControlBar{
                     draw_bg +: {color: surface}
                     controlbar_leading := mod.mp.Row{
-                        // This was three ghost buttons with the active one promoted,
-                        // because the library had no segmented control and the page
-                        // said so. `mp/segmented.rs` is that interim replaced.
+                        // This was three ghost buttons with the active one promoted, because the library had no
+                        // segmented control and the page said so. `mp/segmented.rs` is that interim replaced.
                         view_mode := mod.mp.MpSegmentedSmall{}
                     }
                     controlbar_trailing := mod.mp.Row{

@@ -64,32 +64,36 @@ use crate::mp::text;
 /// point conversion), so this is air and nothing else: 14 points of it, which is where it started before it was
 /// asked to hide an error.
 ///
-/// ## What the measurement did *not* fix, narrowed by six attempts
+/// ## What the measurement did *not* fix, and the mechanism it is not
 ///
-/// The labels are measured now, so this control's geometry is **provably right**: `MP_SEG_DEBUG` printed the
-/// measured widths (`Source=55.9 Split=36.7 Preview=64.1`), the box at `276.3`, each label's x, and the area each
-/// draw landed in — all three inside the box, `Preview` ending at 262.3 of 276.3. The **painted** panel is about
-/// **193**, and `Preview` is invisible.
+/// The panel paints ~193 while the walk says 276.3, with the third label invisible. Seven attempts narrowed it,
+/// and the last one read Makepad's source rather than guessing again:
 ///
-/// Six attempts narrowed it to this:
+/// **`View::walk_from_previous_size` resolves a `Fit` dimension from the view's own last measured size** —
+/// `view_size`, written at the end of `View::draw_walk` and read back when the walk is `Fit`. That is how a `Fit`
+/// view converges, and it is why a `Fit` view inside a `Row` works. **This widget is a custom `Widget`, not a
+/// `View`, so it had no `view_size` at all** — and a `Fit` child with no previous measurement is allocated
+/// nothing, so everything it drew was clipped to an empty cell.
 ///
-/// - **It is not the measurement.** Three attempts went after the estimate; the fourth replaced it with
-///   `DrawText::layout`'s own number. The geometry got *more* correct and the paint did not change.
-/// - **It is not the declared width.** Setting `width: 400` in the DSL moved the **labels** (they spread out,
-///   following `rect.size.x` = 400) and left the **panel** at ~193. So the panel is not drawn from the walk the
-///   widget is given.
-/// - **Everything this widget draws is clipped to its parent's cell** — not just `begin`, but `draw_abs` too.
-///   The magenta slot markers were missing their third bar for the same reason: nothing a child draws escapes its
-///   cell.
-/// - **Two `Fill` siblings in a bar split the remaining space.** Verified by making the bar's leading group `Fill`
-///   alongside the spacer: the group's allocation changed, so the group and the spacer were sharing. `mp/bars.rs`
-///   now says a bar may have **one** `Fill`, which is a real finding even though it did not fix this.
+/// That mechanism is real and this widget now does its own version of it ([`MpSegmented::last_size`]) — **and it
+/// did not fix this**, which narrows the cause further: `last_size` converges on the *requested* size (276.3),
+/// because `draw_bg.area()` reports the walk rather than the painted box, so the resolution is already correct and
+/// the clip happens after it.
 ///
-/// **Not isolated**: with one `Fill`, a `Fit` leading group, and a declared `Fixed` width, the cell is still ~193.
-/// So the allocation rule this control falls foul of is in Makepad's `View{flow: Right}` cell sizing for `Fit`
-/// children — and the next step is to read that, not to touch this file. Recorded rather than left as a mystery,
-/// and recorded with the four things it is *not*, because that is what six attempts bought and it is the part that
-/// saves the seventh.
+/// What is established, from evidence rather than reasoning:
+///
+/// | attempt | result |
+/// |---|---|
+/// | a larger pad; a glyph correction; the missing DPI factor | no change — the estimate was not the problem |
+/// | replacing the estimate with `DrawText::layout`'s own number | geometry **more** correct, paint unchanged |
+/// | deciding the width in `set_segments` rather than while drawing | kept, because it is right; no change here |
+/// | `width: 400` in the DSL | the **labels** moved, the **panel** did not |
+/// | two `Fill` siblings in the bar | they **split** the space — a real finding, in `mp/bars.rs` |
+///
+/// **Still not isolated**: the clip is applied after this widget's walk resolution, to everything it draws —
+/// `draw_abs` as well as `begin` — and the parent's cell is ~193 whatever the child asks for. The next step is to
+/// trace where a `Tensor`/cell is clipped for a non-`View` child, not to touch this control again. Recorded with
+/// the table above because that is what seven attempts bought, and the table is the part that saves the eighth.
 const SLOT_PAD_X: f64 = 14.0;
 
 /// How far the plate is inset from its slot.
@@ -271,6 +275,16 @@ pub struct MpSegmented {
     hovered: Option<usize>,
     #[rust]
     area: Area,
+    /// This widget's own last drawn size, for resolving a `Fit` width.
+    ///
+    /// **`View::walk_from_previous_size` does this for a `View`, and a custom `Widget` has to do it for itself.**
+    /// Makepad resolves a child's `Fit` dimension from what it measured *last* time — that is how a `Fit` view
+    /// converges, because its content-driven size cannot be known before it draws. A widget that is not a `View`
+    /// gets `None` for that and is therefore allocated **nothing**, so everything it draws is clipped to an empty
+    /// cell. That was this control: a panel of ~193 where its walk said 276.3, with the third label invisible, and
+    /// six attempts went after the *measurement* rather than after the allocation.
+    #[rust]
+    last_size: Option<Vec2d>,
 }
 
 impl MpSegmented {
@@ -504,12 +518,23 @@ impl Widget for MpSegmented {
         // a basis and bounds. A caller that asked for `Fill` keeps it, and the slots
         // then divide whatever box the control lands in — which is the case the hit
         // test reads back from the drawn `Area` rather than from `content_width`.
+        // **A `Fit` width is resolved from this widget's own last drawn size**, the way
+        // `View::walk_from_previous_size` resolves it for a `View`. On the first frame there is no previous size,
+        // so the measured content width is used and the frame after that converges on what was actually drawn.
         let measured = self.content_width(cx.cx);
         let walk = match walk.width {
             Size::Fit { .. } => Walk {
-                width: Size::Fixed(measured),
+                width: Size::Fixed(self.last_size.map_or(measured, |size| {
+                    if size.x > 0.0 {
+                        size.x
+                    } else {
+                        measured
+                    }
+                })),
                 ..walk
             },
+            // `Fixed` and `Fill` are already known before drawing, so they are kept live — including the one
+            // `set_segments` declared.
             _ => walk,
         };
         self.walk = walk;
@@ -522,6 +547,10 @@ impl Widget for MpSegmented {
         self.draw_bg.end(cx);
 
         let rect = self.draw_bg.area().rect(cx.cx);
+        // Remember what was actually drawn, for the next frame's `Fit` resolution above.
+        if rect.size.x > 0.0 {
+            self.last_size = Some(rect.size);
+        }
         self.area = self.draw_bg.area();
         let count = self.segments.len();
         let line_box = font * 1.2;
