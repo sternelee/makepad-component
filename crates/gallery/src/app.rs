@@ -33,6 +33,7 @@ use makepad_component::mp::{
     floating::MpFloatingWidgetRefExt,
     code::MpCodeBlockWidgetRefExt,
     markdown::MpMarkdownWidgetRefExt,
+    editor::MpEditorWidgetRefExt,
     date::MpDateWidgetRefExt,
 };
 
@@ -130,6 +131,7 @@ script_mod! {
                         rail_page_33 := RailRow{text: ""}
                         rail_page_34 := RailRow{text: ""}
                         rail_page_35 := RailRow{text: ""}
+                        rail_page_36 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -200,6 +202,7 @@ script_mod! {
                             page_33 := mod.gallery.pages.floating{}
                             page_34 := mod.gallery.pages.code{}
                             page_35 := mod.gallery.pages.document{}
+                            page_36 := mod.gallery.pages.editor{}
                         }
                     }
                 }
@@ -213,7 +216,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 36] = [
+const PAGE_SLOTS: [&[LiveId]; 37] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -250,10 +253,11 @@ const PAGE_SLOTS: [&[LiveId]; 36] = [
     ids!(page_33),
     ids!(page_34),
     ids!(page_35),
+    ids!(page_36),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 36] = [
+const RAIL_ROWS: [&[LiveId]; 37] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -290,6 +294,7 @@ const RAIL_ROWS: [&[LiveId]; 36] = [
     ids!(rail_page_33),
     ids!(rail_page_34),
     ids!(rail_page_35),
+    ids!(rail_page_36),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1265,6 +1270,82 @@ use makepad_component::mp::hover_card::HoverIntent;
             .set_highlighted(cx, &written, &[]);
     }
 
+    /// Give the editor its document and, if asked, drive it from a script.
+    ///
+    /// `GALLERY_EDITOR` is a comma-separated list of steps: `type:text`, `enter`, `backspace`, `delete`, `tab`,
+    /// `outdent`, `left`, `right`, `up`, `down`, `home`, `end`, `undo`, `redo`. Every step is applied through the
+    /// **same methods a keypress applies** — `insert_text`, `press`, `move_by`, `undo`, `redo` — so a run checks
+    /// the behaviour a key gets rather than a second path that resembles it.
+    fn seed_editor(&mut self, cx: &mut Cx) {
+        use makepad_editor::EditKind;
+        use makepad_markdown::edit::Shortcut;
+        use makepad_component::mp::editor::{Motion, MpEditorWidgetRefExt};
+
+        let source = "# A note\n\nAn editor over the document model. Click in it, or drive it from the \\
+                      environment.\n\n- a bullet\n- another\n\n";
+        let script = std::env::var("GALLERY_EDITOR").unwrap_or_else(|_| {
+            // A session that exercises every rule: type at a caret, split with Enter, merge with Backspace,
+            // indent, move, and undo twice — which has to land on the text and then on the split.
+            "end,type: one,type: two,enter,type:next,home,tab,left,left,type:X,undo,undo"
+                .to_string()
+        });
+
+        let view = self.ui.mp_editor(cx, ids!(editor_surface));
+        view.set_measure(cx, 620.0);
+        view.set_source(cx, source);
+
+        for step in script.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            match step.split_once(':') {
+                Some(("type", text)) => view.insert_text(cx, text),
+                _ => match step {
+                    "enter" => view.press(cx, Shortcut::Enter, EditKind::Structural),
+                    "backspace" => view.press(cx, Shortcut::Backspace, EditKind::Deleting),
+                    "delete" => view.press(cx, Shortcut::Delete, EditKind::Deleting),
+                    "tab" => view.press(cx, Shortcut::Indent, EditKind::Structural),
+                    "outdent" => view.press(cx, Shortcut::Outdent, EditKind::Structural),
+                    "left" => view.move_by(cx, Motion::Left, false),
+                    "right" => view.move_by(cx, Motion::Right, false),
+                    "up" => view.move_by(cx, Motion::Up, false),
+                    "down" => view.move_by(cx, Motion::Down, false),
+                    "home" => view.move_by(cx, Motion::Home, false),
+                    "end" => view.move_by(cx, Motion::End, false),
+                    "undo" => {
+                        let moved = view.undo(cx);
+                        println!("EDITOR undo -> {moved}");
+                    }
+                    "redo" => {
+                        let moved = view.redo(cx);
+                        println!("EDITOR redo -> {moved}");
+                    }
+                    other => println!("EDITOR ignoring unknown step {other:?}"),
+                },
+            }
+            println!("EDITOR after {step:?} -> {:?}", view.source().unwrap_or_default());
+        }
+
+        let written = view.source().unwrap_or_default();
+        let (undoable, redoable) = view.depth();
+        println!("EDITOR final undoable={undoable} redoable={redoable} bytes={}", written.len());
+
+        self.ui
+            .mp_code_block(cx, ids!(editor_wire))
+            .set_highlighted(cx, &written, &[]);
+        self.ui.label(cx, ids!(editor_state)).set_text(
+            cx,
+            &format!(
+                "{undoable} to undo, {redoable} to redo \u{b7} the document is {} bytes of markdown",
+                written.len()
+            ),
+        );
+        self.ui.label(cx, ids!(editor_script)).set_text(
+            cx,
+            &format!(
+                "script: {script}. Set GALLERY_EDITOR to change it \u{2014} the steps are applied through the same \
+                 methods a keypress applies, so this is the behaviour a key gets."
+            ),
+        );
+    }
+
     /// Declare a keymap and fill the sheet from it.
     ///
     /// **Nothing below writes a chord.** Each row's trailing text is
@@ -1717,6 +1798,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_floating(cx);
         self.seed_code(cx);
         self.seed_document(cx);
+        self.seed_editor(cx);
     }
 
     /// Fill the table page's tables.
@@ -2343,7 +2425,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 36] = [
+    const SLOT_PAGES: [&str; 37] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -2380,6 +2462,7 @@ mod tests {
         "mod.gallery.pages.floating",
         "mod.gallery.pages.code",
         "mod.gallery.pages.document",
+        "mod.gallery.pages.editor",
     ];
 
     #[test]

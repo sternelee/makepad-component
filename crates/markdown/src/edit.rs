@@ -50,6 +50,17 @@ pub struct Selection {
     pub range: Range<usize>,
 }
 
+/// A caret at the start of the document.
+///
+/// Exists because a host's state fields must be constructible before the first event — the reason
+/// `makepad-editor`'s stack has one too — and because "nothing selected, at the top" is the only
+/// sensible default for a selection.
+impl Default for Selection {
+    fn default() -> Self {
+        Self::caret(0, 0)
+    }
+}
+
 impl Selection {
     /// A caret with nothing selected.
     pub fn caret(block: usize, offset: usize) -> Self {

@@ -2464,6 +2464,7 @@ name = "makepad-component"
 version = "0.1.0"
 dependencies = [
  "log",
+ "makepad-editor",
  "makepad-markdown",
  "makepad-motion",
  "makepad-plot",

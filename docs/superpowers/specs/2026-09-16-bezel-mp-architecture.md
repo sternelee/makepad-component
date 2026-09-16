@@ -557,6 +557,29 @@ And the fix's first attempt was wrong in an instructive way: it also had an `on_
 DSL value across again, which is *the wipe it was written to prevent, one apply later*. `on_after_new` is
 the only hook that runs before a caller can set anything.
 
+### `MpEditor`: the half that needs a window, and it is the small half
+
+bezel's split is the reason this was cheap: *"`markdown` holds the document, its markdown wire form, and the
+painting — all of it testable without a window. What lives here is the half that needs one."* Every part of that
+half except the surface already existed here, so `MpEditor` is only **which key means which shortcut, where the
+caret is, where a click lands, and painting it** — 8 tests against the 135 the layers under it carry.
+
+Two decisions in it:
+
+- **Inserting text is not a `Shortcut`.** `makepad-markdown`'s `Shortcut` set is what a **key** does, and a
+  character arriving is not one of those — it is text. Adding a `Shortcut::Insert(char)` would open a set that is
+  closed for a reason: a shortcut changes the document's *shape*, and text does not. Same for caret motions, which
+  change the *selection*.
+- **`metrics_for` takes a `&Cx`, not a `&mut Cx2d`.** The theme is reachable from both, and an **event** has only a
+  `Cx` — so the first version took a `Cx2d` and had an empty `ensure_laid_in_event` beside it, which made every
+  caret motion driven before the first frame silently do nothing. The gallery's script drives motions before the
+  first draw, so the fault was visible in one run: `end` did nothing and the typing landed at offset 0.
+
+**Named absences rather than oversights**: no clipboard (⌘C/⌘V need a pasteboard and `makepad-clipboard` is in this
+workspace), no IME composition display, no menus, block handles, comments or links — the four `editor.rs`
+submodules on the reference's list that are about a *document editor* rather than an editing surface — and no
+horizontal scrolling.
+
 ### `makepad-editor`: a data structure that was in the wrong crate
 
 `History<T>` lived in `crates/ui/src/mp/history.rs` — a **widget** crate — while its own doc said the one thing
