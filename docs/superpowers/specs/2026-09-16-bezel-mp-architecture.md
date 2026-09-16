@@ -148,69 +148,49 @@ build on).
 | `mp/list.rs` | `MpList` — a glyph, a label and a trailing detail. The third data widget and the simplest. |
 | `mp/feedback.rs` | `MpProgressRing`, `MpSkeleton` — the determinate ring and the shape of content that has not arrived. |
 
-### `#[live]` state mutated from Rust is not safe
+### An `#[live]` field lost a Rust write, and the cause is still unknown
 
 The feedback page's rings drew as **empty tracks** for several build-and-look
-cycles. The shader was innocent: what `draw_walk` read was `0`, and a `log!` in
-the draw showed `value=0` for every ring in every frame while `set_value` was
-demonstrably reaching the widget (its borrow succeeded ten times out of ten, and
-moving the seeding from `handle_startup` to the first event changed nothing).
+cycles. What `draw_walk` read was `0`, and a `log!` in the draw showed `value=0`
+for every ring in every frame while `set_value` was demonstrably reaching the
+widget — its borrow succeeded ten times out of ten, and moving the seeding from
+`handle_startup` to the first event changed nothing.
 
-What settled it was a one-line experiment: declaring `value: 0.5` **in the DSL**
-drew a half ring, while every value written by a Rust setter did not. So the
-script was re-asserting the field, and the fix is that **state an app mutates must
-be `#[rust]`**, with the DSL's declared value as a separate `#[live]` *initial*.
-The ring carries `#[live] initial` and `#[rust] value` now and fills correctly at
-0/25/50/75/90/100%.
+A one-line experiment settled the *symptom*: declaring `value: 0.5` **in the DSL**
+drew a half ring, while every value written by a Rust setter did not. So something
+was re-asserting that field. Moving it to `#[rust]` — with the DSL's value as a
+separate `#[live] initial` — made the rings fill correctly at 0/25/50/75/90/100%.
 
-The pattern is corroborated rather than fully characterised, and the difference
-matters:
+**The obvious explanation is wrong, and this section exists because of that.** The
+first version of this note claimed `#[live]` state mutated from Rust is unsafe.
+One more experiment refutes it: driving `MpSlider::value` — also `#[live]` — from
+Rust renders at the written value, knob and readout both (see the Slider page,
+where the first slider is 0.90 from Rust rather than its declared 0.35). And
+`MpAvatar::text`/`tone` are `#[live]` and their Rust writes survive too.
 
-- `MpTable::rows`, `MpTree::items`, `MpList::items`, `MpList::selected` are
-  `#[rust]` and **their Rust-set content renders** — the tables and trees and the
-  select's highlighted row are all Rust-set.
-- `MpProgressRing::value` was `#[live]` and **every** setter call was lost.
-- `MpAvatar::text` and `MpAvatar::tone` are `#[live]` and their Rust-set values
-  **do** render.
+So `#[live]` accepts Rust writes in general, `MpProgressRing` specifically lost
+them, and **the cause is not known**. What is known:
 
-So `#[live]` is not universally unsafe; something about the ring's shape differs
-and the exact trigger is not yet known. **The safe rule is the one that needs no
-theory: if a Rust setter writes it, make it `#[rust]`.** Every widget that takes a
-setter for a `#[live]` field is an audit item: `MpProgress::value`,
-`MpSlider::value`, `MpCheckbox::checked`, `MpSwitch::checked`,
-`MpRadio::selected`, `MpButton::disabled`. None of them is exercised from Rust by
-the gallery today, which is exactly why none of them was caught.
+| field | attribute | Rust write survives? |
+|---|---|---|
+| `MpTable::rows`, `MpTree::items`, `MpList::items`, `MpList::selected` | `#[rust]` | yes |
+| `MpSlider::value` | `#[live]` | **yes** |
+| `MpAvatar::text`, `MpAvatar::tone` | `#[live]` | **yes** |
+| `MpProgressRing::value` | `#[live]` | **no** |
 
-The Select page is the template the rest of the floating family follows, and the
-evidence that the overlay constraint is workable rather than merely limiting: a
-face (`MpButton` with a trailing chevron), a popover in the page's overlay region,
-an `MpList` of options inside it, and three lines of app wiring. Combobox, date
-picker and menu are the same three things with different contents — which is why
-none of them needs a widget, and why `MpList` being a real widget (hover,
-selection, arrow keys) is what makes the composition worth preferring over a
-hand-rolled set of buttons.
+Candidates not yet eliminated: the ring is the only one of these with no
+`#[rust]` field at all; it has no `Area` of its own (its `draw_walk` never captures
+one, so `#[redraw]` may have nothing to redraw); and its `value` is the last field
+in the struct. Each is a one-experiment question and none has been asked.
 
-### A widget that is not a container drops its children silently
-
-The Icon page shipped a row captioned "In a button" containing
-`MpButton{ MpIcon{..} text: "New" }`, and the glyphs **never drew**. `MpButton` has
-no `#[deref] view`, so it is not a container: a child is never drawn, never
-errors, and leaves zero `[E]` lines. Re-reading my own earlier screenshot is what
-caught it — the buttons rendered as plain buttons and I had described the row as
-working.
-
-The fix is a `glyph` **property** on the button (drawn in the button's own row,
-which already has `flow: Right` and a `spacing`), plus `glyph_trailing` for the
-chevron a select's face needs. Same shape as the tree's chevron and the list's
-leading glyph: **a row is a string and a glyph, not a composition**, and hosting a
-widget to get one is the widget-per-row cost coming back through the door.
-
-The general lesson, and it is the hardest one in this document to act on: **a
-silent failure and a working feature look identical in a log.** Three of this
-port's faults produced zero errors and drew nothing — the zero-sized overlay, the
-`Fit`-measured self-painted widget, and this. All three were found by looking at a
-screenshot rather than at a log, and one of them was found by looking at a
-screenshot *again*, months of commits later.
+**The rule to act on, therefore, is the one that needs no theory rather than the
+one that sounds right:** a field an app mutates through a setter is safest as
+`#[rust]`, and a widget whose state is lost should be checked by driving it from
+Rust — which no page did for the ring, and which is why it shipped broken. Every
+widget whose setter writes a `#[live]` field is an audit item: `MpProgress::value`,
+`MpSlider::value` (now *known* good), `MpCheckbox::checked`, `MpSwitch::checked`,
+`MpRadio::selected`, `MpButton::disabled`. The Slider page drives its first slider
+from Rust permanently now, so that one stays known good.
 
 ### One arithmetic, three widgets
 

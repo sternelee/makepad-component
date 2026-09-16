@@ -500,6 +500,17 @@ impl App {
     /// Called once, on the first event — see `App::seeded` for why it cannot be
     /// `handle_startup`.
     fn seed_all(&mut self, cx: &mut Cx) {
+        // **A permanent regression guard, not an experiment.** `MpSlider::value`
+        // is `#[live]`, and this line is the only place in the gallery that drives
+        // such a field from Rust — the readout beside it is seeded from the
+        // widget's own value, so one screenshot proves the write reached both the
+        // widget and the app. It was written to answer whether `#[live]` state can
+        // hold a Rust write at all (it can, which refuted the first explanation
+        // for the ring's lost value), and it stays because that is exactly the
+        // property a regression would break silently.
+        self.ui
+            .mp_slider(cx, ids!(read_continuous))
+            .set_value(cx, 0.9);
         self.seed_readouts(cx);
         self.seed_tables(cx);
         self.seed_trees(cx);
