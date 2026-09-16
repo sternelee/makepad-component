@@ -37,7 +37,7 @@
 
 use std::ops::Range;
 
-use crate::{Block, BlockKind, Doc, Mark, MarkSpan, Text};
+use crate::{Block, BlockKind, Doc, LinkSpan, Mark, MarkSpan, Text};
 
 /// Where the caret is, and what is selected.
 ///
@@ -399,14 +399,40 @@ fn split_text(text: &Text, head_end: usize, tail_from: usize) -> (Text, Text) {
             });
         }
     }
+    // Links are cut on the same rule as marks, and the result is still faithful: `[label](url)` split in the middle
+    // writes back as `[la](url)[bel](url)`, which re-parses as **two** links — so the fixed point holds and each half
+    // still points where the whole did. Dropping the link instead would lose the target, and giving the whole range to
+    // one side would leave the other half's label unlinked and the range pointing at the wrong characters.
+    let mut before_links = Vec::new();
+    let mut after_links = Vec::new();
+    for link in &text.links {
+        let start = link.range.start.min(at);
+        let end = link.range.end.min(at);
+        if start < end {
+            before_links.push(LinkSpan {
+                range: start..end,
+                url: link.url.clone(),
+            });
+        }
+        let start = link.range.start.max(tail_from) - tail_from;
+        let end = link.range.end.max(tail_from) - tail_from;
+        if start < end {
+            after_links.push(LinkSpan {
+                range: start..end,
+                url: link.url.clone(),
+            });
+        }
+    }
     let mut head_text = Text {
         text: head,
         marks: before,
+        links: before_links,
     };
     head_text.normalize();
     let mut tail_text = Text {
         text: tail,
         marks: after,
+        links: after_links,
     };
     tail_text.normalize();
     (head_text, tail_text)
@@ -424,7 +450,7 @@ fn backspace(doc: &mut Doc, sel: &mut Selection) {
         let end = clamp_to_boundary(&text.text, sel.range.end);
         let mut spliced = text.clone();
         spliced.text.replace_range(start..end, "");
-        shift_marks(&mut spliced, start, end, 0);
+        shift_inline(&mut spliced, start, end, 0);
         if matches!(block.kind, BlockKind::Divider) {
             // A divider has no text, so a selection across it can only mean the block itself.
             doc.blocks.remove(index);
@@ -478,6 +504,13 @@ fn backspace(doc: &mut Doc, sel: &mut Selection) {
                 mark: span.mark,
             });
         }
+        // A link merged in from the block after keeps its target and moves with its label.
+        for link in &text.links {
+            previous_text.links.push(LinkSpan {
+                range: link.range.start + join..link.range.end + join,
+                url: link.url.clone(),
+            });
+        }
         previous_text.normalize();
         set_text(&mut doc.blocks[index - 1], previous_text);
         doc.blocks.remove(index);
@@ -489,7 +522,7 @@ fn backspace(doc: &mut Doc, sel: &mut Selection) {
     let start = previous_boundary(&text.text, at);
     let mut spliced = text.clone();
     spliced.text.replace_range(start..at, "");
-    shift_marks(&mut spliced, start, at, 0);
+    shift_inline(&mut spliced, start, at, 0);
     set_text(&mut doc.blocks[index], spliced);
     // The caret moves back by the number of **characters** removed, which is what a caller that tracks a
     // visual column needs; the byte offset is `start`.
@@ -527,6 +560,12 @@ fn delete(doc: &mut Doc, sel: &mut Selection) {
                 mark: span.mark,
             });
         }
+        for link in &next_text.links {
+            merged.links.push(LinkSpan {
+                range: link.range.start + join..link.range.end + join,
+                url: link.url.clone(),
+            });
+        }
         merged.normalize();
         set_text(&mut doc.blocks[index], merged);
         doc.blocks.remove(index + 1);
@@ -535,7 +574,7 @@ fn delete(doc: &mut Doc, sel: &mut Selection) {
     let end = next_boundary(&text.text, at);
     let mut spliced = text.clone();
     spliced.text.replace_range(at..end, "");
-    shift_marks(&mut spliced, at, end, 0);
+    shift_inline(&mut spliced, at, end, 0);
     set_text(&mut doc.blocks[index], spliced);
 }
 
@@ -651,42 +690,64 @@ fn set_kind(doc: &mut Doc, sel: &mut Selection, kind: SetKind) {
     *sel = Selection::caret(index, offset);
 }
 
-/// Move the marks after a byte range that was replaced by `inserted` bytes of text.
-fn shift_marks(text: &mut Text, start: usize, end: usize, inserted: usize) {
+/// The ranges a span becomes after `start..end` was replaced by `inserted` bytes of text.
+///
+/// `(moved, straddling)` — the whole span when it did not straddle, or the part before and the part after when it did.
+/// `None` for a piece that no longer exists.
+///
+/// **One function, because a mark and a link are the same geometry with different payloads.** The first version moved
+/// only marks, and links would then have stopped matching their own labels the moment anything before them was edited —
+/// serializing `[`/`](url)` around the wrong characters, which is content corruption rather than a cosmetic fault. The
+/// arithmetic lives here so the two cannot drift apart.
+fn shift_range(
+    range: &std::ops::Range<usize>,
+    start: usize,
+    end: usize,
+    inserted: usize,
+) -> (Option<std::ops::Range<usize>>, Option<std::ops::Range<usize>>) {
     let removed = end.saturating_sub(start);
+    if range.end <= start {
+        return (Some(range.clone()), None);
+    }
+    if range.start >= end {
+        let shift = inserted as isize - removed as isize;
+        let start_shifted = (range.start as isize + shift).max(start as isize) as usize;
+        let end_shifted = (range.end as isize + shift).max(start_shifted as isize) as usize;
+        return (Some(start_shifted..end_shifted), None);
+    }
+    // Straddles the edit: the part before, and the part after shifted.
+    let before = (range.start < start).then(|| range.start..start);
+    let after = (range.end > end).then(|| {
+        let start_shifted = start + inserted;
+        start_shifted..(range.end - end + start_shifted)
+    });
+    (before, after)
+}
+
+/// Move every inline span — marks **and links** — after a byte range that was replaced by `inserted` bytes of text.
+fn shift_inline(text: &mut Text, start: usize, end: usize, inserted: usize) {
     let mut marks = Vec::new();
     for span in text.marks.drain(..) {
-        if span.range.end <= start {
-            marks.push(span);
-            continue;
-        }
-        if span.range.start >= end {
-            let shift = inserted as isize - removed as isize;
-            let start_shifted = (span.range.start as isize + shift).max(start as isize) as usize;
-            let end_shifted = (span.range.end as isize + shift).max(start_shifted as isize) as usize;
+        let (moved, straddling) = shift_range(&span.range, start, end, inserted);
+        for range in [moved, straddling].into_iter().flatten() {
             marks.push(MarkSpan {
-                range: start_shifted..end_shifted,
-                mark: span.mark,
-            });
-            continue;
-        }
-        // Straddles the edit: keep the part before, and the part after shifted.
-        if span.range.start < start {
-            marks.push(MarkSpan {
-                range: span.range.start..start,
-                mark: span.mark,
-            });
-        }
-        if span.range.end > end {
-            let start_shifted = start + inserted;
-            let end_shifted = span.range.end - end + start_shifted;
-            marks.push(MarkSpan {
-                range: start_shifted..end_shifted,
+                range,
                 mark: span.mark,
             });
         }
     }
     text.marks = marks;
+    let mut links = Vec::new();
+    for link in text.links.drain(..) {
+        let (moved, straddling) = shift_range(&link.range, start, end, inserted);
+        for range in [moved, straddling].into_iter().flatten() {
+            links.push(LinkSpan {
+                range,
+                url: link.url.clone(),
+            });
+        }
+    }
+    text.links = links;
     text.normalize();
 }
 

@@ -124,6 +124,24 @@ impl BlockKind {
 pub struct Text {
     pub text: String,
     pub marks: Vec<MarkSpan>,
+    /// Links, as ranges over `text` **plus a URL each**.
+    ///
+    /// A parallel list rather than a variant of [`Mark`], because a mark is `Copy`, fieldless and compared by value
+    /// everywhere — a `Mark::Link(String)` would make every one of those comparisons allocate, and it would make
+    /// `Mark::delimiters()` unable to answer, since a link's delimiters are its label's.
+    ///
+    /// The range covers the **label**, which is what is displayed: `[label](url)` parses to `text == "label"` and a
+    /// link whose range is `0..5` with that URL. So a link behaves like a mark in every geometric way, which is what
+    /// lets one shift function move both.
+    pub links: Vec<LinkSpan>,
+}
+
+/// A link, and the bytes of its label.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LinkSpan {
+    pub range: Range<usize>,
+    /// The target, exactly as written. Not normalized: a URL is the server's business.
+    pub url: String,
 }
 
 /// A mark, and the bytes it covers.
@@ -164,6 +182,7 @@ impl Text {
         Self {
             text: text.into(),
             marks: Vec::new(),
+            links: Vec::new(),
         }
     }
 
@@ -200,6 +219,31 @@ impl Text {
                 .then(a.mark.cmp(&b.mark))
         });
         self.marks = spans;
+
+        // Links, clamped the same way, and **de-overlapped** — which marks deliberately are not. A nesting of marks is
+        // writable (`**a *b* c**`), so marks keep theirs; two overlapping links are **not** representable, because the
+        // writer would emit `[a[b]c](u1)(u2)`, which does not re-parse to the same two links. Keeping the earlier one
+        // is the choice that keeps the document writable, and `normalize` is where that has to happen rather than in
+        // the writer, which cannot drop a link without losing the fact that it dropped one.
+        let mut links: Vec<LinkSpan> = self
+            .links
+            .iter()
+            .filter(|link| link.range.start < link.range.end)
+            .map(|link| LinkSpan {
+                range: link.range.start.min(len)..link.range.end.min(len),
+                url: link.url.clone(),
+            })
+            .filter(|link| link.range.start < link.range.end)
+            .collect();
+        links.sort_by(|a, b| a.range.start.cmp(&b.range.start).then(a.range.end.cmp(&b.range.end)));
+        let mut kept: Vec<LinkSpan> = Vec::with_capacity(links.len());
+        for link in links {
+            if kept.last().is_some_and(|last| last.range.end > link.range.start) {
+                continue;
+            }
+            kept.push(link);
+        }
+        self.links = kept;
     }
 }
 
@@ -727,6 +771,114 @@ fn ordered(trimmed: &str) -> Option<(u64, &str)> {
 /// than a mark here). What it must do is produce ranges that [`Text::normalize`] leaves alone — the
 /// round trip depends on the ranges being sorted, non-overlapping and in bounds.
 pub fn parse_inline(source: &str) -> Text {
+    // **Links are extracted first, and the mark pass then runs on what is left.** The two compose because a link pass
+    // only ever *removes* characters — the brackets and the target — so the text it produces is exactly the text the
+    // mark pass sees, and the mark pass never adds or removes a character either (it removes delimiters). **Both
+    // passes therefore report ranges in the same coordinates**, which is what lets a link hold a mark inside its label
+    // without either having to know about the other.
+    let (stripped, links) = extract_links(source);
+    let (text, marks, removed) = parse_marks(&stripped);
+    // The link ranges are in the **stripped** text's coordinates and the marks are in the output's, so the links are
+    // remapped here: an offset is however many bytes this pass deleted before it, subtracted. Doing it in one place is
+    // what lets the two passes stay independent — neither knows the other exists.
+    let links = links
+        .into_iter()
+        .map(|link| LinkSpan {
+            range: remap(link.range.start, &removed)..remap(link.range.end, &removed),
+            url: link.url,
+        })
+        .collect();
+    let mut parsed = Text {
+        text,
+        marks,
+        links,
+    };
+    parsed.normalize();
+    parsed
+}
+
+/// An offset in one pass's input, translated to the other pass's output.
+///
+/// Subtracts everything the second pass deleted **entirely before** the offset. An offset that falls *inside* a deleted
+/// range cannot happen for a link — its endpoints are label characters, and a delimiter is never part of a label — but
+/// it is clamped rather than assumed, because assuming it is exactly how `[**a**](u)` lost its link.
+fn remap(offset: usize, removed: &[Range<usize>]) -> usize {
+    let mut shift = 0usize;
+    for range in removed {
+        if range.end <= offset {
+            shift += range.end - range.start;
+        } else if range.start < offset {
+            // Inside a removed range: clamp to its start.
+            shift += offset - range.start;
+            break;
+        } else {
+            break;
+        }
+    }
+    offset.saturating_sub(shift)
+}
+
+/// Pull `[label](url)` out of `source`, leaving the labels behind.
+///
+/// An **unmatched bracket stays in the text**, which is the same rule the mark pass follows and for the same reason: a
+/// `[` with no target is a character somebody typed, and consuming it would be content loss. So `see [note` comes back
+/// as `see [note`, and `[a](b) and [c` comes back as `a and [c` with one link.
+///
+/// Not supported, and deliberately: a label containing `]`, and a target containing `)`. Both need a real inline
+/// grammar with escapes, and neither is something a person writes by hand. They fail **safely** — the `[` stays
+/// literal — rather than being half-understood.
+fn extract_links(source: &str) -> (String, Vec<LinkSpan>) {
+    let bytes = source.as_bytes();
+    let mut out = String::with_capacity(source.len());
+    let mut links: Vec<LinkSpan> = Vec::new();
+    let mut index = 0usize;
+    while index < bytes.len() {
+        if bytes[index] != b'[' {
+            let ch = source[index..].chars().next().expect("a character");
+            out.push(ch);
+            index += ch.len_utf8();
+            continue;
+        }
+        // `[label](url)` — all four parts required, and the label must be non-empty, because `[](u)` displays nothing
+        // and a link you cannot see or click is a link nobody can use.
+        let Some(label_end) = source[index + 1..].find(']').map(|at| index + 1 + at) else {
+            out.push('[');
+            index += 1;
+            continue;
+        };
+        let after = &source[label_end + 1..];
+        let Some(url_body) = after.strip_prefix('(') else {
+            out.push('[');
+            index += 1;
+            continue;
+        };
+        let Some(url_end) = url_body.find(')') else {
+            out.push('[');
+            index += 1;
+            continue;
+        };
+        let label = &source[index + 1..label_end];
+        if label.is_empty() {
+            out.push('[');
+            index += 1;
+            continue;
+        }
+        let start = out.len();
+        out.push_str(label);
+        links.push(LinkSpan {
+            range: start..out.len(),
+            url: url_body[..url_end].to_string(),
+        });
+        index = label_end + 1 + 1 + url_end + 1;
+    }
+    (out, links)
+}
+
+/// The mark pass: the delimiter-pair scan that `parse_inline` used to be.
+///
+/// Returns the text, its marks, and **the ranges it deleted** — which the link pass needs, because this pass removes
+/// characters and therefore moves everything after them.
+fn parse_marks(source: &str) -> (String, Vec<MarkSpan>, Vec<Range<usize>>) {
     // **Two passes, because an unmatched delimiter has to stay in the text.** The first version was one
     // pass that consumed every delimiter it recognized, so `a ** marker` came back as `a  marker` — the
     // marker vanished from the document, which is content loss rather than a cosmetic fault. What has to
@@ -772,16 +924,25 @@ pub fn parse_inline(source: &str) -> Text {
     let mut starts: Vec<Option<usize>> = vec![None; pairs.len()];
     let mut ends: Vec<Option<usize>> = vec![None; pairs.len()];
     let mut text = String::with_capacity(bytes);
+    // **What this pass removes.** A caller holding ranges in *this* function's input coordinates must subtract these,
+    // or its ranges point at the wrong characters the moment a delimiter precedes them. The first version of the link
+    // pass assumed the mark pass was length-preserving; it is not, and `[**a**](u)` then serialized as `**a**` — the
+    // link silently gone.
+    let mut removed: Vec<Range<usize>> = Vec::new();
     let mut index = 0usize;
     while index < bytes {
         if let Some((pair_index, is_open)) = delimiter_at[index] {
             let (_, open_start, open_end, close_start, close_end) = pairs[pair_index];
             if is_open {
                 starts[pair_index] = Some(text.len());
-                index = open_end.max(open_start + 1);
+                let skipped = open_end.max(open_start + 1);
+                removed.push(index..skipped);
+                index = skipped;
             } else {
                 ends[pair_index] = Some(text.len());
-                index = close_end.max(close_start + 1);
+                let skipped = close_end.max(close_start + 1);
+                removed.push(index..skipped);
+                index = skipped;
             }
             continue;
         }
@@ -814,9 +975,7 @@ pub fn parse_inline(source: &str) -> Text {
             .then(a.mark.cmp(&b.mark))
     });
 
-    let mut parsed = Text { text, marks };
-    parsed.normalize();
-    parsed
+    (text, marks, removed)
 }
 
 /// The mark a delimiter at the start of `rest` opens or closes.
@@ -841,21 +1000,43 @@ fn match_delimiter(rest: &str) -> Option<(Mark, &'static str)> {
 /// sorted and non-overlapping, so a mark's delimiters go around the text between them and a nested mark
 /// falls inside.
 pub fn write_inline(text: &Text) -> String {
-    if text.marks.is_empty() {
+    if text.marks.is_empty() && text.links.is_empty() {
         return text.text.clone();
     }
-    // An insertion list rather than a recursive walk: at each byte boundary that a mark starts or ends
-    // at, emit its delimiter. Non-overlapping sorted ranges mean the boundaries are visited in order.
-    let mut events: Vec<(usize, bool, Mark)> = Vec::new();
-    for span in &text.marks {
-        events.push((span.range.start, true, span.mark));
-        events.push((span.range.end, false, span.mark));
+    // **One event list, both kinds of span.** A link's delimiter is not a constant — it is `[`, `](` and `)`, with the
+    // target in the middle — so it cannot be a `Mark`; but it *is* a range with an opening and a closing, so it belongs
+    // in the same walk. Two writers would be two places for the ordering rule to be got wrong.
+    enum Event {
+        Open(Mark),
+        Close(Mark),
+        // The index of the link, because opening needs the target only at the close.
+        LinkOpen(usize),
+        LinkClose(usize),
     }
-    // A close sorts before an open at the same offset, so adjacent marks do not interleave their
-    // delimiters.
+
+    let mut events: Vec<(usize, u8, Event)> = Vec::new();
+    for span in &text.marks {
+        events.push((span.range.start, MARK_OPEN, Event::Open(span.mark)));
+        events.push((span.range.end, MARK_CLOSE, Event::Close(span.mark)));
+    }
+    for (index, link) in text.links.iter().enumerate() {
+        events.push((link.range.start, LINK_OPEN, Event::LinkOpen(index)));
+        events.push((link.range.end, LINK_CLOSE, Event::LinkClose(index)));
+    }
+    // The ranks are the ordering rule, and they say two things.
+    //
+    // **All closes before all opens at the same offset** — the rule the mark-only version had, written as `close =
+    // false < open = true`. It is what stops two adjacent spans nesting: with two links `[l](u)` and `[nk](u)` meeting
+    // at one offset, opening the second before closing the first would emit `[l[nk](u)](u)`, which re-parses as **one**
+    // link and silently loses the second. My first rank set had opens first and did exactly that; the test that caught
+    // it was the one about a link cut in two by a backspace, whose halves are adjacent by construction.
+    //
+    // **And a link sits outside a mark** — `[**a**](u)`, not `**[a](u)**` — so at an offset where both open the link
+    // goes first, and at one where both close the mark goes first. Which is to say: closer to the *outside* sorts
+    // earlier when closing and later when opening.
     events.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
 
-    let mut out = String::with_capacity(text.text.len() + text.marks.len() * 2);
+    let mut out = String::with_capacity(text.text.len() + text.marks.len() * 2 + text.links.len() * 4);
     let mut cursor = 0usize;
     let mut event_index = 0usize;
     while event_index < events.len() {
@@ -864,11 +1045,16 @@ pub fn write_inline(text: &Text) -> String {
             out.push_str(&text.text[cursor..at]);
             cursor = at;
         }
-        // Every event at this offset, closes before opens.
         while event_index < events.len() && events[event_index].0 == at {
-            let (_, opening, mark) = events[event_index];
-            let _ = opening;
-            out.push_str(mark.delimiters());
+            match &events[event_index].2 {
+                Event::Open(mark) | Event::Close(mark) => out.push_str(mark.delimiters()),
+                Event::LinkOpen(_) => out.push('['),
+                Event::LinkClose(index) => {
+                    out.push_str("](");
+                    out.push_str(&text.links[*index].url);
+                    out.push(')');
+                }
+            }
             event_index += 1;
         }
     }
@@ -877,6 +1063,25 @@ pub fn write_inline(text: &Text) -> String {
     }
     out
 }
+
+/// The event ranks. **The ordering is the rule**, so it is stated as the two constraints that produce it rather than
+/// as four bare numbers.
+///
+/// 1. **Every close sorts before every open.** This is the original rule, and it is what stops two *adjacent* spans
+///    nesting: two links meeting at one offset must emit `[l](u)[nk](u)`, and opening the second before closing the
+///    first would emit `[l[nk](u)](u)` — which re-parses as **one** link, silently losing the other.
+/// 2. **A link is outside a mark.** Where a mark and a link open together the link goes first (`[` then `**`), and where
+///    they close together the mark goes first (`**` then `](u)`). Either way the brackets end up outside the bold, which
+///    is what makes `[**a**](u)` the canonical spelling.
+///
+/// Getting this wrong is invisible in a round trip that never has two spans touching, which is why the test that caught
+/// it is the one whose two halves are adjacent **by construction** — a link cut in two by a backspace. I had it wrong
+/// twice: first with opens before closes, then with the link closing before the mark.
+const MARK_CLOSE: u8 = 0;
+const LINK_CLOSE: u8 = 1;
+const LINK_OPEN: u8 = 2;
+const MARK_OPEN: u8 = 3;
+
 
 #[cfg(test)]
 mod tests {
@@ -1255,6 +1460,7 @@ mod tests {
         // behaviour look intended.
         let mut text = Text {
             text: "abcdefgh".to_string(),
+            links: Vec::new(),
             marks: vec![
                 MarkSpan {
                     range: 4..6,
@@ -1398,6 +1604,199 @@ mod tests {
         // of the two splits is the whole test.
         assert!(is_image("https://host/pic.png#a?b"));
         assert!(!is_image("https://host/photo#a?b.png"));
+    }
+
+    #[test]
+    fn test_a_link_parses_to_its_label_with_the_target_kept() {
+        // The range covers the **label**, which is what is displayed — so a link behaves like a mark geometrically and
+        // one shift function can move both.
+        let text = parse_inline("see [the docs](https://example.com/a) for more");
+        assert_eq!(text.text, "see the docs for more");
+        assert_eq!(text.links.len(), 1);
+        assert_eq!(text.links[0].range, 4..12);
+        assert_eq!(text.links[0].url, "https://example.com/a");
+        assert_eq!(&text.text[text.links[0].range.clone()], "the docs");
+    }
+
+    #[test]
+    fn test_a_link_round_trips_and_the_fixed_point_holds() {
+        // **The invariant this whole model rests on.** A link was not representable before this change — `[a](b)`
+        // parsed as eight literal characters — so this is the case that says the addition did not cost the guarantee.
+        for source in [
+            "[the docs](https://example.com)",
+            "see [the docs](https://example.com/a?b=c#d) for more",
+            "two [a](u1) and [b](u2) links",
+            "[**bold label**](https://example.com)",
+            "[label](https://example.com) and *italic*",
+            "- a [link](u) in a bullet",
+            "> a [link](u) in a quote",
+            "no links at all",
+        ] {
+            let parsed = parse(source);
+            let written = serialize(&parsed);
+            let reparsed = parse(&written);
+            assert_eq!(
+                reparsed, parsed,
+                "the fixed point broke for {source:?}: wrote {written:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_a_mark_inside_a_label_writes_inside_the_brackets() {
+        // **The ordering rule, and the reason it is a rule.** A link is outermost: `[**a**](url)` bolds the label, and
+        // `**[a](url)**` would bold the brackets — which is not a link at all once re-parsed.
+        let text = parse_inline("[**a**](u)");
+        assert_eq!(text.text, "a");
+        assert_eq!(write_inline(&text), "[**a**](u)");
+        assert_eq!(text.marks.len(), 1);
+        assert_eq!(text.marks[0].range, 0..1);
+
+        // ...and a mark written **around** a whole link normalizes **inward**: `**[a](u)**` writes back as
+        // `[**a**](u)`. The two are the same document — a bold label that is a link — and the ordering rule makes the
+        // link outermost, so that is the canonical spelling. **The promise is a fixed point, not byte equality**:
+        // `_italic_` writing as `*italic*` is the same trade, and a test asserting the input spelling would be
+        // asserting that this model preserves a distinction it deliberately does not have.
+        let around = parse_inline("**[a](u)**");
+        let inward = parse_inline("[**a**](u)");
+        assert_eq!(write_inline(&around), "[**a**](u)");
+        assert_eq!(around, inward, "the two spellings must be the same document");
+        assert_eq!(parse_inline(&write_inline(&around)), around, "not a fixed point");
+    }
+
+    #[test]
+    fn test_a_bracket_that_is_not_a_link_stays_in_the_text() {
+        // **The same rule the mark pass follows, for the same reason**: a `[` somebody typed is content, and consuming
+        // it would be content loss. An unpaired delimiter stays visible.
+        for source in [
+            "see [note",
+            "[label](no closing paren",
+            "[label] no target",
+            "[](u)",
+            "[[label]](u)",
+            "a [b] c",
+        ] {
+            let text = parse_inline(source);
+            assert!(
+                source.contains('[') && !source.is_empty(),
+                "the case list is wrong"
+            );
+            let written = write_inline(&text);
+            // Whatever it decided, **nothing was lost**: the written form parses to the same document.
+            assert_eq!(parse_inline(&written), text, "{source:?} did not survive");
+        }
+    }
+
+    #[test]
+    fn test_an_unmatched_bracket_leaves_the_text_alone() {
+        // Stated separately from the round trip above, because "nothing was lost" and "the bracket is still there" are
+        // different claims and only this one says the character survived.
+        let text = parse_inline("see [note");
+        assert_eq!(text.text, "see [note");
+        assert!(text.links.is_empty());
+    }
+
+    #[test]
+    fn test_two_overlapping_links_are_reduced_to_the_first() {
+        // Marks keep their nesting and links do **not**, and the difference is not arbitrary: nested marks are
+        // writable (`**a *b* c**`), while two overlapping links are **not representable** — the writer would emit
+        // `[a[b]c](u1)(u2)`, which does not re-parse to the same two links. So `normalize` keeps the earlier one, which
+        // is the choice that keeps a document writable.
+        let mut text = Text {
+            text: "abcdef".to_string(),
+            marks: Vec::new(),
+            links: vec![
+                LinkSpan {
+                    range: 0..4,
+                    url: "first".to_string(),
+                },
+                LinkSpan {
+                    range: 2..6,
+                    url: "second".to_string(),
+                },
+            ],
+        };
+        text.normalize();
+        assert_eq!(text.links.len(), 1);
+        assert_eq!(text.links[0].url, "first");
+        // ...and the written form still parses back to it, which is the point of the rule.
+        let written = write_inline(&text);
+        assert_eq!(parse_inline(&written), text);
+    }
+
+    #[test]
+    fn test_a_link_moves_when_the_text_before_it_is_deleted() {
+        // **The defect that motivated one `shift_range`.** Before links were shifted, editing text before a link left
+        // its range pointing at the wrong characters — serializing `[`/`](url)` around text that was never linked,
+        // which is content corruption rather than a cosmetic fault. So it is checked through a real edit path.
+        //
+        // `SetKind` was the first attempt and it was the wrong test: a key that changes nothing legitimately returns
+        // `None`, so a test asserting it applied was asserting the opposite of the design.
+        let doc = Doc {
+            blocks: vec![Block {
+                indent: 0,
+                kind: BlockKind::Paragraph(parse_inline("a [link](u) tail")),
+            }],
+        };
+        // Backspace with the caret inside the label deletes a character of the label: the link must come out pointing
+        // at what is left of it.
+        let selection = Selection::caret(0, 4);
+        let edited = edit::apply(&doc, &selection, Shortcut::Backspace).expect("backspace applied");
+        let text = edited.doc.blocks[0].kind.text().expect("a paragraph has text");
+        // **Two links, which is the straddling rule and not a bug.** A span that straddles an edit is cut in two rather
+        // than dropped or given wholesale to one side — the rule marks already followed — and for a link that is
+        // faithful: both halves point where the whole did, and the writer's `[l](u)[nk](u)` re-parses as two links. My
+        // first expectation was one link, which would have meant silently dropping the target from one half.
+        assert_eq!(text.links.len(), 2, "a straddled link must be cut, not dropped");
+        assert!(text.links.iter().all(|link| link.url == "u"));
+        let labels: Vec<&str> = text
+            .links
+            .iter()
+            .map(|link| &text.text[link.range.clone()])
+            .collect();
+        assert_eq!(labels, vec!["l", "nk"], "the halves are not the halves of the label");
+        // ...and it is still writable and still a fixed point, which is the claim that matters.
+        assert_eq!(parse(&serialize(&edited.doc)), edited.doc);
+    }
+
+    /// The document after `Enter`, obtained through the public `apply` — `edit::enter` is private, and the point of
+    /// that test is the split, not the plumbing.
+    struct AfterEnter {
+        doc: Doc,
+    }
+
+    impl AfterEnter {
+        fn of(doc: &Doc, selection: &Selection) -> Self {
+            let edited = edit::apply(doc, selection, Shortcut::Enter).expect("the split applied");
+            Self { doc: edited.doc }
+        }
+    }
+
+    #[test]
+    fn test_a_link_survives_being_split_and_merged() {
+        // The two edit sites that partition spans. Splitting a link in the middle gives **two** links to the same
+        // target — which is faithful, because `[la](u)[bel](u)` re-parses as two links — and merging puts the halves
+        // back, with the second's range moved by the join.
+        let doc = Doc {
+            blocks: vec![Block {
+                indent: 0,
+                kind: BlockKind::Paragraph(parse_inline("[label](u)")),
+            }],
+        };
+        let selection = Selection::caret(0, 3);
+        edit::apply(&doc, &selection, Shortcut::Enter).expect("the split applied");
+        let AfterEnter { doc } = AfterEnter::of(&doc, &selection);
+        assert_eq!(doc.blocks.len(), 2);
+
+        let first = doc.blocks[0].kind.text().expect("text").clone();
+        let second = doc.blocks[1].kind.text().expect("text").clone();
+        assert_eq!(first.text, "lab");
+        assert_eq!(second.text, "el");
+        assert_eq!(first.links.len(), 1, "the first half lost its link");
+        assert_eq!(second.links.len(), 1, "the second half lost its link");
+        assert_eq!(first.links[0].url, "u");
+        assert_eq!(second.links[0].url, "u");
+        assert_eq!(&second.text[second.links[0].range.clone()], "el");
     }
 
 }

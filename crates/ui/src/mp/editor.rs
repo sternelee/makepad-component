@@ -1485,6 +1485,14 @@ mod tests {
         // shifted by the difference.
         let mut text = makepad_markdown::Text {
             text: "hello world".to_string(),
+            // A link as well as a mark, and it is here because a `Text` gained a field and **`cargo check` does not
+            // build tests** — this literal was the only thing that broke, and it broke in the test target, which is
+            // exactly the trap the note in this file's module doc warns about: changing the shape of a public type
+            // means running `cargo test` for every crate that constructs it, not `cargo check`.
+            links: vec![makepad_markdown::LinkSpan {
+                range: 6..11,
+                url: "https://example.com".to_string(),
+            }],
             marks: vec![makepad_markdown::MarkSpan {
                 range: 6..11,
                 mark: makepad_markdown::Mark::Bold,
