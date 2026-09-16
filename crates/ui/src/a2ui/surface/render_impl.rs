@@ -515,10 +515,26 @@ impl A2uiSurface {
         let button = self.pool_button(cx, button_idx);
 
         // Set button text
-        button.set_text(&button_text);
+        button.set_text(cx.cx, &button_text);
 
         // Draw the button widget
         let _ = button.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+
+        // **Positive evidence, not the absence of an error.** A pool that silently built nothing would also leave the
+        // log at `[E]=0`, so what the renderer did is printed under an env var and the run's own output is the evidence:
+        // which library the button came from, and whether it took its text. Kept in place because the remaining
+        // thirteen pools need the same check, and a proof that has to be re-invented per pool is one that will be
+        // skipped for the twelfth.
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            static COUNT: AtomicUsize = AtomicUsize::new(0);
+            println!(
+                "A2UI v3_button #{} id={:?} text={:?} from=mp::button::MpButton",
+                COUNT.fetch_add(1, Ordering::Relaxed),
+                component_id,
+                button_text,
+            );
+        }
 
         // Store metadata
         self.button_meta.push((
@@ -640,13 +656,26 @@ impl A2uiSurface {
         let cb = self.pool_checkbox(cx, checkbox_idx);
 
         // Set state
-        cb.set_checked(cx, is_checked);
+        cb.set_checked(cx.cx, is_checked);
         if !label.is_empty() {
-            cb.set_text(&label);
+            // v3's `set_text` takes a `&mut Cx`, like the button's — the second of the two differences the migration
+            // consists of, and the reason a pool is a small but not a one-line change.
+            cb.set_text(cx.cx, &label);
         }
 
         // Draw the checkbox widget
         let _ = cb.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            static COUNT: AtomicUsize = AtomicUsize::new(0);
+            println!(
+                "A2UI v3_checkbox #{} checked={} label={:?} from=mp::checkbox::MpCheckbox",
+                COUNT.fetch_add(1, Ordering::Relaxed),
+                is_checked,
+                label,
+            );
+        }
 
         // Store metadata
         self.checkbox_meta

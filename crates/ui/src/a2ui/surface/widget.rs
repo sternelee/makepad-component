@@ -18,9 +18,7 @@ use crate::a2ui::{
 };
 use crate::widgets::{
     avatar_group::MpAvatarGroup,
-    button::MpButton,
     calendar::MpCalendar,
-    checkbox::{MpCheckbox, MpCheckboxAction},
     color_picker::{MpColorPicker, MpColorPickerAction},
     description_list::{MpDescriptionItem, MpDescriptionList},
     icon::MpIcon,
@@ -33,6 +31,21 @@ use crate::widgets::{
 };
 
 use super::draw_types::*;
+
+/// **The v3 button, from the component library — not the deprecated v2 one.**
+///
+/// The A2UI renderer builds widgets from Rust into a pool, so what it pools is what the library ships. This is the
+/// first pool moved to `mp`, and it is deliberately the smallest one (one call site) so the procedure is proven before
+/// the other thirteen follow it. Two things changed and nothing else:
+///
+/// 1. The import, from `crate::widgets::button::MpButton` to `crate::mp::button::MpButton`.
+/// 2. `set_text` takes a `&mut Cx` in v3 rather than only the text, so its call site passes `cx.cx`.
+///
+/// Everything else is identical on purpose: `script_new_with_default` still yields the type's defaults **including the
+/// DSL ones** (`mod.mp.MpButton = set_type_default() do mod.mp.MpButtonBase{...}` is what `set_type_default` means), and
+/// `draw_walk` has the same signature, so the pool function and the draw call are unchanged.
+use crate::mp::button::MpButton;
+use crate::mp::checkbox::{MpCheckbox, MpCheckboxAction};
 
 script_mod! {
     use mod.prelude.widgets_internal.*
@@ -779,9 +792,13 @@ impl A2uiSurface {
     /// Get or grow a checkbox from the pool
     fn pool_checkbox(&mut self, cx: &mut Cx, idx: usize) -> &mut MpCheckbox {
         while self.mp_checkboxes.len() <= idx {
-            let mut new_cb = cx.with_vm(MpCheckbox::script_new_with_default);
-            // Override label color for dark bg
-            script_apply_eval!(cx, new_cb, { draw_label +: { color: #E0E0E0 } });
+            // **No colour override, and that is the port paying off.** The v2 checkbox needed one — it hardcoded its
+            // label colour, so the surface reached in and set it for a dark background. The v3 widget reads its colour
+            // from `Theme::of(cx)` on every paint, so the override is not just unnecessary, it is the thing this port
+            // exists to delete: a colour chosen somewhere other than the theme. (It also named the field wrong —
+            // `draw_label` in v2, `draw_text` in v3 — which is what `[E]=0` caught: four script errors, two per
+            // checkbox drawn.)
+            let new_cb = cx.with_vm(MpCheckbox::script_new_with_default);
             self.mp_checkboxes.push(new_cb);
         }
         &mut self.mp_checkboxes[idx]

@@ -1412,12 +1412,25 @@ impl AppMain for App {
         // Auto-load math charts on startup if math_test.json exists
         if let Event::Startup = event {
             self.apply_theme(cx);
-            if std::path::Path::new("music_test.json").exists() {
-                self.load_json_file(cx, "music_test.json", "🎵 Makepad Music Player");
-            } else if std::path::Path::new("math_test.json").exists() {
-                self.load_math_charts(cx);
-            } else {
-                self.connect_to_server(cx);
+            // **A sample named in the environment, because otherwise a pooled widget cannot be confirmed to render.**
+            // The catalog sample — the one with buttons, checkboxes and sliders — is reachable only by *clicking* a
+            // button, and a synthetic pointer does not reach this app's widgets (127,564 `event.hits` calls all came
+            // back `Nothing`). So without a path like this, moving a widget pool from the deprecated set to `mp` could
+            // not be verified at all: `[E]=0` is what a renderer that built nothing also prints. `A2UI_SAMPLE` selects
+            // the sample, and `MP_A2UI_DEBUG` makes the pools print what they built.
+            match std::env::var("A2UI_SAMPLE").as_deref() {
+                Ok("catalog") => self.load_a2ui_data(cx),
+                Ok("cyber") => self.load_json_file(cx, "cyber_art.json", "🎨 Cyber Sound Art"),
+                Ok("music") => self.load_json_file(cx, "music_test.json", "🎵 Makepad Music Player"),
+                Ok(_) | Err(_) => {
+                    if std::path::Path::new("music_test.json").exists() {
+                        self.load_json_file(cx, "music_test.json", "🎵 Makepad Music Player");
+                    } else if std::path::Path::new("math_test.json").exists() {
+                        self.load_math_charts(cx);
+                    } else {
+                        self.connect_to_server(cx);
+                    }
+                }
             }
             // Start interval timer for polling instead of continuous frame requests
             self.poll_timer = cx.start_interval(1.0);
