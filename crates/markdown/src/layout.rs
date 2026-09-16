@@ -36,9 +36,22 @@ use crate::{BlockKind, Doc, Text};
 /// separate from the arithmetic that uses it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Metrics {
-    /// One character's width, in points.
+    /// One character's width at [`Metrics::body_size`], in points.
+    ///
+    /// A **size-relative** number: a heading's characters are wider because its size is larger, so the width of a
+    /// character is `advance * size / body_size`. That is what lets one advance serve every block without a second
+    /// table.
     pub advance: f64,
-    /// One line's height, in points.
+    /// The size of a paragraph, in points. Every other size is stated against it.
+    pub body_size: f64,
+    /// The size of a level 1, 2 and 3 heading, in points.
+    ///
+    /// A **heading is bigger**, and that is not only a paint decision: a taller block occupies more vertical space,
+    /// so a layout that used one line height for everything would paint a heading over the block below it. It was
+    /// the one thing a screenshot found that no test could — the marked-up heading looked exactly like a
+    /// paragraph — because the *layout* had no notion of a size per kind.
+    pub heading_size: [f64; 3],
+    /// One line's height at [`Metrics::body_size`], in points.
     pub line_height: f64,
     /// One indent level, in points.
     pub indent: f64,
@@ -54,6 +67,8 @@ impl Default for Metrics {
         // so. The paint half overrides every one of these from the theme.
         Self {
             advance: 13.0 * 0.6 * (96.0 / 72.0),
+            body_size: 13.0,
+            heading_size: [22.0, 17.0, 15.0],
             line_height: 13.0 * 1.5,
             indent: 22.0,
             gap: 10.0,
@@ -63,20 +78,51 @@ impl Default for Metrics {
 }
 
 impl Metrics {
-    /// How wide one character is, with the full-width characters doubled.
+    /// The painted size of a block's text.
     ///
-    /// See the module doc on why there is no narrow correction.
-    pub fn char_width(&self, ch: char) -> f64 {
-        if is_full_width(ch) {
-            self.advance * 2.0
-        } else {
-            self.advance
+    /// A heading is larger than a paragraph, and levels beyond three are clamped: this port's type ladder has three
+    /// title rungs, and a level 4–6 heading is a *heading* rather than a new size.
+    pub fn size_for(&self, kind: &BlockKind) -> f64 {
+        match kind {
+            BlockKind::Heading { level, .. } => {
+                self.heading_size[(*level as usize).clamp(1, 3) - 1]
+            }
+            _ => self.body_size,
         }
     }
 
-    /// How wide a string is, by the same rule.
+    /// One line's height for a block, so a taller block takes more vertical space.
+    pub fn line_height_for(&self, kind: &BlockKind) -> f64 {
+        // The same ratio as the body's, so a heading is scaled rather than separately chosen — one number instead
+        // of four.
+        self.line_height * (self.size_for(kind) / self.body_size)
+    }
+
+    /// How wide one character is at a block's size, with the full-width characters doubled.
+    ///
+    /// See the module doc on why there is no narrow correction.
+    pub fn char_width_at(&self, ch: char, size: f64) -> f64 {
+        let base = self.advance * (size / self.body_size);
+        if is_full_width(ch) {
+            base * 2.0
+        } else {
+            base
+        }
+    }
+
+    /// How wide one character is at the body size.
+    pub fn char_width(&self, ch: char) -> f64 {
+        self.char_width_at(ch, self.body_size)
+    }
+
+    /// How wide a string is at a block's size.
+    pub fn text_width_at(&self, text: &str, size: f64) -> f64 {
+        text.chars().map(|ch| self.char_width_at(ch, size)).sum()
+    }
+
+    /// How wide a string is at the body size.
     pub fn text_width(&self, text: &str) -> f64 {
-        text.chars().map(|ch| self.char_width(ch)).sum()
+        self.text_width_at(text, self.body_size)
     }
 }
 
@@ -215,6 +261,8 @@ pub fn layout(doc: &Doc, metrics: Metrics, width: f64) -> Laid {
             _ => 0.0,
         };
         let text_x = indent + marker_width + padding;
+        let size = metrics.size_for(&block.kind);
+        let line_height = metrics.line_height_for(&block.kind);
         let available = (width - text_x - indent.min(0.0)).max(metrics.advance);
 
         let text = block.kind.text();
@@ -226,13 +274,13 @@ pub fn layout(doc: &Doc, metrics: Metrics, width: f64) -> Laid {
             // wide they are, and the paint half clips a long one instead. The first version wrapped it
             // like a paragraph and the test caught the code contradicting this doc's neighbour.
             Some(text) if matches!(block.kind, BlockKind::Code { .. }) => hard_lines(&text.text),
-            Some(text) => wrap(text, &metrics, available, indent + marker_width + padding),
+            Some(text) => wrap(text, &metrics, size, available),
         };
         let lines = if ranges.is_empty() {
             vec![Line {
                 range: 0..0,
                 x: indent,
-                y: y + metrics.line_height * 0.5,
+                y: y + line_height * 0.5,
             }]
         } else {
             ranges
@@ -241,7 +289,7 @@ pub fn layout(doc: &Doc, metrics: Metrics, width: f64) -> Laid {
                 .map(|(line_index, range)| Line {
                     range,
                     x: indent + marker_width + padding,
-                    y: y + line_index as f64 * metrics.line_height,
+                    y: y + line_index as f64 * line_height,
                 })
                 .collect()
         };
@@ -249,7 +297,7 @@ pub fn layout(doc: &Doc, metrics: Metrics, width: f64) -> Laid {
         // A code block's height is its line count, and it is not wrapped — the paint half clips it
         // horizontally instead, because rewrapping code changes what the reader reads. So its lines are
         // its own newlines.
-        let height = lines.len().max(1) as f64 * metrics.line_height;
+        let height = lines.len().max(1) as f64 * line_height;
         blocks.push(BlockBox {
             block: index,
             y,
@@ -288,7 +336,7 @@ fn marker_for(kind: &BlockKind) -> Option<String> {
 /// a paragraph breaks between words, and a URL or an identifier longer than the measure breaks inside
 /// itself rather than overflowing. The returned ranges are on character boundaries and cover the text in
 /// order, with the space that ended a line left at the end of that line rather than moved to the next.
-pub fn wrap(text: &Text, metrics: &Metrics, width: f64, _x: f64) -> Vec<Range<usize>> {
+pub fn wrap(text: &Text, metrics: &Metrics, size: f64, width: f64) -> Vec<Range<usize>> {
     let source = text.text.as_str();
     if source.is_empty() {
         // An empty paragraph is still a line — otherwise a blank block would have no height and the
@@ -305,7 +353,7 @@ pub fn wrap(text: &Text, metrics: &Metrics, width: f64, _x: f64) -> Vec<Range<us
     let mut index = 0usize;
     while index < source.len() {
         let ch = source[index..].chars().next().expect("a character");
-        let ch_width = metrics.char_width(ch);
+        let ch_width = metrics.char_width_at(ch, size);
 
         // A newline is a hard break: this is a code block or a quote's internal line.
         if ch == '\n' {
@@ -323,7 +371,7 @@ pub fn wrap(text: &Text, metrics: &Metrics, width: f64, _x: f64) -> Vec<Range<us
             let break_at = last_break.unwrap_or(index);
             lines.push(line_start..break_at);
             line_start = break_at;
-            used = metrics.text_width(&source[line_start..index]);
+            used = metrics.text_width_at(&source[line_start..index], size);
             last_break = None;
         }
 
@@ -437,6 +485,10 @@ mod tests {
         // reader can check by hand.
         Metrics {
             advance: 10.0,
+            body_size: 10.0,
+            // Ten, twenty and thirty points, so a test can tell a heading's line from a paragraph's by arithmetic
+            // alone: a body line is 20 high, an h1 line 40.
+            heading_size: [20.0, 15.0, 12.0],
             line_height: 20.0,
             indent: 30.0,
             gap: 5.0,
@@ -564,14 +616,45 @@ mod tests {
 
     #[test]
     fn test_blocks_stack_with_a_gap_between_them() {
-        // Three blocks of one line each, twenty high, with two gaps of five.
+        // A heading, a paragraph and a list item, each one line, with a gap of five between them.
         let doc = parse("# H\n\npara\n\n- item\n");
         let laid = layout(&doc, metrics(), 1000.0);
         assert_eq!(laid.blocks.len(), 3);
+        // **The heading's line is twice a paragraph's**, because its size is: the fixture's `heading_size[0]` is
+        // 20 against a body of 10, and the line height is scaled by the same ratio. So the paragraph starts at
+        // 40 + 5 rather than 20 + 5 — which is the whole point of a size per kind, and the first version of this
+        // test asserted the paragraph's height for every block.
         assert_eq!(laid.blocks[0].y, 0.0);
-        assert_eq!(laid.blocks[1].y, 25.0);
-        assert_eq!(laid.blocks[2].y, 50.0);
-        assert_eq!(laid.height, 70.0, "the document's height is the last block's bottom");
+        assert_eq!(laid.blocks[0].height, 40.0);
+        assert_eq!(laid.blocks[1].y, 45.0);
+        assert_eq!(laid.blocks[1].height, 20.0);
+        assert_eq!(laid.blocks[2].y, 70.0);
+        assert_eq!(laid.height, 90.0, "the document's height is the last block's bottom");
+    }
+
+    #[test]
+    fn test_a_heading_takes_more_vertical_space_than_a_paragraph() {
+        // **The property the per-kind size exists for.** A layout that used one line height for everything paints a
+        // heading over the block below it, and the marked-up heading looks exactly like a paragraph — which is
+        // what a screenshot found and no test could, because the layout had no notion of a size per kind.
+        let doc = parse("# Heading\n\nParagraph\n");
+        let laid = layout(&doc, metrics(), 1000.0);
+        assert!(
+            laid.blocks[0].height > laid.blocks[1].height,
+            "the heading is {} high and the paragraph {}",
+            laid.blocks[0].height,
+            laid.blocks[1].height
+        );
+        // And the taller block pushes the next one down by the difference, which is what stops the overlap.
+        assert_eq!(laid.blocks[1].y, laid.blocks[0].height + laid.metrics.gap);
+        // A deeper heading is smaller than a shallower one, so the three levels are ordered.
+        let doc = parse("# One\n\n## Two\n\n### Three\n\n#### Four\n");
+        let laid = layout(&doc, metrics(), 1000.0);
+        let heights: Vec<f64> = laid.blocks.iter().map(|block| block.height).collect();
+        assert!(heights[0] > heights[1], "{heights:?}");
+        assert!(heights[1] > heights[2], "{heights:?}");
+        // ...and a level 4 is clamped to level 3's size rather than inventing a fourth rung.
+        assert_eq!(heights[2], heights[3], "{heights:?}");
     }
 
     #[test]

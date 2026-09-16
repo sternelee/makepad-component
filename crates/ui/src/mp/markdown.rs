@@ -193,8 +193,18 @@ impl MpMarkdown {
     fn metrics_for(&self, cx: &mut Cx2d) -> Metrics {
         let theme = makepad_theme::Theme::of(cx.cx);
         let body = theme.metrics(makepad_theme::TextStyle::Body).size() as f64;
+        // **The heading sizes come from the theme's title rungs**, so a heading in a document is the same size as
+        // the same heading drawn by any other widget in the library. The first version gave every block the body
+        // size, and a screenshot showed a marked-up heading that looked exactly like a paragraph.
+        let heading_size = [
+            theme.metrics(makepad_theme::TextStyle::Title).size() as f64,
+            theme.metrics(makepad_theme::TextStyle::Title2).size() as f64,
+            theme.metrics(makepad_theme::TextStyle::Title3).size() as f64,
+        ];
         Metrics {
             advance: text::width("a", body),
+            body_size: body,
+            heading_size,
             line_height: body * 1.6,
             indent: body * 1.6,
             gap: body * 0.7,
@@ -369,6 +379,10 @@ impl Widget for MpMarkdown {
                         slice,
                     );
                 } else {
+                    // The block's own size, so a heading is a heading. The **layout** already accounted for it —
+                    // `line_height_for` scales the line height by the same ratio — so the paint and the geometry
+                    // agree by construction rather than by two tables being kept in step.
+                    self.draw_body.text_style.font_size = metrics.size_for(&block.kind) as f32;
                     self.draw_body.color = body_ink;
                     self.draw_body.draw_walk(
                         cx,
