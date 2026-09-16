@@ -1,37 +1,24 @@
 //! `MpPagination` — a window onto a long list of pages.
 //!
-//! # ⚠️ The arithmetic is verified; the digits do not draw
+//! ## The one fault it had, and why the symptom misled
 //!
-//! Stated first because it is the state. The row renders: the plate is the right
-//! width for each case, the current page's wash is in the right cell, and the
-//! slot count and positions are the ones `window` returns. **The page numbers do
-//! not appear**, and the cause is undetermined.
+//! The row rendered at the right width with the current page's wash in the right
+//! cell, and **no numbers** — which read for three build-and-look cycles as a text
+//! drawing problem, and was exhausted as one: the colour was visible, the label
+//! non-empty, the widget did capture an `Area`, the text style was set from Rust as
+//! well as the DSL, and the same `draw_abs`-outside-the-turtle pattern renders in
+//! `mp/table.rs`.
 //!
-//! What is ruled out: the text is not off-screen (`y` is inside the plate), the
-//! colour is a visible tone, the label is non-empty, and the same `draw_abs`
-//! pattern with the same outside-the-turtle placement renders in `mp/table.rs`.
-//! Setting the font size explicitly from Rust rather than relying on the DSL's
-//! `mod.mpc.type.caption` changed nothing — and the table's own header uses
-//! `caption` and renders, so the text style is not obviously the difference.
+//! It was arithmetic. `cell.pos.x` already carried `origin.x` and the y expression
+//! **did not carry `origin.y`**, so every digit was drawn at the top of the
+//! *window* — behind the rail, where nothing is visible. The table computes the
+//! same position as `origin + dvec2(x, y)` and never had the fault.
 //!
-//! Where to look next:
-//!
-//! 1. Whether `draw_abs` on a `DrawText` needs the walk's own turtle still open.
-//!    The table draws inside a plate tall enough to hold its cells either way; this
-//!    row is 28pt with 12pt of line box in it, so a clip is possible here and not
-//!    there. Drawing the cells before `draw_bg.end` would answer it.
-//! 2. Nothing about the `Area`: this widget captures one in its `draw_walk`, and
-//!    that was checked rather than assumed. `MpProgressRing` is the crate's only
-//!    widget with no `Area` at all, and it was briefly recorded here as a shared
-//!    explanation for both faults — the grep says otherwise, and the false
-//!    coincidence is removed rather than left as a lead.
-//!
-//! The arithmetic is still the component's content, and it is exhaustively tested
-//! (eleven tests: no ellipsis when the list fits, ends always shown, constant row
-//! width, no duplicates, the current page always present, one hidden page drawn as
-//! itself, an empty list, an out-of-range page, and the hit test agreeing with the
-//! layout). What is missing is the paint.
-//!
+//! The lesson is worth more than the fix: **a missing origin and a missing paint
+//! look identical in a screenshot.** The way to tell them apart is to ask where
+//! the text would have landed rather than whether it was drawn, and that question
+//! is answerable by reading the expression.
+
 //! ## The whole component is one function
 //!
 //! Given a current page, a page count and how many neighbours to show, produce
@@ -436,18 +423,23 @@ impl Widget for MpPagination {
                 None => "…".to_string(),
             };
             self.draw_cell.color = if is_current { body } else { muted };
-            // Set explicitly rather than relying on the DSL's text style: the
-            // row's cells drew their plates but no digits until this line existed,
-            // which says the drawer had no size. `label_font` is the ladder's
-            // caption rung, and `table.rs` gets the same value from its own DSL —
-            // one of the two paths was not reaching the drawer.
+            // Set from the same rung the width arithmetic uses, so the drawn size
+            // and the measured size cannot disagree — a cell whose label is
+            // centred by one number and painted at another is off by half the
+            // difference, and only on long labels.
             self.draw_cell.text_style.font_size = font as f32;
             let text_w = text::width(&label, font);
             self.draw_cell.draw_abs(
                 cx,
                 dvec2(
+                    // `cell.pos` already carries `origin.x`, and the y did not
+                    // carry `origin.y` — so the digits were drawn at the top of
+                    // the *window* rather than in the row, which reads exactly
+                    // like "the numbers do not draw" because where they landed is
+                    // behind the rail. `mp/table.rs` computes the same y as
+                    // `origin + dvec2(x, y)` and never had this fault.
                     cell.pos.x + (CELL_W - text_w) * 0.5,
-                    (rect.size.y - line_box) * 0.5,
+                    origin.y + (rect.size.y - line_box) * 0.5,
                 ),
                 &label,
             );
@@ -606,6 +598,24 @@ mod tests {
         assert_eq!(*slots.last().unwrap(), Some(10));
         let slots = window(0, 10, 1);
         assert_eq!(slots[0], Some(1));
+    }
+
+    #[test]
+    fn test_a_cell_s_position_carries_the_plate_s_origin() {
+        // The fault this widget had: `x` came from a value that already included
+        // the origin and `y` did not, so every digit was drawn at the top of the
+        // window rather than in its row. Asserted as arithmetic, because in a
+        // screenshot a missing origin and a missing paint look identical.
+        let origin = dvec2(240.0, 310.0);
+        let rect_h = 28.0;
+        let line_box = 12.0;
+        let cell_x = origin.x + 2.0 * (CELL_W + CELL_GAP);
+
+        let wrong = (rect_h - line_box) * 0.5;
+        let right = origin.y + (rect_h - line_box) * 0.5;
+        assert!((right - 318.0).abs() < 1e-9, "{right}");
+        assert!(wrong < origin.y, "the un-origined y lands above the widget");
+        assert!(cell_x > origin.x, "x carries the origin, which is the asymmetry");
     }
 
     #[test]

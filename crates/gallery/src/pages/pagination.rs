@@ -1,16 +1,9 @@
 //! The pagination: the window onto a long list, at the shapes it has to hold.
 //!
-//! **The rows render but their digits do not.** The plate's width, the current
-//! page's wash and the slot positions are all correct per case; the numbers are
-//! missing, and `mp/pagination.rs` records what is ruled out and the two
-//! candidates. The page is kept in the rail rather than hidden so the gallery
-//! reports the truth about what works.
+//! The arithmetic is the component's content, so it is exhaustively tested, and
+//! the four cases on this page are the ones a still frame can check: the row must
+//! not change width as the current page moves, and the ends must always be present.
 //!
-//! The page shows a short list (no ellipsis), a long one at each end, and a long
-//! one in the middle — which is the four cases the arithmetic has to get right,
-//! and the four a still frame can actually check: the row must not change width as
-//! the current page moves, and the ends must always be present.
-
 use makepad_widgets::*;
 
 script_mod! {

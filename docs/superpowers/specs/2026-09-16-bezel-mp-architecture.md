@@ -150,67 +150,23 @@ build on).
 | `mp/scaffolding.rs` | `MpGroupBox`, `MpGroupBoxPlain`, `MpKbd` — a titled card, and a key cap. |
 | `mp/pagination.rs` | `MpPagination` — **the arithmetic is tested and the row renders; the page numbers do not draw.** See below. |
 
-### The second self-painted row whose digits do not draw
+### A missing origin and a missing paint look identical in a screenshot
 
-`MpPagination` renders its plates and its current-page wash at the right widths and
-positions, and no numbers. Ruled out by checking rather than by assuming: the text
-is not off-screen, the colour is a visible tone, the label is non-empty, the widget
-does capture an `Area`, and the same `draw_abs`-outside-the-turtle pattern with the
-same text style renders in `mp/table.rs`. Setting the font size from Rust rather
-than relying on the DSL changed nothing. The two candidates left are in the module
-doc, and the first is a walk/turtle question this row's 28pt height makes possible
-where the table's taller plate does not.
+`MpPagination` rendered its plates at the right widths with the current page's wash
+in the right cell and **no numbers**. That read as a text-painting problem for
+three build-and-look cycles, and was exhausted as one: the colour was visible, the
+label non-empty, the widget does capture an `Area` (checked by grep, after a false
+claim that it did not), the text style was set from Rust as well as from the DSL,
+and the same `draw_abs`-outside-the-turtle pattern renders in `mp/table.rs`.
 
-A false lead is recorded here because it was written down before it was checked:
-an earlier version of this note claimed `MpPagination` and `MpProgressRing` were
-the crate's only two widgets that never capture an `Area`, and called it the first
-shared property between the two faults. **A grep refutes it** — the pagination
-captures one. `MpProgressRing` remains the only area-less widget, which is still a
-lead for *its* fault and no longer an explanation for both.
+It was arithmetic. `cell.pos.x` already carried `origin.x`; the y expression did
+not carry `origin.y`, so every digit was drawn at the top of the *window*, behind
+the rail. The table computes `origin + dvec2(x, y)` and never had the fault.
 
-### An `#[live]` field lost a Rust write, and the cause is still unknown
-
-The feedback page's rings drew as **empty tracks** for several build-and-look
-cycles. What `draw_walk` read was `0`, and a `log!` in the draw showed `value=0`
-for every ring in every frame while `set_value` was demonstrably reaching the
-widget — its borrow succeeded ten times out of ten, and moving the seeding from
-`handle_startup` to the first event changed nothing.
-
-A one-line experiment settled the *symptom*: declaring `value: 0.5` **in the DSL**
-drew a half ring, while every value written by a Rust setter did not. So something
-was re-asserting that field. Moving it to `#[rust]` — with the DSL's value as a
-separate `#[live] initial` — made the rings fill correctly at 0/25/50/75/90/100%.
-
-**The obvious explanation is wrong, and this section exists because of that.** The
-first version of this note claimed `#[live]` state mutated from Rust is unsafe.
-One more experiment refutes it: driving `MpSlider::value` — also `#[live]` — from
-Rust renders at the written value, knob and readout both (see the Slider page,
-where the first slider is 0.90 from Rust rather than its declared 0.35). And
-`MpAvatar::text`/`tone` are `#[live]` and their Rust writes survive too.
-
-So `#[live]` accepts Rust writes in general, `MpProgressRing` specifically lost
-them, and **the cause is not known**. What is known:
-
-| field | attribute | Rust write survives? |
-|---|---|---|
-| `MpTable::rows`, `MpTree::items`, `MpList::items`, `MpList::selected` | `#[rust]` | yes |
-| `MpSlider::value` | `#[live]` | **yes** |
-| `MpAvatar::text`, `MpAvatar::tone` | `#[live]` | **yes** |
-| `MpProgressRing::value` | `#[live]` | **no** |
-
-Candidates not yet eliminated: the ring is the only one of these with no
-`#[rust]` field at all; it has no `Area` of its own (its `draw_walk` never captures
-one, so `#[redraw]` may have nothing to redraw); and its `value` is the last field
-in the struct. Each is a one-experiment question and none has been asked.
-
-**The rule to act on, therefore, is the one that needs no theory rather than the
-one that sounds right:** a field an app mutates through a setter is safest as
-`#[rust]`, and a widget whose state is lost should be checked by driving it from
-Rust — which no page did for the ring, and which is why it shipped broken. Every
-widget whose setter writes a `#[live]` field is an audit item: `MpProgress::value`,
-`MpSlider::value` (now *known* good), `MpCheckbox::checked`, `MpSwitch::checked`,
-`MpRadio::selected`, `MpButton::disabled`. The Slider page drives its first slider
-from Rust permanently now, so that one stays known good.
+**The rule:** when text does not appear, ask *where it would have landed* before
+asking whether it was drawn. A missing origin and a missing paint produce the same
+screenshot, and the position question is answerable by reading the expression. This
+widget now carries a test that asserts the arithmetic rather than the render.
 
 ### One arithmetic, three widgets
 
