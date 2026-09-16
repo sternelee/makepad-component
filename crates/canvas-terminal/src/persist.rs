@@ -148,6 +148,11 @@ pub struct SavedWorkspace {
     pub camera_zoom: f32,
     #[serde(default)]
     pub items: Vec<SavedItem>,
+    /// Cards parked as top-bar tabs. Kept separate from `items` so a card is
+    /// never saved twice, and `#[serde(default)]` so canvases written before
+    /// the tab strip still load.
+    #[serde(default)]
+    pub minimized: Vec<SavedItem>,
     /// Whiteboard strokes, in world coordinates, with the ink they were
     /// drawn in so each keeps its own style.
     #[serde(default)]
@@ -380,6 +385,15 @@ mod tests {
                         rect,
                     },
                 ],
+                // A card parked as a tab is part of the workspace too.
+                minimized: vec![SavedItem::Note {
+                    title: "parked".into(),
+                    body: "# parked\n- [ ] later".into(),
+                    font_size: 16.0,
+                    color_idx: 3,
+                    edited_ms: 1_773_329_520_000,
+                    rect,
+                }],
                 shapes: vec![SavedShape {
                     kind: "pen".into(),
                     points: vec![Point { x: 1.0, y: 2.0 }, Point { x: 3.0, y: 4.0 }],

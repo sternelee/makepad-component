@@ -570,15 +570,6 @@ impl CanvasItem {
         }
     }
 
-    /// When this note was last edited (wall-clock ms), 0 when unknown or when
-    /// this is not a note card.
-    pub fn edited_ms(&self) -> i64 {
-        match self {
-            CanvasItem::Note { edited_ms, .. } => *edited_ms,
-            _ => 0,
-        }
-    }
-
     /// Stamp an edit: also the dirty signal the caller persists on.
     pub fn set_edited_now(&mut self) -> bool {
         match self {

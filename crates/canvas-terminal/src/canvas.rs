@@ -12,6 +12,120 @@ use crate::items::{
 use crate::note::{BlockKind, InlineStyle};
 use crate::terminal::state::{Cell, DEFAULT_BG};
 
+/// A parked tab's "favicon" colour, keyed by card kind.
+fn kind_accent(kind: ItemKind) -> [f32; 4] {
+    match kind {
+        ItemKind::Terminal => [0.42, 0.80, 0.55, 1.0],
+        ItemKind::Agent => [0.72, 0.55, 0.95, 1.0],
+        ItemKind::Note => [0.95, 0.75, 0.28, 1.0],
+        ItemKind::Browser => [0.30, 0.62, 0.98, 1.0],
+        ItemKind::MusicPlayer => [0.90, 0.39, 0.70, 1.0],
+        ItemKind::Media => [0.35, 0.78, 0.80, 1.0],
+    }
+}
+
+/// The kind a saved entry rebuilds as (mirrors the restore match).
+fn saved_item_kind(item: &crate::persist::SavedItem) -> ItemKind {
+    match item {
+        crate::persist::SavedItem::Note { .. } => ItemKind::Note,
+        crate::persist::SavedItem::Terminal { .. } => ItemKind::Terminal,
+        crate::persist::SavedItem::Agent { .. } => ItemKind::Agent,
+        crate::persist::SavedItem::Browser { .. } => ItemKind::Browser,
+        crate::persist::SavedItem::MusicPlayer { .. } => ItemKind::MusicPlayer,
+        crate::persist::SavedItem::Media { .. } => ItemKind::Media,
+    }
+}
+
+/// One canvas item in its saved form. Shared by the on-canvas list and the
+/// parked tab strip, so a parked card persists exactly like a placed one.
+fn saved_item(item: &CanvasItem) -> Option<crate::persist::SavedItem> {
+    let world = item.world();
+    let rect = crate::persist::SavedRect {
+        pos: crate::persist::Point {
+            x: world.pos.x,
+            y: world.pos.y,
+        },
+        size: crate::persist::Point {
+            x: world.size.x,
+            y: world.size.y,
+        },
+    };
+    match item {
+                CanvasItem::Note {
+                    title,
+                    body,
+                    font_size,
+                    color_idx,
+                    edited_ms,
+                    world: _,
+                    ..
+                } => Some(crate::persist::SavedItem::Note {
+                    title: title.clone(),
+                    body: body.clone(),
+                    font_size: *font_size,
+                    color_idx: *color_idx,
+                    edited_ms: *edited_ms,
+                    rect: rect,
+                }),
+                CanvasItem::Terminal {
+                    title, world: _, ..
+                } => Some(crate::persist::SavedItem::Terminal {
+                    name: title.clone(),
+                    command: String::new(),
+                    rect: rect,
+                }),
+                CanvasItem::Agent {
+                    title,
+                    cwd,
+                    provider,
+                    world: _,
+                    ..
+                } => {
+                    let cli_session_id = item
+                        .agent_session()
+                        .and_then(|s| s.chat.lock().ok())
+                        .and_then(|card| card.session_id.clone());
+                    Some(crate::persist::SavedItem::Agent {
+                        name: title.clone(),
+                        cwd: cwd.clone(),
+                        provider: provider.clone(),
+                        cli_session_id,
+                        rect: rect,
+                    })
+                }
+                CanvasItem::Browser {
+                    title,
+                    url,
+                    world: _,
+                    ..
+                } => Some(crate::persist::SavedItem::Browser {
+                    title: title.clone(),
+                    url: url.clone(),
+                    rect: rect,
+                }),
+                CanvasItem::MusicPlayer {
+                    title,
+                    progress,
+                    world: _,
+                    ..
+                } => Some(crate::persist::SavedItem::MusicPlayer {
+                    title: title.clone(),
+                    progress: *progress,
+                    rect: rect,
+                }),
+                CanvasItem::Media {
+                    title,
+                    path,
+                    world: _,
+                    ..
+                } => Some(crate::persist::SavedItem::Media {
+                    title: title.clone(),
+                    path: path.clone(),
+                    rect: rect,
+                }),
+    }
+}
+
 /// The source line of the checklist hit area containing `point` on card `id`.
 ///
 /// Split out of the click handler so the lookup is testable without a window:
@@ -226,13 +340,19 @@ const BTN_BORDER: [f32; 4] = [0.28, 0.32, 0.42, 1.0];
 const BTN_HOVER: [f32; 4] = [0.22, 0.28, 0.40, 1.0];
 const BTN_CLOSE_HOVER: [f32; 4] = [0.65, 0.25, 0.25, 1.0];
 
-/// Bottom dock (screen-fixed minimize tray).
-const DOCK_H: f64 = 34.0;
-const DOCK_BOTTOM: f64 = 108.0;
-const DOCK_BG: [f32; 4] = [0.10, 0.11, 0.15, 1.0];
-const CHIP_BG: [f32; 4] = [0.16, 0.18, 0.24, 1.0];
-const CHIP_BG_HOVER: [f32; 4] = [0.22, 0.26, 0.34, 1.0];
-const CHIP_BORDER: [f32; 4] = [0.28, 0.32, 0.42, 1.0];
+/// Parked-card tabs in the top bar (browser style): they share the bar with the
+/// workspace tabs, shrinking down to `CARD_TAB_MIN_W` before the overflow clips.
+const CARD_TAB_H: f64 = 24.0;
+const CARD_TAB_GAP: f64 = 3.0;
+const CARD_TAB_MIN_W: f64 = 76.0;
+const CARD_TAB_MAX_W: f64 = 168.0;
+const CARD_TAB_CLOSE: f64 = 14.0;
+/// Gap either side of the divider that separates spaces from parked cards.
+const CARD_TAB_DIVIDER: f64 = 10.0;
+/// An inactive tab body, one step above the bar itself.
+const CARD_TAB_BG: [f32; 4] = [0.17, 0.19, 0.25, 1.0];
+/// Inactive tab titles read back a step, like a browser's unfocused tabs.
+const TAB_TITLE_DIM: [f32; 4] = [0.66, 0.71, 0.82, 1.0];
 
 /// Top workspace tab bar.
 const TAB_BAR_H: f64 = 34.0;
@@ -336,11 +456,16 @@ enum BtnKind {
     Print,
 }
 
-/// What part of the workspace tab bar a click landed on.
+/// What part of the top bar a click landed on: a workspace tab, the new-space
+/// button, or one of the minimized cards parked as tabs beside them.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum WorkspaceTabHit {
-    Tab(usize),
-    Add,
+enum TopBarHit {
+    Workspace(usize),
+    AddWorkspace,
+    /// A parked card's tab: click restores it.
+    Card(u64),
+    /// The ✕ on a parked card's tab: closes the card (and its session).
+    CardClose(u64),
 }
 
 /// What part of the global tool palette a click landed on.
@@ -368,7 +493,7 @@ struct Workspace {
     next_item_id: u64,
     selected: Option<u64>,
     focused_terminal: Option<u64>,
-    minimized: Vec<MinimizedItem>,
+    minimized: Vec<CanvasItem>,
     browser_spawned: Vec<u64>,
     browser_slots: Vec<(u64, usize)>,
     media_image_slots: Vec<(u64, usize)>,
@@ -442,19 +567,6 @@ impl Workspace {
     }
 }
 
-/// A minimized item's stored data.
-/// For Terminal, `extra` = command, `status` = agent presence, and `session`
-/// keeps the live PTY alive.
-type MinimizedItem = (
-    u64,
-    ItemKind,
-    Rect,
-    String,
-    String,
-    Option<crate::items::AgentStatus>,
-    Option<Box<crate::terminal::session::TerminalSession>>,
-);
-
 #[derive(Script, ScriptHook, Widget)]
 pub struct CanvasPanel {
     #[deref]
@@ -463,6 +575,12 @@ pub struct CanvasPanel {
     area: Area,
     #[rust]
     viewport: Vec2d,
+    /// Where the panel's rect starts in *draw* space. The window's title bar
+    /// occupies the first 32px of that space, so the walk rect is at (0, 32) and
+    /// everything drawn by hand has to be offset by it — otherwise the top bar
+    /// lands under the title bar and the canvas sits a title bar too high.
+    #[rust]
+    viewport_pos: Vec2d,
     #[rust]
     camera: Camera,
     #[rust]
@@ -482,15 +600,17 @@ pub struct CanvasPanel {
     /// The title-bar control button currently hovered, if any.
     #[rust]
     hovered_btn: Option<(u64, BtnKind)>,
-    /// The dock chip currently hovered, if any.
+    /// The top-bar tab currently hovered: a workspace tab, the new-space
+    /// button, or a parked card's tab (and its ✕).
     #[rust]
-    hovered_chip: Option<u64>,
-    /// Minimized items: (id, kind, world rect, title, extra, session).
-    /// For Terminal, extra = command and session keeps the live PTY alive
-    /// so restore can reuse it without re-spawning (which would collide on
-    /// the create_only rmux session name). For Browser, extra = url.
+    hovered_tab: Option<TopBarHit>,
+    /// Minimized cards, parked whole: they are the top bar's tabs. Keeping the
+    /// `CanvasItem` itself (rather than a per-kind copy) means minimizing cannot
+    /// lose a note's styling, a media card's kind, or a terminal's live PTY
+    /// session — restore is exact, and the card re-attaches without re-spawning
+    /// (which would collide on the create_only rmux session name).
     #[rust]
-    minimized: Vec<MinimizedItem>,
+    minimized: Vec<CanvasItem>,
     #[rust]
     focused_terminal: Option<u64>,
     /// Active terminal text selection: (item_id, start_row, start_col).
@@ -720,8 +840,21 @@ pub struct CanvasPanel {
 }
 
 impl CanvasPanel {
+    /// The viewport in *draw* space, which is what the camera transforms and
+    /// `me.abs` share: `(p - pan) * zoom + viewport / 2` then centres on the
+    /// panel's real middle instead of a title bar above it.
     fn world_viewport(&self) -> Vec2d {
-        self.viewport
+        self.viewport + self.viewport_pos * 2.0
+    }
+
+    /// The panel's centre, in draw space.
+    fn view_center(&self) -> Vec2d {
+        self.viewport_pos + self.viewport * 0.5
+    }
+
+    /// The panel's bottom-right corner, in draw space.
+    fn view_bottom_right(&self) -> Vec2d {
+        self.viewport_pos + self.viewport
     }
 
     pub fn set_grid_enabled(&mut self, enabled: bool) {
@@ -831,7 +964,7 @@ impl CanvasPanel {
         self.selecting = None;
         self.hovered = None;
         self.hovered_btn = None;
-        self.hovered_chip = None;
+        self.hovered_tab = None;
         self.note_draw = None;
         self.text_editing = false;
         self.note_edit_id = None;
@@ -1133,7 +1266,7 @@ impl CanvasPanel {
     pub fn spawn_note(&mut self, cx: &mut Cx) {
         let world_pos = self
             .camera
-            .screen_to_world(self.viewport * 0.5, self.world_viewport());
+            .screen_to_world(self.view_center(), self.world_viewport());
         let item = CanvasItem::Note {
             id: self.next_item_id,
             world: Rect {
@@ -1155,7 +1288,7 @@ impl CanvasPanel {
     pub fn spawn_music_player(&mut self, cx: &mut Cx, title: &str) {
         let world_pos = self
             .camera
-            .screen_to_world(self.viewport * 0.5, self.world_viewport());
+            .screen_to_world(self.view_center(), self.world_viewport());
         let item = CanvasItem::MusicPlayer {
             id: self.next_item_id,
             world: Rect {
@@ -1318,7 +1451,7 @@ impl CanvasPanel {
     fn new_agent_geometry(&self) -> Rect {
         let mut world_pos = self
             .camera
-            .screen_to_world(self.viewport * 0.5, self.world_viewport());
+            .screen_to_world(self.view_center(), self.world_viewport());
         // Cascade by the number of existing agents, like the attach path.
         let n = self
             .items
@@ -1365,97 +1498,8 @@ impl CanvasPanel {
 
     /// Snapshot the current workspace into the plain-data canvas model.
     pub fn snapshot(&self) -> crate::persist::SavedCanvas {
-        let to_rect = |item: &CanvasItem| {
-            let world = item.world();
-            crate::persist::SavedRect {
-                pos: crate::persist::Point {
-                    x: world.pos.x,
-                    y: world.pos.y,
-                },
-                size: crate::persist::Point {
-                    x: world.size.x,
-                    y: world.size.y,
-                },
-            }
-        };
-        let items = self
-            .items
-            .iter()
-            .filter_map(|item| match item {
-                CanvasItem::Note {
-                    title,
-                    body,
-                    font_size,
-                    color_idx,
-                    edited_ms,
-                    world: _,
-                    ..
-                } => Some(crate::persist::SavedItem::Note {
-                    title: title.clone(),
-                    body: body.clone(),
-                    font_size: *font_size,
-                    color_idx: *color_idx,
-                    edited_ms: *edited_ms,
-                    rect: to_rect(item),
-                }),
-                CanvasItem::Terminal {
-                    title, world: _, ..
-                } => Some(crate::persist::SavedItem::Terminal {
-                    name: title.clone(),
-                    command: String::new(),
-                    rect: to_rect(item),
-                }),
-                CanvasItem::Agent {
-                    title,
-                    cwd,
-                    provider,
-                    world: _,
-                    ..
-                } => {
-                    let cli_session_id = item
-                        .agent_session()
-                        .and_then(|s| s.chat.lock().ok())
-                        .and_then(|card| card.session_id.clone());
-                    Some(crate::persist::SavedItem::Agent {
-                        name: title.clone(),
-                        cwd: cwd.clone(),
-                        provider: provider.clone(),
-                        cli_session_id,
-                        rect: to_rect(item),
-                    })
-                }
-                CanvasItem::Browser {
-                    title,
-                    url,
-                    world: _,
-                    ..
-                } => Some(crate::persist::SavedItem::Browser {
-                    title: title.clone(),
-                    url: url.clone(),
-                    rect: to_rect(item),
-                }),
-                CanvasItem::MusicPlayer {
-                    title,
-                    progress,
-                    world: _,
-                    ..
-                } => Some(crate::persist::SavedItem::MusicPlayer {
-                    title: title.clone(),
-                    progress: *progress,
-                    rect: to_rect(item),
-                }),
-                CanvasItem::Media {
-                    title,
-                    path,
-                    world: _,
-                    ..
-                } => Some(crate::persist::SavedItem::Media {
-                    title: title.clone(),
-                    path: path.clone(),
-                    rect: to_rect(item),
-                }),
-            })
-            .collect();
+        let items: Vec<_> = self.items.iter().filter_map(saved_item).collect();
+        let minimized: Vec<_> = self.minimized.iter().filter_map(saved_item).collect();
         let shapes = self
             .shapes
             .iter()
@@ -1470,6 +1514,7 @@ impl CanvasPanel {
             },
             camera_zoom: self.camera.zoom,
             items,
+            minimized,
             shapes,
         };
         canvas
@@ -1522,7 +1567,18 @@ impl CanvasPanel {
                 y: rect.size.y,
             },
         };
-        for item in &ws.items {
+        // Parked cards are rebuilt through exactly the same paths as placed ones
+        // (session attach/relaunch included) and then moved to the tab strip, so
+        // the session logic lives in one place.
+        let to_restore: Vec<(&crate::persist::SavedItem, bool)> = ws
+            .items
+            .iter()
+            .map(|item| (item, false))
+            .chain(ws.minimized.iter().map(|item| (item, true)))
+            .collect();
+        for (item, parked) in to_restore {
+            let parked_title = item.title().to_string();
+            let parked_kind = saved_item_kind(item);
             match item {
                 crate::persist::SavedItem::Terminal { name, rect, .. } => {
                     if live.iter().any(|n| n == name) {
@@ -1641,6 +1697,9 @@ impl CanvasPanel {
                     // restoring as a dead card is worse than no card.
                 }
             }
+            if parked {
+                self.park_restored(&parked_title, parked_kind);
+            }
         }
         self.camera = crate::camera::Camera {
             pan: Vec2d {
@@ -1687,7 +1746,7 @@ impl CanvasPanel {
     fn new_terminal_geometry(&self) -> (Rect, usize, usize) {
         let world_pos = self
             .camera
-            .screen_to_world(self.viewport * 0.5, self.world_viewport());
+            .screen_to_world(self.view_center(), self.world_viewport());
         let world = Rect {
             pos: world_pos,
             size: Vec2d { x: 620.0, y: 380.0 },
@@ -1724,7 +1783,7 @@ impl CanvasPanel {
     pub fn spawn_browser(&mut self, cx: &mut Cx, url: &str) {
         let world_pos = self
             .camera
-            .screen_to_world(self.viewport * 0.5, self.world_viewport());
+            .screen_to_world(self.view_center(), self.world_viewport());
         let id = self.next_item_id;
         self.next_item_id += 1;
 
@@ -1746,7 +1805,7 @@ impl CanvasPanel {
     /// Spawn a media card for `path` at the canvas center (the `/open`
     /// command path — drag & drop uses [`Self::drop_files`] instead).
     pub fn spawn_media(&mut self, cx: &mut Cx, path: &str, kind: MediaKind) {
-        let center = self.viewport * 0.5;
+        let center = self.view_center();
         self.spawn_media_at(cx, path, kind, center, 0);
     }
 
@@ -1941,8 +2000,9 @@ impl CanvasPanel {
         };
         // Clamp inside the viewport (MpTooltip's edge behavior, simplified —
         // the palette hugs the left edge so only vertical clamping bites).
-        pos.x = pos.x.min((self.viewport.x - tip_w - 2.0).max(2.0));
-        pos.y = pos.y.max(2.0).min((self.viewport.y - TIP_H - 2.0).max(2.0));
+        let bottom_right = self.view_bottom_right();
+        pos.x = pos.x.min((bottom_right.x - tip_w - 2.0).max(2.0));
+        pos.y = pos.y.max(2.0).min((bottom_right.y - TIP_H - 2.0).max(2.0));
 
         let tip_rect = Rect {
             pos,
@@ -2494,189 +2554,61 @@ impl CanvasPanel {
         })
     }
 
-    /// The minimized-item chip under `screen` in the bottom dock (if any).
-    fn dock_chip_under(&self, screen: Vec2d, viewport: Vec2d) -> Option<u64> {
-        if self.minimized.is_empty() {
-            return None;
-        }
-        let tray_y = viewport.y - DOCK_BOTTOM;
-        let chip_w = 140.0;
-        let chip_h = DOCK_H - 8.0;
-        let x0 = 10.0;
-        for (i, m) in self.minimized.iter().enumerate() {
-            let rect = Rect {
-                pos: Vec2d {
-                    x: x0 + i as f64 * (chip_w + 8.0),
-                    y: tray_y + 4.0,
-                },
-                size: Vec2d {
-                    x: chip_w,
-                    y: chip_h,
-                },
-            };
-            if rect.contains(screen) {
-                return Some(m.0);
-            }
-        }
-        None
-    }
-
-    /// Minimize `id`: remove it from the canvas, add it to the bottom dock.
+    /// Minimize `id`: the card leaves the canvas and becomes a tab in the top
+    /// bar. Nothing is copied, so restoring brings back exactly what left.
     fn minimize_item(&mut self, cx: &mut Cx, id: u64) {
-        // Agent cards are not minimizable for now: the minimized slot holds a
-        // terminal session, and widening it is not worth it before the dock
-        // learns about agents. Closing (✕) works and kills the agent.
-        if self
-            .items
-            .iter()
-            .find(|i| i.id() == id)
-            .is_some_and(|i| i.kind() == ItemKind::Agent)
-        {
-            self.status(
-                cx,
-                "agent cards cannot be docked yet — close (✕) or leave them",
-            );
-            return;
-        }
-
-        if self.minimized.iter().any(|m| m.0 == id) {
+        if self.minimized.iter().any(|i| i.id() == id) {
             return;
         }
         let Some(pos) = self.items.iter().position(|i| i.id() == id) else {
             return;
         };
         let item = self.items.remove(pos);
-        let meta = match item {
-            CanvasItem::Terminal {
-                world,
-                title,
-                status,
-                session,
-                ..
-            } => {
-                let command = session
-                    .as_ref()
-                    .map(|s| s.command.clone())
-                    .unwrap_or_default();
-                (
-                    id,
-                    ItemKind::Terminal,
-                    world,
-                    title,
-                    command,
-                    Some(status),
-                    session,
-                )
-            }
-            CanvasItem::Agent { .. } => {
-                // Unreachable: guarded above. Present so the match stays
-                // exhaustive if the guard is ever relaxed.
-                return;
-            }
-            CanvasItem::Browser {
-                world, title, url, ..
-            } => (id, ItemKind::Browser, world, title, url, None, None),
-            CanvasItem::Note {
-                world, title, body, ..
-            } => (id, ItemKind::Note, world, title, body, None, None),
-            CanvasItem::MusicPlayer {
-                world,
-                title,
-                progress,
-                ..
-            } => (
-                id,
-                ItemKind::MusicPlayer,
-                world,
-                title,
-                progress.to_string(),
-                None,
-                None,
-            ),
-            CanvasItem::Media {
-                world, title, path, ..
-            } => (id, ItemKind::Media, world, title, path, None, None),
-        };
-        self.minimized.push(meta);
+        self.minimized.push(item);
         self.selected = None;
         self.focused_terminal = None;
+        self.save_canvas();
         self.redraw(cx);
     }
 
-    /// Restore `id` from the dock back onto the canvas.
+    /// Move a card a restore just rebuilt into the tab strip, when the canvas
+    /// was saved with it parked. Matched by title and kind: terminal and agent
+    /// cards are titled after their (unique) daemon session.
+    fn park_restored(&mut self, title: &str, kind: ItemKind) {
+        if let Some(pos) = self
+            .items
+            .iter()
+            .rposition(|i| i.title() == title && i.kind() == kind)
+        {
+            let item = self.items.remove(pos);
+            if self.selected == Some(item.id()) {
+                self.selected = None;
+            }
+            if self.focused_terminal == Some(item.id()) {
+                self.focused_terminal = None;
+            }
+            self.minimized.push(item);
+        }
+    }
+
+    /// Restore `id` from the tab strip back onto the canvas.
     fn restore_item(&mut self, cx: &mut Cx, id: u64) {
-        let Some(pos) = self.minimized.iter().position(|m| m.0 == id) else {
+        let Some(pos) = self.minimized.iter().position(|i| i.id() == id) else {
             return;
         };
-        let (id, kind, world, title, extra, status, session) = self.minimized.remove(pos);
-        match kind {
-            ItemKind::Agent => {
-                // Agent cards are never minimized; see minimize_item.
-                return;
-            }
-            ItemKind::Terminal => {
-                // Reuse the live session saved at minimize time; re-spawning
-                // would collide on the create_only rmux session name.
-                self.items.push(CanvasItem::Terminal {
-                    id,
-                    world,
-                    title,
-                    status: status.unwrap_or_default(),
-                    session,
-                });
-            }
-            ItemKind::Browser => {
-                self.items.push(CanvasItem::Browser {
-                    id,
-                    world,
-                    title,
-                    url: extra,
-                });
-            }
-            ItemKind::Note => {
-                self.items.push(CanvasItem::Note {
-                    id,
-                    world,
-                    title,
-                    body: extra,
-                    font_size: 13.0,
-                    color_idx: 0,
-                    edited_ms: crate::items::now_ms(),
-                });
-            }
-            ItemKind::MusicPlayer => {
-                let progress = extra.parse::<f32>().unwrap_or(0.0);
-                self.items.push(CanvasItem::MusicPlayer {
-                    id,
-                    world,
-                    title,
-                    progress,
-                    playing: false,
-                });
-            }
-            ItemKind::Media => {
-                // The media kind is re-derived from the stored path, so the
-                // minimize tuple stays a plain string.
-                if let Some(kind) = MediaKind::from_path(&extra) {
-                    self.items.push(CanvasItem::Media {
-                        id,
-                        world,
-                        title,
-                        path: extra,
-                        kind,
-                    });
-                }
-            }
-        }
+        let item = self.minimized.remove(pos);
+        let is_terminal = item.kind() == ItemKind::Terminal;
+        self.items.push(item);
         self.selected = Some(id);
         // Restoring a non-terminal item should not leave a stale terminal focus.
-        if !matches!(kind, ItemKind::Terminal) {
+        if !is_terminal {
             self.focused_terminal = None;
         }
+        self.save_canvas();
         self.redraw(cx);
     }
 
-    /// Close `id`: fully remove it from the canvas and the dock. Terminal
+    /// Close `id`: fully remove it from the canvas and the tab strip. Terminal
     /// sessions are killed so a closed terminal doesn't keep running in the
     /// daemon and resurrect on the next launch.
     fn close_item(&mut self, cx: &mut Cx, id: u64) {
@@ -2691,7 +2623,16 @@ impl CanvasPanel {
                 agent.kill();
             }
         }
-        self.minimized.retain(|m| m.0 != id);
+        // A parked card's session is just as live as a canvas one's.
+        if let Some(item) = self.minimized.iter().find(|i| i.id() == id) {
+            if let Some(session) = item.session() {
+                session.kill();
+            }
+            if let Some(agent) = item.agent_session() {
+                agent.kill();
+            }
+        }
+        self.minimized.retain(|i| i.id() != id);
         self.items.retain(|i| i.id() != id);
         self.note_scroll.remove(&id);
         self.save_canvas();
@@ -2772,8 +2713,8 @@ impl CanvasPanel {
         let total_h = Self::PAL_PAD + tools_h + SECT + colors_h + SECT + widths_h + Self::PAL_PAD;
         let palette_rect = Rect {
             pos: Vec2d {
-                x: 2.0,
-                y: ((self.viewport.y - total_h) * 0.5).max(2.0),
+                x: self.viewport_pos.x + 2.0,
+                y: self.viewport_pos.y + ((self.viewport.y - total_h) * 0.5).max(2.0),
             },
             size: Vec2d {
                 x: Self::PAL_W,
@@ -2854,7 +2795,7 @@ impl CanvasPanel {
             return true;
         }
         const BOTTOM_UI_H: f64 = 112.0;
-        if screen.y >= self.viewport.y - BOTTOM_UI_H {
+        if screen.y >= self.view_bottom_right().y - BOTTOM_UI_H {
             return true;
         }
         let menu = self.view.view(cx, ids!(new_item_menu));
@@ -2874,10 +2815,11 @@ impl CanvasPanel {
             if panel.area().is_valid(cx) && panel.area().rect(cx).contains(screen) {
                 return true;
             }
-            if screen.x >= self.viewport.x - RIGHT_PANEL_W - RIGHT_PANEL_RIGHT_PAD
-                && screen.x <= self.viewport.x - RIGHT_PANEL_RIGHT_PAD
+            let edge = self.view_bottom_right();
+            if screen.x >= edge.x - RIGHT_PANEL_W - RIGHT_PANEL_RIGHT_PAD
+                && screen.x <= edge.x - RIGHT_PANEL_RIGHT_PAD
                 && screen.y >= RIGHT_PANEL_TOP_PAD
-                && screen.y <= self.viewport.y - RIGHT_PANEL_BOTTOM_PAD
+                && screen.y <= edge.y - RIGHT_PANEL_BOTTOM_PAD
             {
                 return true;
             }
@@ -3057,7 +2999,7 @@ impl CanvasPanel {
             }
             Command::Zoom { factor } => {
                 self.camera
-                    .zoom_at(factor, self.viewport * 0.5, self.world_viewport());
+                    .zoom_at(factor, self.view_center(), self.world_viewport());
                 self.redraw(cx);
                 self.status(cx, &format!("Zoom: {:.0}%", self.camera.zoom * 100.0));
             }
@@ -3434,7 +3376,7 @@ impl CanvasPanel {
     /// font size); good enough for a subtle watermark.
     fn draw_empty_hint(&mut self, cx: &mut Cx2d, rect: Rect) {
         // Hide once there's any content: on-canvas items, whiteboard shapes,
-        // or docked (minimized) items in the bottom tray.
+        // or cards parked as top-bar tabs.
         if !self.items.is_empty() || !self.shapes.is_empty() || !self.minimized.is_empty() {
             return;
         }
@@ -5178,7 +5120,7 @@ impl CanvasPanel {
         let ink_color = self.ink_color();
         let ink_width = self.ink_width();
         cx.push_clip_rect(Rect {
-            pos: Vec2d { x: 0.0, y: 0.0 },
+            pos: self.viewport_pos,
             size: viewport,
         });
         for ds in shapes {
@@ -5313,106 +5255,151 @@ impl CanvasPanel {
         );
     }
 
-    /// Draw the bottom dock tray with minimized-item chips.
-    fn draw_dock(&mut self, cx: &mut Cx2d, viewport: Vec2d) {
-        if self.minimized.is_empty() {
-            return;
+    /// Width and x of every parked card's tab, in bar order.
+    ///
+    /// Tabs shrink to share the bar (browser style) down to a floor, so a
+    /// handful of parked cards always stay reachable; past the floor the rest
+    /// are clipped rather than scrolled.
+    fn card_tab_rects(&self, start_x: f64) -> Vec<(u64, Rect, Rect)> {
+        let right = self.view_bottom_right().x;
+        let avail = (right - 8.0 - start_x).max(0.0);
+        let n = self.minimized.len();
+        if n == 0 || avail < CARD_TAB_MIN_W {
+            return Vec::new();
         }
-        let tray_y = viewport.y - DOCK_BOTTOM;
-        let tray_rect = Rect {
-            pos: Vec2d { x: 0.0, y: tray_y },
-            size: Vec2d {
-                x: viewport.x,
-                y: DOCK_H,
-            },
-        };
-        self.draw_item_bg_rect(cx, tray_rect, DOCK_BG);
-        self.draw_border_rect(cx, tray_rect, CHIP_BORDER);
-
-        let chip_w = 140.0;
-        let chip_h = DOCK_H - 8.0;
-        let x0 = 10.0;
-        let minimized: Vec<(u64, ItemKind, String)> = self
-            .minimized
-            .iter()
-            .map(|m| (m.0, m.1, m.3.clone()))
-            .collect();
-        let hovered_chip = self.hovered_chip;
-        for (i, (id, kind, title)) in minimized.iter().enumerate() {
+        let tab_h = CARD_TAB_H;
+        let tab_y = self.viewport_pos.y + (TAB_BAR_H - tab_h) * 0.5;
+        // One gap between tabs, plus a slot for the ✕ inside each.
+        let per = ((avail - CARD_TAB_GAP * (n.saturating_sub(1)) as f64) / n as f64)
+            .clamp(CARD_TAB_MIN_W, CARD_TAB_MAX_W);
+        let mut rects = Vec::with_capacity(n);
+        let mut x = start_x;
+        for item in self.minimized.iter() {
+            if x + per > right - 8.0 {
+                break;
+            }
             let rect = Rect {
+                pos: Vec2d { x, y: tab_y },
+                size: Vec2d {
+                    x: per,
+                    y: tab_h,
+                },
+            };
+            let close = Rect {
                 pos: Vec2d {
-                    x: x0 + i as f64 * (chip_w + 8.0),
-                    y: tray_y + 4.0,
+                    x: rect.pos.x + rect.size.x - CARD_TAB_CLOSE - 4.0,
+                    y: rect.pos.y + (rect.size.y - CARD_TAB_CLOSE) * 0.5,
                 },
                 size: Vec2d {
-                    x: chip_w,
-                    y: chip_h,
+                    x: CARD_TAB_CLOSE,
+                    y: CARD_TAB_CLOSE,
                 },
             };
-            let hov = hovered_chip == Some(*id);
-            self.draw_item_bg_rect(cx, rect, if hov { CHIP_BG_HOVER } else { CHIP_BG });
-            self.draw_border_rect(cx, rect, CHIP_BORDER);
-            let kind_label = match kind {
-                ItemKind::Terminal => ">_",
-                ItemKind::Browser => "◎",
-                ItemKind::Note => "📝",
-                ItemKind::MusicPlayer => "♫",
-                ItemKind::Media => "🖼",
-                ItemKind::Agent => "✦",
-            };
-            let label = format!("{kind_label} {title}");
-            self.draw_cell_text.color = vec4f(TITLE_TEXT);
-            // Fixed-size chrome: the tray does not scale with the camera, so
-            // pin the scale instead of inheriting the last drawer's. Centre the
-            // label's line box in the chip — parking it at a fixed `+6` left the
-            // text hanging off the chip's bottom edge.
-            self.draw_cell_text.font_scale = 1.0;
-            let line_box = self.cell_metrics().1;
-            let text_y = rect.pos.y + ((rect.size.y - line_box) * 0.5).max(1.0);
-            self.draw_cell_text
-                .draw_abs(cx, Vec2d { x: rect.pos.x + 8.0, y: text_y }, &label);
+            rects.push((item.id(), rect, close));
+            x += per + CARD_TAB_GAP;
         }
+        rects
     }
 
-    /// Draw the top workspace tab bar. Each workspace gets a tab; the active
-    /// one is highlighted and a "+" button at the right creates a new space.
-    fn draw_workspace_tabs(&mut self, cx: &mut Cx2d, viewport: Vec2d) {
+    /// The workspace tab rects and new-space button, plus the x where the
+    /// parked-card strip begins. One layout, so the draw pass and the hit-test
+    /// cannot disagree.
+    fn workspace_tab_layout(&self) -> (Vec<(TopBarHit, Rect)>, f64) {
+        let mut out = Vec::new();
+        let mut x = self.viewport_pos.x + 8.0;
+        let tab_h = TAB_BAR_H - 8.0;
+        let tab_y = self.viewport_pos.y + 4.0;
+        let n = self.workspaces.len().max(1);
+        for i in 0..n {
+            let tab_w = (Self::space_tab_w(i) + 28.0).max(70.0);
+            out.push((
+                TopBarHit::Workspace(i),
+                Rect {
+                    pos: Vec2d { x, y: tab_y },
+                    size: Vec2d { x: tab_w, y: tab_h },
+                },
+            ));
+            x += tab_w + 6.0;
+        }
+        out.push((
+            TopBarHit::AddWorkspace,
+            Rect {
+                pos: Vec2d { x, y: tab_y },
+                size: Vec2d {
+                    x: TAB_PLUS_W,
+                    y: tab_h,
+                },
+            },
+        ));
+        (out, x + TAB_PLUS_W + CARD_TAB_DIVIDER)
+    }
+
+    /// Width of a `Space N` tab's label, in the bar face.
+    fn space_tab_w(index: usize) -> f64 {
+        format!("Space {index}").chars().count() as f64 * 7.5
+    }
+
+    /// Which workspace tab, new-space button or parked-card tab is under
+    /// `screen`.
+    fn top_bar_hit(&self, screen: Vec2d) -> Option<TopBarHit> {
+        if screen.y < self.viewport_pos.y || screen.y > self.viewport_pos.y + TAB_BAR_H {
+            return None;
+        }
+        let (spaces, strip_x) = self.workspace_tab_layout();
+        if let Some(hit) = spaces
+            .iter()
+            .find(|(_, rect)| rect.contains(screen))
+            .map(|(hit, _)| *hit)
+        {
+            return Some(hit);
+        }
+        self.card_tab_rects(strip_x)
+            .into_iter()
+            .find_map(|(id, rect, close)| {
+                if close.contains(screen) {
+                    Some(TopBarHit::CardClose(id))
+                } else if rect.contains(screen) {
+                    Some(TopBarHit::Card(id))
+                } else {
+                    None
+                }
+            })
+    }
+
+    /// Draw the top bar: workspace tabs, the new-space button, then the parked
+    /// cards as browser-style tabs (favicon dot, title, ✕).
+    fn draw_top_bar(&mut self, cx: &mut Cx2d) {
         let bar_rect = Rect {
-            pos: Vec2d { x: 0.0, y: 0.0 },
+            pos: self.viewport_pos,
             size: Vec2d {
-                x: viewport.x,
+                x: self.viewport.x,
                 y: TAB_BAR_H,
             },
         };
         self.draw_item_bg_rect(cx, bar_rect, TAB_BG);
+
         self.draw_border_rect(cx, bar_rect, TAB_BORDER);
         // Fixed-size chrome: pin the text scale so camera zoom (left behind by
         // the last card drawn) cannot leak into the tab bar.
         self.draw_title.font_scale = 1.0;
 
-        let mut x = 8.0;
-        let tab_h = TAB_BAR_H - 8.0;
-        let tab_y = 4.0;
-        let n = self.workspaces.len().max(1);
-        for i in 0..n {
-            let label = format!("Space {}", i + 1);
-            let text_w = label.chars().count() as f64 * 7.5;
-            let tab_w = (text_w + 28.0).max(70.0);
-            let tab_rect = Rect {
-                pos: Vec2d { x, y: tab_y },
-                size: Vec2d { x: tab_w, y: tab_h },
+        let (spaces, strip_x) = self.workspace_tab_layout();
+        for (hit, tab_rect) in spaces.iter() {
+            let TopBarHit::Workspace(i) = hit else {
+                continue;
             };
-            let active = i == self.current_workspace;
+            let active = *i == self.current_workspace;
+            let label = format!("Space {}", i + 1);
             self.draw_item_bg_rect(
                 cx,
-                tab_rect,
+                *tab_rect,
                 if active {
                     TAB_ACTIVE_BG
                 } else {
                     TAB_INACTIVE_BG
                 },
             );
-            self.draw_border_rect(cx, tab_rect, TAB_BORDER);
+            self.draw_border_rect(cx, *tab_rect, TAB_BORDER);
             if active {
                 // Accent underline marks the active workspace clearly.
                 self.draw_item_bg_rect(
@@ -5433,58 +5420,165 @@ impl CanvasPanel {
             self.draw_title.color = vec4f(if active { PAL_ACCENT } else { TITLE_TEXT });
             self.draw_title
                 .draw_abs(cx, tab_rect.pos + Vec2d { x: 12.0, y: 5.0 }, &label);
-            x += tab_w + 6.0;
         }
 
         // Add-workspace button.
-        let plus_rect = Rect {
-            pos: Vec2d { x, y: tab_y },
+        if let Some((_, plus_rect)) = spaces
+            .iter()
+            .find(|(hit, _)| matches!(hit, TopBarHit::AddWorkspace))
+        {
+            let plus_rect = *plus_rect;
+            self.draw_item_bg_rect(cx, plus_rect, TAB_INACTIVE_BG);
+            self.draw_border_rect(cx, plus_rect, TAB_BORDER);
+            self.draw_title.color = vec4f(TITLE_TEXT);
+            self.draw_title
+                .draw_abs(cx, plus_rect.pos + Vec2d { x: 10.0, y: 5.0 }, "+");
+        }
+
+        // Divider, then the parked cards.
+        self.draw_item_bg_rect(
+            cx,
+            Rect {
+                pos: Vec2d {
+                    x: strip_x - CARD_TAB_DIVIDER * 0.5,
+                    y: self.viewport_pos.y + 8.0,
+                },
+                size: Vec2d {
+                    x: 1.0,
+                    y: TAB_BAR_H - 16.0,
+                },
+            },
+            TAB_BORDER,
+        );
+        let hovered = self.hovered_tab;
+        for (id, rect, _close) in self.card_tab_rects(strip_x) {
+            let tab_hovered = hovered == Some(TopBarHit::Card(id));
+            let close_hovered = hovered == Some(TopBarHit::CardClose(id));
+            self.draw_card_tab(cx, id, rect, tab_hovered, close_hovered);
+        }
+    }
+    /// One parked card's tab: a raised body with clipped top corners (the tab
+    /// silhouette), a kind-coloured "favicon" dot, the title, and a ✕.
+    fn draw_card_tab(
+        &mut self,
+        cx: &mut Cx2d,
+        id: u64,
+        rect: Rect,
+        hovered: bool,
+        close_hovered: bool,
+    ) {
+        let Some(item) = self.items.iter().find(|i| i.id() == id).or_else(|| {
+            self.minimized.iter().find(|i| i.id() == id)
+        }) else {
+            return;
+        };
+        let kind = item.kind();
+        let title = item.title().to_string();
+        let body = if hovered { TAB_ACTIVE_BG } else { CARD_TAB_BG };
+        self.draw_item_bg_rect(cx, rect, body);
+        self.draw_border_rect(cx, rect, TAB_BORDER);
+        // Pixel-art rounded top corners: a 2px and a 1px step off each shoulder,
+        // painted in the bar's own colour (the bar is flat, so this is exact).
+        for (step, w) in [(0.0, 1.0), (1.0, 2.0), (2.0, 3.0)] {
+            for side in [rect.pos.x, rect.pos.x + rect.size.x - w] {
+                self.draw_item_bg_rect(
+                    cx,
+                    Rect {
+                        pos: Vec2d {
+                            x: side,
+                            y: rect.pos.y + step,
+                        },
+                        size: Vec2d { x: w, y: 1.0 },
+                    },
+                    TAB_BG,
+                );
+            }
+        }
+        // Kind dot, the tab's "favicon".
+        let dot = 7.0;
+        self.draw_filled_disc(
+            cx,
+            Vec2d {
+                x: rect.pos.x + 10.0,
+                y: rect.pos.y + rect.size.y * 0.5,
+            },
+            dot * 0.5,
+            kind_accent(kind),
+        );
+        // Title, elided to the space between the dot and the ✕.
+        let text_x = rect.pos.x + 10.0 + dot + 5.0;
+        let close_x = rect.pos.x + rect.size.x - CARD_TAB_CLOSE - 4.0;
+        let label = self.elide_title(cx, &title, (close_x - 6.0 - text_x).max(8.0));
+        self.draw_title.color = vec4f(if hovered { TITLE_TEXT } else { TAB_TITLE_DIM });
+        self.draw_title.draw_abs(
+            cx,
+            Vec2d {
+                x: text_x,
+                y: rect.pos.y + (rect.size.y - 16.0) * 0.5,
+            },
+            &label,
+        );
+        // ✕ close affordance.
+        let close = Rect {
+            pos: Vec2d {
+                x: close_x,
+                y: rect.pos.y + (rect.size.y - CARD_TAB_CLOSE) * 0.5,
+            },
             size: Vec2d {
-                x: TAB_PLUS_W,
-                y: tab_h,
+                x: CARD_TAB_CLOSE,
+                y: CARD_TAB_CLOSE,
             },
         };
-        self.draw_item_bg_rect(cx, plus_rect, TAB_INACTIVE_BG);
-        self.draw_border_rect(cx, plus_rect, TAB_BORDER);
-        self.draw_title.color = vec4f(TITLE_TEXT);
-        self.draw_title
-            .draw_abs(cx, plus_rect.pos + Vec2d { x: 10.0, y: 5.0 }, "+");
+        let ink = if close_hovered {
+            BTN_CLOSE_HOVER
+        } else if hovered {
+            TITLE_TEXT
+        } else {
+            TAB_TITLE_DIM
+        };
+        let a = close.pos + Vec2d { x: 4.0, y: 4.0 };
+        let b = close.pos + Vec2d {
+            x: CARD_TAB_CLOSE - 4.0,
+            y: CARD_TAB_CLOSE - 4.0,
+        };
+        self.draw_segment(cx, a, b, 1.4, ink);
+        self.draw_segment(
+            cx,
+            Vec2d { x: b.x, y: a.y },
+            Vec2d { x: a.x, y: b.y },
+            1.4,
+            ink,
+        );
     }
 
-    /// Which workspace tab (or the add button) is under `screen`, if any.
-    fn workspace_tab_hit(&self, screen: Vec2d, _viewport: Vec2d) -> Option<WorkspaceTabHit> {
-        if screen.y < 0.0 || screen.y > TAB_BAR_H {
-            return None;
+    /// `s` elided with an ellipsis to `max_w` (measured, not guessed).
+    fn elide_title(&mut self, cx: &mut Cx2d, s: &str, max_w: f64) -> String {
+        self.draw_title.font_scale = 1.0;
+        let width = self
+            .draw_title
+            .prepare_single_line_run(cx, s)
+            .map(|run| run.width_in_lpxs as f64)
+            .unwrap_or(0.0);
+        if width <= max_w {
+            return s.to_string();
         }
-        let mut x = 8.0;
-        let tab_h = TAB_BAR_H - 8.0;
-        let tab_y = 4.0;
-        let n = self.workspaces.len().max(1);
-        for i in 0..n {
-            let label = format!("Space {}", i + 1);
-            let text_w = label.chars().count() as f64 * 7.5;
-            let tab_w = (text_w + 28.0).max(70.0);
-            let tab_rect = Rect {
-                pos: Vec2d { x, y: tab_y },
-                size: Vec2d { x: tab_w, y: tab_h },
-            };
-            if tab_rect.contains(screen) {
-                return Some(WorkspaceTabHit::Tab(i));
+        let mut out = String::new();
+        for ch in s.chars() {
+            let mut probe = out.clone();
+            probe.push(ch);
+            probe.push('…');
+            let w = self
+                .draw_title
+                .prepare_single_line_run(cx, &probe)
+                .map(|run| run.width_in_lpxs as f64)
+                .unwrap_or(0.0);
+            if w > max_w {
+                break;
             }
-            x += tab_w + 6.0;
+            out.push(ch);
         }
-        let plus_rect = Rect {
-            pos: Vec2d { x, y: tab_y },
-            size: Vec2d {
-                x: TAB_PLUS_W,
-                y: tab_h,
-            },
-        };
-        if plus_rect.contains(screen) {
-            Some(WorkspaceTabHit::Add)
-        } else {
-            None
-        }
+        out.push('…');
+        out
     }
 
     /// Render one terminal grid row as color runs.
@@ -7114,6 +7208,19 @@ impl Widget for CanvasPanel {
 
         if let Event::MouseDown(me) = event {
             if me.button.contains(MouseButton::PRIMARY) {
+                if std::env::var_os("CANVAS_TRACE_INPUT").is_some() {
+                    // Same shape as MAKEPAD_TRACE_FONT_LOAD: what the press hit,
+                    // in the draw space the app and the pointer share.
+                    log!(
+                        "down abs=({:.1},{:.1}) top_bar={:?} ctrl={:?} chat={:?} item={:?}",
+                        me.abs.x,
+                        me.abs.y,
+                        self.top_bar_hit(me.abs),
+                        self.control_button_under(me.abs),
+                        self.chat_switch_under(me.abs),
+                        self.hit_test(me.abs),
+                    );
+                }
                 self.last_mouse = me.abs;
                 // A click inside the card/note being edited keeps its hidden
                 // input focused: mark this click for the focus repair, since
@@ -7158,11 +7265,14 @@ impl Widget for CanvasPanel {
                         < 6.0;
                 self.last_click_time = now;
                 self.last_click_pos = me.abs;
-                // Top workspace tab bar.
-                if let Some(hit) = self.workspace_tab_hit(me.abs, self.viewport) {
+                // Top bar: workspace tabs, new-space, and the parked cards
+                // (a tab restores its card, its ✕ closes the card).
+                if let Some(hit) = self.top_bar_hit(me.abs) {
                     match hit {
-                        WorkspaceTabHit::Tab(i) => self.switch_workspace(cx, i),
-                        WorkspaceTabHit::Add => self.add_workspace(cx),
+                        TopBarHit::Workspace(i) => self.switch_workspace(cx, i),
+                        TopBarHit::AddWorkspace => self.add_workspace(cx),
+                        TopBarHit::Card(id) => self.restore_item(cx, id),
+                        TopBarHit::CardClose(id) => self.close_item(cx, id),
                     }
                     return;
                 }
@@ -7206,11 +7316,6 @@ impl Widget for CanvasPanel {
                         BtnKind::Close => self.close_item(cx, id),
                         BtnKind::Print => self.print_pdf(cx, id),
                     }
-                    return;
-                }
-                // Dock chip: restore a minimized item.
-                if let Some(id) = self.dock_chip_under(me.abs, self.viewport) {
-                    self.restore_item(cx, id);
                     return;
                 }
                 // Global whiteboard palette: clicking a tool/color/width
@@ -7647,7 +7752,7 @@ impl Widget for CanvasPanel {
             } else {
                 let hov = self.hit_test(me.abs);
                 let hov_btn = self.control_button_under(me.abs);
-                let hov_chip = self.dock_chip_under(me.abs, self.viewport);
+                let hov_tab = self.top_bar_hit(me.abs);
                 // Move tool: track which shape is under the cursor for
                 // highlight feedback.
                 let hov_shape = if self.tool == NoteTool::Move {
@@ -7658,13 +7763,13 @@ impl Widget for CanvasPanel {
                 let hov_pal = self.palette_hit(me.abs);
                 if hov != self.hovered
                     || hov_btn != self.hovered_btn
-                    || hov_chip != self.hovered_chip
+                    || hov_tab != self.hovered_tab
                     || hov_shape != self.hovered_shape
                     || hov_pal != self.palette_hover
                 {
                     self.hovered = hov;
                     self.hovered_btn = hov_btn;
-                    self.hovered_chip = hov_chip;
+                    self.hovered_tab = hov_tab;
                     self.hovered_shape = hov_shape;
                     if hov_pal != self.palette_hover {
                         self.palette_hover = hov_pal;
@@ -8256,6 +8361,7 @@ impl Widget for CanvasPanel {
         // Canvas background
         let rect = cx.walk_turtle_with_area(&mut self.area, walk);
         self.viewport = rect.size;
+        self.viewport_pos = rect.pos;
         if rect.size.x <= 1.0 || rect.size.y <= 1.0 {
             return DrawStep::done();
         }
@@ -8273,7 +8379,7 @@ impl Widget for CanvasPanel {
         if self.drop_hover {
             // Inset glow frame signals the canvas accepts the pending drop.
             let inset = Rect {
-                pos: Vec2d { x: 14.0, y: 14.0 },
+                pos: rect.pos + Vec2d { x: 14.0, y: 14.0 },
                 size: rect.size - Vec2d { x: 28.0, y: 28.0 },
             };
             self.draw_glow_border(cx, inset, [0.30, 0.62, 0.98, 1.0]);
@@ -8574,15 +8680,7 @@ impl Widget for CanvasPanel {
         let pending = self.pending.clone();
         self.draw_canvas_shapes(cx, rect.size, &shapes, pending.as_ref());
 
-        // Bottom dock (minimized items tray) draws FIRST — it sits in the
-        // gap between the command bar and the bottom edge (y-108..y-74), and
-        // drawing it before the command-bar pass lets the new-item menu
-        // (which pops up above the input row into the dock's band) render on
-        // top of the dock instead of being occluded by it.
-        self.draw_dock(cx, rect.size);
-
-        // Children (command bar, status label, popup menu) draw AFTER the
-        // dock, so the menu always covers the dock tray.
+        // Children (command bar, status label, popup menu).
         while self.view.draw_walk(cx, scope, walk).step().is_some() {}
 
         // Video/PDF preview slots draw after the child pass so each widget's
@@ -8593,8 +8691,9 @@ impl Widget for CanvasPanel {
             self.draw_deferred_media(cx, &deferred);
         }
 
-        // Workspace tab bar sits on top of the canvas items and dock.
-        self.draw_workspace_tabs(cx, rect.size);
+        // The top bar (workspace tabs + the parked cards' tabs) sits on top of
+        // the canvas items and the command bar.
+        self.draw_top_bar(cx);
 
         // Global tool palette: fixed to the left edge, always on top.
         self.draw_tool_palette(cx);
