@@ -156,6 +156,53 @@ build on).
 | `mp/history.rs` | `History<T>` — undo/redo as a value, not a widget. |
 | `mp/combobox.rs` | `Combobox` / `MpCombobox` / `MpComboboxPanel` — a field over a list. |
 | `mp/focus.rs` | `FocusRegistry` / `register` / `handle_key` — tab traversal. |
+| `mp/hover_card.rs` | `HoverIntent` / `Presence` / `Change` / `MpHoverCard` — a card on hover. |
+
+### The timing is the module, because Makepad owns none of it
+
+gpui owns hover-card timing: a tooltip there has a 500ms delay built in and stays alive while
+the pointer is inside it, which is why bezel's `hover_card.rs` is 120 lines of **content** with
+no timing in it at all. Makepad owns nothing, so this port had to write the machine — and it is
+the substance, because all four ways it goes wrong are visible the moment a reader moves a
+mouse:
+
+1. **A card that opens instantly flickers.** The pointer crossing the window passes dozens of
+   triggers, and each one that opens is a flash of content nobody asked for.
+2. **A card that opens on a passing pointer must not.** The same delay from the other side:
+   leaving before it elapses has to *cancel*, not merely not-yet-open.
+3. **A card the pointer can enter must not close when the pointer enters it.** This is what
+   separates a hover card from a tooltip — closing on "left the trigger" closes the thing the
+   reader is reaching for.
+4. **A card must not flicker across the gap** between trigger and card, which belongs to
+   neither.
+
+`Presence` is three states rather than a `hovered: bool` precisely because "inside the card"
+and "inside the trigger" have to be told apart: one of them is the arm that stops the close.
+
+**The numbers have sources.** `DEFAULT_DELAY_MS = 500` is gpui's own tooltip delay, so a control
+here opens when the same control would open under the reference implementation — the same
+convention as every other number that reached the theme because a platform named it.
+`DEFAULT_GRACE_MS = 150` is chosen: it only has to cover a hand crossing a small gap.
+
+### Verified at runtime, because a hover is not photographable
+
+A synthetic pointer produces no hover event in this app, so the card can only be *pictured*
+pinned, and the **timing cannot be photographed at all**. `GALLERY_HOVER` drives a scripted
+presence sequence through the same machine and prints every decision:
+
+| script | result |
+|---|---|
+| `trigger:200,outside:100,` ×2 | **nothing decided** — no opens, no closes, `dwell=0` |
+| `trigger:520,outside:200` | `Opened at 512ms`, `Closed at 160ms` |
+| `trigger:600,outside:60,card:300` | `Opened at 512ms`, then **still open** across a 60ms gap and into the card |
+
+The first row is the flicker prevention proven by the **absence** of decisions. The third is the
+hoverable property proven by the card surviving a gap crossing — the rule that makes a hover
+card a hover card.
+
+One reporting bug was fixed on the way: the log printed the tick's *starting* time, so a
+machine with a 500ms delay opened "after 496ms" — a number that appears to contradict the number
+it is demonstrating, which is worse than no log at all. It prints the decision time now.
 
 ### A v3 module that registered into a v2 one
 

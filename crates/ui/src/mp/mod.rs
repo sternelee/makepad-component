@@ -47,6 +47,7 @@ pub mod date;
 pub mod feedback;
 pub mod focus;
 pub mod history;
+pub mod hover_card;
 pub mod icon;
 pub mod input;
 pub mod keys;
@@ -120,6 +121,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     // from where the author put it in the tree.
     crate::mp::popover::script_mod(vm);
     crate::mp::tooltip::script_mod(vm);
+    crate::mp::hover_card::script_mod(vm);
     // **Last, because it composes two prototypes that register earlier** — an
     // `MpTextInput` (from `input`) and an `MpPopover` (from `popover`). This is the third
     // time this port has paid for this rule: `palette` before `list` failed on `MpMenu`, and

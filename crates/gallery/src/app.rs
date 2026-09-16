@@ -36,6 +36,7 @@ use makepad_component::mp::{
 use crate::pages::PAGES;
 use makepad_component::mp::combobox::Combobox;
 use makepad_component::mp::history::History;
+use makepad_component::mp::hover_card::HoverIntent;
 
 script_mod! {
     use mod.prelude.widgets_internal.*
@@ -122,6 +123,7 @@ script_mod! {
                         rail_page_29 := RailRow{text: ""}
                         rail_page_30 := RailRow{text: ""}
                         rail_page_31 := RailRow{text: ""}
+                        rail_page_32 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -188,6 +190,7 @@ script_mod! {
                             page_29 := mod.gallery.pages.shortcuts{}
                             page_30 := mod.gallery.pages.history{}
                             page_31 := mod.gallery.pages.combobox{}
+                            page_32 := mod.gallery.pages.hover_card{}
                         }
                     }
                 }
@@ -201,7 +204,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 32] = [
+const PAGE_SLOTS: [&[LiveId]; 33] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -234,10 +237,11 @@ const PAGE_SLOTS: [&[LiveId]; 32] = [
     ids!(page_29),
     ids!(page_30),
     ids!(page_31),
+    ids!(page_32),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 32] = [
+const RAIL_ROWS: [&[LiveId]; 33] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -270,6 +274,7 @@ const RAIL_ROWS: [&[LiveId]; 32] = [
     ids!(rail_page_29),
     ids!(rail_page_30),
     ids!(rail_page_31),
+    ids!(rail_page_32),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -548,6 +553,7 @@ impl App {
     fn seed_history(&mut self, cx: &mut Cx) {
         use makepad_component::mp::combobox::Combobox;
 use makepad_component::mp::history::History;
+use makepad_component::mp::hover_card::HoverIntent;
 
         // Eight states of capacity: enough that a script can exceed it and still have a
         // readable stack.
@@ -810,6 +816,104 @@ use makepad_component::mp::history::History;
             let script = std::env::var("GALLERY_COMBOBOX").unwrap_or_default();
             self.paint_combobox(cx, &script);
         }
+    }
+
+    /// Run a scripted pointer through the hover card's timing machine.
+    ///
+    /// `GALLERY_HOVER` is a list of `presence:milliseconds` steps — `trigger`, `card`,
+    /// `outside`. Every change the machine decides is printed, because **the timing is not
+    /// photographable**: a synthetic pointer produces no hover event in this app, so the only
+    /// evidence for the delay, the cancellation, the stay-open arm and the grace period is a
+    /// log. The default script is a session that exercises all four.
+    fn seed_hover_card(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::hover_card::{Change, HoverIntent, Presence};
+
+        let mut intent = HoverIntent::default();
+        let script = std::env::var("GALLERY_HOVER").unwrap_or_else(|_| {
+            // A sweep that must amount to nothing, a rest that opens, a gap crossing, reading
+            // the card, and leaving. The same sequence the module's own test walks.
+            "trigger:150,outside:60,trigger:150,outside:60,trigger:150,outside:60,\
+             trigger:520,outside:80,card:900,outside:200"
+                .to_string()
+        });
+        let mut log: Vec<String> = Vec::new();
+        for step in script.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            let Some((presence, ms)) = step.split_once(':') else {
+                log.push(format!("ignoring {step:?}"));
+                continue;
+            };
+            let presence = match presence {
+                "trigger" => Presence::OnTrigger,
+                "card" => Presence::OnCard,
+                "outside" => Presence::Outside,
+                other => {
+                    log.push(format!("ignoring unknown presence {other:?}"));
+                    continue;
+                }
+            };
+            let Ok(ms) = ms.parse::<f64>() else {
+                log.push(format!("ignoring unparseable duration {ms:?}"));
+                continue;
+            };
+            // Ticked at a frame's worth, because a real caller ticks per frame and a machine
+            // that only works for one big jump is not the machine being shipped.
+            let mut elapsed = 0.0;
+            while elapsed < ms {
+                let dt = 16.0_f64.min(ms - elapsed);
+                match intent.update(presence, dt) {
+                    // `elapsed + dt`, not `elapsed`: the decision happened at the **end** of
+                    // this tick. Printing the time before it read as "after 496ms: OPENED"
+                    // for a machine whose delay is 500ms — a number that appears to
+                    // contradict the number it is demonstrating, which is worse than no log
+                    // at all.
+                    Change::Opened => {
+                        log.push(format!("after {:>4.0}ms {presence:?}: OPENED", elapsed + dt));
+                        println!("HOVER {step}: Opened at {:.0}ms", elapsed + dt);
+                    }
+                    Change::Closed => {
+                        log.push(format!("after {:>4.0}ms {presence:?}: CLOSED", elapsed + dt));
+                        println!("HOVER {step}: Closed at {:.0}ms", elapsed + dt);
+                    }
+                    Change::Nothing => {}
+                }
+                elapsed += dt;
+            }
+        }
+        println!(
+            "HOVER final open={} dwell={:.0}ms",
+            intent.is_open(),
+            intent.dwell_ms()
+        );
+
+        self.ui.label(cx, ids!(hover_log)).set_text(
+            cx,
+            &format!(
+                "{} changes decided: {}",
+                log.len(),
+                if log.is_empty() {
+                    "none".to_string()
+                } else {
+                    log.join(" \u{b7} ")
+                },
+            ),
+        );
+        self.ui.label(cx, ids!(hover_replay)).set_text(
+            cx,
+            &format!(
+                "script: {script}. Set GALLERY_HOVER to change it. Final state: {}.",
+                if intent.is_open() { "open" } else { "closed" },
+            ),
+        );
+        self.ui.label(cx, ids!(hover_numbers)).set_text(
+            cx,
+            &format!(
+                "delay = {:.0}ms (gpui's own tooltip delay), grace = {:.0}ms (chosen). \
+                 A card with a zero delay opens on the first tick and closes on the first \
+                 departure, which is what a caller asking for an immediate card gets.",
+                intent.delay_ms(),
+                intent.grace_ms(),
+            ),
+        );
     }
 
     /// Declare a keymap and fill the sheet from it.
@@ -1194,7 +1298,7 @@ use makepad_component::mp::history::History;
         // widgets are laid out, so the others' triggers have empty rects and are
         // skipped — which is what lets one environment variable serve every page
         // rather than one variable per page.
-        const PINS: [(&[LiveId], &[LiveId]); 8] = [
+        const PINS: [(&[LiveId], &[LiveId]); 9] = [
             (ids!(pop_form), ids!(pop_form_panel)),
             (ids!(pop_menu), ids!(pop_menu_panel)),
             (ids!(pop_tall), ids!(pop_tall_panel)),
@@ -1207,6 +1311,7 @@ use makepad_component::mp::history::History;
             // the capture useless for the one thing that page exists to check.
             (ids!(menu_face_a), ids!(menu_panel_a)),
             (ids!(combo_field), ids!(combo_panel)),
+            (ids!(hover_card_anchor), ids!(hover_card)),
         ];
         // **Re-asserted on every event, not fired once.** A popover closes on any
         // press outside its panel, and a capture run is not a clean room: raising
@@ -1259,6 +1364,7 @@ use makepad_component::mp::history::History;
         self.seed_keys(cx);
         self.seed_history(cx);
         self.seed_combobox(cx);
+        self.seed_hover_card(cx);
     }
 
     /// Fill the table page's tables.
@@ -1880,7 +1986,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 32] = [
+    const SLOT_PAGES: [&str; 33] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -1913,6 +2019,7 @@ mod tests {
         "mod.gallery.pages.shortcuts",
         "mod.gallery.pages.history",
         "mod.gallery.pages.combobox",
+        "mod.gallery.pages.hover_card",
     ];
 
     #[test]

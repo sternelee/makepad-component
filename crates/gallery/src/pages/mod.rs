@@ -17,6 +17,7 @@ pub mod controls;
 pub mod feedback;
 pub mod foundation;
 pub mod history;
+pub mod hover_card;
 pub mod icon;
 pub mod input;
 pub mod layout;
@@ -64,6 +65,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     overlay::script_mod(vm);
     popover::script_mod(vm);
     history::script_mod(vm);
+    hover_card::script_mod(vm);
     icon::script_mod(vm);
     status::script_mod(vm);
     table::script_mod(vm);
@@ -294,6 +296,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/combobox.rs",
         blurb: "A field over a list, and the choice it holds",
     },
+    Page {
+        title: "Hover Card",
+        path: "mod.gallery.pages.hover_card",
+        source: "crates/gallery/src/pages/hover_card.rs",
+        blurb: "A card on hover, and its timing",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -370,6 +378,7 @@ mod tests {
             ("crates/gallery/src/pages/overlay.rs", "overlay"),
             ("crates/gallery/src/pages/popover.rs", "popover"),
             ("crates/gallery/src/pages/history.rs", "history"),
+            ("crates/gallery/src/pages/hover_card.rs", "hover_card"),
             ("crates/gallery/src/pages/icon.rs", "icon"),
             ("crates/gallery/src/pages/status.rs", "status"),
             ("crates/gallery/src/pages/table.rs", "table"),
