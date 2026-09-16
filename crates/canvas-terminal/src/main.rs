@@ -595,6 +595,17 @@ impl AppMain for App {
     }
 
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
+        if let Event::WindowCloseRequested(_) | Event::WindowClosed(_) = event {
+            // The canvas layout is the user's work: persist it on the way
+            // out, best-effort.
+            if let Some(panel) = self
+                .ui
+                .widget(cx, ids!(main_window.body.canvas))
+                .borrow_mut::<CanvasPanel>()
+            {
+                panel.save_canvas();
+            }
+        }
         if let Event::Startup = event {
             self.ui
                 .text_input(
@@ -617,29 +628,11 @@ impl AppMain for App {
                 .borrow_mut::<CanvasPanel>()
             {
                 panel.set_grid_enabled(false);
-                // Persistent sessions: re-attach to any terminal the daemon
-                // is still holding from a previous GUI run; otherwise start
-                // a fresh default terminal.
-                match crate::terminal::TerminalSession::list_sessions() {
-                    Ok(infos) => {
-                        let live: Vec<String> = infos
-                            .into_iter()
-                            .filter(|s| s.alive)
-                            .map(|s| s.name)
-                            .collect();
-                        if live.is_empty() {
-                            panel.spawn_terminal(cx, "claude", None, "zsh");
-                        } else {
-                            for name in live {
-                                panel.attach_terminal(cx, &name);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        log!("canvas-terminal: list sessions failed: {e}");
-                        panel.spawn_terminal(cx, "claude", None, "zsh");
-                    }
-                }
+                // Restore the saved canvas: re-attach live sessions, relaunch
+                // agent CLIs against their persisted conversations, rebuild
+                // plain cards, camera and whiteboard. Falls back to a fresh
+                // default terminal on first run.
+                panel.restore_canvas(cx);
             }
         }
         self.ui.handle_event(cx, event, &mut Scope::empty());

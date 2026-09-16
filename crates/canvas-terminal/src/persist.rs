@@ -95,13 +95,13 @@ pub enum SavedItem {
     Agent {
         name: String,
         cwd: String,
+        /// Which CLI hosts the chat ("pi" / "claude" / "codex").
         provider: String,
-        /// The daemon session this card talks to. `cursor.seq` tells the
-        /// re-attach how far the card had rendered; the transcript itself
-        /// replays from the daemon's journal.
-        session_id: u64,
-        epoch: u64,
-        seq: u64,
+        /// The CLI's own session id, when it reported one: the restore path
+        /// relaunches with `--session`/`--resume`, so the conversation
+        /// survives a full app restart (daemon included).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cli_session_id: Option<String>,
         rect: SavedRect,
     },
 }
@@ -167,6 +167,83 @@ pub struct SavedShape {
     /// The hand-drawn wobble seed; stored so a restored stroke keeps its
     /// exact shape instead of wobbling differently on every launch.
     pub seed: u32,
+}
+
+impl SavedShape {
+    /// From a drawn shape (whiteboard layer).
+    pub fn from_shape(shape: &crate::items::DrawnShape) -> Self {
+        use crate::items::NoteShape;
+        let (kind, points, radius, text) = match &shape.shape {
+            NoteShape::Arrow { a, b } => ("arrow", vec![*a, *b], None, None),
+            NoteShape::Pen { points } => ("pen", points.clone(), None, None),
+            NoteShape::Rect { a, b } => ("rect", vec![*a, *b], None, None),
+            NoteShape::Circle { center, r } => ("circle", vec![*center], Some(*r), None),
+            NoteShape::Ellipse { a, b } => ("ellipse", vec![*a, *b], None, None),
+            NoteShape::Line { a, b } => ("line", vec![*a, *b], None, None),
+            NoteShape::Polyline { points } => ("polyline", points.clone(), None, None),
+            NoteShape::Text { pos, text } => ("text", vec![*pos], None, Some(text.clone())),
+        };
+        Self {
+            kind: kind.to_owned(),
+            points: points
+                .into_iter()
+                .map(|p| Point { x: p.x, y: p.y })
+                .collect(),
+            radius,
+            text,
+            color: shape.color,
+            width: shape.width,
+            seed: shape.seed,
+        }
+    }
+
+    /// Back into a drawn shape; `None` for an unknown kind (forward
+    /// compatibility: a newer file may carry kinds this build cannot draw).
+    pub fn to_shape(&self) -> Option<crate::items::DrawnShape> {
+        use crate::items::NoteShape;
+        let pts: Vec<makepad_widgets::Vec2d> = self
+            .points
+            .iter()
+            .map(|p| makepad_widgets::Vec2d { x: p.x, y: p.y })
+            .collect();
+        let first = || pts.first().copied();
+        let second = || pts.get(1).copied();
+        let shape = match self.kind.as_str() {
+            "arrow" => NoteShape::Arrow {
+                a: first()?,
+                b: second()?,
+            },
+            "pen" => NoteShape::Pen { points: pts },
+            "rect" => NoteShape::Rect {
+                a: first()?,
+                b: second()?,
+            },
+            "circle" => NoteShape::Circle {
+                center: first()?,
+                r: self.radius?,
+            },
+            "ellipse" => NoteShape::Ellipse {
+                a: first()?,
+                b: second()?,
+            },
+            "line" => NoteShape::Line {
+                a: first()?,
+                b: second()?,
+            },
+            "polyline" => NoteShape::Polyline { points: pts },
+            "text" => NoteShape::Text {
+                pos: first()?,
+                text: self.text.clone().unwrap_or_default(),
+            },
+            _ => return None,
+        };
+        Some(crate::items::DrawnShape {
+            shape,
+            color: self.color,
+            width: self.width,
+            seed: self.seed,
+        })
+    }
 }
 
 /// The whole saved canvas.
@@ -293,10 +370,8 @@ mod tests {
                     SavedItem::Agent {
                         name: "demo".into(),
                         cwd: "/tmp/ws".into(),
-                        provider: "kimi-k2.5".into(),
-                        session_id: 42,
-                        epoch: 7,
-                        seq: 1234,
+                        provider: "pi".into(),
+                        cli_session_id: Some("sid-1".into()),
                         rect,
                     },
                 ],
@@ -320,19 +395,18 @@ mod tests {
         assert_eq!(ws.shapes[0].seed, 99);
         assert_eq!(ws.shapes[0].color, [0.1, 0.2, 0.3, 1.0]);
 
-        // The agent card keeps its identity so re-attach can find the session.
+        // The agent card keeps its identity so restore can resume the CLI
+        // session even after a full app restart.
         match &ws.items[5] {
             SavedItem::Agent {
                 name,
-                session_id,
-                epoch,
-                seq,
+                provider,
+                cli_session_id,
                 ..
             } => {
                 assert_eq!(name, "demo");
-                assert_eq!(*session_id, 42);
-                assert_eq!(*epoch, 7);
-                assert_eq!(*seq, 1234);
+                assert_eq!(provider, "pi");
+                assert_eq!(cli_session_id.as_deref(), Some("sid-1"));
             }
             other => panic!("expected the agent item, got {other:?}"),
         }
@@ -374,10 +448,8 @@ mod tests {
         canvas.workspaces[0].items.push(SavedItem::Agent {
             name: "demo".into(),
             cwd: "/tmp".into(),
-            provider: "scripted".into(),
-            session_id: 1,
-            epoch: 2,
-            seq: 3,
+            provider: "pi".into(),
+            cli_session_id: None,
             rect: SavedRect::default(),
         });
         canvas.save(&path).expect("save");

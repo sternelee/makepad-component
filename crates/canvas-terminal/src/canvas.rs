@@ -599,6 +599,11 @@ pub struct CanvasPanel {
     /// Same repair for the hidden note editor, which shares the mechanism.
     #[rust]
     note_focus_repair: bool,
+    /// Last-saved (session_id, usage) per agent card: when a CLI reports its
+    /// session id or usage changes, the canvas is re-saved so a restart
+    /// resumes the right conversation with fresh metadata.
+    #[rust]
+    saved_chat_sig: HashMap<u64, (Option<String>, Option<String>)>,
     /// Transcript scroll offset (lines from the tail) per agent card.
     #[rust]
     agent_scroll: HashMap<u64, f64>,
@@ -733,6 +738,7 @@ impl CanvasPanel {
         self.agent_input.clear();
         self.composer_focus_repair = false;
         self.note_focus_repair = false;
+        self.saved_chat_sig.clear();
         self.redraw(cx);
     }
 
@@ -761,6 +767,9 @@ impl CanvasPanel {
     /// Snapshot the current shapes list onto the undo stack and clear redo.
     /// Call before any mutation to `self.shapes`.
     fn push_undo(&mut self) {
+        // Every undoable mutation (shape commit, erase, clear) funnels
+        // through here, so the saved canvas tracks the whiteboard too.
+        self.save_canvas();
         self.undo_stack.push(self.shapes.clone());
         // Cap history to avoid unbounded growth.
         if self.undo_stack.len() > 100 {
@@ -909,6 +918,7 @@ impl CanvasPanel {
     /// Commit the inline edit buffer back to the note and exit edit mode.
     fn finish_note_edit(&mut self, cx: &mut Cx) {
         self.note_focus_repair = false;
+        self.save_canvas();
         if let Some(id) = self.note_edit_id.take() {
             // Prefer the hidden editor's text so the final IME composition is
             // captured; fall back to the cached buffer if the editor is gone.
@@ -1009,6 +1019,7 @@ impl CanvasPanel {
         self.items.push(item);
         self.selected = Some(id);
         self.redraw(cx);
+        self.save_canvas();
     }
 
     /// Create an agent card: a terminal session whose CLI launches straight
@@ -1035,6 +1046,7 @@ impl CanvasPanel {
                 });
                 self.selected = Some(id);
                 self.redraw(cx);
+                self.save_canvas();
                 self.status(cx, &format!("agent '{name}' ready — type to prompt it"));
             }
             Err(message) => {
@@ -1185,6 +1197,317 @@ impl CanvasPanel {
     /// (GUI restart path), replaying its scrollback into the local grid.
     /// Failures are logged silently — startup may race a session dying
     /// right as we attach.
+    // ── canvas persistence ─────────────────────────────────────────────
+    //
+    // The daemon owns sessions; this file owns the *layout*. An agent card
+    // is saved as identity (name + CLI + the CLI's own session id), so the
+    // restore relaunches the CLI against its persisted conversation instead
+    // of keeping a second copy of the transcript here.
+
+    /// Where the canvas state is persisted.
+    fn canvas_path() -> std::path::PathBuf {
+        crate::persist::default_path()
+    }
+
+    /// Snapshot the current workspace into the plain-data canvas model.
+    pub fn snapshot(&self) -> crate::persist::SavedCanvas {
+        let to_rect = |item: &CanvasItem| {
+            let world = item.world();
+            crate::persist::SavedRect {
+                pos: crate::persist::Point {
+                    x: world.pos.x,
+                    y: world.pos.y,
+                },
+                size: crate::persist::Point {
+                    x: world.size.x,
+                    y: world.size.y,
+                },
+            }
+        };
+        let items = self
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                CanvasItem::Note {
+                    title,
+                    body,
+                    font_size,
+                    color_idx,
+                    world: _,
+                    ..
+                } => Some(crate::persist::SavedItem::Note {
+                    title: title.clone(),
+                    body: body.clone(),
+                    font_size: *font_size,
+                    color_idx: *color_idx,
+                    rect: to_rect(item),
+                }),
+                CanvasItem::Terminal {
+                    title, world: _, ..
+                } => Some(crate::persist::SavedItem::Terminal {
+                    name: title.clone(),
+                    command: String::new(),
+                    rect: to_rect(item),
+                }),
+                CanvasItem::Agent {
+                    title,
+                    cwd,
+                    provider,
+                    world: _,
+                    ..
+                } => {
+                    let cli_session_id = item
+                        .agent_session()
+                        .and_then(|s| s.chat.lock().ok())
+                        .and_then(|card| card.session_id.clone());
+                    Some(crate::persist::SavedItem::Agent {
+                        name: title.clone(),
+                        cwd: cwd.clone(),
+                        provider: provider.clone(),
+                        cli_session_id,
+                        rect: to_rect(item),
+                    })
+                }
+                CanvasItem::Browser {
+                    title,
+                    url,
+                    world: _,
+                    ..
+                } => Some(crate::persist::SavedItem::Browser {
+                    title: title.clone(),
+                    url: url.clone(),
+                    rect: to_rect(item),
+                }),
+                CanvasItem::MusicPlayer {
+                    title,
+                    progress,
+                    world: _,
+                    ..
+                } => Some(crate::persist::SavedItem::MusicPlayer {
+                    title: title.clone(),
+                    progress: *progress,
+                    rect: to_rect(item),
+                }),
+                CanvasItem::Media {
+                    title,
+                    path,
+                    world: _,
+                    ..
+                } => Some(crate::persist::SavedItem::Media {
+                    title: title.clone(),
+                    path: path.clone(),
+                    rect: to_rect(item),
+                }),
+            })
+            .collect();
+        let shapes = self
+            .shapes
+            .iter()
+            .map(crate::persist::SavedShape::from_shape)
+            .collect();
+        let mut canvas = crate::persist::SavedCanvas::empty();
+        canvas.workspaces[0] = crate::persist::SavedWorkspace {
+            name: format!("workspace {}", self.current_workspace),
+            camera_pan: crate::persist::Point {
+                x: self.camera.pan.x,
+                y: self.camera.pan.y,
+            },
+            camera_zoom: self.camera.zoom,
+            items,
+            shapes,
+        };
+        canvas
+    }
+
+    /// Persist the canvas to its default path. Best-effort: a failed write
+    /// is logged, never surfaced as UI noise.
+    pub fn save_canvas(&self) {
+        let canvas = self.snapshot();
+        let path = Self::canvas_path();
+        if let Err(e) = canvas.save(&path) {
+            log!("canvas: save failed: {e}");
+        }
+    }
+
+    /// Restore the canvas from disk: re-attach live sessions (terminal or
+    /// chat view), relaunch agent CLIs against their persisted conversations
+    /// when the session is gone, and rebuild plain cards. Falls back to the
+    /// old behavior (fresh default terminal) when there is nothing saved.
+    pub fn restore_canvas(&mut self, cx: &mut Cx) {
+        let Some(saved) = crate::persist::SavedCanvas::load(&Self::canvas_path()) else {
+            // No canvas on disk (first run): keep the historical default.
+            match crate::terminal::TerminalSession::list_sessions() {
+                Ok(infos) if infos.iter().any(|s| s.alive) => {
+                    for info in infos.iter().filter(|s| s.alive) {
+                        self.attach_terminal(cx, &info.name);
+                    }
+                }
+                _ => self.spawn_terminal(cx, "claude", None, "zsh"),
+            }
+            return;
+        };
+        let ws = &saved.workspaces[0];
+        let live = crate::terminal::TerminalSession::list_sessions()
+            .map(|infos| {
+                infos
+                    .into_iter()
+                    .filter(|s| s.alive)
+                    .map(|s| s.name)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let to_world = |rect: &crate::persist::SavedRect| Rect {
+            pos: Vec2d {
+                x: rect.pos.x,
+                y: rect.pos.y,
+            },
+            size: Vec2d {
+                x: rect.size.x,
+                y: rect.size.y,
+            },
+        };
+        for item in &ws.items {
+            match item {
+                crate::persist::SavedItem::Terminal { name, rect, .. } => {
+                    if live.iter().any(|n| n == name) {
+                        self.attach_terminal_in(cx, name, to_world(rect));
+                    }
+                }
+                crate::persist::SavedItem::Agent {
+                    name,
+                    cwd,
+                    provider,
+                    cli_session_id,
+                    rect,
+                } => {
+                    let world = to_world(rect);
+                    if live.iter().any(|n| n == name) {
+                        // Daemon still holds it: attach and flip the parser
+                        // back on (the ring replays the transcript).
+                        if let Ok(session) = crate::terminal::TerminalSession::attach(name, 100, 30)
+                        {
+                            session.chat_switch(provider, true, crate::ipc::SwitchScript::None);
+                            session.chat_sync();
+                            let id = self.next_item_id;
+                            self.next_item_id += 1;
+                            self.items.push(CanvasItem::Agent {
+                                id,
+                                world,
+                                title: name.clone(),
+                                cwd: cwd.clone(),
+                                provider: provider.clone(),
+                                session: Some(Box::new(session)),
+                            });
+                        }
+                    } else {
+                        // Session gone (daemon restarted): relaunch the CLI
+                        // against its persisted conversation.
+                        if let Ok(session) =
+                            crate::terminal::TerminalSession::spawn(name, "zsh", Some(cwd), 100, 30)
+                        {
+                            session.chat_switch(
+                                provider,
+                                true,
+                                crate::ipc::SwitchScript::FreshLaunch,
+                            );
+                            if let Some(sid) = cli_session_id {
+                                // Re-launch with the exact id so pi/claude
+                                // resume the stored conversation.
+                                session.write_line(
+                                    &(crate::chat::CliAdapter::from_comm(provider)
+                                        .launch(crate::chat::ChatMode::Chat, Some(sid))
+                                        + "\n"),
+                                );
+                            }
+                            let id = self.next_item_id;
+                            self.next_item_id += 1;
+                            self.items.push(CanvasItem::Agent {
+                                id,
+                                world,
+                                title: name.clone(),
+                                cwd: cwd.clone(),
+                                provider: provider.clone(),
+                                session: Some(Box::new(session)),
+                            });
+                        }
+                    }
+                }
+                crate::persist::SavedItem::Note {
+                    title,
+                    body,
+                    font_size,
+                    color_idx,
+                    rect,
+                } => {
+                    let world = to_world(rect);
+                    let id = self.next_item_id;
+                    self.next_item_id += 1;
+                    self.items.push(CanvasItem::Note {
+                        id,
+                        world,
+                        title: title.clone(),
+                        body: body.clone(),
+                        font_size: *font_size,
+                        color_idx: *color_idx,
+                    });
+                }
+                crate::persist::SavedItem::Browser { title, url, rect } => {
+                    let world = to_world(rect);
+                    let id = self.next_item_id;
+                    self.next_item_id += 1;
+                    self.items.push(CanvasItem::Browser {
+                        id,
+                        world,
+                        title: title.clone(),
+                        url: url.clone(),
+                    });
+                }
+                crate::persist::SavedItem::MusicPlayer {
+                    title,
+                    progress,
+                    rect,
+                } => {
+                    let world = to_world(rect);
+                    let id = self.next_item_id;
+                    self.next_item_id += 1;
+                    self.items.push(CanvasItem::MusicPlayer {
+                        id,
+                        world,
+                        title: title.clone(),
+                        progress: *progress,
+                        playing: false,
+                    });
+                }
+                crate::persist::SavedItem::Media { .. } => {
+                    // Media cards need their file re-dropped; a stale path
+                    // restoring as a dead card is worse than no card.
+                }
+            }
+        }
+        self.camera = crate::camera::Camera {
+            pan: Vec2d {
+                x: ws.camera_pan.x,
+                y: ws.camera_pan.y,
+            },
+            zoom: ws.camera_zoom,
+        };
+        self.shapes = ws
+            .shapes
+            .iter()
+            .filter_map(crate::persist::SavedShape::to_shape)
+            .collect();
+        self.redraw(cx);
+    }
+
+    /// Attach to a live session at a specific saved rect (no cascade).
+    pub fn attach_terminal_in(&mut self, cx: &mut Cx, name: &str, world: Rect) {
+        let (cols, rows) = self.term_grid_size_from(world.size.x, world.size.y);
+        match crate::terminal::TerminalSession::attach(name, cols, rows) {
+            Ok(session) => self.place_terminal(cx, world, session),
+            Err(e) => log!("canvas: failed to attach terminal '{name}': {e}"),
+        }
+    }
+
     pub fn attach_terminal(&mut self, cx: &mut Cx, name: &str) {
         let (mut world, cols, rows) = self.new_terminal_geometry();
         // Cascade each restored card by the number of terminals already on
@@ -1259,6 +1582,7 @@ impl CanvasPanel {
         self.items.push(item);
         self.selected = Some(id);
         self.redraw(cx);
+        self.save_canvas();
     }
 
     /// Spawn a media card for `path` at the canvas center (the `/open`
@@ -1712,6 +2036,7 @@ impl CanvasPanel {
         }
         self.selected = Some(id);
         self.redraw(cx);
+        self.save_canvas();
     }
 
     /// Draw the view-switch button (◎ on terminals, ▮ on chat cards).
@@ -2005,6 +2330,7 @@ impl CanvasPanel {
         }
         self.minimized.retain(|m| m.0 != id);
         self.items.retain(|i| i.id() != id);
+        self.save_canvas();
         if self.selected == Some(id) {
             self.selected = None;
         }
@@ -6965,6 +7291,7 @@ impl Widget for CanvasPanel {
             String,
             String,
         );
+        let mut chat_sigs: HashMap<u64, (Option<String>, Option<String>)> = HashMap::new();
         let n_items = self.items.len();
         let mut draw_queue: Vec<DrawItem> = Vec::new();
         for idx in 0..n_items {
@@ -6982,6 +7309,11 @@ impl Widget for CanvasPanel {
             let url = item.url().unwrap_or("").to_string();
             let state = item.session().map(|t| t.state.clone());
             let agent_state = item.agent_session().map(|a| a.chat.clone());
+            if let Some(session) = item.agent_session() {
+                if let Ok(card) = session.chat.lock() {
+                    chat_sigs.insert(item.id(), (card.session_id.clone(), card.usage.clone()));
+                }
+            }
             let agent_cwd = item.agent_cwd().unwrap_or("").to_string();
             let agent_provider = item.agent_provider().unwrap_or("").to_string();
             let (body, font_size, color_idx) = match item {
@@ -7115,6 +7447,11 @@ impl Widget for CanvasPanel {
                 }
                 ItemKind::Agent => {
                     if let Some(card) = agent_state {
+                        // Track CLI-reported metadata for the autosave.
+                        if let Ok(card) = card.lock() {
+                            chat_sigs
+                                .insert(item_id, (card.session_id.clone(), card.usage.clone()));
+                        }
                         // A gap in the sequence stream means the card is missing
                         // transcript; repair it from the daemon's journal
                         // before drawing, so the user never sees a hole.
@@ -7207,6 +7544,13 @@ impl Widget for CanvasPanel {
 
         // Right-side properties panel reflects the current selection.
         self.sync_properties_panel(cx);
+
+        // A chat card learned its CLI session id or usage since the last
+        // save: re-save so a restart resumes with fresh metadata.
+        if chat_sigs != self.saved_chat_sig {
+            self.saved_chat_sig = chat_sigs;
+            self.save_canvas();
+        }
 
         // Global whiteboard shapes (world coords) draw ON TOP of items so
         // annotations/flowcharts can mark terminals and browsers.
