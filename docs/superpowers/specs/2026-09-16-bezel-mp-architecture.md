@@ -136,6 +136,7 @@ build on).
 | `mp/radio.rs` | `MpRadio` — one choice, and the group is the caller's. |
 | `mp/layout.rs` | `Row`, `Column`, `Divider`, `DividerVertical`, `Spacer`. The system gap, carried by a prototype so a call site that wants 8pt writes no number. |
 | `mp/loaders.rs` | `MpSpinner`, `MpPulse`, `MpProgress`. The payoff for `motion::phase` — its constants are injected as instances from Rust rather than restated in the DSL. |
+| `mp/slider.rs` | `MpSlider`, and the four free functions that turn a pointer into a value. |
 
 `MpButton` is the demonstration — the v2 button against this one:
 
@@ -240,7 +241,50 @@ The gallery's rail is also hand-maintained against `PAGES` (`ids!` needs
 literals), which drifted: `GALLERY_PAGE=Loaders` opened the Layout page because
 the two lists disagreed about which slot held which page. There is now a
 `SLOT_PAGES` table in Rust naming what each slot holds, and a test that asserts it
-against `PAGES` — the only place the two can be compared.
+against `PAGES` — the only place the two can be compared. It earned itself
+immediately: adding the Slider page failed that test before the build finished,
+with `slot 7 holds mod.gallery.pages.controls but PAGES[7] is "Slider"`.
+
+### The slider, and the disabled hole
+
+`mp/slider.rs` moves the pixel-to-value arithmetic out of the widget into four
+free functions — `clamp`, `snap`, `fraction`, `value_at` — because that is the
+part worth testing and the v2 version could not be tested at all: it was a method
+on a widget that needed a live `Area` to run.
+
+Two rules the tests settled, and the second one changed the implementation:
+
+- **The step grid is anchored at `min`, not at zero.** 5..10 by 2 offers 5, 7, 9.
+  A zero-anchored grid offers 6, 8, 10, which puts the slider's own minimum out
+  of reach.
+- **`min` and `max` are members of the grid.** 0..1 by 0.3 offers 0, 0.3, 0.6,
+  0.9 *and* 1. Without it, dragging to the far end of the track stops at 0.9 and
+  the maximum is unreachable by any gesture — a bug the user finds and the author
+  does not. The first implementation clamped instead, which is what the
+  reachability test caught; a value *at* an end is now that end, before the grid
+  is consulted, because a step larger than the whole range has exactly one grid
+  member and both ends are equidistant from it.
+
+Then the screenshot found the same class of bug the controls had, in two more
+places:
+
+- **`disabled` was tracked and never read.** The slider's shader had a `disabled`
+  instance from `mod.mp.ControlAnimator` and the pixel function never mentioned
+  it, so a disabled slider was pixel-identical to an enabled one. It now cuts the
+  whole control's coverage, so an unavailable slider still reads as *this*
+  slider.
+- **`set_disabled` animates, so it cannot seat an initial state.** A control
+  built `disabled: true` faded from 0 and, with nothing driving frames, stayed
+  there: it rendered enabled. `control::init_disabled` does it with `cut`, the
+  same rule as `init_checked`. Applied to the button, slider, checkbox, switch
+  and radio — the button had the same hole and the controls page had not shown
+  it, because the earlier screenshot only checked the ones whose *value* was set
+  at construction rather than their `disabled` flag.
+
+The gallery's slider page also seeds its readouts from the values the pages were
+built with, so the value path is visible in a screenshot rather than only after a
+drag — and a slider whose value never reaches its readout is a visible defect
+rather than a latent one.
 
 ### Two findings from building it
 

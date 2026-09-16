@@ -288,9 +288,10 @@ impl MpRadio {
 
 impl ScriptHook for MpRadio {
     fn on_after_new(&mut self, vm: &mut ScriptVm) {
-        let selected = self.selected;
+        let (selected, disabled) = (self.selected, self.disabled);
         vm.with_cx_mut(|cx| {
             control::init_checked(&mut self.animator, cx, selected);
+            control::init_disabled(&mut self.animator, cx, disabled);
         });
     }
 }

@@ -15,6 +15,8 @@ use makepad_component::mp::{
     button::{MpButtonStyle, MpButtonWidgetRefExt},
     checkbox::MpCheckboxWidgetRefExt,
     radio::MpRadioWidgetRefExt,
+    loaders::MpProgressWidgetRefExt,
+    slider::MpSliderWidgetRefExt,
     switch::MpSwitchWidgetRefExt,
 };
 
@@ -81,6 +83,7 @@ script_mod! {
                         rail_page_5 := RailRow{text: ""}
                         rail_page_6 := RailRow{text: ""}
                         rail_page_7 := RailRow{text: ""}
+                        rail_page_8 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -117,7 +120,8 @@ script_mod! {
                             page_4 := mod.gallery.pages.button{}
                             page_5 := mod.gallery.pages.layout{}
                             page_6 := mod.gallery.pages.loaders{}
-                            page_7 := mod.gallery.pages.controls{}
+                            page_7 := mod.gallery.pages.slider{}
+                            page_8 := mod.gallery.pages.controls{}
                         }
                     }
                 }
@@ -131,7 +135,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 8] = [
+const PAGE_SLOTS: [&[LiveId]; 9] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -140,10 +144,11 @@ const PAGE_SLOTS: [&[LiveId]; 8] = [
     ids!(page_5),
     ids!(page_6),
     ids!(page_7),
+    ids!(page_8),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 8] = [
+const RAIL_ROWS: [&[LiveId]; 9] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -152,6 +157,7 @@ const RAIL_ROWS: [&[LiveId]; 8] = [
     ids!(rail_page_5),
     ids!(rail_page_6),
     ids!(rail_page_7),
+    ids!(rail_page_8),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -180,6 +186,11 @@ impl MatchEvent for App {
                 .set_text(cx, page.title);
         }
         self.show(cx, self.opening_page());
+        // Seed the slider readouts from the values the pages were built with,
+        // so the page shows the value path working before anyone touches it —
+        // and so a slider whose value never reaches its readout is visible in a
+        // screenshot rather than only after a drag.
+        self.seed_readouts(cx);
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -213,6 +224,7 @@ impl MatchEvent for App {
         }
 
         self.handle_controls(cx, actions);
+        self.handle_sliders(cx, actions);
     }
 }
 
@@ -276,6 +288,61 @@ impl App {
             self.ui
                 .label(cx, ids!(radio_readout))
                 .set_text(cx, labels.get(picked).copied().unwrap_or("?"));
+        }
+    }
+
+    /// Write each slider's starting value into its readout.
+    fn seed_readouts(&mut self, cx: &mut Cx) {
+        const PAIRS: [(&[LiveId], &[LiveId]); 7] = [
+            (ids!(read_continuous), ids!(out_continuous)),
+            (ids!(read_stepped), ids!(out_stepped)),
+            (ids!(read_thirds), ids!(out_thirds)),
+            (ids!(read_anchor), ids!(out_anchor)),
+            (ids!(read_negative), ids!(out_negative)),
+            (ids!(read_small), ids!(out_small)),
+            (ids!(drive_source), ids!(drive_bar)),
+        ];
+        for (slider, readout) in PAIRS {
+            let value = self.ui.mp_slider(cx, slider).value();
+            if readout == ids!(drive_bar) {
+                self.ui.mp_progress(cx, readout).set_value(cx, value);
+            } else {
+                self.ui
+                    .label(cx, readout)
+                    .set_text(cx, &format!("{value:.2}"));
+            }
+        }
+    }
+
+    /// The slider page's readouts, and the one slider that drives something.
+    ///
+    /// A readout per slider is the page's own test: it shows the *value* the
+    /// widget reported rather than only that a knob moved, and the last pair
+    /// shows the value leaving the slider and arriving at another widget.
+    fn handle_sliders(&mut self, cx: &mut Cx, actions: &Actions) {
+        const READOUTS: [(&[LiveId], &[LiveId]); 7] = [
+            (ids!(read_continuous), ids!(out_continuous)),
+            (ids!(read_stepped), ids!(out_stepped)),
+            (ids!(read_thirds), ids!(out_thirds)),
+            (ids!(read_anchor), ids!(out_anchor)),
+            (ids!(read_negative), ids!(out_negative)),
+            (ids!(read_small), ids!(out_small)),
+            (ids!(drive_source), ids!(drive_bar)),
+        ];
+        for (slider, readout) in READOUTS {
+            let Some(value) = self.ui.mp_slider(cx, slider).changed(actions) else {
+                continue;
+            };
+            if readout == ids!(drive_bar) {
+                self.ui.mp_progress(cx, readout).set_value(cx, value);
+            } else {
+                // The last pair has a progress bar where the others have a
+                // label, so the branch is on what the path holds rather than on
+                // an index nobody can read.
+                self.ui
+                    .label(cx, readout)
+                    .set_text(cx, &format!("{value:.2}"));
+            }
         }
     }
 
@@ -360,7 +427,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 8] = [
+    const SLOT_PAGES: [&str; 9] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -368,6 +435,7 @@ mod tests {
         "mod.gallery.pages.button",
         "mod.gallery.pages.layout",
         "mod.gallery.pages.loaders",
+        "mod.gallery.pages.slider",
         "mod.gallery.pages.controls",
     ];
 

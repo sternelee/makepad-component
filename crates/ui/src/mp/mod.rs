@@ -43,6 +43,7 @@ pub mod control;
 pub mod layout;
 pub mod loaders;
 pub mod radio;
+pub mod slider;
 pub mod surface;
 pub mod switch;
 
@@ -64,5 +65,6 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::checkbox::script_mod(vm);
     crate::mp::switch::script_mod(vm);
     crate::mp::radio::script_mod(vm);
+    crate::mp::slider::script_mod(vm);
     crate::mp::loaders::script_mod(vm);
 }

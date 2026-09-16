@@ -260,8 +260,12 @@ impl MpSwitch {
 impl ScriptHook for MpSwitch {
     fn on_after_new(&mut self, vm: &mut ScriptVm) {
         let checked = self.checked;
+        let disabled = self.disabled;
         vm.with_cx_mut(|cx| {
             control::init_checked(&mut self.animator, cx, checked);
+            // ...and the same for `disabled`, which the v2 set tracked in an
+            // animator field it never read at construction either.
+            control::init_disabled(&mut self.animator, cx, disabled);
         });
     }
 }

@@ -133,7 +133,7 @@ script_mod! {
 /// A struct rather than a `Vec<Event>`: a control reacts to at most one of each
 /// per event, and naming them makes a control's `handle_event` read as the
 /// behaviour it has.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Signals {
     /// The pointer entered the control.
     pub hover_in: bool,
@@ -143,17 +143,41 @@ pub struct Signals {
     pub down: bool,
     /// A press ended, whether or not it landed on the control.
     pub up: bool,
+    /// The pointer is down and moved.
+    ///
+    /// The drag signal. Makepad delivers `FingerMove` to the widget whose area
+    /// took the press, so a control sees the whole gesture rather than only the
+    /// part of it that stays inside itself — which is what a slider needs and a
+    /// button has no use for.
+    pub moved: bool,
     /// The control's value should change: a press that landed on it, or
     /// Enter/Space while it holds key focus.
     pub activate: bool,
     /// The animator advanced and the control needs a repaint.
     pub redraw: bool,
+    /// Where the pointer was, in screen coordinates.
+    ///
+    /// Meaningful when `down` or `moved` is set. Carried because the value of a
+    /// drag is a *position*, and a control that has to re-derive it from the
+    /// event has to re-implement the hit test that produced this signal.
+    pub pointer: Vec2d,
 }
 
 impl Signals {
     /// Whether anything at all happened.
+    ///
+    /// The pointer's position is deliberately not consulted: it is a payload
+    /// that rides along with a gesture, not a gesture. Counting it would make
+    /// every mouse move over a control read as activity, and a control that
+    /// checks this before redrawing would redraw every frame.
     pub fn is_idle(self) -> bool {
-        self == Self::default()
+        !(self.hover_in
+            || self.hover_out
+            || self.down
+            || self.up
+            || self.moved
+            || self.activate
+            || self.redraw)
     }
 }
 
@@ -205,17 +229,23 @@ pub fn handle(
             animator.play(cx, ids!(press.off), None);
             signals.hover_out = true;
         }
-        Hit::FingerDown(_) => {
+        Hit::FingerDown(fe) => {
             animator.play(cx, ids!(press.on), None);
             // Claim key focus on press, so the ring follows the pointer and a
             // following Tab continues from here. This is the line the v2 radio
             // was missing.
             cx.set_key_focus(area);
             signals.down = true;
+            signals.pointer = fe.abs;
+        }
+        Hit::FingerMove(fe) => {
+            signals.moved = true;
+            signals.pointer = fe.abs;
         }
         Hit::FingerUp(fe) => {
             animator.play(cx, ids!(press.off), None);
             signals.up = true;
+            signals.pointer = fe.abs;
             if fe.is_over {
                 signals.activate = true;
             }
@@ -257,6 +287,28 @@ pub fn init_checked(animator: &mut Animator, cx: &mut Cx, checked: bool) {
             &[id!(checked), id!(on)]
         } else {
             &[id!(checked), id!(off)]
+        },
+    );
+}
+
+/// Seat the `disabled` track for a control that was **built** disabled,
+/// without animating.
+///
+/// The same rule as [`init_checked`], and the same bug when it is missed: a
+/// control built `disabled: true` has a true field and an animator still at
+/// `off`, and the paint reads the animator — so it renders enabled and responds
+/// to nothing, which looks like a widget that has stopped working rather than
+/// like one that is deliberately off.
+///
+/// [`set_disabled`] is for a state that *changes* and should therefore fade;
+/// this is for the state it starts in.
+pub fn init_disabled(animator: &mut Animator, cx: &mut Cx, disabled: bool) {
+    animator.cut(
+        cx,
+        if disabled {
+            &[id!(disabled), id!(on)]
+        } else {
+            &[id!(disabled), id!(off)]
         },
     );
 }
@@ -366,6 +418,10 @@ mod tests {
                 ..Default::default()
             },
             Signals {
+                moved: true,
+                ..Default::default()
+            },
+            Signals {
                 activate: true,
                 ..Default::default()
             },
@@ -377,6 +433,18 @@ mod tests {
             assert_ne!(signal, idle);
             assert!(!signal.is_idle());
         }
+    }
+
+    #[test]
+    fn test_a_pointer_position_alone_is_not_a_signal() {
+        // The position rides along with the gesture that produced it; it is not
+        // a gesture of its own, or every mouse move over a control would read
+        // as activity and the control would redraw every frame.
+        let drift = Signals {
+            pointer: Vec2d { x: 100.0, y: 40.0 },
+            ..Default::default()
+        };
+        assert!(drift.is_idle());
     }
 
     #[test]

@@ -196,7 +196,8 @@ pub struct DrawMpButton {
     ring_color: Vec4f,
 }
 
-#[derive(Script, ScriptHook, Widget, Animator)]
+// No `ScriptHook` derive: it is implemented by hand to seat `disabled`.
+#[derive(Script, Widget, Animator)]
 pub struct MpButton {
     #[uid]
     uid: WidgetUid,
@@ -348,6 +349,18 @@ impl MpButton {
             ids!(disabled.off),
         );
         self.redraw(cx);
+    }
+}
+
+impl ScriptHook for MpButton {
+    fn on_after_new(&mut self, vm: &mut ScriptVm) {
+        // Same hole the checkbox had: a button built `disabled: true` paints
+        // enabled, because the field is true from construction while the
+        // animator is still in its default `off` state.
+        let disabled = self.disabled;
+        vm.with_cx_mut(|cx| {
+            crate::mp::control::init_disabled(&mut self.animator, cx, disabled);
+        });
     }
 }
 
