@@ -145,6 +145,25 @@ build on).
 | `mp/tree.rs` | `MpTree` — a flat list where each item carries its depth, with the collapsed set owned by the widget. Ten tests, all on the visibility model. |
 | `mp/avatar.rs` | `MpAvatar`, `MpAvatarGroup` — initials with a plate derived from the name, presence reusing the badge tones, and an overlapped group. |
 
+### The glass is real, and the page that proved it had to be built twice
+
+`mp.SurfaceGlass` — Makepad's mip-chain backdrop blur with the measured SwiftUI
+frost numbers — had never been rendered since it was written. The Surface page was
+added to check it, and its **first version proved nothing**: the backdrop was five
+plates from the surface ladder, all within a few levels of each other, so the glass
+looked identical whether it blurred or not — and a plain tinted rectangle would
+have looked identical too.
+
+Rebuilt over **maximum-contrast stripes** the reading is unambiguous: through the
+tile the bars are soft and lifted toward the tint, and outside it they are
+hard-edged white on black. That is what distinguishes a real backdrop blur from a
+fill, and it is the reason the page's own caption says so.
+
+The general lesson, and it applies to every visual claim in this document: **a
+verification page whose subject has nothing to act on verifies nothing.** Flat
+colours cannot show a blur, equal tones cannot show a hairline, and a screenshot of
+either is not evidence.
+
 ### The ink rule, and the bug that widening a test found
 
 `mp::control::plates::ink_on` picks a plate's label ink, and its first version

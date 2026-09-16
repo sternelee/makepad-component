@@ -98,6 +98,7 @@ script_mod! {
                         rail_page_14 := RailRow{text: ""}
                         rail_page_15 := RailRow{text: ""}
                         rail_page_16 := RailRow{text: ""}
+                        rail_page_17 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -144,6 +145,7 @@ script_mod! {
                             page_14 := mod.gallery.pages.table{}
                             page_15 := mod.gallery.pages.tree{}
                             page_16 := mod.gallery.pages.avatar{}
+                            page_17 := mod.gallery.pages.surface{}
                         }
                     }
                 }
@@ -157,7 +159,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 17] = [
+const PAGE_SLOTS: [&[LiveId]; 18] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -175,10 +177,11 @@ const PAGE_SLOTS: [&[LiveId]; 17] = [
     ids!(page_14),
     ids!(page_15),
     ids!(page_16),
+    ids!(page_17),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 17] = [
+const RAIL_ROWS: [&[LiveId]; 18] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -196,6 +199,7 @@ const RAIL_ROWS: [&[LiveId]; 17] = [
     ids!(rail_page_14),
     ids!(rail_page_15),
     ids!(rail_page_16),
+    ids!(rail_page_17),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -801,7 +805,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 17] = [
+    const SLOT_PAGES: [&str; 18] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -819,6 +823,7 @@ mod tests {
         "mod.gallery.pages.table",
         "mod.gallery.pages.tree",
         "mod.gallery.pages.avatar",
+        "mod.gallery.pages.surface",
     ];
 
     #[test]

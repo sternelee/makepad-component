@@ -18,6 +18,7 @@ pub mod layout;
 pub mod loaders;
 pub mod slider;
 pub mod status;
+pub mod surface;
 pub mod table;
 pub mod tree;
 pub mod motion;
@@ -50,6 +51,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     table::script_mod(vm);
     tree::script_mod(vm);
     avatar::script_mod(vm);
+    surface::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -170,6 +172,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/avatar.rs",
         blurb: "Initials, presence, and the group",
     },
+    Page {
+        title: "Surface",
+        path: "mod.gallery.pages.surface",
+        source: "crates/gallery/src/pages/surface.rs",
+        blurb: "The planes, the radii, and the glass",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -247,6 +255,7 @@ mod tests {
             ("crates/gallery/src/pages/table.rs", "table"),
             ("crates/gallery/src/pages/tree.rs", "tree"),
             ("crates/gallery/src/pages/avatar.rs", "avatar"),
+            ("crates/gallery/src/pages/surface.rs", "surface"),
         ]
         .into_iter()
         .collect();
