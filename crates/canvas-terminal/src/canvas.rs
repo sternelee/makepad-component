@@ -397,6 +397,8 @@ struct Workspace {
     agent_composer_id: Option<u64>,
     agent_input: String,
     agent_scroll: HashMap<u64, f64>,
+    /// Per-note body scroll, in world units (so it survives camera zoom).
+    note_scroll: HashMap<u64, f64>,
 }
 
 impl Workspace {
@@ -435,6 +437,7 @@ impl Workspace {
             agent_composer_id: None,
             agent_input: String::new(),
             agent_scroll: HashMap::new(),
+            note_scroll: HashMap::new(),
         }
     }
 }
@@ -528,6 +531,15 @@ pub struct CanvasPanel {
     /// pass publishes the geometry the click handler reads back.
     #[rust]
     note_check_rows: Vec<(u64, Rect, usize)>,
+    /// Scrollable overflow of each note body (world units) from the last draw
+    /// pass, so a wheel event knows whether the card can scroll at all before
+    /// it swallows the gesture.
+    #[rust]
+    note_scroll_max: HashMap<u64, f64>,
+    /// Per-note body scroll offset (world units). Mirrored on `Workspace` so the
+    /// offset travels with its workspace, like `agent_scroll`.
+    #[rust]
+    note_scroll: HashMap<u64, f64>,
     /// Shrink factor for fallback glyphs wider than their cell, keyed by
     /// `(char, cells)` — 1.0 when the glyph already fits.
     #[rust]
@@ -761,6 +773,7 @@ impl CanvasPanel {
             agent_composer_id: self.agent_composer_id,
             agent_input: std::mem::take(&mut self.agent_input),
             agent_scroll: std::mem::take(&mut self.agent_scroll),
+            note_scroll: std::mem::take(&mut self.note_scroll),
         };
         if self.current_workspace < self.workspaces.len() {
             self.workspaces[self.current_workspace] = ws;
@@ -810,6 +823,7 @@ impl CanvasPanel {
         self.agent_composer_id = ws.agent_composer_id;
         self.agent_input = ws.agent_input;
         self.agent_scroll = ws.agent_scroll;
+        self.note_scroll = ws.note_scroll;
         self.current_workspace = idx;
         // Clear transient cross-workspace interaction state.
         self.drag = None;
@@ -2679,6 +2693,7 @@ impl CanvasPanel {
         }
         self.minimized.retain(|m| m.0 != id);
         self.items.retain(|i| i.id() != id);
+        self.note_scroll.remove(&id);
         self.save_canvas();
         if self.selected == Some(id) {
             self.selected = None;
@@ -3718,6 +3733,7 @@ impl CanvasPanel {
         };
         cx.push_clip_rect(body_rect);
         let color = NOTE_TEXT_COLORS[color_idx.min(NOTE_TEXT_COLORS.len() - 1)];
+        let ink_dim = [color[0] * 0.6, color[1] * 0.6, color[2] * 0.6];
         // Owned: `note_rows` needs `&mut self` for the measuring calls, so the
         // edited buffer cannot stay borrowed across them.
         let display_body: String = if editing {
@@ -3725,9 +3741,71 @@ impl CanvasPanel {
         } else {
             body.to_string()
         };
-        let rows = self.note_rows(cx, id, &display_body, body_rect, font_size);
+        let mut rows = self.note_rows(cx, id, &display_body, body_rect, font_size);
+        // In-card scrolling: a note body can be taller than its card. The offset
+        // lives in world units so it survives camera zoom; the clamp comes from
+        // this frame's measured content, so typing or a card resize re-clamps it.
+        let zoom = (self.camera.zoom as f64).max(0.1);
+        let content_h = rows
+            .last()
+            .map(|row| (row.y + row.height - body_rect.pos.y).max(0.0))
+            .unwrap_or(0.0);
+        let max_scroll = ((content_h - body_rect.size.y).max(0.0)) / zoom;
+        let mut scroll = self
+            .note_scroll
+            .get(&id)
+            .copied()
+            .unwrap_or(0.0)
+            .clamp(0.0, max_scroll);
+        // While editing, keep the caret's row on screen — by the minimum the
+        // caret needs, so it never fights a deliberate scroll.
+        if editing {
+            if let Some(row) = rows
+                .iter()
+                .find(|row| caret >= row.char_start && caret <= row.char_end)
+            {
+                let top = row.y - body_rect.pos.y;
+                let view_top = scroll * zoom;
+                let view_bottom = view_top + body_rect.size.y;
+                if top < view_top {
+                    scroll = (top / zoom).max(0.0);
+                } else if top + row.height > view_bottom {
+                    scroll = (top + row.height - body_rect.size.y) / zoom;
+                }
+                scroll = scroll.clamp(0.0, max_scroll);
+            }
+        }
+        if max_scroll > f64::EPSILON {
+            self.note_scroll.insert(id, scroll);
+            self.note_scroll_max.insert(id, max_scroll);
+        } else if self.note_scroll.remove(&id).is_some() {
+            // Content shrank (or the card grew): forget the offset.
+        }
+        let shift = scroll * zoom;
+        for row in rows.iter_mut() {
+            row.y -= shift;
+        }
+
         for row in rows.iter() {
             self.draw_note_row(cx, row, color, font_size);
+        }
+        // Scroll indicator: a thin thumb on the body's right edge, only when
+        // there is something to scroll.
+        if max_scroll > f64::EPSILON {
+            let track = body_rect.size.y;
+            let thumb = (track * (track / content_h).clamp(0.08, 1.0)).max(18.0);
+            let t = (scroll / max_scroll).clamp(0.0, 1.0);
+            self.draw_item_bg_rect(
+                cx,
+                Rect {
+                    pos: Vec2d {
+                        x: body_rect.pos.x + body_rect.size.x - 3.0,
+                        y: body_rect.pos.y + (track - thumb) * t,
+                    },
+                    size: Vec2d { x: 2.5, y: thumb },
+                },
+                [ink_dim[0], ink_dim[1], ink_dim[2], 0.35],
+            );
         }
         // Blinking caret, placed by the same measured layout the rows came from.
         if editing {
@@ -7692,12 +7770,34 @@ impl Widget for CanvasPanel {
         }
 
         if let Event::Scroll(se) = event {
+            if std::env::var_os("CANVAS_TRACE_SCROLL").is_some() {
+                log!(
+                    "scroll abs=({:.1},{:.1}) dy={:.1} is_mouse={} over_note={}",
+                    se.abs.x,
+                    se.abs.y,
+                    se.scroll.y,
+                    se.is_mouse,
+                    self.items.iter().rev().any(|i| {
+                        i.kind() == ItemKind::Note && self.item_screen_rect(i).contains(se.abs)
+                    })
+                );
+            }
+            // The topmost card under the cursor owns the wheel. Without this the
+            // per-kind handlers below were tried in a fixed order, so a note card
+            // lying on top of a terminal scrolled the terminal underneath it.
+            let topmost = self
+                .items
+                .iter()
+                .rev()
+                .find(|i| self.item_screen_rect(i).contains(se.abs))
+                .map(|i| i.id());
             // Transcript: over an agent card, wheel scrolls the conversation
             // history instead of panning the canvas.
-            let agent_under =
-                self.items.iter().rev().find(|i| {
-                    i.kind() == ItemKind::Agent && self.item_screen_rect(i).contains(se.abs)
-                });
+            let agent_under = self.items.iter().rev().find(|i| {
+                i.kind() == ItemKind::Agent
+                    && Some(i.id()) == topmost
+                    && self.item_screen_rect(i).contains(se.abs)
+            });
             if let Some(item) = agent_under {
                 let id = item.id();
                 let rows: usize = item
@@ -7724,6 +7824,7 @@ impl Widget for CanvasPanel {
             // canvas (like alacritty/wezterm).
             let term_under = self.items.iter().rev().find(|i| {
                 i.kind() == ItemKind::Terminal
+                    && Some(i.id()) == topmost
                     && self.item_screen_rect(i).contains(se.abs)
                     && se.abs.y > self.item_screen_rect(i).pos.y + 26.0
             });
@@ -7742,6 +7843,7 @@ impl Widget for CanvasPanel {
             // its pages; don't pan/zoom the canvas underneath.
             let pdf_under = self.items.iter().rev().find(|i| {
                 i.media_kind() == Some(MediaKind::Pdf)
+                    && Some(i.id()) == topmost
                     && self.item_screen_rect(i).contains(se.abs)
                     && se.abs.y > self.item_screen_rect(i).pos.y + 26.0
             });
@@ -7752,6 +7854,7 @@ impl Widget for CanvasPanel {
             // (offset clamped at draw time to the line count).
             let text_under = self.items.iter().rev().find(|i| {
                 i.media_kind() == Some(MediaKind::Text)
+                    && Some(i.id()) == topmost
                     && self.item_screen_rect(i).contains(se.abs)
                     && se.abs.y > self.item_screen_rect(i).pos.y + 26.0
             });
@@ -7763,6 +7866,36 @@ impl Widget for CanvasPanel {
                     self.redraw(cx);
                 }
                 return;
+            }
+            // Over a note card's body: scroll the note (a note can be taller
+            // than its card). Only claims the gesture when the body actually
+            // overflows, so the wheel still zooms the canvas over short notes.
+            let note_under = self.items.iter().rev().find(|i| {
+                i.kind() == ItemKind::Note
+                    && Some(i.id()) == topmost
+                    && self.item_screen_rect(i).contains(se.abs)
+                    && se.abs.y > self.item_screen_rect(i).pos.y + 28.0
+            });
+            if let Some(item) = note_under {
+                let id = item.id();
+                if std::env::var_os("CANVAS_TRACE_SCROLL").is_some() {
+                    log!(
+                        "scroll note id={id} max={:?} offset={:?}",
+                        self.note_scroll_max.get(&id),
+                        self.note_scroll.get(&id)
+                    );
+                }
+                if self.note_scroll_max.get(&id).copied().unwrap_or(0.0) > 0.0 {
+                    let delta = (se.scroll.y / 20.0).round();
+                    if delta != 0.0 {
+                        // One prose line per notch, in world units.
+                        let step = item.note_font_size().unwrap_or(13.0) as f64 * 1.36;
+                        let entry = self.note_scroll.entry(id).or_insert(0.0);
+                        *entry = (*entry + delta * step).max(0.0);
+                        self.redraw(cx);
+                    }
+                    return;
+                }
             }
             // Not over a terminal: zoom/pan the canvas as before.
             if se.is_mouse {
@@ -8174,8 +8307,9 @@ impl Widget for CanvasPanel {
         let n_items = self.items.len();
         let mut draw_queue: Vec<DrawItem> = Vec::new();
         // Fresh every frame: the note draws below publish their checkbox hit
-        // areas for this frame's click handling.
+        // areas and overflow for this frame's input handling.
         self.note_check_rows.clear();
+        self.note_scroll_max.clear();
         for idx in 0..n_items {
             let item = &self.items[idx];
             let screen = self.item_screen_rect(item);
