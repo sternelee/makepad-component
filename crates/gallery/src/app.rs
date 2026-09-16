@@ -136,6 +136,7 @@ script_mod! {
                         rail_page_37 := RailRow{text: ""}
                         rail_page_38 := RailRow{text: ""}
                         rail_page_39 := RailRow{text: ""}
+                        rail_page_40 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -210,6 +211,7 @@ script_mod! {
                             page_37 := mod.gallery.pages.canvas{}
                             page_38 := mod.gallery.pages.blocks{}
                             page_39 := mod.gallery.pages.details{}
+                            page_40 := mod.gallery.pages.steps{}
                         }
                     }
                 }
@@ -223,7 +225,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 40] = [
+const PAGE_SLOTS: [&[LiveId]; 41] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -264,10 +266,11 @@ const PAGE_SLOTS: [&[LiveId]; 40] = [
     ids!(page_37),
     ids!(page_38),
     ids!(page_39),
+    ids!(page_40),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 40] = [
+const RAIL_ROWS: [&[LiveId]; 41] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -308,6 +311,7 @@ const RAIL_ROWS: [&[LiveId]; 40] = [
     ids!(rail_page_37),
     ids!(rail_page_38),
     ids!(rail_page_39),
+    ids!(rail_page_40),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1503,6 +1507,51 @@ use makepad_component::mp::hover_card::HoverIntent;
             .set_highlighted(cx, &written, &[]);
     }
 
+    /// Fill the step indicators on the steps page, and print where each stands.
+    ///
+    /// The three cases are the current step at the **start**, in the **middle**, and past the end in the truncating case
+    /// — because the connector rule is only visible when there are steps on both sides of the current one.
+    fn seed_steps(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::step_indicator::{
+            connector_passed, state_of, steps_shown, MpStepIndicatorWidgetRefExt, StepState, SLOTS,
+        };
+
+        let five: Vec<String> = ["Cart", "Address", "Payment", "Review", "Done"]
+            .iter()
+            .map(|title| title.to_string())
+            .collect();
+        let ten: Vec<String> = (1..=SLOTS + 2)
+            .map(|index| format!("Step {index}"))
+            .collect();
+
+        for (id, titles, current) in [
+            (ids!(steps_third), &five, 2usize),
+            (ids!(steps_first), &five, 0usize),
+            (ids!(steps_over), &ten, SLOTS + 1),
+        ] {
+            let view = self.ui.mp_step_indicator(cx, id);
+            view.set_items(cx, titles);
+            view.set_step(cx, current);
+            // **Every step's state and every connector's**, printed: the two rules are different and a page that only
+            // showed the picture could not say which was in force.
+            let states: Vec<&str> = (0..titles.len())
+                .map(|index| match state_of(index, current) {
+                    StepState::Passed => "passed",
+                    StepState::Active => "active",
+                    StepState::Upcoming => "upcoming",
+                })
+                .collect();
+            let connectors: Vec<bool> = (0..titles.len())
+                .map(|index| connector_passed(index, current))
+                .collect();
+            println!(
+                "STEPS offered={} shown={} current={current} states={states:?} connectors={connectors:?}",
+                titles.len(),
+                steps_shown(titles.len()),
+            );
+        }
+    }
+
     /// Fill the description lists on the details page, and print what each holds.
     ///
     /// The three cases are the **bound** from both sides — inside it, exactly at it, and past it — because the past-it
@@ -2182,6 +2231,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_steps(cx);
         self.seed_details(cx);
         self.seed_v3_pool(cx);
         self.seed_canvas(cx);
@@ -2812,7 +2862,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 40] = [
+    const SLOT_PAGES: [&str; 41] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -2853,6 +2903,7 @@ mod tests {
         "mod.gallery.pages.canvas",
         "mod.gallery.pages.blocks",
         "mod.gallery.pages.details",
+        "mod.gallery.pages.steps",
     ];
 
     #[test]

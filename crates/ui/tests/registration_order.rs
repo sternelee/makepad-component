@@ -30,6 +30,13 @@
 //! - **References**: every `mod.mp.<Name>` anywhere in a `script_mod!` block, including the
 //!   definition site itself and every `+: { ... }` override.
 //!
+//! - **Module uses**: `use mod.mp.*` and `mod.mp = { ... }` — **the namespace itself**. A block that writes
+//!   `mod.mp.X = ...` or takes a glob of `mod.mp` needs the module to already exist, and registering before the file
+//!   that declares `mod.mp = {}` fails at runtime with *"property mp not found in prototype chain"* while the build stays
+//!   green. `mp/step_indicator.rs` did exactly that: it was registered before `surface.rs`, which is where `mod.mp = {}`
+//!   lives. **The first version of this test watched only `mod.mp.<Name> =` and `mod.mp.<Name>` references, so the one
+//!   form that broke was the one form it did not look at.**
+//!
 //! Then the registration order comes from `src/mp/mod.rs`'s `script_mod(vm)` calls.
 //!
 //! It asserts its own scan found a plausible amount before asserting anything about order, so
@@ -261,6 +268,44 @@ fn test_manually_planted_violations_are_detected() {
     // And at least one dependency that is satisfied, so the assertion above is not
     // trivially true of every pair.
     assert!(planted_index("list").unwrap() > planted_index("combobox").unwrap());
+}
+
+#[test]
+fn test_no_module_touches_the_mp_namespace_before_it_is_declared() {
+    // **The runtime failure this catches**: `property mp not found in prototype chain`, fifty-one of them, on a build
+    // that was green and a widget that otherwise worked. The scan above reads `mod.mp.<Name> =` and `mod.mp.<Name>`
+    // references; this reads the two forms that ask for the **namespace itself** — `use mod.mp.*` and `mod.mp = {` — and
+    // requires them to come at or after the declaration, which is what `mp/surface.rs` does.
+    //
+    // The first version of this test watched only the two `<Name>` forms, **so the one form that broke was the one form
+    // it did not look at.**
+    let order = registration_order();
+    let sources = module_sources();
+    let position = |name: &str| order.iter().position(|entry| entry == name);
+
+    let declared_at = sources
+        .iter()
+        .filter(|(_, source)| source.contains("mod.mp = {") || source.contains("mod.mp = {"))
+        .filter_map(|(file, _)| position(file))
+        .min()
+        .expect("no module declares `mod.mp`");
+
+    let askers: Vec<(&String, usize)> = sources
+        .iter()
+        .filter(|(_, source)| source.contains("use mod.mp.*"))
+        .filter_map(|(file, _)| position(file).map(|at| (file, at)))
+        .collect();
+    assert!(
+        !askers.is_empty(),
+        "no module takes a glob of `mod.mp`, so this test would pass vacuously"
+    );
+    for (file, at) in askers {
+        assert!(
+            at >= declared_at,
+            "{file} takes `use mod.mp.*` at position {at}, but `mod.mp` is first declared at position {declared_at} \
+             — this fails at runtime as `property mp not found in prototype chain`, with the build green"
+        );
+    }
 }
 
 #[test]

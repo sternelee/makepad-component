@@ -73,6 +73,7 @@ pub mod status;
 pub mod table;
 pub mod text;
 pub mod tree;
+pub mod step_indicator;
 pub mod surface;
 pub mod tooltip;
 pub mod switch;
@@ -87,6 +88,11 @@ pub fn script_mod(vm: &mut ScriptVm) {
     // Surfaces first: every container and several leaf widgets paint one,
     // and a widget's DSL block names the prototype it inherits.
     crate::mp::surface::script_mod(vm);
+    // **After `surface`, which is what declares `mod.mp = {}`.** A block that writes `mod.mp.X = ...` or `use mod.mp.*`
+    // needs the module to exist, and registering before the declaration is the failure the ordering test exists for —
+    // except that the test watched `mod.mp.<Name> =` and this block's first line was `use mod.mp.*`, which it did not
+    // look at. Both forms are checked now.
+    crate::mp::step_indicator::script_mod(vm);
     crate::mp::keys::script_mod(vm);
     crate::mp::layout::script_mod(vm);
     crate::mp::floating::script_mod(vm);

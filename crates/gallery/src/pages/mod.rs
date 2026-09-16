@@ -33,6 +33,7 @@ pub mod select;
 pub mod shortcuts;
 pub mod slider;
 pub mod status;
+pub mod steps;
 pub mod surface;
 pub mod table;
 pub mod blocks;
@@ -79,6 +80,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     editor::script_mod(vm);
     icon::script_mod(vm);
     status::script_mod(vm);
+    steps::script_mod(vm);
     table::script_mod(vm);
     blocks::script_mod(vm);
     canvas::script_mod(vm);
@@ -358,6 +360,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/details.rs",
         blurb: "Key/value rows, and the bound on how many",
     },
+    Page {
+        title: "Steps",
+        path: "mod.gallery.pages.steps",
+        source: "crates/gallery/src/pages/steps.rs",
+        blurb: "A numbered path, and where it stands",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -441,6 +449,7 @@ mod tests {
             ("crates/gallery/src/pages/editor.rs", "editor"),
             ("crates/gallery/src/pages/icon.rs", "icon"),
             ("crates/gallery/src/pages/status.rs", "status"),
+            ("crates/gallery/src/pages/steps.rs", "steps"),
             ("crates/gallery/src/pages/table.rs", "table"),
             ("crates/gallery/src/pages/blocks.rs", "blocks"),
             ("crates/gallery/src/pages/canvas.rs", "canvas"),

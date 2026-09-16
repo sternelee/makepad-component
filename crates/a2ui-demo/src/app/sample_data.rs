@@ -671,3 +671,62 @@ pub(crate) fn get_sample_detail() -> String {
     ]"##
     .to_string()
 }
+
+/// A fixture whose only job is to reach the **step indicator**, named `A2UI_SAMPLE=steps`.
+///
+/// The third of these, and the reason is now a pattern: no shipped sample contains a `StepIndicator`, so the pool
+/// migration had nothing that would exercise it, and **a migration nothing exercises is not verified however green the
+/// build**. Five steps with the third current — so the run shows passed, current and upcoming in one path, and the
+/// connector rule (the line into the current step is filled) with them.
+pub(crate) fn get_sample_steps() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "steps"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Checkout"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {
+                        "id": "steps",
+                        "component": {
+                            "StepIndicator": {
+                                "steps": [
+                                    {"literalString": "Cart"},
+                                    {"literalString": "Address"},
+                                    {"literalString": "Payment"},
+                                    {"literalString": "Review"},
+                                    {"literalString": "Done"}
+                                ],
+                                "current": 3
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}

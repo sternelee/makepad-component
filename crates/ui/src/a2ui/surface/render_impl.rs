@@ -776,8 +776,21 @@ impl A2uiSurface {
             .collect();
         let current = si.current.unwrap_or(0.0);
         let widget = self.pool_step_indicator(cx, idx);
-        widget.set_items(cx, titles);
-        widget.set_step(cx, (current.max(0.0) as usize).saturating_sub(1));
+        // `set_items` takes the full list and the widget applies the bound itself — so a protocol that sends twelve steps
+        // gets eight drawn rather than twelve truncated here, and **the truncation is the widget's rule in one place**
+        // rather than a second `min` at this call site that could disagree with it.
+        widget.set_items(cx.cx, &titles);
+        // The protocol's `current` is one-based; the widget's step is zero-based. Converting here rather than inside the
+        // widget keeps the widget's own meaning ("step 0 is the first") intact for a Rust caller.
+        widget.set_step(cx.cx, (current.max(0.0) as usize).saturating_sub(1));
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            println!(
+                "A2UI v3_step_indicator steps={} shown={} current={} from=mp::step_indicator::MpStepIndicator",
+                titles.len(),
+                step_indicator::rows_shown_for(titles.len()),
+                (current.max(0.0) as usize).saturating_sub(1),
+            );
+        }
         let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
     }
 

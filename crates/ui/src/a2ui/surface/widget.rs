@@ -22,7 +22,6 @@ use crate::widgets::{
     color_picker::{MpColorPicker, MpColorPickerAction},
     number_input::{MpNumberInput, MpNumberInputAction},
     searchable_list::MpSearchableList,
-    step_indicator::MpStepIndicator,
 };
 
 use super::draw_types::*;
@@ -43,6 +42,7 @@ use crate::mp::button::MpButton;
 use crate::mp::checkbox::{MpCheckbox, MpCheckboxAction};
 use crate::mp::description_list::{DescriptionItem, MpDescriptionList};
 use crate::mp::icon::MpIcon;
+use crate::mp::step_indicator::{self, MpStepIndicator};
 use crate::mp::icons;
 use crate::mp::markdown::MpMarkdown;
 use crate::mp::slider::{MpSlider, MpSliderAction};
