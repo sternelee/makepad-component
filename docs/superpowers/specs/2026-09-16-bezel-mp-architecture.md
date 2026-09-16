@@ -148,6 +148,47 @@ build on).
 | `mp/list.rs` | `MpList`, `MpMenu` — a glyph, a label and a trailing detail; a menu is the same widget with one flag. |
 | `mp/scroll.rs` | `MpScroll`, `MpScrollBoth` — the scroll bar, themed. |
 | `mp/search.rs` | `rank` / `matches` / `MpSearch` — the match behind a command palette. |
+| `mp/bars.rs` | `MpTitlebar`, `MpControlBar`, `MpMenubar` — the three horizontal chrome strips. |
+
+### Three strips, one module — and a height only where the platform has one
+
+All three bars are horizontal strips that hold other things, and a strip's only real
+decisions are how tall it is, how much air it has at the sides, and where its content
+sits vertically. So they are three prototypes in one module, by the rule this crate
+has used since `mp/control.rs`: two widgets needing the same arithmetic is one
+module, not two copies.
+
+**Only the titlebar reads a height, and it reads the theme's.** `layout.titlebar_height`,
+`layout.titlebar_top_pad` and `layout.traffic_light_inset` were already in this port's
+layout tokens from the reference, with their source noted where they are defined, so
+nothing in `bars.rs` was chosen. `MpControlBar` and `MpMenubar` take `Fit` — their
+height is their content's. That is the decision worth stating: a control bar is 32pt
+in one app and 44pt in another, and a library that picks one is a library that will
+be overridden.
+
+The traffic-light inset is a **spacer, not padding**, because macOS draws its window
+buttons inside the titlebar's own rectangle — padding would move the bar's background
+too, and the background is supposed to run *under* the buttons. The Bars page shows
+the consequence: the titlebar's content is indented past the inset while the control
+bars below align to `layout.space`, which is a visible difference and is correct.
+
+A menubar's triggers are `MpButton` ghosts rather than labels, so they get the press,
+focus and hover behaviour every other control already has instead of a second
+implementation of the same three states.
+
+### Two runtime-only findings from this page
+
+`script_mod!` is validated at **runtime**, not by `cargo check` — so `cargo build`
+passing is not the gate, and the gate is `[E] = 0` on a run. Three names invented for
+the first version of this page (`MpButtonStyle`, `MpIconButton`, `MpSegmented`) all
+failed at runtime with useful suggestions; the type is `ButtonStyle`, and there is no
+icon-button or segmented prototype.
+
+And **`text: ""` is load-bearing on an icon-only button**: `MpButton` ships a
+placeholder label, so setting only `glyph` gives an icon *and* the word "Button".
+Nothing errored — the two titlebar buttons rendered as `＋ Button` and `✓ Button` —
+which is the fourth time in this port that a silent failure and a working feature
+looked identical in the log.
 
 ### A ranking is a weighted score, not a comparison order
 

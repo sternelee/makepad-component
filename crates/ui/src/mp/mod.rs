@@ -38,6 +38,7 @@
 
 pub mod action;
 pub mod avatar;
+pub mod bars;
 pub mod button;
 pub mod checkbox;
 pub mod control;
@@ -76,6 +77,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     // The shared animator prototype every control inherits. Before the
     // controls, because their DSL blocks name it.
     crate::mp::control::script_mod(vm);
+    crate::mp::bars::script_mod(vm);
     crate::mp::button::script_mod(vm);
     crate::mp::checkbox::script_mod(vm);
     crate::mp::switch::script_mod(vm);

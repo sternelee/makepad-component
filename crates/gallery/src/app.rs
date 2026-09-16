@@ -112,6 +112,7 @@ script_mod! {
                         rail_page_23 := RailRow{text: ""}
                         rail_page_24 := RailRow{text: ""}
                         rail_page_25 := RailRow{text: ""}
+                        rail_page_26 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -172,6 +173,7 @@ script_mod! {
                             page_23 := mod.gallery.pages.menu{}
                             page_24 := mod.gallery.pages.scroll{}
                             page_25 := mod.gallery.pages.search{}
+                            page_26 := mod.gallery.pages.bars{}
                         }
                     }
                 }
@@ -185,7 +187,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 26] = [
+const PAGE_SLOTS: [&[LiveId]; 27] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -212,10 +214,11 @@ const PAGE_SLOTS: [&[LiveId]; 26] = [
     ids!(page_23),
     ids!(page_24),
     ids!(page_25),
+    ids!(page_26),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 26] = [
+const RAIL_ROWS: [&[LiveId]; 27] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -242,6 +245,7 @@ const RAIL_ROWS: [&[LiveId]; 26] = [
     ids!(rail_page_23),
     ids!(rail_page_24),
     ids!(rail_page_25),
+    ids!(rail_page_26),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1154,7 +1158,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 26] = [
+    const SLOT_PAGES: [&str; 27] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -1181,6 +1185,7 @@ mod tests {
         "mod.gallery.pages.menu",
         "mod.gallery.pages.scroll",
         "mod.gallery.pages.search",
+        "mod.gallery.pages.bars",
     ];
 
     #[test]

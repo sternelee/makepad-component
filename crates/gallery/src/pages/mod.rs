@@ -9,6 +9,7 @@
 //! [`tests`] is what stops it drifting.
 
 pub mod avatar;
+pub mod bars;
 pub mod button;
 pub mod content;
 pub mod controls;
@@ -46,6 +47,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     script_eval!(vm, { mod.gallery.pages = {} });
     foundation::script_mod(vm);
     motion::script_mod(vm);
+    bars::script_mod(vm);
     button::script_mod(vm);
     controls::script_mod(vm);
     layout::script_mod(vm);
@@ -242,6 +244,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/search.rs",
         blurb: "The match behind a palette",
     },
+    Page {
+        title: "Bars",
+        path: "mod.gallery.pages.bars",
+        source: "crates/gallery/src/pages/bars.rs",
+        blurb: "Titlebar, control bar, menubar",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -306,6 +314,7 @@ mod tests {
         let declared: HashMap<&str, &str> = [
             ("crates/gallery/src/pages/foundation.rs", "foundation"),
             ("crates/gallery/src/pages/motion.rs", "motion"),
+            ("crates/gallery/src/pages/bars.rs", "bars"),
             ("crates/gallery/src/pages/button.rs", "button"),
             ("crates/gallery/src/pages/controls.rs", "controls"),
             ("crates/gallery/src/pages/layout.rs", "layout"),

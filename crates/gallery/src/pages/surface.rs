@@ -60,11 +60,11 @@ script_mod! {
                     mod.mp.SurfacePage{ width: 130, height: 64 }
                 }
                 Tile{
-                    tile_caption +: {text: "MpSurfacePanel"}
+                    tile_caption +: {text: "SurfacePanel"}
                     mod.mp.SurfacePanel{ width: 130, height: 64 }
                 }
                 Tile{
-                    tile_caption +: {text: "MpSurfaceCard"}
+                    tile_caption +: {text: "SurfaceCard"}
                     mod.mp.SurfaceCard{ width: 130, height: 64 }
                 }
                 Tile{
@@ -72,7 +72,7 @@ script_mod! {
                     mod.mp.SurfaceRaised{ width: 130, height: 64 }
                 }
                 Tile{
-                    tile_caption +: {text: "MpSurfaceSunken"}
+                    tile_caption +: {text: "SurfaceSunken"}
                     mod.mp.SurfaceSunken{ width: 130, height: 64 }
                 }
             }
