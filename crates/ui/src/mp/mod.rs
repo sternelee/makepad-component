@@ -49,6 +49,7 @@ pub mod layout;
 pub mod list;
 pub mod loaders;
 pub mod pagination;
+pub mod palette;
 pub mod popover;
 pub mod radio;
 pub mod scaffolding;
@@ -98,6 +99,14 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::avatar::script_mod(vm);
     crate::mp::tree::script_mod(vm);
     crate::mp::list::script_mod(vm);
+    // **After `list`.** `MpPalette` composes an `MpMenu`, which `list.rs` defines,
+    // and this crate has now hit that ordering rule twice: a widget that references
+    // another widget's prototype in its own `script_mod!` must register later. The
+    // first version of this line sat with the other compositions near the top and
+    // failed at runtime with "property MpMenu not found in prototype chain" —
+    // a message that points at the *user*, not at the line that is in the wrong
+    // place.
+    crate::mp::palette::script_mod(vm);
     // The overlay family, whose z-order comes from a DrawList2d rather than
     // from where the author put it in the tree.
     crate::mp::popover::script_mod(vm);

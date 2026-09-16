@@ -113,6 +113,7 @@ script_mod! {
                         rail_page_24 := RailRow{text: ""}
                         rail_page_25 := RailRow{text: ""}
                         rail_page_26 := RailRow{text: ""}
+                        rail_page_27 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -174,6 +175,7 @@ script_mod! {
                             page_24 := mod.gallery.pages.scroll{}
                             page_25 := mod.gallery.pages.search{}
                             page_26 := mod.gallery.pages.bars{}
+                            page_27 := mod.gallery.pages.command_palette{}
                         }
                     }
                 }
@@ -187,7 +189,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 27] = [
+const PAGE_SLOTS: [&[LiveId]; 28] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -215,10 +217,11 @@ const PAGE_SLOTS: [&[LiveId]; 27] = [
     ids!(page_24),
     ids!(page_25),
     ids!(page_26),
+    ids!(page_27),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 27] = [
+const RAIL_ROWS: [&[LiveId]; 28] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -246,6 +249,7 @@ const RAIL_ROWS: [&[LiveId]; 27] = [
     ids!(rail_page_24),
     ids!(rail_page_25),
     ids!(rail_page_26),
+    ids!(rail_page_27),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -262,6 +266,28 @@ pub struct App {
     /// Whether to open the first popover on the first laid-out event.
     #[rust]
     want_popover: bool,
+    /// The palette's command list, in its **original** order.
+    ///
+    /// The indices `rank` returns are into this, and they are what a selection
+    /// reports — never a position in the filtered view.
+    #[rust]
+    palette_commands: Vec<String>,
+    /// The palette's current ranked view, as original indices.
+    #[rust]
+    palette_ranked: Vec<usize>,
+    /// The cursor, as an **original** index rather than a position.
+    ///
+    /// This is the whole point of `mp/palette.rs`: a cursor held as a position is
+    /// correct until the first query that filters its row out, at which point it
+    /// has silently moved onto a different command.
+    #[rust]
+    palette_active: Option<usize>,
+    /// The cursor position this app last set **programmatically**.
+    ///
+    /// Needed because `MpList::select` emits the same `Selected` action a click
+    /// does, so without this the app reads its own highlight back as a selection.
+    #[rust]
+    palette_highlight: Option<usize>,
     /// Whether the pages' data has been installed yet.
     ///
     /// **Not in `handle_startup`.** `Theme::install` calls
@@ -346,6 +372,7 @@ impl MatchEvent for App {
         self.handle_popovers(cx, actions);
         self.handle_controls(cx, actions);
         self.handle_sliders(cx, actions);
+        self.handle_palette(cx, actions);
         self.handle_input(cx, actions);
     }
 }
@@ -470,6 +497,148 @@ impl App {
         }
     }
 
+    /// Re-rank the palette, remap the cursor, and select it.
+    ///
+    /// The single place the palette's state changes — the `changed` handler and the
+    /// `GALLERY_PALETTE_QUERY` seed both call it, so the check a run performs is the
+    /// behaviour a keystroke gets rather than a second path that resembles it.
+    fn apply_palette(&mut self, cx: &mut Cx, query: &str) {
+        self.palette_ranked =
+            makepad_component::mp::search::rank(&self.palette_commands, query);
+        // By identity: the original index the cursor was on, if it survived.
+        let position =
+            makepad_component::mp::palette::remap(self.palette_active, &self.palette_ranked);
+        self.palette_active = position
+            .and_then(|p| makepad_component::mp::palette::original(&self.palette_ranked, p));
+
+        let items: Vec<ListItem> = self
+            .palette_ranked
+            .iter()
+            .map(|i| ListItem::new(&self.palette_commands[*i]))
+            .collect();
+        self.ui.mp_list(cx, ids!(palette_list)).set_items(cx, items);
+        if let Some(p) = position {
+            self.palette_highlight = Some(p);
+            self.ui.mp_list(cx, ids!(palette_list)).select(cx, p);
+        } else {
+            self.palette_highlight = None;
+        }
+
+        // The evidence, as a line of stdout rather than a reading of pixels: a
+        // screenshot cannot show which *original* command a cursor is on, and that
+        // is the only part of this that can go wrong invisibly.
+        let names: Vec<&str> = self
+            .palette_ranked
+            .iter()
+            .map(|i| self.palette_commands[*i].as_str())
+            .collect();
+        println!(
+            "PALETTE query={query:?} ranked={names:?} cursor_pos={position:?} active_original={:?}",
+            self.palette_active
+        );
+    }
+
+    /// Fill the palette and, if asked, drive it from the environment.
+    fn seed_palette(&mut self, cx: &mut Cx) {
+        const COMMANDS: [&str; 10] = [
+            "New Terminal",
+            "Toggle Terminal",
+            "Go to File",
+            "Command Palette",
+            "Split Right",
+            "Delete",
+            "Duplicate",
+            "Move to Space…",
+            "Rename…",
+            "Close Window",
+        ];
+        self.palette_commands = COMMANDS.iter().map(|s| s.to_string()).collect();
+        let query = std::env::var("GALLERY_PALETTE_QUERY").unwrap_or_default();
+        if !query.is_empty() {
+            self.ui
+                .text_input(cx, ids!(palette_field))
+                .set_text(cx, &query);
+        }
+        // Move the cursor off the first row before applying, when the environment
+        // asks for it, so a run can show the cursor *following a row* rather than
+        // merely starting on it. This is the case the module exists for.
+        if std::env::var("GALLERY_PALETTE_CURSOR_DOWN").is_ok() && !query.is_empty() {
+            let first_view =
+                makepad_component::mp::search::rank(&self.palette_commands, &query);
+            if first_view.len() > 1 {
+                self.palette_active = Some(first_view[1]);
+            }
+        }
+        self.apply_palette(cx, &query);
+        // A second query, to show the cursor **following a row through a shrink** —
+        // the case `mp/palette.rs` exists for. `de` leaves the cursor on
+        // `Duplicate` at position 1; `du` filters every row before it away, so the
+        // position has to move to 0 while the command stays `Duplicate`. A cursor
+        // held as a position would have stayed at 1 and been out of range.
+        if let Ok(second) = std::env::var("GALLERY_PALETTE_QUERY2") {
+            println!(
+                "PALETTE before-second-query cursor_pos={:?} active_original={:?}",
+                self.palette_ranked.iter().position(|i| Some(*i) == self.palette_active),
+                self.palette_active
+            );
+            self.ui
+                .text_input(cx, ids!(palette_field))
+                .set_text(cx, &second);
+            self.apply_palette(cx, &second);
+        }
+        let active = self
+            .palette_active
+            .map(|i| self.palette_commands[i].clone())
+            .unwrap_or_else(|| "—".to_string());
+        self.ui.label(cx, ids!(palette_state)).set_text(
+            cx,
+            &format!(
+                "query {:?} · {} of {} commands · cursor on {:?}",
+                query,
+                self.palette_ranked.len(),
+                self.palette_commands.len(),
+                active
+            ),
+        );
+        self.ui.label(cx, ids!(palette_cursor_note)).set_text(
+            cx,
+            "cursor_pos is the position in the filtered view; active_original is the command it stands for.              A selection is reported as the latter, always.",
+        );
+    }
+
+    /// The palette's live filter.
+    fn handle_palette(&mut self, cx: &mut Cx, actions: &Actions) {
+        let field = self.ui.text_input(cx, ids!(palette_field));
+        if let Some(text) = field.changed(actions) {
+            self.apply_palette(cx, &text);
+        }
+        // A row was selected. Only a **click** counts, and the check has to be by
+        // position against what this app set itself.
+        //
+        // `MpList::select` emits the same `Selected` action a click does, and the
+        // action carries a **position**, not an identity. So a caller that
+        // re-filters and re-selects in one pass reads its own highlight back — and
+        // if the view shrank in between, the position it reads is stale and can be
+        // out of range. That is not hypothetical: the run that proved the cursor
+        // survives a shrink ended with `chosen_by_click original=None`, because a
+        // position of 1 arrived after the view had gone from three rows to one.
+        //
+        // Filtering by identity (comparing originals) is not enough — `None` is not
+        // equal to the current cursor either. The only sound check is against the
+        // position this app asked for.
+        if let Some(position) = self.ui.mp_list(cx, ids!(palette_list)).row_selected(actions) {
+            if Some(position) == self.palette_highlight {
+                // Our own highlight coming back. Not a choice.
+            } else if let Some(selected) =
+                makepad_component::mp::palette::original(&self.palette_ranked, position)
+            {
+                self.palette_active = Some(selected);
+                self.palette_highlight = Some(position);
+                println!("PALETTE chosen_by_click position={position} original={selected:?}");
+            }
+        }
+    }
+
     /// Echo what the text field reports, which is the page's own check that the
     /// action path reaches an app rather than only the widget.
     fn handle_input(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -559,6 +728,7 @@ impl App {
         self.seed_pagination(cx);
         self.seed_menus(cx);
         self.seed_search(cx);
+        self.seed_palette(cx);
     }
 
     /// Fill the table page's tables.
@@ -1158,7 +1328,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 27] = [
+    const SLOT_PAGES: [&str; 28] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -1186,6 +1356,7 @@ mod tests {
         "mod.gallery.pages.scroll",
         "mod.gallery.pages.search",
         "mod.gallery.pages.bars",
+        "mod.gallery.pages.command_palette",
     ];
 
     #[test]

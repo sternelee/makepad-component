@@ -32,6 +32,7 @@ pub mod menu;
 pub mod motion;
 pub mod overlay;
 pub mod pagination;
+pub mod palette;
 pub mod popover;
 
 use makepad_widgets::*;
@@ -67,6 +68,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     feedback::script_mod(vm);
     content::script_mod(vm);
     pagination::script_mod(vm);
+    palette::script_mod(vm);
     menu::script_mod(vm);
     scroll::script_mod(vm);
     search::script_mod(vm);
@@ -250,6 +252,16 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/bars.rs",
         blurb: "Titlebar, control bar, menubar",
     },
+    Page {
+        // "Command Palette", not "Palette": the colour palette page already owns
+        // that title, and the uniqueness test above caught the collision on the
+        // first run. A rail with two rows reading "Palette" would have opened
+        // whichever came first and looked like the other one was broken.
+        title: "Command Palette",
+        path: "mod.gallery.pages.command_palette",
+        source: "crates/gallery/src/pages/palette.rs",
+        blurb: "The query, the list, and the cursor",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -334,6 +346,7 @@ mod tests {
             ("crates/gallery/src/pages/feedback.rs", "feedback"),
             ("crates/gallery/src/pages/content.rs", "content"),
             ("crates/gallery/src/pages/pagination.rs", "pagination"),
+            ("crates/gallery/src/pages/palette.rs", "palette"),
             ("crates/gallery/src/pages/menu.rs", "menu"),
             ("crates/gallery/src/pages/scroll.rs", "scroll"),
             ("crates/gallery/src/pages/search.rs", "search"),

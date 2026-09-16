@@ -149,6 +149,80 @@ build on).
 | `mp/scroll.rs` | `MpScroll`, `MpScrollBoth` — the scroll bar, themed. |
 | `mp/search.rs` | `rank` / `matches` / `MpSearch` — the match behind a command palette. |
 | `mp/bars.rs` | `MpTitlebar`, `MpControlBar`, `MpMenubar` — the three horizontal chrome strips. |
+| `mp/palette.rs` | `remap` / `step` / `original` / `MpPalette` — the query, the list, and the cursor. |
+
+### A cursor held as a position is wrong
+
+`MpPalette`'s composition is nothing new — a field, a divider, a list, all of which
+already existed. What is new is the part in between: a query that re-ranks on every
+keystroke, and a **cursor that follows its own row while the view shrinks underneath
+it**.
+
+A cursor held as a *position* is correct until the first query that filters its row
+out, at which point it has silently moved onto a different command. **Running the
+wrong command leaves no trace in any log.** So the cursor is held as an **original
+index** and remapped by identity.
+
+Proven at runtime rather than argued: with the cursor on `Duplicate` in the view for
+`de` (`Delete, Duplicate, Command Palette`), a second query of `du` narrows the view
+to `[Duplicate]`, and the app prints
+
+```
+PALETTE query="de" ranked=[...] cursor_pos=Some(1) active_original=Some(6)
+PALETTE query="du" ranked=["Duplicate"] cursor_pos=Some(0) active_original=Some(6)
+```
+
+— the **position moved 1 → 0 while the command stayed 6**. A position-held cursor
+would have stayed at 1, which is out of range for a one-row view.
+
+### Two traps found only by running it
+
+1. **`MpList::select` emits the same `Selected` action a click does**, and the
+   action carries a *position*, not an identity. A caller that re-filters and
+   re-selects in one pass therefore reads its own highlight back as a selection —
+   and if the view shrank in between, the position is **stale and can be out of
+   range**. `remap` returning `None` for it is not a fix; the caller has to remember
+   the position it asked for. Filtering by *identity* is not sufficient either,
+   because an out-of-range position resolves to `None`, which is not equal to the
+   current cursor, so a `selected != active` check lets it through — observed as
+   `chosen_by_click original=None` at the end of the very run that proved the shrink.
+
+2. **Registration order, again.** `mp/palette.rs` composes an `MpMenu` in its own
+   `script_mod!`, so it must register *after* `mp/list.rs`. It was placed with the
+   other compositions near the top and failed at runtime with "property MpMenu not
+   found in prototype chain" — a message that points at the **user** of the name, not
+   at the line that is in the wrong place. That is the second time this port has paid
+   for this rule.
+
+### A new page can overwrite an old one, silently
+
+The Command Palette page's first version registered the DSL path
+`mod.gallery.pages.palette` — which the **colour** palette page already owned. So
+`crates/gallery/src/pages/palette.rs` was *overwriting that page's DSL tree*: the
+colour page's rail row would simply have rendered a command palette, and nothing
+would have errored.
+
+The crate's own uniqueness tests caught it — first the duplicate **title**, then the
+duplicate **path**, then the slot-table mismatch — and each fix revealed the next,
+because the three are separately maintained. The rail's four hand-maintained tables
+(`PAGES`, `PAGE_SLOTS`, `RAIL_ROWS`, `SLOT_PAGES`) are hand-maintained *because*
+`ids!` needs literals, and this is the second defect their tests have caught (the
+first was `GALLERY_PAGE=Loaders` opening the Layout page).
+
+The lesson generalises past this crate: **a DSL path is a global namespace, and a
+new page claiming a name does not conflict — it replaces.** Verified after the fix
+that the colour Palette page renders its own "Surface ladder" again and the new page
+renders under its own title.
+
+### A page whose evidence is not a screenshot
+
+Typing cannot be delivered by the screenshot script (synthetic pointers do not hit in
+this app), so the Palette page takes its query from `GALLERY_PALETTE_QUERY` and runs
+the *same* `apply_palette` the `changed` handler runs, printing the query, the ranked
+view, the cursor position and the active original index. **A screenshot cannot show
+which original command a cursor is on, and that is the only part of this that can go
+wrong invisibly** — so for this page stdout is the stronger evidence, and it is the
+first page in the port where that is true.
 
 ### Three strips, one module — and a height only where the platform has one
 
