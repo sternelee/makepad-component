@@ -319,15 +319,18 @@ impl App {
 
     /// Hover tooltips for the overlay page.
     ///
-    /// Driven from `Event::MouseMove` rather than from an action, because hover
-    /// is not an action in Makepad and inventing one would mean a widget
-    /// emitting an event per mouse move. The trigger's `Area` comes from the
-    /// widget itself — `WidgetRef::area()` — so the page never does arithmetic on
-    /// a rectangle, which is exactly the arithmetic that went wrong in v2.
+    /// Through `event.hits`, **not** by comparing rectangles. The first version
+    /// did `area.rect(cx).contains(me.abs)` and never fired: an `Area`'s rect is
+    /// in pass coordinates while a mouse event's `abs` is in screen coordinates,
+    /// so the two only agree when the window happens to be at the origin. That
+    /// is the same hand-rolled geometry that v2 used to resolve z-order and hit
+    /// handling, and it failed there for the same reason — `hits` exists so that
+    /// nobody has to know which space an `Area` is in.
+    ///
+    /// Called for every event rather than only for `MouseMove`, because the
+    /// signal wanted is the *transition* — hover-in shows, hover-out hides — and
+    /// a transition only appears on the event that caused it.
     fn handle_hover_tooltips(&mut self, cx: &mut Cx, event: &Event) {
-        let Event::MouseMove(me) = event else {
-            return;
-        };
         const TRIGGERS: [(&[LiveId], &str); 5] = [
             (ids!(tip_primary), "Runs the primary action"),
             (ids!(tip_default), "Saves without closing"),
@@ -337,15 +340,21 @@ impl App {
         ];
         for (trigger, text) in TRIGGERS {
             let area = self.ui.widget(cx, trigger).area();
-            if area.rect(cx).contains(me.abs) {
-                let tooltip = self.ui.mp_tooltip(cx, ids!(tip));
-                if !tooltip.is_opened() {
-                    tooltip.show_for(cx, area, text);
+            match event.hits(cx, area) {
+                Hit::FingerHoverIn(_) | Hit::FingerHoverOver(_) => {
+                    self.ui.mp_tooltip(cx, ids!(tip)).show_for(cx, area, text);
+                    return;
                 }
-                return;
+                // Leaving is the other half, and it is a transition too — so it
+                // is read here rather than inferred from "nothing is hovered",
+                // which would also fire on every unrelated event.
+                Hit::FingerHoverOut(_) => {
+                    self.ui.mp_tooltip(cx, ids!(tip)).hide(cx);
+                    return;
+                }
+                _ => {}
             }
         }
-        self.ui.mp_tooltip(cx, ids!(tip)).hide(cx);
     }
 
     /// Echo what the text field reports, which is the page's own check that the
@@ -462,11 +471,19 @@ impl AppMain for App {
 
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
         if self.want_tooltip {
-            self.want_tooltip = false;
+            // Wait for the trigger to have a real rectangle. An `Area` is empty
+            // until the widget that owns it has been laid out, and the first
+            // `handle_event` can arrive before the first draw — anchoring to an
+            // empty rect puts the plate at the pass origin, which is what the
+            // first working capture showed: a correct plate in the wrong place.
             let trigger = self.ui.widget(cx, ids!(tip_primary)).area();
-            self.ui
-                .mp_tooltip(cx, ids!(tip))
-                .show_for(cx, trigger, "Runs the primary action");
+            let rect = trigger.rect(cx);
+            if rect.size.x > 0.0 && rect.size.y > 0.0 {
+                self.want_tooltip = false;
+                self.ui
+                    .mp_tooltip(cx, ids!(tip))
+                    .show_for(cx, trigger, "Runs the primary action");
+            }
         }
         self.match_event(cx, event);
         self.handle_hover_tooltips(cx, event);

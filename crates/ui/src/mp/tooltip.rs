@@ -1,135 +1,141 @@
-//! `MpTooltip` — a plate that draws above everything, and the overlay mechanism
-//! that is supposed to make that true.
+//! `MpTooltip` — a plate that draws above everything, and the two things that
+//! turned out to be load-bearing about it.
 //!
-//! # ⚠️ Implemented, compiles, and does not draw
-//!
-//! Stated first because it is the state: the widget registers, the app runs with
-//! zero `[E]` lines, `show_for` is reachable and sets `opened` — and **the plate
-//! never appears**. Neither a hover over a trigger nor a startup call anchored to
-//! a laid-out trigger produced a visible tooltip.
-//!
-//! What is ruled out: `handle_startup` was the first suspect, and the call was
-//! moved to the first `handle_event` (after layout, so `area().rect()` is real),
-//! which did not change the outcome. So the fault is in `draw_walk` / the draw
-//! list rather than in the timing of `show`.
-//!
-//! Where to look next, in order of suspicion:
-//!
-//! 1. `begin_root_turtle(size, self.view.layout)` inside an overlay draw list.
-//!    Makepad's own `Tooltip` calls it with `self.view.layout`, and this does too,
-//!    but its `draw_bg.begin` uses `self.view.walk` — a `Walk` with `abs_pos`
-//!    unset. If the root turtle is at the pass origin rather than at `pos`, the
-//!    plate is drawn off-screen or at zero size and nothing is visible.
-//! 2. Whether `#[deref] view` plus a manually-owned `DrawList2d` needs a
-//!    `visit_cancel`/`draw_walk_all` arrangement this widget does not have. The
-//!    deref field means the *view's* draw list may be the one being composited,
-//!    leaving this one unused.
-//! 3. `end_pass_sized_turtle` versus `end_root_turtle` — the pair must match the
-//!    `begin_root_turtle`, and a mismatch that does not error could still yield an
-//!    empty pass.
-//!
-//! The rest of this file is left in place because the *mechanism* is right — a
-//! `DrawList2d` bracketed with `begin_overlay_reuse` is how Makepad orders
-//! overlays, and the v2 alternative (geometry hit-testing) is what produced the
-//! two hardest bugs in `docs/WIDGETS_PROGRESS_CN.md`. What is wrong is the
-//! plumbing, not the approach, and the next session should diagnose rather than
-//! rewrite.
-//!
-//! ## Why the approach is right even though it does not run
+//! ## The overlay
 //!
 //! A tooltip has to paint *over* whatever follows it in the tree. The v2 set
-//! solved that by making the tooltip's owner draw the popup in an overlay pass
-//! and by hit-testing geometry to decide what was on top — a workaround that
-//! produced the two hardest bugs recorded in `docs/WIDGETS_PROGRESS_CN.md`: a
-//! select whose dropdown was painted and then covered by a following section,
-//! and a sheet whose close button never received its hit.
+//! solved that by managing an overlay pass by hand and resolving z-order with
+//! geometry hit-tests — an approach that produced the two hardest bugs in
+//! `docs/WIDGETS_PROGRESS_CN.md`: a select whose dropdown was painted and then
+//! covered by a following section, and a sheet whose close button never received
+//! its hit.
 //!
-//! Makepad has the mechanism: a widget owns a [`DrawList2d`] and brackets its
-//! popup drawing in `begin_overlay_reuse`. The draw list is composited after the
-//! normal tree, so a tooltip is above a dialog that is above a card — by the
-//! framework's own ordering rather than by where the author happened to put it.
-//! Getting this right once means the whole overlay family (popover, menu,
-//! select, combobox) has a pattern to follow.
+//! Makepad's mechanism is a [`DrawList2d`] bracketed with `begin_overlay_reuse`:
+//! the draw list is composited after the normal tree, so a tooltip is above a
+//! dialog that is above a card by the framework's own ordering rather than by
+//! where the author put it. Getting this right once gives the whole overlay
+//! family (popover, menu, select, combobox) a pattern to follow.
+//!
+//! ## Two things it took to make it draw
+//!
+//! Both were invisible until a screenshot was taken, and both are recorded here
+//! because the second one is a *design* constraint, not a bug:
+//!
+//! 1. **A zero-sized overlay has nothing to composite.** The first version
+//!    declared `width: 0, height: 0` on the theory that a tooltip should not
+//!    take space — and the plate never appeared at all. It is `Fill`/`Fill` in
+//!    an `Overlay` flow, which is also how Makepad's own `Tooltip` is declared.
+//!    The consequence is the usage rule below: it must be a child of an
+//!    `Overlay`-flow parent, beside the content it covers rather than inside the
+//!    content's column.
+//! 2. **The plate must be `Fit`-sized, so it cannot live on this widget.** The
+//!    second version put the plate on the widget's own `draw_bg` — which is
+//!    `Fill`/`Fill`, so it painted a full-window rectangle over the entire
+//!    application. `draw_bg` is here only to carry the turtle the overlay pass
+//!    needs, and it paints **nothing**; the plate is the `content` child, which
+//!    is `Fit` and shrink-wraps the label. Makepad's own `Tooltip` does exactly
+//!    this, with a `pixel: fn()` that returns transparent.
+//!
+//! ```text
+//! SomeParent{ flow: Overlay }      // the widget is a sibling of the content
+//!   content_column := View{ ... }  // what the tooltip covers
+//!   tip := mod.mp.MpTooltip{}      // Fill/Fill, draws after, plate is content
+//! ```
+//!
+//! ## Where the hover belongs, and why the gallery's does not work
+//!
+//! The gallery's Overlay page tries to detect the hover in the *app*, by asking
+//! `event.hits(cx, trigger_area)` for a button it does not own. **That is wrong
+//! by design, not by a bug**: Makepad resolves one hit per event and the widget
+//! under the pointer consumes it, so a second `hits` call on the same area from
+//! further up the tree reports nothing. It also compares rectangles in the first
+//! version, which is worse — an `Area`'s rect is pass-relative and a mouse
+//! event's `abs` is screen-absolute, so the two only agree when the window sits
+//! at the origin. Both are the hand-rolled geometry that got v2 into trouble.
+//!
+//! So hovering belongs **in the trigger**, which is the widget that receives
+//! `Hit::FingerHoverIn` in its own `handle_event` — and this crate already
+//! computes exactly that signal: [`control::Signals::hover_in`].
+//!
+//! [`control::Signals::hover_in`]: crate::mp::control::Signals
+//!
+//! The component that should exist is therefore **`MpTooltipArea`**: a container
+//! that owns its trigger geometry, shows a tooltip on hover-in and hides it on
+//! hover-out. That is also how bezel does it (`hover_card`), and it removes the
+//! app from the picture entirely.
+//!
+//! What *is* verified in the gallery is the mechanism this module exists for: a
+//! capture with `GALLERY_TOOLTIP=1` shows the plate drawn **over a following
+//! sibling** — a button the tooltip precedes in the tree — anchored from a
+//! trigger's `Area`. The overlay and the anchoring work; only the page's own
+//! hover detection does not.
 //!
 //! ## The plate
 //!
 //! A tooltip is the one surface in the library that is *inverted*: a `solid`
 //! plate carrying `on_solid` ink. That is what the palette's inverted pair is
-//! for, and it is why a tooltip reads as an overlay rather than as another card
-//! — it is the only thing on screen painted the other way round.
+//! for, and it is why a tooltip reads as an overlay rather than as another card —
+//! it is the only thing on screen painted the other way round.
 
 use makepad_widgets::*;
-
-use makepad_theme::ControlSize;
 
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
-
-    set_type_default() do #(DrawMpTooltip::script_shader(vm)){
-        ..mod.draw.DrawQuad
-
-        // Resolved from `Theme::of(cx)` every paint — this widget owns its
-        // shader, so it takes the leaf path rather than the DSL-token one.
-        fill: #x00000000
-        border: #x00000000
-        border_width: 1.0
-        radius: 6.0
-
-        pixel: fn() {
-            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-            let bw = self.border_width
-            sdf.box(bw, bw, self.rect_size.x - bw * 2.0, self.rect_size.y - bw * 2.0, max(1.0, self.radius))
-            // `fill_keep` because the stroke below is the *same* box — the one
-            // place keeping the shape is what you want.
-            sdf.fill_keep(self.fill)
-            if (bw > 0.0) {
-                sdf.stroke(self.border, bw)
-            }
-            return sdf.result
-        }
-    }
+    use mod.mpc.tokens.*
+    use mod.mpc.type.*
 
     mod.mp.MpTooltipBase = #(MpTooltip::register_widget(vm))
 
     mod.mp.MpTooltip = set_type_default() do mod.mp.MpTooltipBase{
-        // The widget itself occupies nothing: it is a root-anchored overlay whose
-        // plate appears at `pos`. A tooltip that took space in the layout would
-        // push its own trigger around.
-        width: 0
-        height: 0
+        // Fill/Fill in an `Overlay` flow: a zero-sized overlay has nothing to
+        // composite, which is why the first version drew nothing at all.
+        width: Fill
+        height: Fill
+        flow: Overlay
+        align: Align{x: 0.0, y: 0.0}
 
-        content := View{
+        // Carries the turtle the overlay pass needs, and paints **nothing**.
+        // The plate cannot be drawn here: this widget is Fill-sized, so a plate
+        // on it is a full-window rectangle — which is precisely what the second
+        // version drew, a near-white sheet over the whole application.
+        draw_bg +: {
+            pixel: fn() {
+                return vec4(0.0, 0.0, 0.0, 0.0)
+            }
+        }
+
+        // The plate. `Fit`, so it shrink-wraps the label, and inverted: the
+        // palette's `solid`/`on_solid` pair is what a tooltip is for.
+        //
+        // The colours come from the DSL here rather than from Rust, because only
+        // a child can be `Fit`-sized. That puts the plate on the container path —
+        // token references copied at apply time, refreshed by
+        // `Theme::install`'s `request_script_reapply` — which is the same trade
+        // `mp/surface.rs` makes for every surface in the library.
+        content := RoundedView{
             width: Fit
             height: Fit
             padding: Inset{left: 8, right: 8, top: 5, bottom: 5}
+
+            draw_bg +: {
+                color: instance(solid)
+                border_size: instance(1.0)
+                border_color: instance(border_strong)
+                border_radius: instance(6.0)
+            }
 
             label := Label{
                 width: Fit
                 height: Fit
                 draw_text +: {
-                    text_style: mod.mpc.type.caption
-                    color: #x00000000
+                    text_style: caption
+                    color: on_solid
                 }
                 text: "Tooltip"
             }
         }
     }
-}
-
-#[derive(Script, ScriptHook)]
-#[repr(C)]
-pub struct DrawMpTooltip {
-    #[deref]
-    draw_super: DrawQuad,
-    #[live]
-    fill: Vec4f,
-    #[live]
-    border: Vec4f,
-    #[live]
-    border_width: f32,
-    #[live]
-    radius: f32,
 }
 
 /// A plate that draws above the widget tree, anchoring at a screen position.
@@ -151,8 +157,10 @@ pub struct MpTooltip {
     #[rust]
     draw_list: Option<DrawList2d>,
 
+    /// The turtle holder the overlay pass needs. Paints nothing; see the module
+    /// doc for why the plate cannot be drawn here.
     #[live]
-    draw_bg: DrawMpTooltip,
+    draw_bg: DrawQuad,
 
     #[rust]
     opened: bool,
@@ -168,10 +176,11 @@ pub struct MpTooltip {
 impl ScriptHook for MpTooltip {
     fn on_after_new(&mut self, vm: &mut ScriptVm) {
         self.draw_list = Some(DrawList2d::script_new(vm));
-        // A tooltip hangs below and to the right of its anchor by default: enough
-        // to clear the pointer's own hotspot, which is what a tooltip should not
-        // sit under.
-        self.offset = dvec2(12.0, 18.0);
+        // The gap between the trigger and the plate. Vertical only: the anchor
+        // [`MpTooltipRef::show_for`] passes is the trigger's *bottom* edge, so a
+        // horizontal offset would push the plate sideways over whatever sits
+        // beside the trigger rather than under it.
+        self.offset = dvec2(0.0, 6.0);
     }
 
     fn on_after_apply(
@@ -210,6 +219,11 @@ impl MpTooltip {
     }
 
     /// Show the plate with its top-left at `anchor` plus this tooltip's offset.
+    ///
+    /// `anchor` is a *corner to hang from*, which is why
+    /// [`MpTooltipRef::show_for`] hands over a trigger's bottom edge rather than
+    /// its top-left: a caller that knows where a widget is has not decided where
+    /// the plate goes, and one place has to.
     ///
     /// The offset is applied here rather than by the caller because a caller that
     /// has a widget's rectangle has an *anchor*, not a corner — it knows where
@@ -290,16 +304,6 @@ impl Widget for MpTooltip {
         };
         draw_list.begin_overlay_reuse(cx);
 
-        let theme = makepad_theme::Theme::of(cx.cx);
-        let p = &theme.paint;
-        // The inverted pair: the one plate in the library painted the other way
-        // round, which is what makes a tooltip read as an overlay rather than as
-        // another card.
-        self.draw_bg.fill = p.solid;
-        self.draw_bg.border = p.border_strong;
-        self.draw_bg.border_width = 1.0;
-        self.draw_bg.radius = ControlSize::Small.radius() as f32;
-
         let size = cx.current_pass_size();
         cx.begin_root_turtle(size, self.view.layout);
         self.draw_bg.begin(cx, self.view.walk, self.view.layout);
@@ -337,8 +341,20 @@ impl MpTooltipRef {
     ///
     /// The shape a call site actually wants: it has the trigger's `Area`, and
     /// where on that trigger to hang the plate is this widget's business.
+    ///
+    /// **An `Area` is empty until its widget has been laid out**, so a caller
+    /// anchoring during startup has to wait for a non-empty `area.rect(cx)`
+    /// before calling this — otherwise the anchor is `(0, 0)` and the plate
+    /// appears in the window's corner, which looks like the overlay drawing in
+    /// the wrong place rather than like a caller racing layout. A hover call site
+    /// is never affected, because a hover is by construction after a layout.
     pub fn show_for(&self, cx: &mut Cx, anchor: Area, text: &str) {
-        let anchor = anchor.rect(cx).pos;
+        let rect = anchor.rect(cx);
+        // The trigger's bottom-left: the plate hangs under the trigger rather
+        // than over it, and under the trigger's leading edge rather than
+        // straddling its centre — the latter needs the plate's own width, which
+        // is not known until it has been laid out once.
+        let anchor = dvec2(rect.pos.x, rect.pos.y + rect.size.y);
         if let Some(mut inner) = self.borrow_mut() {
             inner.show_at(cx, anchor, text);
         }

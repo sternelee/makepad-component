@@ -137,7 +137,7 @@ build on).
 | `mp/layout.rs` | `Row`, `Column`, `Divider`, `DividerVertical`, `Spacer`. The system gap, carried by a prototype so a call site that wants 8pt writes no number. |
 | `mp/loaders.rs` | `MpSpinner`, `MpPulse`, `MpProgress`. The payoff for `motion::phase` — its constants are injected as instances from Rust rather than restated in the DSL. |
 | `mp/slider.rs` | `MpSlider`, and the four free functions that turn a pointer into a value. |
-| `mp/tooltip.rs` | `MpTooltip` — **implemented and not drawing.** See below. |
+| `mp/tooltip.rs` | `MpTooltip` — the overlay mechanism, verified; the gallery's hover wiring for it is not. See below. |
 | `mp/input.rs` | `MpTextInput`, `MpField`, `MpTextInputSearch`. The one component with no Rust: the caret, selection, IME, scroll-into-view and platform keys are Makepad's `TextInput`, so this styles it rather than reimplementing it. |
 
 `MpButton` is the demonstration — the v2 button against this one:
@@ -332,37 +332,53 @@ module whose members you name — never a parent.
   `mod.mpc = {}` in the theme. Assigning into a missing module produced 215
   runtime errors that all pointed at innocuous-looking lines.
 
-## Open: the overlay does not draw
+## The overlay: fixed, and what is left of it
 
-`mp/tooltip.rs` is the first component in this port that is **implemented,
-compiles, runs with zero `[E]` lines, and does not work**. The plate never
-appears — not on a hover over a trigger, and not with a startup call anchored to a
-laid-out trigger.
+The tooltip drew nothing, and two separate faults had to be found. Both were
+invisible to `cargo check` and to any test; both were found by taking a
+screenshot.
 
-What is ruled out: the first suspicion was `handle_startup`, which runs before
-layout, so `area().rect()` is empty there. Moving the call to the first
-`handle_event` (after layout) changed nothing, so the fault is in `draw_walk` or
-the draw list rather than in when `show` is called.
+1. **A zero-sized overlay has nothing to composite.** The widget was declared
+   `width: 0, height: 0`, on the theory that a tooltip should not take space in
+   the layout. It never appeared. It is `Fill`/`Fill` in an `Overlay` flow, which
+   is how Makepad's own `Tooltip` is declared — and the consequence is a *usage*
+   rule, not a bug: the tooltip must be a child of an `Overlay`-flow parent,
+   **beside** the content it covers rather than inside the content's column,
+   because inside a column a Fill-height overlay competes with the content for
+   height.
+2. **The plate must be `Fit`-sized, so it cannot live on the widget.** With the
+   widget `Fill`/`Fill`, putting the plate on its own `draw_bg` painted a
+   full-window rectangle — a near-white sheet over the entire application. The
+   fix is Makepad's: `draw_bg` carries the turtle and paints **nothing**
+   (`pixel: fn() { return vec4(0.0, 0.0, 0.0, 0.0) }`), and the plate is a
+   `Fit`-sized `content` child that shrink-wraps the label.
 
-Next suspects, in order:
+A third, smaller one: an `Area` is empty until its widget has been laid out, so
+anchoring during startup put the plate at the window corner. `show_for`'s doc now
+says so, and the gallery waits for a non-empty rect.
 
-1. `cx.begin_root_turtle(size, self.view.layout)` inside an overlay draw list,
-   with `draw_bg.begin(cx, self.view.walk, ...)` using a walk whose `abs_pos` is
-   unset. If the root turtle is at the pass origin rather than at `pos`, the plate
-   is drawn off-screen or at zero size.
-2. `#[deref] view` alongside a manually-owned `DrawList2d`. The deref field may
-   mean the *view's* draw list is the one composited, leaving this one unused.
-3. `end_pass_sized_turtle` against `begin_root_turtle` — a mismatch that does not
-   error could still produce an empty pass.
+**Verified:** `GALLERY_TOOLTIP=1` shows the plate drawn over a following sibling —
+a button the tooltip *precedes* in the tree — anchored from a trigger's `Area`. So
+the `DrawList2d` mechanism and the anchoring both work.
 
-The approach is not in question: a `DrawList2d` bracketed with
-`begin_overlay_reuse` is how Makepad orders overlays, and v2's alternative —
-managing an overlay pass by hand and resolving z-order with geometry hit-tests —
-is what produced the two hardest bugs in `docs/WIDGETS_PROGRESS_CN.md`. What is
-wrong is the plumbing.
+**Not working: the gallery's hover detection.** It asks
+`event.hits(cx, trigger_area)` from the app for a button it does not own, and
+Makepad resolves one hit per event — the widget under the pointer consumes it, so
+the second call reports nothing. The first version did something worse
+(`area.rect(cx).contains(me.abs)`), comparing a pass-relative rect against a
+screen-absolute pointer, which only agrees when the window is at the origin.
 
-**The whole overlay family (popover, menu, select, combobox) depends on this
-working, so it is the next thing to fix rather than something to work around.**
+Both are the hand-rolled geometry that got v2 into trouble, and the conclusion is
+a design one rather than a patch: **hovering belongs in the trigger**, which is
+the widget that receives `Hit::FingerHoverIn` in its own `handle_event` — and
+`mp::control::Signals::hover_in` already computes exactly that. So the component
+that should exist is **`MpTooltipArea`**: a container that owns its trigger
+geometry, shows on hover-in and hides on hover-out, keeping the app out of it. It
+is also how bezel does it (`hover_card`).
+
+That is the next thing to build, and the rest of the overlay family (popover,
+menu, select, combobox) follows the same two rules the tooltip established: a
+`Fill`/`Fill` overlay sibling of the content, with a `Fit`-sized plate inside it.
 
 ## What Phase 1 and 2 actually verify
 
