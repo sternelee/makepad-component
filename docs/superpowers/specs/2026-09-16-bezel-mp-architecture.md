@@ -779,6 +779,53 @@ Verified at runtime: a 13-action sheet declares with **0 conflicts**, and a deli
 broken map of 6 reports **3**, including `⇧⌘D` found from `cmd+shift+d` and the glyph run
 `⇧⌘D` — a config spelling and a menu paste recognized as one chord.
 
+### Screen capture came back, and the first thing it showed
+
+`GALLERY_PAGE=Document` verified `MpMarkdown`'s paint, which had been unverified for two turns: a heading, a
+wrapped paragraph, nested bullets, an ordered list **starting at three**, tasks, a quote and a fence on their
+plates, and `*markdown*` correctly *not* emphasised inside a fence. The layout's numbers and the pixels agree.
+
+It also showed a **new defect**: a heading renders at the body size, because the layout uses **one line height
+for every block** — so per-kind typography needs `Metrics` to carry a size per block kind, and half-fixing it by
+painting a larger heading would overlap the next block. Recorded rather than half-fixed.
+
+And it showed that the segmented control's label was **still clipped** (`Previ`) *after* the DPI factor, which
+had been my explanation for it. So the DPI factor was not the answer either.
+
+### The answer was to stop estimating, which took four attempts
+
+The three earlier attempts each made the *estimate* better — a larger pad, a glyph correction, then the missing
+DPI factor — and the fourth was to remove the estimate from the geometry:
+
+```ignore
+let laid = draw.layout(cx, 0.0, 0.0, None, false, Align::default(), text);
+laid.size_in_lpxs.width as f64 * DPI
+```
+
+`DrawText::layout` is **public** and returns the size the renderer will use. So `text::measured_width` gives a
+real number, and the estimator stays in `text.rs` for **clipping**, where an error in either direction is
+invisible.
+
+**And it cost another screenshot to find the unit**: `size_in_lpxs` is in Makepad's **layout pixels**, which are
+96-dpi, while `draw_abs` coordinates and every number in `text.rs` are in points — so the measurement is
+multiplied by `DPI` like everything else. Without it the measured label came out 25% under and the same clipping
+returned by a different route. **That is the third time this factor has been the answer**, so it now has one
+home and a doc comment naming the two ways it is met.
+
+### One thing the measurement did *not* fix, recorded as an open issue
+
+With the labels measured, the control's geometry is **provably right**. `MP_SEG_DEBUG` printed the measured
+widths (`Source=55.9 Split=36.7 Preview=64.1`), the box at `276.3`, every label's x, and the area each draw
+landed in — all three inside the box, `Preview` ending at **262.3 of 276.3**. And the **painted** box measures
+about **195** from the screenshot, with `Preview` invisible.
+
+So the walk this widget computes is not the box it draws, by about eighty points — and the fault is **not in
+that file**, because the numbers it hands the renderer are self-consistent, and independent unit tests cover the
+slot arithmetic. Recorded in the source and here, because it is the second time this port has met the same
+shape (`mp/markdown.rs` set a width and read back a different one) and the next person should start from *"the
+walk is truncated between the widget and the paint"* rather than from *"the measurement is wrong"*, which is
+where three earlier attempts went.
+
 ### An estimate cannot be exact, and the direction that hurts is *under*
 
 `mp/text.rs::width` estimates rather than measures, and that is right for **clipping**

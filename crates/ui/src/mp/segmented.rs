@@ -52,22 +52,31 @@ use crate::mp::text;
 ///
 /// Air on each side of a slot's label, so a segment reads as a target rather than as text.
 ///
-/// ## It was 16 because it was carrying a bug
+/// ## It carried a bug for three attempts, and the fourth was to stop carrying it
 ///
-/// The Bars toolbar's first render drew `Preview` as **`Previ`**, and the diagnosis at the time was
-/// that [`crate::mp::text::width`] is a heuristic that can come out under the painted width on a
-/// proportional label — so this was raised to 16 to absorb the error.
+/// The Bars toolbar's first render drew `Preview` as **`Previ`**, and there were three attempts to fix it with
+/// a *better estimate*: this pad raised from 14 to 16 to absorb the error, a glyph correction in `mp/text.rs`
+/// for symbols, and then the DPI factor that estimate had always been missing. Each was an improvement and none
+/// was the answer — a screenshot after the third still showed `Previ`, because the estimate for that particular
+/// word was still under.
 ///
-/// **The real cause was elsewhere and was found later:** `width` omitted the factor between a
-/// declared font size and the size Makepad lays text out at, so **every estimate was about 25%
-/// under**. `mp/text.rs` carries the derivation and the measurement now, and with it in place the
-/// estimate agrees with the paint to **0.0016pt per character**.
+/// The labels are **measured** now (`text::measured_width`, which is `DrawText::layout` plus the layout-pixel to
+/// point conversion), so this is air and nothing else: 14 points of it, which is where it started before it was
+/// asked to hide an error.
 ///
-/// The value stays at 16 rather than going back to 14, because the two points are indistinguishable
-/// in the rendered control and changing a number whose fault has been fixed somewhere else is how a
-/// fix becomes a regression nobody can attribute. What changed is the reason written down: this is
-/// air, not a margin.
-const SLOT_PAD_X: f64 = 16.0;
+/// ## One thing the measurement did not fix, recorded rather than left as a mystery
+///
+/// With the labels measured, the control's geometry is **provably right**: `MP_SEG_DEBUG` printed the three
+/// measured widths (`Source=55.9 Split=36.7 Preview=64.1`), the box at `276.3`, each label's x, and the area
+/// each draw landed in — all three inside the box, `Preview` ending at 262.3 of 276.3. And the **painted** box
+/// measures about 195 from the screenshot, with `Preview` not visible at all.
+///
+/// So the walk this widget computes is not the box it draws, by about 80 points, and the fault is **not in this
+/// file**: the numbers it hands the renderer are self-consistent. It is recorded here because it is the second
+/// time this port has met the same shape — `mp/markdown.rs` set a width and read back a different one — and the
+/// next person should start from "the walk is truncated between the widget and the paint" rather than from
+/// "the measurement is wrong", which is where three earlier attempts went.
+const SLOT_PAD_X: f64 = 14.0;
 
 /// How far the plate is inset from its slot.
 ///
@@ -323,16 +332,30 @@ impl MpSegmented {
         }
     }
 
-    /// How wide the control wants to be: every slot the width of the widest label.
-    fn content_width(&self, font: f64) -> f64 {
+    /// How wide one label paints, **measured** rather than estimated.
+    ///
+    /// `DrawText::layout` lays the string out and returns the size, so this is the same number the renderer will
+    /// use — no estimator, no error margin and no direction to get wrong.
+    ///
+    /// **This replaces [`crate::mp::text::width`] in this widget's geometry**, and it is the fix for a fault
+    /// that took three attempts: the segmented control's last label was clipped (`Preview` drawn as `Previ`) and
+    /// each attempt was a better *estimate* — a bigger pad, a glyph correction, then the missing DPI factor —
+    /// when the answer was to stop estimating. The estimator stays in `text.rs` for **clipping**, where an error
+    /// in either direction is invisible.
+    fn label_width(&self, cx: &mut Cx, label: &str) -> f64 {
+        text::measured_width(&self.draw_label, cx, label)
+    }
+
+    /// How wide the control wants to be: every slot the width of the widest label, **measured**.
+    fn content_width(&mut self, cx: &mut Cx) -> f64 {
         if self.segments.is_empty() {
             return 0.0;
         }
-        let widest = self
-            .segments
-            .iter()
-            .map(|label| text::width(label, font))
-            .fold(0.0f64, f64::max);
+        let mut widest = 0.0f64;
+        for index in 0..self.segments.len() {
+            let width = self.label_width(cx, &self.segments[index]);
+            widest = widest.max(width);
+        }
         (widest + SLOT_PAD_X * 2.0) * self.segments.len() as f64
     }
 
@@ -453,9 +476,10 @@ impl Widget for MpSegmented {
         // a basis and bounds. A caller that asked for `Fill` keeps it, and the slots
         // then divide whatever box the control lands in — which is the case the hit
         // test reads back from the drawn `Area` rather than from `content_width`.
+        let measured = self.content_width(cx.cx);
         let walk = match walk.width {
             Size::Fit { .. } => Walk {
-                width: Size::Fixed(self.content_width(font)),
+                width: Size::Fixed(measured),
                 ..walk
             },
             _ => walk,
@@ -521,7 +545,8 @@ impl Widget for MpSegmented {
             let Some((left, width)) = slot_span(index, count, rect.size.x) else {
                 continue;
             };
-            let text_w = text::width(label, font);
+            // Centred by the **measured** width, so the label is centred by the same number that sized its slot.
+            let text_w = self.label_width(cx.cx, label);
             // The selected label reads at full strength and the rest recede, the
             // same rule the checkbox and the radio follow, so a control is
             // scannable without reading every word.

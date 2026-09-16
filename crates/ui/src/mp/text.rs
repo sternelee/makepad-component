@@ -53,6 +53,8 @@
 //! estimate for a monospace run agrees with the paint to **0.0016pt per character** — checked in
 //! `MpCodeBlock`, which prints both.
 
+use makepad_widgets::*;
+
 /// Which face a string is measured in.
 ///
 /// **The same estimator cannot serve both, and this crate now has a widget of each.** A proportional
@@ -84,7 +86,7 @@ pub enum Face {
 /// per character, the same ratio to five decimal places. Against the mono face's own `hmtx` advance
 /// of 0.6 em (LiberationMono is 1229/2048, JetBrains Mono is 600/1000), that ratio is
 /// `0.8001 / 0.6 = 1.3336`, and `96 / 72 = 1.3333`.
-const DPI: f64 = 96.0 / 72.0;
+pub const DPI: f64 = 96.0 / 72.0;
 
 /// The advance of an average character, as a fraction of the font size, for the
 /// proportional faces this crate bundles.
@@ -169,6 +171,24 @@ fn is_symbol(ch: char) -> bool {
 /// corrections are applied on top of it.
 pub fn width(text: &str, font_size: f64) -> f64 {
     width_in(text, font_size, Face::Proportional)
+}
+
+/// How wide `text` paints, **measured** by laying it out.
+///
+/// `DrawText::layout` is public and returns the size the renderer will use, which is a *better* number than
+/// anything this module can estimate — so a widget that needs geometry should call this and not `width`. The
+/// estimator stays for **clipping**, where an error in either direction is invisible.
+///
+/// ## The unit, which cost a screenshot to find
+///
+/// `size_in_lpxs` is in Makepad's **layout pixels**, which are 96-dpi — while a widget's `draw_abs`
+/// coordinates, and every number in this module, are in points. So the measurement is multiplied by [`DPI`] like
+/// everything else here; without that, a measured label comes out **25% under** and the same clipping returns
+/// by a different route. That is the third time this factor has been the answer, which is why it now has one
+/// home and a doc comment naming the two ways it is met.
+pub fn measured_width(draw: &DrawText, cx: &mut Cx, text: &str) -> f64 {
+    let laid = draw.layout(cx, 0.0, 0.0, None, false, Align::default(), text);
+    laid.size_in_lpxs.width as f64 * DPI
 }
 
 /// How wide `text` paints in `face` at `font_size`, in points.
