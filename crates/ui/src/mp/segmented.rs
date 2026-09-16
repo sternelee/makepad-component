@@ -64,36 +64,34 @@ use crate::mp::text;
 /// point conversion), so this is air and nothing else: 14 points of it, which is where it started before it was
 /// asked to hide an error.
 ///
-/// ## What the measurement did *not* fix, and the mechanism it is not
+/// ## Why it was clipped, which took eight attempts
 ///
-/// The panel paints ~193 while the walk says 276.3, with the third label invisible. Seven attempts narrowed it,
-/// and the last one read Makepad's source rather than guessing again:
+/// The panel painted ~193 while its walk said 276.3, and the third label was invisible. The cause is in the
+/// **parent**, not here, and it is a trap in `Fit`:
 ///
-/// **`View::walk_from_previous_size` resolves a `Fit` dimension from the view's own last measured size** —
-/// `view_size`, written at the end of `View::draw_walk` and read back when the walk is `Fit`. That is how a `Fit`
-/// view converges, and it is why a `Fit` view inside a `Row` works. **This widget is a custom `Widget`, not a
-/// `View`, so it had no `view_size` at all** — and a `Fit` child with no previous measurement is allocated
-/// nothing, so everything it drew was clipped to an empty cell.
+/// > `View::walk_from_previous_size` resolves a `Fit` width from **that view's own previous area**
+/// > (`view_size`, written at the end of `View::draw_walk`), **not from its children's content.**
 ///
-/// That mechanism is real and this widget now does its own version of it ([`MpSegmented::last_size`]) — **and it
-/// did not fix this**, which narrows the cause further: `last_size` converges on the *requested* size (276.3),
-/// because `draw_bg.area()` reports the walk rather than the painted box, so the resolution is already correct and
-/// the clip happens after it.
+/// So a `Fit` container that was first given less than its child needs is a **self-reinforcing fixed point**: a
+/// small box, so it clips, so its area is small, so it asks for the small box again. And **everything a child
+/// draws is clipped to that box** — `draw_abs` as much as `begin` — so nothing the control drew could escape.
+/// Giving the *container* an explicit width breaks the loop, which is what the Bars page now does, and it is
+/// documented in `mp/bars.rs` where the slots are declared.
 ///
-/// What is established, from evidence rather than reasoning:
+/// The eight attempts are worth keeping because **seven of them were in the wrong file**:
 ///
 /// | attempt | result |
 /// |---|---|
-/// | a larger pad; a glyph correction; the missing DPI factor | no change — the estimate was not the problem |
+/// | a larger pad; a glyph correction; the missing DPI factor | no change — the estimate was never the problem |
 /// | replacing the estimate with `DrawText::layout`'s own number | geometry **more** correct, paint unchanged |
 /// | deciding the width in `set_segments` rather than while drawing | kept, because it is right; no change here |
-/// | `width: 400` in the DSL | the **labels** moved, the **panel** did not |
-/// | two `Fill` siblings in the bar | they **split** the space — a real finding, in `mp/bars.rs` |
+/// | `width: 400` **on this control** | the **labels** moved, the **panel** did not |
+/// | two `Fill` siblings in the bar | they **split** the space — real, and now in `mp/bars.rs` |
+/// | reading `walk_from_previous_size` | found the mechanism; then a `Fixed` width **on the container** |
 ///
-/// **Still not isolated**: the clip is applied after this widget's walk resolution, to everything it draws —
-/// `draw_abs` as well as `begin` — and the parent's cell is ~193 whatever the child asks for. The next step is to
-/// trace where a `Tensor`/cell is clipped for a non-`View` child, not to touch this control again. Recorded with
-/// the table above because that is what seven attempts bought, and the table is the part that saves the eighth.
+/// The last row is the fix. The lesson is the shape of the search: a widget whose geometry is provably correct
+/// while its paint is not has a **parent** problem, and the measurement is the wrong place to look — which is
+/// where seven attempts went.
 const SLOT_PAD_X: f64 = 14.0;
 
 /// How far the plate is inset from its slot.

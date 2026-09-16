@@ -842,10 +842,22 @@ slot markers lost their third bar for the same reason. The one structural fact v
    because `draw_bg.area()` reports the walk rather than the painted box. So the resolution is already correct and
    **the clip happens after it**.
 
-**Still not isolated**: the clip is applied after this widget's walk resolution, to everything it draws —
-`draw_abs` as well as `begin` — and the parent's cell is ~193 whatever the child asks for. The next step is to
-trace where a cell is clipped for a non-`View` child, not to touch this control again. Recorded with the table of
-seven attempts because that is what they bought, and the table is the part that saves the eighth.
+8. **A `Fixed` width on the *container*** — which is the fix. The mechanism is one sentence:
+
+   > `View::walk_from_previous_size` resolves a `Fit` width from **that view's own previous area**, **not from its
+   > children's content.**
+
+   So a `Fit` container first given less than its child needs is a **self-reinforcing fixed point**: a small box,
+   so it clips, so its area is small, so it asks for the small box again. And **everything a child draws is clipped
+   to that box** — `draw_abs` as much as `begin` — so nothing the control drew could escape it.
+
+   **Verified by contrast as well as by the fix**: the same control on the Controls page never showed the defect,
+   because its container is a `Fill` row. `Fill` ✓, `Fit` with an explicit width ✓, `Fit` without ✗.
+
+**The lesson is the shape of the search**: a widget whose geometry is *provably correct* while its paint is not has
+a **parent** problem, and the measurement is the wrong place to look — which is where seven of the eight attempts
+went. The rule is written where the slots are declared (`mp/bars.rs`), because it is the caller's to know what its
+slot holds.
 
 ### One thing the measurement did *not* fix, recorded as an open issue
 

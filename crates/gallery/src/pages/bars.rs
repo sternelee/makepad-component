@@ -82,9 +82,18 @@ script_mod! {
                 }
                 mod.mp.MpControlBar{
                     draw_bg +: {color: surface}
+                    // **The width is load-bearing, and the reason is a trap in `Fit`.**
+                    //
+                    // A `Fit` view resolves its own width from its **own previous area**
+                    // (`View::walk_from_previous_size`), not from its children's content. So a `Fit` group that
+                    // was first given less than its child needs is a **self-reinforcing fixed point** — its box is
+                    // small, so it clips, so its area is small, so next frame it asks for the small box again. The
+                    // segmented control in it asked for 276.3 and painted 193 with its third label invisible.
+                    //
+                    // A `Fixed` width breaks the loop, and it is the caller's to give because only the caller
+                    // knows what the slot holds. `mp/bars.rs` says the same thing where the slots are declared.
                     controlbar_leading := mod.mp.Row{
-                        // This was three ghost buttons with the active one promoted, because the library had no
-                        // segmented control and the page said so. `mp/segmented.rs` is that interim replaced.
+                        width: 320
                         view_mode := mod.mp.MpSegmentedSmall{}
                     }
                     controlbar_trailing := mod.mp.Row{

@@ -111,17 +111,23 @@ script_mod! {
         }
 
         controlbar_leading := mod.mp.Row{
-            // **`Fit`, and there must be only one `Fill` among a bar's children.**
+            // ## A `Fit` slot cannot grow to fit a child it clipped
             //
-            // A segmented control painted two of its three labels, and the cause was structural rather than in
-            // the control: this group and the spacer below were **both** `Fill`, so they **split** the bar's
-            // remaining space — the group got half, and a child drawing wider than its cell is clipped to it.
-            // Which it is: `draw_abs` from inside a widget is clipped to the parent's cell as well as `begin`,
-            // so nothing the child draws can escape it.
+            // Three rules, all of them learned from a segmented control that painted two of its three labels:
             //
-            // `Fit` and a declared width is the combination that works: `mp/segmented.rs` sets its own
-            // `Fixed` walk in `set_segments`, which runs between frames, so the parent's next layout pass reads a
-            // number instead of a `Fit` it cannot resolve.
+            // 1. **This is `Fit`, and there must be only one `Fill` among a bar's children.** With this group and
+            //    the spacer *both* `Fill` they **split** the bar's remaining space, so the group got half.
+            // 2. **A `Fit` view cannot grow to fit its content.** `View::walk_from_previous_size` resolves a `Fit`
+            //    width from the view's **own previous area**, not from its children — so a slot first given less
+            //    than its child needs is a **self-reinforcing fixed point**: small box, so clip, so small area, so
+            //    small box again.
+            // 3. **Everything a child draws is clipped to the slot**, `draw_abs` as much as `begin`, so nothing a
+            //    control draws can escape.
+            //
+            // Which means: **a caller putting a self-measuring control in a slot must give the slot a width.**
+            // Only the caller knows what it holds. `crates/gallery/src/pages/bars.rs` does exactly that, and says
+            // so. Everything else — a row of buttons, a label — is fine with `Fit`, because the turtle can sum a
+            // child whose width it knows before drawing.
             width: Fit
             height: Fit
             spacing: 4
