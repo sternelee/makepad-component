@@ -45,6 +45,7 @@ pub mod combobox;
 pub mod control;
 pub mod date;
 pub mod feedback;
+pub mod focus;
 pub mod history;
 pub mod icon;
 pub mod input;

@@ -486,9 +486,10 @@ impl Widget for MpButton {
         self.draw_bg.end(cx);
         self.area = self.draw_bg.area();
 
-        if !self.disabled {
-            crate::widgets::focus::register(cx, self.widget_uid(), self.area);
-        }
+        // The flag is handed over rather than tested, so the guard cannot drift from the
+        // field it is guarding — and so a button that *becomes* disabled leaves the tab
+        // order. See `mp/focus.rs`.
+        crate::mp::focus::register(cx, self.widget_uid(), self.area, self.disabled);
         DrawStep::done()
     }
 }

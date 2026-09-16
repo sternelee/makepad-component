@@ -1815,7 +1815,8 @@ impl AppMain for App {
         self.match_event(cx, event);
         // Tab and Shift-Tab traversal. Makepad has a single key-focus area on
         // `Cx` and no traversal, so the app owns the pass.
-        makepad_component::widgets::focus::handle_key(cx, event);
+        // The v3 traversal, which owns the one registry the v2 widgets also feed.
+        makepad_component::mp::focus::handle_key(cx, event);
         self.ui.handle_event(cx, event, &mut Scope::empty());
     }
 }

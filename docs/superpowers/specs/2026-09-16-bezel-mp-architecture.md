@@ -155,6 +155,50 @@ build on).
 | `mp/keys.rs` | `parse` / `format` / `Keymap` — the chord behind a printed shortcut. |
 | `mp/history.rs` | `History<T>` — undo/redo as a value, not a widget. |
 | `mp/combobox.rs` | `Combobox` / `MpCombobox` / `MpComboboxPanel` — a field over a list. |
+| `mp/focus.rs` | `FocusRegistry` / `register` / `handle_key` — tab traversal. |
+
+### A v3 module that registered into a v2 one
+
+The v3 controls' tab traversal ran through `crates/ui/src/widgets/focus.rs` — a **v2** module —
+while everything else about a v3 control lives in `mp/`. That is the kind of seam that makes a
+migration stall: `mp/focus.rs` is now the home, the v2 module is a set of forwarders into it,
+and both feed **one registry**. Two registries would mean `tab` walking half the controls on a
+page that has both kinds, and the gallery has exactly such pages while the port is in progress.
+
+### The bug the port was written around
+
+The first version put the disabled guard at the **call site**:
+
+```ignore
+if !self.disabled { focus::register(cx, uid, area) }
+```
+
+Both call sites honoured it, and it is still wrong. What it misses is the control that
+**becomes** disabled: it stops calling `register`, so nothing removes it, and its `Area` is
+still valid because the control is still drawn — so it stays in the tab order and **tab lands
+on a control the reader cannot use**. Taking `disabled` as a parameter means a disabled control
+is **removed** when it draws rather than merely not added, so the stale entry cannot exist. The
+distinction is the one `mp/list.rs` makes about a value that is no longer in its list: dropping
+says "not available", and not-adding says nothing about what was there before.
+
+Two tests hold it: one that a control which becomes disabled leaves the order, and one that a
+control reaching disabled by either route produces the same order.
+
+### A surface can claim `tab`
+
+`claim_tab` / `release_tab` stand the traversal down for a surface where `tab` belongs to
+something else — a document that nests a list, an editor that inserts indentation. The claim
+**persists until released** rather than being per-event, because it describes who owns the key
+while that surface has focus. `handle_key` returns `false` while it is claimed, so the key falls
+through instead of being consumed. This is bezel's `CLAIMS_TAB` marker, expressed as a flag
+because Makepad has no key-context stack to predicate on.
+
+### A limitation recorded rather than repaired
+
+The v2 widgets keep their own `if !self.disabled` guards, so they keep the stale-entry bug. The
+forwarder passes `disabled: false`. Fixing it means seven v2 call sites, and those seven widgets
+are scheduled for deletion by phase 6 — repairing them would be work spent on code the plan
+already removes. Recorded in the forwarder's own doc so it is not mistaken for an oversight.
 
 ### A combobox is the only control that holds two things which can disagree
 

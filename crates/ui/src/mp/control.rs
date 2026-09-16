@@ -493,9 +493,10 @@ pub mod plates {
 /// order. A disabled control is skipped: tabbing into something that cannot be
 /// activated is worse than not reaching it.
 pub fn register(cx: &mut Cx2d, uid: WidgetUid, area: Area, disabled: bool) {
-    if !disabled {
-        crate::widgets::focus::register(cx, uid, area);
-    }
+    // The flag is **passed** rather than tested here, so a disabled control is removed from
+    // the tab order instead of merely not being added to it. `mp/focus.rs` records the bug
+    // that distinction fixes.
+    crate::mp::focus::register(cx, uid, area, disabled);
 }
 
 #[cfg(test)]
