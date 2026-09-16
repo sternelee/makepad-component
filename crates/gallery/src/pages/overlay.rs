@@ -1,16 +1,15 @@
 //! The overlay: a tooltip that has to paint above everything below it.
 //!
 //! **Hovering a button on this page shows nothing, and that is a known gap.**
-//! The page detects the hover in the *app*, which is the wrong place: Makepad
-//! resolves one hit per event and the button consumes it, so a second
-//! `event.hits` on the same area from the app reports nothing. Hovering belongs
-//! in the trigger, which is why the component that should exist is an
-//! `MpTooltipArea` container rather than a page-level lookup. See
-//! `mp/tooltip.rs`.
+//! The page detects the hover in the app, and the fix is not the obvious one: an
+//! `MpTooltipArea` wrapper was built and cannot work, because an overlay draw
+//! list clips to its widget's rectangle and a tooltip's plate sits *outside* a
+//! trigger-sized box. One tooltip per overlay region is the constraint, so a
+//! trigger has to signal it rather than own it. See `mp/tooltip.rs`.
 //!
-//! What the page *does* verify, with `GALLERY_TOOLTIP=1`, is the mechanism: the
-//! plate is drawn over the card and the buttons below it — siblings that follow
-//! it in the tree — anchored from a trigger's `Area`.
+//! `GALLERY_TOOLTIP=1` pins the plate open: a synthetic pointer warp does not
+//! produce a hover in this app, so a capture script cannot hover, and this is how
+//! the plate and its anchoring are checked instead.
 //!
 //! The arrangement matters and is the page's other lesson: the tooltip is a
 //! `Fill`/`Fill` overlay *sibling* of the content, not a child of it. Inside the

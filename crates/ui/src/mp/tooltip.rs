@@ -42,35 +42,50 @@
 //!   tip := mod.mp.MpTooltip{}      // Fill/Fill, draws after, plate is content
 //! ```
 //!
-//! ## Where the hover belongs, and why the gallery's does not work
+//! ## One tooltip per overlay region, and why a wrapper cannot exist
 //!
-//! The gallery's Overlay page tries to detect the hover in the *app*, by asking
-//! `event.hits(cx, trigger_area)` for a button it does not own. **That is wrong
-//! by design, not by a bug**: Makepad resolves one hit per event and the widget
-//! under the pointer consumes it, so a second `hits` call on the same area from
-//! further up the tree reports nothing. It also compares rectangles in the first
-//! version, which is worse — an `Area`'s rect is pass-relative and a mouse
-//! event's `abs` is screen-absolute, so the two only agree when the window sits
-//! at the origin. Both are the hand-rolled geometry that got v2 into trouble.
+//! The gallery's Overlay page detects its hover in the *app* and does not work.
+//! The obvious fix is a wrapper — an `MpTooltipArea` that holds its trigger and
+//! its own tooltip — and **that was built, tested, and cannot work.** Recording
+//! it here because the reason is structural and would otherwise be re-attempted:
 //!
-//! So hovering belongs **in the trigger**, which is the widget that receives
-//! `Hit::FingerHoverIn` in its own `handle_event` — and this crate already
-//! computes exactly that signal: [`control::Signals::hover_in`].
+//! An overlay draw list clips to **its widget's rectangle**. A tooltip's plate is
+//! positioned at an absolute `pos` that lies *outside* a trigger-sized box, so in
+//! a `Fit`-sized wrapper the plate is clipped away. This widget works because it
+//! is `Fill`/`Fill` inside a `Fill`/`Fill` `Overlay` parent: its rectangle is the
+//! whole overlay region, and the plate is inside it.
+//!
+//! What was observed, precisely:
+//!
+//! - `Fill`/`Fill` inside the page's `Overlay` flow, opened by `show_for` —
+//!   **draws**, over a following sibling, anchored to a trigger's `Area`.
+//! - the same tooltip nested inside a `Fit` wrapper that owns its trigger —
+//!   **does not draw**, whether opened by a real hover or by calling `show()`
+//!   directly on it. The direct call is what isolated the fault to the draw path
+//!   rather than to the hover, since a synthetic pointer cannot be trusted here
+//!   (see below).
+//!
+//! So the constraint is a *usage* rule with teeth: **one tooltip per overlay
+//! region, `Fill`/`Fill`, and triggers cause it to be shown rather than owning
+//! one.** A wrapper is not an option, and neither is a tooltip per control.
+//!
+//! ## The hover, and what this tool can and cannot check
+//!
+//! Hovering belongs in the trigger — the widget that receives `Hit::FingerHoverIn`
+//! in its own `handle_event`, which is exactly what
+//! [`control::Signals::hover_in`] already computes — but a trigger cannot *own* a
+//! tooltip, so what it must do is signal one. That is a hover action from the
+//! control, handled where the one shared tooltip lives.
+//!
+//! That work is not done. Note also that a synthetic pointer warp does **not**
+//! produce a hover event in this app, so the hover path cannot be verified from a
+//! capture script at all: the evidence is that a ghost button under the warped
+//! pointer shows none of its hover wash. `GALLERY_TOOLTIP=1` exists for that
+//! reason — it exercises the plate and the anchoring without a pointer.
 //!
 //! [`control::Signals::hover_in`]: crate::mp::control::Signals
 //!
-//! The component that should exist is therefore **`MpTooltipArea`**: a container
-//! that owns its trigger geometry, shows a tooltip on hover-in and hides it on
-//! hover-out. That is also how bezel does it (`hover_card`), and it removes the
-//! app from the picture entirely.
-//!
-//! What *is* verified in the gallery is the mechanism this module exists for: a
-//! capture with `GALLERY_TOOLTIP=1` shows the plate drawn **over a following
-//! sibling** — a button the tooltip precedes in the tree — anchored from a
-//! trigger's `Area`. The overlay and the anchoring work; only the page's own
-//! hover detection does not.
-//!
-//! ## The plate
+//! ## The plate//! ## The plate
 //!
 //! A tooltip is the one surface in the library that is *inverted*: a `solid`
 //! plate carrying `on_solid` ink. That is what the palette's inverted pair is

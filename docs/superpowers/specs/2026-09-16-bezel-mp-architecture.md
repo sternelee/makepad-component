@@ -361,7 +361,25 @@ says so, and the gallery waits for a non-empty rect.
 a button the tooltip *precedes* in the tree — anchored from a trigger's `Area`. So
 the `DrawList2d` mechanism and the anchoring both work.
 
-**Not working: the gallery's hover detection.** It asks
+**A wrapper cannot host a tooltip, and this is structural.** The obvious fix for
+the hover — an `MpTooltipArea` holding its trigger and its own tooltip — was
+built, and it cannot work: **an overlay draw list clips to its widget's
+rectangle**, and a tooltip's plate is positioned outside a trigger-sized box. So
+the constraint is *one tooltip per overlay region*, `Fill`/`Fill` inside a
+`Fill`/`Fill` `Overlay` parent, with triggers causing it to be shown rather than
+owning one. Established by building the wrapper, watching it not draw, and then
+calling `show()` on it directly — which isolated the fault to the draw path
+rather than the hover.
+
+What that implies for the hover: the trigger must *signal* the one tooltip, via a
+hover action from `mp::control` — and that work is not done.
+
+**Also recorded: a synthetic pointer warp does not produce a hover event in this
+app**, so the hover path cannot be verified from a capture script at all. The
+evidence is that a ghost button under the warped pointer shows none of its hover
+wash. `GALLERY_TOOLTIP=1` exists because of it.
+
+**The gallery's hover detection asks
 `event.hits(cx, trigger_area)` from the app for a button it does not own, and
 Makepad resolves one hit per event — the widget under the pointer consumes it, so
 the second call reports nothing. The first version did something worse
