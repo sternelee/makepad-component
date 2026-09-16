@@ -45,6 +45,42 @@ script_mod! {
         }
 
         Section{
+            Caption{ text: "Stat cards — four in a row, which is how a dashboard reads them. The value takes the title rung and the label the caption one, so the row is read by number and confirmed by label rather than the other way round" }
+            mod.mp.MpStatRow{
+                width: 640
+                stat_a +: {}
+                stat_b +: {}
+                stat_c +: {}
+                stat_d +: {}
+            }
+        }
+
+        Section{
+            Caption{ text: "An empty state — the one thing a list, a pane and a search result all need when there is nothing to show. Its rhythm is the point: glyph, space, heading, a tighter space, the sentence, and the action set apart from all of it" }
+            mod.mp.SurfaceSunken{
+                width: 640
+                mod.mp.MpEmptyState{
+                    empty_title +: {text: "No terminals yet"}
+                    empty_body +: {text: "A terminal hosts a shell in its own PTY, and the canvas keeps its session alive when you minimize it."}
+                    empty_glyph +: {glyph: "\u{f120}"}
+                }
+            }
+        }
+
+        Section{
+            Caption{ text: "The same empty state without an action — for a pane whose next step is elsewhere on the screen" }
+            mod.mp.SurfaceSunken{
+                width: 640
+                mod.mp.MpEmptyState{
+                    empty_title +: {text: "Nothing matches"}
+                    empty_body +: {text: "The filter is narrower than the data."}
+                    empty_glyph +: {glyph: "\u{f002}"}
+                    empty_action +: {visible: false}
+                }
+            }
+        }
+
+        Section{
             Caption{ text: "A group box — a heading, a description, and a body" }
             mod.mp.MpGroupBox{
                 width: 460

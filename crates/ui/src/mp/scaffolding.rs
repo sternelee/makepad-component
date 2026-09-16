@@ -87,6 +87,139 @@ script_mod! {
         padding: Inset{left: 0, right: 0, top: 0, bottom: 0}
     }
 
+    // ---- the stat card ----
+    //
+    // A labelled metric. No Rust: it is a card, three labels and a badge, and the
+    // only decision is which of them the eye reaches first — the *value* takes the
+    // title rung and the label takes the caption one, so a row of stat cards is
+    // read by number and confirmed by label rather than the other way round.
+    //
+    // The delta is an `MpBadge` rather than a coloured label, so a rise and a fall
+    // use the same six tones every other status in the library uses, and the tone
+    // carries the semantics rather than the arrow's colour.
+    mod.mp.MpStatCard = mod.mp.SurfaceCard{
+        width: Fill
+        height: Fit
+        flow: Down
+        spacing: 6
+
+        stat_label := Label{
+            width: Fill
+            height: Fit
+            draw_text +: {
+                text_style: caption
+                color: text_muted
+            }
+            text: "Metric"
+        }
+        stat_value := Label{
+            width: Fill
+            height: Fit
+            draw_text +: {
+                // Deliberately a rung above the title the card's heading would
+                // take: a stat card's number is the thing being read.
+                text_style: title
+                color: text
+            }
+            text: "0"
+        }
+        stat_trend := View{
+            width: Fill
+            height: Fit
+            flow: Right
+            spacing: 6
+            align: Align{y: 0.5}
+            stat_delta := mod.mp.MpBadgeSmall{
+                tone: mod.mp.StatusTone.Neutral
+                text: "—"
+            }
+            stat_note := Label{
+                width: Fill
+                height: Fit
+                draw_text +: {
+                    text_style: caption
+                    color: text_faint
+                }
+                text: ""
+            }
+        }
+    }
+
+    // A row of them, which is how stat cards are actually used — the grid is part
+    // of the component because a single stat card is a strange object and four in
+    // a row are a dashboard.
+    mod.mp.MpStatRow = View{
+        width: Fill
+        height: Fit
+        flow: Right
+        spacing: 12
+        align: Align{y: 0.0}
+        stat_a := mod.mp.MpStatCard{}
+        stat_b := mod.mp.MpStatCard{}
+        stat_c := mod.mp.MpStatCard{}
+        stat_d := mod.mp.MpStatCard{}
+    }
+
+    // ---- the empty state ----
+    //
+    // A glyph, a heading, a sentence and an optional action. No Rust: it is the
+    // one thing a list, a pane and a search result all need when there is nothing
+    // to show, and the reason it is a component rather than a call site's
+    // three labels is that the *rhythm* is the point — glyph, then space, then
+    // heading, then a tighter space, then the sentence, and the action set apart
+    // from all of it.
+    mod.mp.MpEmptyState = View{
+        width: Fill
+        height: Fit
+        flow: Down
+        spacing: 8
+        align: Align{x: 0.5, y: 0.0}
+        padding: Inset{left: 24, right: 24, top: 32, bottom: 32}
+
+        empty_glyph := mod.mp.MpIconLarge{
+            width: 28
+            height: 28
+            glyph: "\u{f0f6}"
+        }
+        empty_title := Label{
+            width: Fit
+            height: Fit
+            draw_text +: {
+                text_style: title3
+                color: text
+            }
+            text: "Nothing here"
+        }
+        empty_body := Label{
+            width: Fill
+            height: Fit
+            align: Align{x: 0.5, y: 0.0}
+            draw_text +: {
+                text_style: footnote
+                color: text_muted
+            }
+            text: ""
+        }
+        // The action is set apart from the prose by its own container, because
+        // the gap above it is larger than the gaps inside the prose.
+        empty_action := View{
+            width: Fit
+            height: Fit
+            // A `Fill`-width container aligned to the centre, so the button inside
+            // is centred without the container stretching.
+            align: Align{x: 0.5, y: 0.0}
+            padding: Inset{left: 0, right: 0, top: 8, bottom: 0}
+            empty_action_slot := View{
+                width: Fit
+                height: Fit
+                empty_action_btn := mod.mp.MpButton{
+                    style: mod.mp.ButtonStyle.Prominent
+                    text: "Create"
+                }
+            }
+        }
+    }
+
     // ---- the key cap ----
     set_type_default() do #(DrawMpKbd::script_shader(vm)){
         ..mod.draw.DrawQuad

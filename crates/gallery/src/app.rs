@@ -21,6 +21,7 @@ use makepad_component::mp::{
     popover::MpPopoverWidgetRefExt,
     pagination::MpPaginationWidgetRefExt,
     scaffolding::MpKbdWidgetRefExt,
+    status::MpBadgeWidgetRefExt,
     list::{ListItem, MpListWidgetRefExt},
     table::MpTableWidgetRefExt,
     avatar::MpAvatarWidgetRefExt,
@@ -791,6 +792,24 @@ impl App {
 
     /// Set the content page's key caps and its group box's list.
     fn seed_content(&mut self, cx: &mut Cx) {
+        // The stat row: four metrics with their trends. The tones are the same six
+        // a badge uses, so a rise and a fall are the library's status vocabulary
+        // rather than the arrow's colour.
+        use makepad_component::mp::status::StatusTone;
+        for (card, value, label, delta, tone, note) in [
+            (ids!(stat_a), "12", "Terminals", "+3", StatusTone::Success, "since Monday"),
+            (ids!(stat_b), "2m 14s", "Median build", "-8s", StatusTone::Success, "vs last week"),
+            (ids!(stat_c), "4", "Failing tests", "+2", StatusTone::Danger, "on main"),
+            (ids!(stat_d), "62%", "Cache hit rate", "—", StatusTone::Neutral, "no baseline"),
+        ] {
+            let card_ref = self.ui.widget(cx, card);
+            card_ref.label(cx, ids!(stat_value)).set_text(cx, value);
+            card_ref.label(cx, ids!(stat_label)).set_text(cx, label);
+            card_ref.label(cx, ids!(stat_note)).set_text(cx, note);
+            card_ref.mp_badge(cx, ids!(stat_delta)).set_text(cx, delta);
+            card_ref.mp_badge(cx, ids!(stat_delta)).set_tone(cx, tone);
+        }
+
         // A chord as three caps rather than one cap with a string in it: the caps
         // share a face and a height, so three of them read as keys pressed
         // together and one string reads as a label.
