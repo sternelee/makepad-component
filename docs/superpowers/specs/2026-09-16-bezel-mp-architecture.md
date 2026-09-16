@@ -138,7 +138,7 @@ build on).
 | `mp/loaders.rs` | `MpSpinner`, `MpPulse`, `MpProgress`. The payoff for `motion::phase` — its constants are injected as instances from Rust rather than restated in the DSL. |
 | `mp/slider.rs` | `MpSlider`, and the four free functions that turn a pointer into a value. |
 | `mp/tooltip.rs` | `MpTooltip` — the overlay mechanism, verified; the gallery's hover wiring for it is proven by signal, not by capture. See below. |
-| `mp/popover.rs` | `MpPopover` — **implemented and does not open.** The click reaches the trigger's hover state; the panel never draws. See below. |
+| `mp/popover.rs` | `MpPopover` — verified: the panel opens at its trigger's bottom edge and draws over the content below. |
 | `mp/input.rs` | `MpTextInput`, `MpField`, `MpTextInputSearch`. The one component with no Rust: the caret, selection, IME, scroll-into-view and platform keys are Makepad's `TextInput`, so this styles it rather than reimplementing it. |
 
 `MpButton` is the demonstration — the v2 button against this one:
@@ -461,32 +461,32 @@ Two things it cost, both worth recording:
 `lib.rs`'s `script_mod!` and the legacy half of `install::stamp` with the last
 v2 widget.**
 
-## Open: the popover does not open
+## The popover works — and what hid it
 
-`mp/popover.rs` compiles, its page renders, and its panels are correctly invisible
-while closed. Clicking a trigger reaches the button — the hover highlight appears,
-so synthetic input does arrive — and **the panel does not draw**.
-
-Two real faults were found and fixed on the way, neither of which was the cause:
+Four faults, the last of which concealed the first two.
 
 1. The panels were nested in their trigger rows, so a `Fill`/`Fill` popover had no
-   rectangle to draw in. They are siblings of the content at the page root now —
-   the overlay region a real app declares once at the window root.
+   rectangle to draw in. They are siblings of the content at the page root now.
 2. `MpPopover` forwarded its view's children, so `panel` drew **inline**, beside
-   its trigger, whether or not the popover was open. It returns `DrawStep::done()`
-   now and the panel is drawn only in the overlay, which is what `MpTooltip` does
-   and for the same reason.
+   its trigger, open or shut. It returns `DrawStep::done()` and draws the panel
+   only in the overlay, as `MpTooltip` does.
+3. **`self.pin_popover(cx)` was never called.** The helper existed and the
+   environment variable was read, but nothing invoked it — so with
+   `GALLERY_POPOVER=1` the popover was never opened, and every conclusion drawn
+   from those runs was about a widget that had not been asked to do anything. A
+   log line at the top of `draw_walk` showed 6 calls, never `open=true`, which is
+   what exposed it.
+4. A layout rule that looked like a fault: **a `Fill` child contributes nothing to
+   a `Fit` parent's width**, so a `Fit` panel measures to its widest *intrinsic*
+   child. The form panel was 143pt wide with a 260pt field inside it, clipping
+   everything past the label. A panel of `Fill` rows must name its width.
 
-Where to look next:
-
-1. **Whether the app's listener runs.** `MpButton` was migrated onto
-   `control::handle` in the same session; its `Clicked` is now derived from
-   `Signals::activate` rather than emitted from `Hit::FingerUp`, and `activate`
-   requires a `FingerUp` with `is_over`. The hover highlight only proves
-   `FingerHoverIn` arrived.
-2. **Whether an overlay opened from an action listener is scheduled for the next
-   composite.** `MpTooltip` is opened from `handle_actions` too, but only through
-   the `GALLERY_TOOLTIP=1` path, which runs before any paint.
+**A synthetic pointer produces no hit at all in this app.** Every `event.hits`
+call in a run reports `Nothing` — for every control, over 127,564 calls — so
+neither a hover nor a click can be delivered from a capture script, and
+`GALLERY_TOOLTIP=1` / `GALLERY_POPOVER=1` are the only way to exercise a floating
+surface. That also retracts an earlier claim in this file that "a click is
+synthesizable": it is not, here.
 
 ## A workflow finding worth keeping: `act_ui` takes look-image coordinates
 

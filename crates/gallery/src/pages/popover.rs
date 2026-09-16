@@ -1,9 +1,10 @@
 //! The popover: a panel that opens under its trigger.
 //!
-//! **Clicking a trigger currently does nothing.** The click reaches the button —
-//! its hover highlight appears — but the panel never draws. See
-//! `mp/popover.rs` for the two places to look next. The page is kept in the rail
-//! rather than hidden so the gallery reports the truth about what works.
+//! **The panels are opened by `GALLERY_POPOVER=1` rather than by clicking.** Not
+//! because clicking is broken here, but because a synthetic pointer produces no
+//! hit at all in this app: every `event.hits` in a run reports `Nothing`, for
+//! every control, over 100k calls. So a capture script cannot deliver a click,
+//! and this is how the panel, its anchoring and its dismissal are checked.
 //!
 //! ## The overlay region is part of the page's structure
 //!
@@ -95,6 +96,14 @@ script_mod! {
 
         pop_form_panel := mod.mp.MpPopover{
             panel +: {
+                // The width is named, and it has to be: this panel's rows are
+                // `Fill`, and a `Fill` child contributes **nothing** to a `Fit`
+                // parent's width — so a `Fit` panel measures to its widest
+                // *intrinsic* child, which here is one label. The panel was 143pt
+                // wide with a 260pt field inside it, and everything past the
+                // label was clipped. A panel of `Fill` rows must say how wide it
+                // is, exactly as `pop_menu_panel` and `pop_tall_panel` do.
+                width: 300
                 Label{ draw_text +: {text_style: body, color: text} text: "Spawn a terminal" }
                 View{
                     width: Fill, height: Fit, flow: Down, spacing: 6

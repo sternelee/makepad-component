@@ -185,6 +185,9 @@ pub struct App {
     /// proves the action path rather than only painting.
     #[rust]
     clicks: usize,
+    /// Whether to open the first popover on the first laid-out event.
+    #[rust]
+    want_popover: bool,
     /// Whether to pin the overlay open on the first event.
     ///
     /// A flag rather than a call in `handle_startup`, because startup runs
@@ -221,6 +224,7 @@ impl MatchEvent for App {
         // script. It is also the only way to see the *hardest* property this
         // page exists for — that the plate draws over the card below it.
         self.want_tooltip = std::env::var("GALLERY_TOOLTIP").is_ok();
+        self.want_popover = std::env::var("GALLERY_POPOVER").is_ok();
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -396,6 +400,36 @@ impl App {
         }
     }
 
+    /// Open a popover without a pointer.
+    ///
+    /// The same affordance as `GALLERY_TOOLTIP`, and needed for a stronger
+    /// reason: a synthetic pointer produces **no** hit at all in this app —
+    /// every `event.hits` in a run reports `Nothing`, for every control, over
+    /// 100k calls — so a click cannot be delivered and the popover's own path is
+    /// unreachable from a capture script. This exercises the widget: the state,
+    /// the anchor, the overlay pass and the plate.
+    fn pin_popover(&mut self, cx: &mut Cx) {
+        if !self.want_popover {
+            return;
+        }
+        // Same deference as the tooltip: an `Area` is empty until its widget has
+        // been laid out, and anchoring to an empty rect puts the panel in the
+        // window corner.
+        let trigger = self.ui.widget(cx, ids!(pop_form)).area();
+        let rect = trigger.rect(cx);
+        if rect.size.x > 0.0 && rect.size.y > 0.0 {
+            // **Re-asserted on every event, not fired once.** A popover closes on
+            // any press outside its panel, and a capture run is not a clean room:
+            // the act of raising the window, or a stray synthetic press, would
+            // dismiss it before the screenshot. Firing once made the capture
+            // non-deterministic — the panel was there in one run and gone in the
+            // next — and a verification affordance that only sometimes works is
+            // worse than none. `open_for` on an already-open popover is a no-op
+            // beyond re-anchoring, so this costs nothing.
+            self.ui.mp_popover(cx, ids!(pop_form_panel)).open_for(cx, trigger);
+        }
+    }
+
     /// Write each slider's starting value into its readout.
     fn seed_readouts(&mut self, cx: &mut Cx) {
         const PAIRS: [(&[LiveId], &[LiveId]); 7] = [
@@ -539,6 +573,13 @@ impl AppMain for App {
                     .show_for(cx, trigger, "Runs the primary action");
             }
         }
+        // **Both pins must be called here or they do nothing.** The tooltip's
+        // was inlined at some point and this one's call was lost in an edit,
+        // which cost a long hunt: with `GALLERY_POPOVER=1` set and no call, the
+        // popover was never opened at all, so every "the panel does not draw"
+        // conclusion drawn from it was about a widget that had not been asked to
+        // do anything.
+        self.pin_popover(cx);
         self.match_event(cx, event);
         // Tab and Shift-Tab traversal. Makepad has a single key-focus area on
         // `Cx` and no traversal, so the app owns the pass.

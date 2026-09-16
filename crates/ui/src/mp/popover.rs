@@ -17,38 +17,31 @@
 //!   widget is the tooltip recipe with the label removed and `#[deref] view`
 //!   exposed as the content.
 //!
-//! # ⚠️ Implemented, compiles, and does not open
+//! ## It works, and the hunt for why it did not is worth recording
 //!
-//! Stated first because it is the state. The page renders, the panels are
-//! correctly invisible while closed, and clicking a trigger reaches the button —
-//! the button shows its hover highlight, so input arrives. **The panel does not
-//! appear.**
+//! Three faults, in the order they were found, and the *third* was the one that
+//! hid the other two:
 //!
-//! What is ruled out:
+//! 1. The panels were nested in their trigger rows, so a `Fill`/`Fill` popover
+//!    had no rectangle to draw in. They are siblings of the content at the page
+//!    root now — the overlay region a real app declares once at the window root.
+//! 2. This widget forwarded its view's children, so `panel` drew **inline**,
+//!    beside its trigger, open or shut. It returns `DrawStep::done()` now and the
+//!    panel draws only in the overlay, which is what `MpTooltip` does.
+//! 3. **`self.pin_popover(cx)` was never called.** The helper existed, the
+//!    environment variable was read, and nothing invoked it — so with
+//!    `GALLERY_POPOVER=1` set the popover was never opened at all. Every
+//!    "the panel does not draw" conclusion drawn from those runs was about a
+//!    widget that had not been asked to do anything. It took a log line at the
+//!    top of `draw_walk` (6 calls, never `open=true`) to see it.
 //!
-//! - The `Fill`/`Fill`-in-an-`Overlay`-flow requirement is satisfied: the page's
-//!   root is the overlay region and the popovers are siblings of the content, the
-//!   arrangement `MpTooltip` uses successfully. (The first version nested them in
-//!   their rows, which is a real fault, and fixing it changed nothing.)
-//! - Forwarding the view's children is *not* the fault any more: this widget
-//!   returns `DrawStep::done()` and draws the panel only in the overlay, which was
-//!   a real fault — panels were drawing inline beside their triggers — and fixing
-//!   it also changed nothing about opening.
+//! A fourth thing looked like a fault and is a **layout rule**: a `Fill` child
+//! contributes nothing to a `Fit` parent's width, so a `Fit` panel measures to
+//! its widest *intrinsic* child. The form panel was 143pt wide with a 260pt field
+//! inside it and everything past the label was clipped. A panel of `Fill` rows
+//! must name its width.
 //!
-//! Where to look next, in order:
-//!
-//! 1. Whether the app's listener runs at all. `MpButton` was migrated onto
-//!    `control::handle` in the same session, and its `Clicked` is now derived from
-//!    `Signals::activate` rather than emitted from `Hit::FingerUp` directly — so
-//!    the first thing to check is that a synthetic click still produces
-//!    `activate` (it requires `FingerUp` with `is_over`). The button's hover
-//!    highlight only proves `FingerHoverIn` arrived.
-//! 2. Whether an overlay draw list opened from a listener *after* the frame that
-//!    delivered the click is scheduled for the next composite. `MpTooltip` is
-//!    opened from `handle_actions` too, but only through the pinning path, which
-//!    runs before any paint.
-//!
-//! ## The tooltip's trigger could not be checked; this one is meant to be
+//! ## The tooltip's trigger could not be checked; this one is meant to be//! ## The tooltip's trigger could not be checked; this one is meant to be
 //!
 //! A tooltip's trigger is a hover, and a synthetic pointer warp produces no hover
 //! event in this app, so its plate and anchoring are only checkable through
@@ -305,9 +298,14 @@ impl Widget for MpPopover {
                 cx.begin_root_turtle(size, self.view.layout);
                 self.draw_bg.begin(cx, self.view.walk, self.view.layout);
 
-                let panel = self.view.view(cx, ids!(panel));
-                let panel_walk = panel.walk(cx).with_abs_pos(self.pos);
-                panel.draw_walk_all(cx, scope, panel_walk);
+                // `self.view`, not the `panel` child directly — the same call
+                // `MpTooltip` makes, and the difference that made this draw:
+                // a child drawn by `draw_walk_all` outside its parent's
+                // bookkeeping does not render, while the widget's own deref view
+                // does. `panel` is that view's only child, so drawing the view
+                // draws the plate.
+                let view_walk = self.view.walk(cx).with_abs_pos(self.pos);
+                self.view.draw_walk_all(cx, scope, view_walk);
 
                 self.draw_bg.end(cx);
                 self.panel = self.draw_bg.area().rect(cx.cx);
