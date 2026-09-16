@@ -1,5 +1,13 @@
 # UI 组件库开发进度（dev 分支）
 
+> ⚠️ **本文档描述的是 v2 组件集，已被 v3 端口取代。**
+> v3 的目标、法则、分层与交付阶段见
+> [`docs/superpowers/specs/2026-09-16-bezel-mp-architecture.md`](superpowers/specs/2026-09-16-bezel-mp-architecture.md)。
+> v2 的 widget 仍在运行（靠 `crates/theme/src/legacy.rs` 的兼容桥接），
+> 会随后续阶段逐个替换并删除；本文档仅作为**待替换清单与历史 bug 记录**保留，
+> 尤其是 §3 的运行时陷阱（DSL `child:{}` 覆盖、`find_widget_action` 影子 action、
+> Modal 根节点 visible、overlay z-order），这些在 v3 的新组件里不应复现。
+
 > 最后更新：2026-09-06 · 分支 `dev` · 基线 commit `e046913`
 > 参考项目：[gpui-component](https://github.com/longbridge/gpui-component)（shadcn 风格 Rust UI 库）
 > 组件源码：`crates/ui/src/widgets/`（75 个文件）· 演示：`cargo run -p component-zoo`
