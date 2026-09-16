@@ -135,6 +135,7 @@ script_mod! {
                         rail_page_36 := RailRow{text: ""}
                         rail_page_37 := RailRow{text: ""}
                         rail_page_38 := RailRow{text: ""}
+                        rail_page_39 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -208,6 +209,7 @@ script_mod! {
                             page_36 := mod.gallery.pages.editor{}
                             page_37 := mod.gallery.pages.canvas{}
                             page_38 := mod.gallery.pages.blocks{}
+                            page_39 := mod.gallery.pages.details{}
                         }
                     }
                 }
@@ -221,7 +223,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 39] = [
+const PAGE_SLOTS: [&[LiveId]; 40] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -261,10 +263,11 @@ const PAGE_SLOTS: [&[LiveId]; 39] = [
     ids!(page_36),
     ids!(page_37),
     ids!(page_38),
+    ids!(page_39),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 39] = [
+const RAIL_ROWS: [&[LiveId]; 40] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -304,6 +307,7 @@ const RAIL_ROWS: [&[LiveId]; 39] = [
     ids!(rail_page_36),
     ids!(rail_page_37),
     ids!(rail_page_38),
+    ids!(rail_page_39),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1499,6 +1503,58 @@ use makepad_component::mp::hover_card::HoverIntent;
             .set_highlighted(cx, &written, &[]);
     }
 
+    /// Fill the description lists on the details page, and print what each holds.
+    ///
+    /// The three cases are the **bound** from both sides — inside it, exactly at it, and past it — because the past-it
+    /// case is the one a caller meets by accident and the page is the only place it is visible.
+    fn seed_details(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::description_list::{DescriptionItem, MpDescriptionListWidgetRefExt, SLOTS};
+
+        let four: Vec<DescriptionItem> = vec![
+            // The tuple form, which is what a caller with literal rows writes — the `From` impl is what makes it work,
+            // and `"x".into()` inside a tuple does not (the tuple's element type is uninferred).
+            ("Operating system", "macOS 26").into(),
+            ("Renderer", "Metal").into(),
+            ("Toolkit", "Makepad").into(),
+            ("License", "MIT OR Apache-2.0").into(),
+        ];
+
+        let full: Vec<DescriptionItem> = (0..SLOTS)
+            .map(|index| DescriptionItem::new(format!("Row {}", index + 1), format!("Value {}", index + 1)))
+            .collect();
+
+        let over: Vec<DescriptionItem> = (0..SLOTS + 2)
+            .map(|index| {
+                if index == 0 {
+                    // Long enough to wrap, so the label and value columns can be seen lining up across two lines.
+                    DescriptionItem::new(
+                        "Release notes",
+                        "A value long enough to wrap onto a second line, which is where a row's alignment \
+                         either holds or does not.",
+                    )
+                } else {
+                    DescriptionItem::new(format!("Row {}", index + 1), format!("Value {}", index + 1))
+                }
+            })
+            .collect();
+
+        for (id, items) in [
+            (ids!(details_four), &four),
+            (ids!(details_full), &full),
+            (ids!(details_over), &over),
+        ] {
+            let view = self.ui.mp_description_list(cx, id);
+            view.set_items(cx, items);
+            // **What the widget was given and what it will show**, because the bound is the whole point of the page and a
+            // list that silently truncates looks exactly like one that fits.
+            println!(
+                "DETAILS offered={} shown={} slots={SLOTS}",
+                items.len(),
+                makepad_component::mp::description_list::rows_shown(items.len()),
+            );
+        }
+    }
+
     /// **The primitive phase 6 needs, proven at runtime.**
     ///
     /// The A2UI renderer builds widgets **from Rust** into a pool, because how many a surface needs is not known when
@@ -2126,6 +2182,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_details(cx);
         self.seed_v3_pool(cx);
         self.seed_canvas(cx);
         self.seed_blocks(cx);
@@ -2755,7 +2812,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 39] = [
+    const SLOT_PAGES: [&str; 40] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -2795,6 +2852,7 @@ mod tests {
         "mod.gallery.pages.editor",
         "mod.gallery.pages.canvas",
         "mod.gallery.pages.blocks",
+        "mod.gallery.pages.details",
     ];
 
     #[test]

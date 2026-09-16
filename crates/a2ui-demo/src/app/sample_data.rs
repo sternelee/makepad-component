@@ -615,3 +615,59 @@ pub(crate) fn get_sample_icons() -> String {
     ]"##
     .to_string()
 }
+
+/// A fixture whose only job is to reach the **description list**, named `A2UI_SAMPLE=detail`.
+///
+/// The same reason `get_sample_icons` exists: no shipped sample contains a `DescriptionList`, so the moment its pool
+/// moved to `mp` nothing exercised it. Four items, which is inside the widget's eight slots and more than one — so the
+/// run proves the fill **and** the rule that the last visible row has no hairline under it.
+pub(crate) fn get_sample_detail() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "details"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Details"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {
+                        "id": "details",
+                        "component": {
+                            "DescriptionList": {
+                                "items": [
+                                    {"term": {"literalString": "Operating system"}, "description": {"literalString": "macOS 26"}},
+                                    {"term": {"literalString": "Renderer"}, "description": {"literalString": "Metal"}},
+                                    {"term": {"literalString": "Toolkit"}, "description": {"literalString": "Makepad"}},
+                                    {"term": {"literalString": "License"}, "description": {"literalString": "MIT OR Apache-2.0"}}
+                                ]
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}

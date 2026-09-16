@@ -946,16 +946,26 @@ impl A2uiSurface {
         let idx = self.description_list_count;
         self.description_list_count += 1;
         let scope = self.current_scope.as_deref();
-        let items: Vec<MpDescriptionItem> = dl
+        let items: Vec<DescriptionItem> = dl
             .items
             .iter()
-            .map(|it| MpDescriptionItem::new(
+            .map(|it| DescriptionItem::new(
                 &resolve_string_value_scoped(&it.term, data_model, scope),
                 &resolve_string_value_scoped(&it.description, data_model, scope),
             ))
             .collect();
         let widget = self.pool_description_list(cx, idx);
-        widget.set_items(cx, &items);
+        widget.set_items(cx.cx, &items);
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            // `shown` is printed as well as `items`, because the widget's bound is eight and **a run that only printed
+            // `items` could not tell a correct fill from a truncated one.**
+            println!(
+                "A2UI v3_description_list items={} shown={} first={:?} from=mp::description_list::MpDescriptionList",
+                items.len(),
+                crate::mp::description_list::rows_shown(items.len()),
+                items.first().map(|item| (item.label.as_str(), item.value.as_str())),
+            );
+        }
         let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
     }
 

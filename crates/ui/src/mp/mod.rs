@@ -46,6 +46,7 @@ pub mod code;
 pub mod combobox;
 pub mod control;
 pub mod date;
+pub mod description_list;
 pub mod editor;
 pub mod feedback;
 pub mod floating;
@@ -117,6 +118,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::tree::script_mod(vm);
     crate::mp::list::script_mod(vm);
     crate::mp::markdown::script_mod(vm);
+    crate::mp::description_list::script_mod(vm);
     crate::mp::editor::script_mod(vm);
     // **After `list`.** `MpPalette` composes an `MpMenu`, which `list.rs` defines,
     // and this crate has now hit that ordering rule twice: a widget that references

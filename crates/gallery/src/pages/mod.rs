@@ -15,6 +15,7 @@ pub mod calendar;
 pub mod content;
 pub mod controls;
 pub mod document;
+pub mod details;
 pub mod editor;
 pub mod feedback;
 pub mod foundation;
@@ -74,6 +75,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     history::script_mod(vm);
     hover_card::script_mod(vm);
     document::script_mod(vm);
+    details::script_mod(vm);
     editor::script_mod(vm);
     icon::script_mod(vm);
     status::script_mod(vm);
@@ -350,6 +352,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/blocks.rs",
         blurb: "A fence tag routed to a renderer",
     },
+    Page {
+        title: "Details",
+        path: "mod.gallery.pages.details",
+        source: "crates/gallery/src/pages/details.rs",
+        blurb: "Key/value rows, and the bound on how many",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -429,6 +437,7 @@ mod tests {
             ("crates/gallery/src/pages/history.rs", "history"),
             ("crates/gallery/src/pages/hover_card.rs", "hover_card"),
             ("crates/gallery/src/pages/document.rs", "document"),
+            ("crates/gallery/src/pages/details.rs", "details"),
             ("crates/gallery/src/pages/editor.rs", "editor"),
             ("crates/gallery/src/pages/icon.rs", "icon"),
             ("crates/gallery/src/pages/status.rs", "status"),
