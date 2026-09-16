@@ -34,6 +34,7 @@
 //! does not would serialize to a jump the parser refuses to read back, and the fixed point would
 //! break. [`Doc::is_well_formed`] is the check, and the round-trip test runs it on every result.
 
+pub mod edit;
 pub mod layout;
 
 use std::ops::Range;
@@ -232,6 +233,17 @@ impl Doc {
         // The number owed to the next ordered item at each indent level, one slot per level.
         let mut expected: Vec<Option<u64>> = Vec::new();
         for block in &mut self.blocks {
+            // **A block the wire form does not write does not break a run.** An empty paragraph is skipped
+            // by `serialize` — its representation *is* the blank line between blocks — so two ordered items
+            // separated only by one come out consecutive in the markdown, renumber as 1 and 2 on the next
+            // read, and the document drifts. Numbering has to follow the wire form because the wire form is
+            // what the next parse sees.
+            //
+            // Found by the random-session test, which is the only place an empty paragraph between two list
+            // items arises: `SetKind(Ordered)` on a block next to one.
+            if matches!(&block.kind, BlockKind::Paragraph(text) if text.text.is_empty()) {
+                continue;
+            }
             let indent = block.indent as usize;
             expected.truncate(indent + 1);
             expected.resize(indent + 1, None);
@@ -268,6 +280,11 @@ pub fn parse(source: &str) -> Doc {
             index += 1;
             continue;
         }
+        // **The marker recognizers see the line before its trailing whitespace is trimmed.** `- ` is an empty
+        // bullet, and `trim()` turns it into `-`, which is a paragraph whose text is a minus — so an editor
+        // that pressed Enter at the end of a bullet produced a document whose wire form changed on the next
+        // read. `raw` keeps the trailing space; the text each recognizer returns is trimmed by the recognizer.
+        let raw = line.trim_start();
 
         // The raw indent is clamped to **one deeper than the previous block**, which is the invariant
         // and also what makes a source indented by four spaces parse rather than be rejected.
@@ -357,7 +374,7 @@ pub fn parse(source: &str) -> Doc {
         }
 
         // A task before a bullet: `- [ ]` is also a bullet, and the more specific rule has to win.
-        if let Some((checked, text)) = task(trimmed) {
+        if let Some((checked, text)) = task(raw) {
             blocks.push(Block {
                 indent,
                 kind: BlockKind::Task {
@@ -369,7 +386,7 @@ pub fn parse(source: &str) -> Doc {
             continue;
         }
 
-        if let Some(text) = bullet(trimmed) {
+        if let Some(text) = bullet(raw) {
             blocks.push(Block {
                 indent,
                 kind: BlockKind::Bullet(parse_inline(text)),
@@ -378,7 +395,7 @@ pub fn parse(source: &str) -> Doc {
             continue;
         }
 
-        if let Some((number, text)) = ordered(trimmed) {
+        if let Some((number, text)) = ordered(raw) {
             blocks.push(Block {
                 indent,
                 kind: BlockKind::Ordered {
@@ -414,74 +431,139 @@ pub fn parse(source: &str) -> Doc {
 ///   serializes as `*italic*`; `+ item` and `* item` serialize as `- item`. The document is unchanged
 ///   by each of those, which is the property rather than a compromise.
 pub fn serialize(doc: &Doc) -> String {
-    let mut out = String::new();
-    for (index, block) in doc.blocks.iter().enumerate() {
-        if index > 0 {
-            let previous = &doc.blocks[index - 1];
-            // **Any two list items are one list**, nesting included. Requiring equal indents put a blank
-            // line between `- outer` and its indented child, which ends the list on the next parse and
-            // broke the round trip for every nested list in the corpus.
-            let same_list = previous.kind.is_list_item() && block.kind.is_list_item();
-            // **One newline always ends the previous block**, and a *second* one is the blank line
-            // between blocks that are not one list. The first version pushed only the blank line, so
-            // consecutive list items came out as `- a- b` — a fault that made every list in the corpus
-            // fail at once.
-            out.push('\n');
-            if !same_list {
-                out.push('\n');
-            }
-        }
-        out.push_str(&"  ".repeat(block.indent as usize));
-        match &block.kind {
-            BlockKind::Paragraph(text) => out.push_str(&write_inline(text)),
+    // **An empty paragraph is not a line.** Its wire representation *is* the blank line that already
+    // separates two blocks, so writing a line for it produces two blank lines where one belongs — and the
+    // parser absorbs one of them, so the *second* write is shorter than the first. That is a wire form that
+    // drifts on a save/load/save, which is the one thing this function exists to prevent.
+    //
+    // Found by the exhaustive shortcut sweep in `edit.rs`: pressing Enter at the end of a paragraph is how
+    // an empty one appears, and that is not an edge case.
+    //
+    // So blocks are emitted into a list first and joined afterwards, which is what lets one be skipped
+    // without the blank-line rule counting it.
+    struct Emitted {
+        /// The block's lines with **no** indent applied.
+        body: String,
+        /// The indent level the wire form should write, which is normalised below.
+        indent: u8,
+        is_list_item: bool,
+        /// Whether the lines after the first are **raw**: a fence's content.
+        ///
+        /// A fence's content is read exactly as written, so indenting it would add the block's indent to the
+        /// code *again on every save*. Found by the random-session test after one step: an indented fence came
+        /// back with two extra spaces on its code line, and the next save would have added two more.
+        raw_body: bool,
+    }
+    let mut emitted: Vec<Emitted> = Vec::new();
+    for block in &doc.blocks {
+        let body = match &block.kind {
+            // The skip. An empty paragraph emits nothing at all.
+            BlockKind::Paragraph(text) if text.text.is_empty() => continue,
+            BlockKind::Paragraph(text) => write_inline(text),
             BlockKind::Heading { level, text } => {
-                out.push_str(&"#".repeat((*level).clamp(1, 6) as usize));
-                out.push(' ');
-                out.push_str(&write_inline(text));
+                let mut out = "#".repeat((*level).clamp(1, 6) as usize);
+                // The space only when there is something after it: `#` alone is an empty heading and reads
+                // back as one, and a trailing space is a difference a diff would show.
+                if !text.text.is_empty() {
+                    out.push(' ');
+                    out.push_str(&write_inline(text));
+                }
+                out
             }
-            BlockKind::Bullet(text) => {
-                out.push_str("- ");
-                out.push_str(&write_inline(text));
-            }
-            BlockKind::Ordered { number, text } => {
-                out.push_str(&format!("{number}. "));
-                out.push_str(&write_inline(text));
-            }
+            BlockKind::Bullet(text) => format!("- {}", write_inline(text)),
+            BlockKind::Ordered { number, text } => format!("{number}. {}", write_inline(text)),
             BlockKind::Task { checked, text } => {
-                out.push_str(if *checked { "- [x] " } else { "- [ ] " });
-                out.push_str(&write_inline(text));
+                format!(
+                    "{} {}",
+                    if *checked { "- [x]" } else { "- [ ]" },
+                    write_inline(text)
+                )
             }
             BlockKind::Quote(text) => {
                 // Through `write_inline`, so a quote's marks are written back. The first version wrote
-                // `text.text` directly and dropped them: `> quote with \`code\`` came back as
-                // `> quote with code`.
+                // `text.text` directly and dropped them.
                 let body = write_inline(text);
-                for (line_index, line) in body.split('\n').enumerate() {
-                    if line_index > 0 {
-                        out.push('\n');
-                        out.push_str(&"  ".repeat(block.indent as usize));
-                    }
-                    if line.is_empty() {
-                        out.push('>');
-                    } else {
-                        out.push_str("> ");
-                        out.push_str(line);
-                    }
-                }
+                body.split('\n')
+                    .map(|line| {
+                        if line.is_empty() {
+                            ">".to_string()
+                        } else {
+                            format!("> {line}")
+                        }
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n")
             }
             BlockKind::Code { language, code } => {
-                out.push_str("```");
-                if let Some(language) = language {
-                    out.push_str(language);
-                }
-                out.push('\n');
-                out.push_str(&code.text);
-                // A fence's content never ends with a newline in the model, so the closing marker goes
-                // on its own line and a round trip adds no blank line inside the block.
-                out.push_str("\n```");
+                let fence = match language {
+                    Some(language) => format!("```{language}"),
+                    None => "```".to_string(),
+                };
+                // A fence's content never ends with a newline in the model, so the closing marker goes on its
+                // own line and a round trip adds no blank line inside the block.
+                format!("{fence}\n{}\n```", code.text)
             }
-            BlockKind::Divider => out.push_str("---"),
+            BlockKind::Divider => "---".to_string(),
+        };
+        emitted.push(Emitted {
+            body,
+            indent: block.indent,
+            is_list_item: block.kind.is_list_item(),
+            raw_body: matches!(block.kind, BlockKind::Code { .. }),
+        });
+    }
+
+    // **The indents are normalised on what is written, not on the document.** Skipping an empty paragraph
+    // removes a block from the sequence, so the blocks after it are one level deeper than the *wire form's*
+    // first — and `parse` reads the first written block as level 0 and clamps the rest to one deeper, so the
+    // next save is shorter. The invariant has to hold of the emitted sequence, because that is what the next
+    // parse sees. Found by the random-session test at step 3318.
+    let mut previous = 0u8;
+    for (index, entry) in emitted.iter_mut().enumerate() {
+        entry.indent = if index == 0 {
+            0
+        } else {
+            entry.indent.min(previous.saturating_add(1))
+        };
+        previous = entry.indent;
+    }
+
+    let mut out = String::new();
+    for (index, entry) in emitted.iter().enumerate() {
+        if index > 0 {
+            // **One newline always ends the previous block**, and a *second* one is the blank line between
+            // blocks that are not one list. The first version pushed only the blank line, so consecutive list
+            // items came out as `- a- b`.
+            out.push('\n');
+            // **Any two list items are one list**, nesting included: requiring equal indents put a blank line
+            // between `- outer` and its indented child, which ends the list on the next parse.
+            if !(emitted[index - 1].is_list_item && entry.is_list_item) {
+                out.push('\n');
+            }
         }
+        // The indent, applied per line — except a fence's content, which is raw: indenting it would add the
+        // block's indent to the code *again on every save*.
+        let indent = "  ".repeat(entry.indent as usize);
+        let lines: Vec<&str> = entry.body.split('\n').collect();
+        let last = lines.len().saturating_sub(1);
+        let body = lines
+            .iter()
+            .enumerate()
+            .map(|(line_index, line)| {
+                let indented = if entry.raw_body {
+                    line_index == 0 || line_index == last
+                } else {
+                    true
+                };
+                if indented {
+                    format!("{indent}{line}")
+                } else {
+                    (*line).to_string()
+                }
+            })
+            .collect::<Vec<String>>()
+            .join("\n");
+        out.push_str(&body);
     }
     if out.is_empty() {
         return out;
@@ -519,7 +601,12 @@ fn heading_level(trimmed: &str) -> Option<u8> {
     }
     // `#hashtag` is a paragraph, not a heading: CommonMark requires the space, and without this rule a
     // document full of tags would parse into headings.
-    if trimmed.chars().nth(hashes) != Some(' ') {
+    //
+    // **But an empty heading is a heading.** `#` alone — or `# ` — has no following character to be a word,
+    // and an *editor* holds one the moment a reader turns an empty block into a heading or deletes a
+    // heading's text. Requiring the space made `#` parse back as a paragraph whose text is `#`, so an empty
+    // heading broke the fixed point — found by the exhaustive shortcut sweep in `edit.rs`.
+    if trimmed.len() > hashes && trimmed.chars().nth(hashes) != Some(' ') {
         return None;
     }
     Some(hashes as u8)
@@ -531,6 +618,9 @@ fn heading_level(trimmed: &str) -> Option<u8> {
 /// decide: it is a horizontal rule in CommonMark when it is alone on its line, and that is the reading
 /// that keeps a document with dividers round-tripping.
 fn is_divider(trimmed: &str) -> bool {
+    // Trimmed here rather than by the caller, because the caller now passes a form that keeps trailing
+    // whitespace for the marker recognizers: `--- ` is still a rule.
+    let trimmed = trimmed.trim();
     for marker in ['-', '*', '_'] {
         let count = trimmed.chars().filter(|c| *c == marker).count();
         if count >= 3 && count == trimmed.chars().count() {
@@ -1222,3 +1312,4 @@ mod tests {
         assert!(!bad_start.is_well_formed());
     }
 }
+

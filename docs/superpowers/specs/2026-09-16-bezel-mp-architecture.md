@@ -557,6 +557,53 @@ And the fix's first attempt was wrong in an instructive way: it also had an `on_
 DSL value across again, which is *the wipe it was written to prevent, one apply later*. `on_after_new` is
 the only hook that runs before a caller can set anything.
 
+### The editing half: where the flat model's claim is cashed
+
+`lib.rs` says the shape was chosen because *"editing a flat list means Enter splits, Backspace merges and
+Tab indents — all list operations"*. `edit.rs` is where that claim is cashed: **every operation is a `Vec`
+operation plus a byte splice**, and none of them traverses anything.
+
+The rules are mostly Notion's, and each has a reason: Enter at the end of a heading gives a **paragraph**
+(that is how you stop writing a heading); Enter on an **empty** list item outdents it and at level 0 turns it
+into a paragraph (without that rule there is no way out of a list); Backspace at the start of an indented
+item **outdents** rather than merging (merging is a much bigger edit than the reader asked for); Tab is
+**bounded by the invariant**, which is what keeps the serializer's assumption true.
+
+Two structural decisions turned out to matter more than any individual rule:
+
+1. **An invariant that every operation must remember is one that one will forget.** Each operation already
+   tried to maintain the indent invariant, and it was not enough: removing the first block left whatever
+   became first at its old indent, and one random step produced `[Task at indent 1]` as a whole document. It
+   is now established **once**, after whatever happened, alongside the renumber and the fence-mark clearing.
+2. **A guarantee is only as strong as what the wire form can express.** The property tests began by asserting
+   `parse(serialize(doc)) == doc` after every edit, which is **false and cannot be true**: markdown has no
+   spelling for an empty paragraph, for text with a leading or trailing space, or for an empty list item
+   whose marker is trimmed. The honest property is the one an editor needs — **the wire form is stable across
+   a save/load/save** — and getting *that* to hold found the real bugs.
+
+### Ten bugs the property tests found, none of which an example would have
+
+The exhaustive sweep (every shortcut at every offset of every block kind) and the random session (4000
+shortcuts) found, in order:
+
+| # | fault |
+|---|---|
+| 1 | a shortcut that changed nothing returned `Some(unchanged)`, so the caller could not tell a no-op from an edit |
+| 2 | a mark inside a **code block** survived an edit and was silently lost on save — breaking the fixed point |
+| 3 | an **empty heading** parsed back as a paragraph whose text was `#`, because the marker rule required a space |
+| 4 | an **empty paragraph** wrote a line of its own, giving two blank lines where one belongs — and the parser absorbed one, so the second save was shorter |
+| 5 | an **indented fence** re-indented its own content on every save |
+| 6 | a split could leave a block whose text **started with a space** (which `parse` trims) |
+| 7 | and one whose text **ended** with one, because advancing a single offset past the spaces *gives them to the head* |
+| 8 | an **empty bullet** was unrepresentable: `- ` trims to `-`, so it read back as a paragraph whose text is a minus |
+| 9 | **numbering did not follow the wire form**: an empty paragraph between two ordered items is skipped when written, so the two become consecutive and renumber to `1, 2` on the next read — the numbering has to be computed on what is *written*, because that is what the next parse sees |
+| 10 | the **emitted** sequence's indents were not normalised: with a skipped leading block, the wire form's first block carried an indent that `parse` forces to 0 |
+
+Plus three of my own test errors, each of which had the library right: a selection offset taken from the
+*source* rather than the parsed text, a Backspace expectation that removed the character *at* the caret rather
+than before it, and a "tab carries the children" test that tried to indent a block the invariant already
+allowed no deeper.
+
 **What is not verified:** the paint itself, because screen capture is unavailable. What *is* verified, from
 the widget's own printed numbers on the actual page: 14 blocks in both columns, **18 lines at measure 620
 and 23 at 300**, heights 520.70 and 624.70, and `drawn` matching the computed height exactly in both — with
