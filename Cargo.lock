@@ -1472,6 +1472,7 @@ dependencies = [
 name = "gallery"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "makepad-component",
  "makepad-motion",
  "makepad-theme",

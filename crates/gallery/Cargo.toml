@@ -10,3 +10,7 @@ makepad-component = { workspace = true }
 makepad-theme = { workspace = true }
 makepad-motion = { workspace = true }
 makepad-widgets = { workspace = true }
+# For the local timezone offset only. The date arithmetic lives in
+# `makepad_component::mp::date` and is tested; what a library cannot know is **which
+# zone the reader is in**, and that is the one thing this asks the OS for.
+libc = "0.2"

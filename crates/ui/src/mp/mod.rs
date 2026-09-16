@@ -42,6 +42,7 @@ pub mod bars;
 pub mod button;
 pub mod checkbox;
 pub mod control;
+pub mod date;
 pub mod feedback;
 pub mod icon;
 pub mod input;
@@ -76,6 +77,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     // and a widget's DSL block names the prototype it inherits.
     crate::mp::surface::script_mod(vm);
     crate::mp::layout::script_mod(vm);
+    crate::mp::date::script_mod(vm);
     // The shared animator prototype every control inherits. Before the
     // controls, because their DSL blocks name it.
     crate::mp::control::script_mod(vm);

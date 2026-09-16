@@ -11,6 +11,7 @@
 pub mod avatar;
 pub mod bars;
 pub mod button;
+pub mod calendar;
 pub mod content;
 pub mod controls;
 pub mod feedback;
@@ -50,6 +51,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     motion::script_mod(vm);
     bars::script_mod(vm);
     button::script_mod(vm);
+    calendar::script_mod(vm);
     controls::script_mod(vm);
     layout::script_mod(vm);
     loaders::script_mod(vm);
@@ -262,6 +264,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/palette.rs",
         blurb: "The query, the list, and the cursor",
     },
+    Page {
+        title: "Calendar",
+        path: "mod.gallery.pages.calendar",
+        source: "crates/gallery/src/pages/calendar.rs",
+        blurb: "The month grid and its arithmetic",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -328,6 +336,7 @@ mod tests {
             ("crates/gallery/src/pages/motion.rs", "motion"),
             ("crates/gallery/src/pages/bars.rs", "bars"),
             ("crates/gallery/src/pages/button.rs", "button"),
+            ("crates/gallery/src/pages/calendar.rs", "calendar"),
             ("crates/gallery/src/pages/controls.rs", "controls"),
             ("crates/gallery/src/pages/layout.rs", "layout"),
             ("crates/gallery/src/pages/loaders.rs", "loaders"),

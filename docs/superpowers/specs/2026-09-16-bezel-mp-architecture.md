@@ -151,6 +151,60 @@ build on).
 | `mp/bars.rs` | `MpTitlebar`, `MpControlBar`, `MpMenubar` — the three horizontal chrome strips. |
 | `mp/palette.rs` | `remap` / `step` / `original` / `MpPalette` — the query, the list, and the cursor. |
 | `mp/segmented.rs` | `slot_at` / `slot_span` / `valid` / `MpSegmented` — the track and the plate. |
+| `mp/date.rs` | `is_leap` / `weekday` / `month_grid` / `shift_month` / `MpDate` — the calendar. |
+
+### A right calendar is wrong on a small fraction of dates
+
+That is the worst possible failure rate: it survives every look-at-it test and then
+puts an appointment on the wrong day. So the arithmetic is the module and the grid is
+the easy part, and the tests are aimed at the two ways it goes wrong invisibly:
+
+1. **The leap rule.** A century is a leap year only when divisible by 400 — 2000 is,
+1930 and 2100 are not — so an approximation is correct for three years in four.
+2. **The weekday of a date**, which needs a real algorithm. The one here is Hinnant's
+`days_from_civil`, and the test that it is right is **not an anchor date**: it is a
+second, independent computation that walks one day at a time from the epoch and
+advances the weekday by hand — forward *and* backward, because the backward walk is
+what exercises the era division's `- 399` (without it every date before 1970 is a day
+off and no modern date shows it). Two more properties carry the weight no anchor can:
+the **400-year cycle** (400 years is exactly 146097 days, a whole number of weeks, so
+every date shares its weekday 400 years later — true only if the century rules are all
+right), and the grid invariant checked over a **whole Gregorian cycle** (1970..2370 ×
+12 months × 2 week starts): every day present, in order, in consecutive cells.
+
+The weekday arithmetic was then checked **against the OS's own calendar** for seven
+dates spanning 56 years — `2026-09-01 Tuesday`, `2026-09-17 Thursday`, `1970-01-01
+Thursday`, `2000-01-01 Saturday`, `2024-12-25 Wednesday`, `2026-02-01 Sunday`,
+`2026-05-01 Friday` — all seven matching.
+
+### The library does not read the clock, and that caught a real bug
+
+`today` is set by the caller. A widget calling `SystemTime::now()` itself would be
+untestable, would disagree with the app's own idea of today across midnight, and would
+make "is this cell today" uncheckable without waiting a day.
+
+Having made that split, the *app* then got it wrong in a way worth recording: it
+computed today as `epoch_seconds / 86400`, which is the **UTC** day. On this machine
+(`UTC+8`) that is the *previous* day for the first eight hours of every local day — the
+page printed `today=2026-09-16` while the system clock said `2026-09-17`, and a calendar
+ringing the wrong day is wrong in exactly the way this module's own doc calls the worst
+failure rate. The fix is `date_from_epoch_seconds(seconds, offset_seconds)`: the offset
+is a **parameter**, because a library cannot know the zone, and the app asks the OS
+once via `libc::localtime_r`'s `tm_gmtoff`. Tests now cover the case that broke, both
+directions (a zone east of UTC can be a day ahead, one west can be a day behind), and
+the pre-epoch sign case where `div_euclid` floors and `/` would truncate.
+
+Verified after the fix: the app prints `today=2026-09-17 (offset +28800s)`, matching the
+system's local date.
+
+### A glyph that is missing looks exactly like a glyph that is present
+
+The calendar's month arrows were `\u{f053}` and `\u{f054}` — FontAwesome's
+chevron-left and chevron-right — which are **not in this port's icon subset**, so the
+first render drew two tofu boxes either side of the month name. Nothing errored. They
+are now `‹` and `›` from the text face. The glyphs that *are* in the subset are the ones
+already used elsewhere (`f002`, `f067`, `f00c`), which is why this had never come up
+before.
 
 ### A widget that must exist rather than be composed, and the two bugs its first render showed
 

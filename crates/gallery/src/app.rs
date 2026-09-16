@@ -30,6 +30,7 @@ use makepad_component::mp::{
     slider::MpSliderWidgetRefExt,
     segmented::MpSegmentedWidgetRefExt,
     switch::MpSwitchWidgetRefExt,
+    date::MpDateWidgetRefExt,
 };
 
 use crate::pages::PAGES;
@@ -115,6 +116,7 @@ script_mod! {
                         rail_page_25 := RailRow{text: ""}
                         rail_page_26 := RailRow{text: ""}
                         rail_page_27 := RailRow{text: ""}
+                        rail_page_28 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -177,6 +179,7 @@ script_mod! {
                             page_25 := mod.gallery.pages.search{}
                             page_26 := mod.gallery.pages.bars{}
                             page_27 := mod.gallery.pages.command_palette{}
+                            page_28 := mod.gallery.pages.calendar{}
                         }
                     }
                 }
@@ -190,7 +193,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 28] = [
+const PAGE_SLOTS: [&[LiveId]; 29] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -219,10 +222,11 @@ const PAGE_SLOTS: [&[LiveId]; 28] = [
     ids!(page_25),
     ids!(page_26),
     ids!(page_27),
+    ids!(page_28),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 28] = [
+const RAIL_ROWS: [&[LiveId]; 29] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -251,6 +255,7 @@ const RAIL_ROWS: [&[LiveId]; 28] = [
     ids!(rail_page_25),
     ids!(rail_page_26),
     ids!(rail_page_27),
+    ids!(rail_page_28),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -374,6 +379,7 @@ impl MatchEvent for App {
         self.handle_controls(cx, actions);
         self.handle_sliders(cx, actions);
         self.handle_segmented(cx, actions);
+        self.handle_date(cx, actions);
         self.handle_palette(cx, actions);
         self.handle_input(cx, actions);
     }
@@ -495,6 +501,78 @@ impl App {
                         self.ui.mp_tooltip(cx, ids!(tip)).hide(cx);
                     }
                 }
+            }
+        }
+    }
+
+    /// Give the calendars a real today and an initial selection.
+    ///
+    /// **The app reads the clock, not the library.** `SystemTime` gives seconds since
+    /// the epoch; this divides by 86400 to get a day count and hands it to the date
+    /// module's inverse. That keeps the arithmetic — the part that can be wrong —
+    /// testable, and it keeps "today" the app's business rather than a widget's.
+    fn seed_date(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::date::{date_from_epoch_seconds, YearMonth};
+        let seconds = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        // **Not `seconds / 86400`.** That is the UTC day, and on this machine (UTC+8)
+        // it is the *previous* day for the first eight hours of every local day: the
+        // page printed `today=2026-09-16` while the system clock said `2026-09-17`.
+        // A library cannot know the zone, so it takes the offset as a parameter and
+        // this is where it comes from — the OS, once, at seed time.
+        let offset = local_utc_offset_seconds();
+        let (year, month, day) = date_from_epoch_seconds(seconds, offset);
+        let today = (year, month, day);
+        // A fixed selection, so the page shows a plate as well as a ring and the two
+        // are distinguishable.
+        let selected = (2026, 9, 9);
+
+        // Every calendar gets the same today and selection, including the
+        // Monday-first one — which had no id at all in the first version of the page,
+        // so it was never seeded and opened on January 1970 while the others showed
+        // September 2026. Nothing errored; the month was just a different one.
+        for path in [ids!(cal_sunday), ids!(cal_monday), ids!(cal_worst)] {
+            self.ui.mp_date(cx, path).set_today(cx, Some(today));
+            self.ui.mp_date(cx, path).set_selected(cx, Some(selected));
+        }
+        self.ui
+            .mp_date(cx, ids!(cal_worst))
+            .show(cx, YearMonth::new(2026, 5));
+        for path in [ids!(cal_sunday), ids!(cal_monday)] {
+            self.ui.mp_date(cx, path).show(cx, YearMonth::new(2026, 9));
+        }
+
+        println!(
+            "DATE today={year:04}-{month:02}-{day:02} (offset {offset:+}s, epoch second {seconds}) selected={selected:?}"
+        );
+        self.ui.label(cx, ids!(cal_readout)).set_text(
+            cx,
+            &format!("selected = {:04}-{:02}-{:02}", selected.0, selected.1, selected.2),
+        );
+        self.ui.label(cx, ids!(cal_today_note)).set_text(
+            cx,
+            &format!("today = {year:04}-{month:02}-{day:02} (zone offset {offset:+}s)"),
+        );
+    }
+
+    /// Follow the calendar's month arrows and day clicks on the page's readout.
+    fn handle_date(&mut self, cx: &mut Cx, actions: &Actions) {
+        for path in [ids!(cal_sunday), ids!(cal_monday), ids!(cal_worst)] {
+            if let Some((y, m, d)) = self.ui.mp_date(cx, path).day_selected(actions) {
+                println!("DATE selected {y:04}-{m:02}-{d:02}");
+                self.ui
+                    .label(cx, ids!(cal_readout))
+                    .set_text(cx, &format!("selected = {y:04}-{m:02}-{d:02}"));
+                // The other calendar follows, so the two grids never disagree about
+                // which day is chosen.
+                for other in [ids!(cal_sunday), ids!(cal_monday), ids!(cal_worst)] {
+                    self.ui.mp_date(cx, other).set_selected(cx, Some((y, m, d)));
+                }
+            }
+            if let Some(view) = self.ui.mp_date(cx, path).view_changed(actions) {
+                println!("DATE view changed to {:04}-{:02}", view.year, view.month);
             }
         }
     }
@@ -777,6 +855,7 @@ impl App {
         self.seed_search(cx);
         self.seed_palette(cx);
         self.seed_segmented(cx);
+        self.seed_date(cx);
     }
 
     /// Fill the table page's tables.
@@ -1338,6 +1417,27 @@ impl AppMain for App {
     }
 }
 
+/// How far the local zone is ahead of UTC, in seconds.
+///
+/// The one thing the date module cannot be asked for, because it is not arithmetic —
+/// it is a fact about where the machine is. Asked of the OS with `localtime_r`, which
+/// is POSIX; a Windows build would need `_get_timezone`, and saying so here is better
+/// than a silent zero.
+fn local_utc_offset_seconds() -> i64 {
+    // Safety: `localtime_r` writes into the `tm` this owns and reads a time this owns;
+    // neither pointer escapes.
+    unsafe {
+        let now = libc::time(std::ptr::null_mut());
+        let mut tm: libc::tm = std::mem::zeroed();
+        if libc::localtime_r(&now, &mut tm).is_null() {
+            // Falling back to UTC rather than to a guess. It is wrong for part of
+            // every day, which is precisely why it is logged.
+            return 0;
+        }
+        tm.tm_gmtoff as i64
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1376,7 +1476,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 28] = [
+    const SLOT_PAGES: [&str; 29] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -1405,6 +1505,7 @@ mod tests {
         "mod.gallery.pages.search",
         "mod.gallery.pages.bars",
         "mod.gallery.pages.command_palette",
+        "mod.gallery.pages.calendar",
     ];
 
     #[test]
