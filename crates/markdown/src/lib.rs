@@ -272,6 +272,48 @@ impl Doc {
 /// The subset this port carries is listed in the module doc; what matters here is that the result
 /// **always satisfies the indent invariant**, because a parser that let an indent jump by two would
 /// produce a document its own serializer could not write back.
+/// Whether a URL's **name** says it paints as an image.
+///
+/// Asked by two callers that must agree: the paste menu, which offers "Create image" only where a picture can go, and a
+/// renderer, which decides whether to paint one. A shared predicate rather than two lists is the whole point — the two
+/// disagreeing is how a menu offers a row that paints a broken box.
+///
+/// The rule is the **last path segment's extension**, so all of these are images:
+///
+/// - `https://host/picture.png`
+/// - `https://host/a/b/photo.JPEG` — case does not matter, because a URL's case is the server's business
+/// - `https://host/pic.webp?w=400&h=200#top` — the query and the fragment are not part of the name
+/// - `https://host/download.jpg/` — a trailing slash, which servers hand out
+///
+/// And these are not, because this answers from the text and **nothing here fetches anything**:
+///
+/// - `https://host/photo` — no extension says nothing; guessing would paint a broken box
+/// - `https://host/a.png/index.html` — the last segment wins, and it is not an image
+/// - `https://img.example.com` — a bare host is not a file
+///
+/// An extension **list** rather than "does the name contain a dot": `report.pdf` and `page.html` are files with
+/// extensions and neither is a picture.
+pub fn is_image(url: &str) -> bool {
+    // The fragment first, then the query: a fragment can contain a `?`, so taking the query first would keep part of
+    // the fragment as the name.
+    let without_fragment = url.split('#').next().unwrap_or(url);
+    let without_query = without_fragment.split('?').next().unwrap_or(without_fragment);
+    let trimmed = without_query.trim_end_matches('/');
+    let Some(segment) = trimmed.rsplit('/').next() else {
+        return false;
+    };
+    let Some((_, extension)) = segment.rsplit_once('.') else {
+        return false;
+    };
+    if extension.is_empty() || extension.contains('/') {
+        return false;
+    }
+    matches!(
+        extension.to_ascii_lowercase().as_str(),
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "avif" | "bmp" | "svg" | "ico" | "tif" | "tiff"
+    )
+}
+
 pub fn parse(source: &str) -> Doc {
     let mut blocks: Vec<Block> = Vec::new();
     let lines: Vec<&str> = source.split('\n').collect();
@@ -1315,5 +1357,48 @@ mod tests {
         };
         assert!(!bad_start.is_well_formed());
     }
+    #[test]
+    fn test_a_name_that_says_image_is_an_image() {
+        // The rule is the **last path segment's extension**, and the cases are the ones a real URL arrives as.
+        for url in [
+            "https://host/picture.png",
+            "https://host/a/b/photo.JPEG",
+            "https://host/pic.webp?w=400&h=200",
+            "https://host/pic.png#top",
+            "https://host/pic.png?w=1#top",
+            "https://host/download.jpg/",
+            "/local/path/thing.gif",
+            "thing.avif",
+        ] {
+            assert!(is_image(url), "{url} should be an image");
+        }
+    }
+
+    #[test]
+    fn test_a_name_that_does_not_say_image_is_not_one() {
+        // **This answers from the text and fetches nothing.** Guessing would paint a broken box, and the menu offers
+        // "Create image" only where a picture can go.
+        for url in [
+            "https://host/photo",
+            "https://img.example.com",
+            "https://host/a.png/index.html",
+            "https://host/report.pdf",
+            "https://host/page.html",
+            "https://host/.",
+            "https://host/pic.",
+            "",
+        ] {
+            assert!(!is_image(url), "{url} should not be an image");
+        }
+    }
+
+    #[test]
+    fn test_the_fragment_is_taken_before_the_query_because_a_fragment_can_contain_a_query() {
+        // `#a?b` — taking the query first would leave `pic.png#a` as the name, and `#a` is not an extension. The order
+        // of the two splits is the whole test.
+        assert!(is_image("https://host/pic.png#a?b"));
+        assert!(!is_image("https://host/photo#a?b.png"));
+    }
+
 }
 

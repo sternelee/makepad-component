@@ -107,9 +107,15 @@ pub enum Shortcut {
 
 /// The kinds a shortcut can turn a block into, as data.
 ///
-/// A small closed enum rather than a `BlockKind`, because two of the model's variants carry data a key
-/// cannot supply: an `Image` needs a URL and a `Code` block needs a language. What a key can do is choose
-/// a *shape*, and this is exactly the set of shapes it can choose.
+/// A small closed enum rather than a `BlockKind`, because one of the model's variants carries data a key
+/// cannot supply: a `Code` block needs a language, and a key has no way to name one. What a key can do is
+/// choose a *shape*, and this is exactly the set of shapes it can choose.
+///
+/// **This used to say "an `Image` needs a URL and a `Code` block needs a language" — and there is no `Image`
+/// variant in [`BlockKind`].** A doc that names a variant the model does not have is worse than no doc: it
+/// reads as a description of the model, so a reader plans against an image block that cannot be constructed.
+/// Found while working out what applying the paste menu's card rows would need — which is exactly the question
+/// the stale sentence would have answered wrongly.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SetKind {
     Paragraph,

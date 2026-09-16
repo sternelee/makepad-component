@@ -17,9 +17,11 @@
 //! - [`EditKind`] — what an edit did, in the four kinds the coalescing rules need.
 
 pub mod history;
+pub mod link;
 pub mod slash;
 pub mod snapshot;
 
 pub use history::{DEFAULT_UNDO_LIMIT, EditKind, History, Step};
+pub use link::{Choice, Paste, CHOICES};
 pub use slash::{item, items, label, query as slash_query, Item, SlashMenu};
 pub use snapshot::SnapshotHistory;
