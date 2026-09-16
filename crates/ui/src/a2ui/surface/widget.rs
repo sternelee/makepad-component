@@ -638,11 +638,14 @@ impl A2uiSurface {
         fn load(cx: &mut Cx, src: &Option<ScriptHandleRef>, jpg: bool) -> Option<Texture> {
             let handle_ref = src.as_ref()?;
             let handle = handle_ref.as_handle();
-            let data = if let Some(data) = cx.get_resource(handle) {
+            // A handle value only means something inside its owning script heap,
+            // so resource lookups take the (heap_key, handle) pair.
+            let heap_key = handle_ref.heap_key();
+            let data = if let Some(data) = cx.get_resource(heap_key, handle) {
                 data
             } else {
-                cx.load_script_resource(handle);
-                cx.get_resource(handle)?
+                cx.load_script_resource(heap_key, handle);
+                cx.get_resource(heap_key, handle)?
             };
             let image = if jpg {
                 ImageBuffer::from_jpg(&data).ok()?
