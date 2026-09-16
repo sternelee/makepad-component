@@ -146,6 +146,21 @@ build on).
 | `mp/avatar.rs` | `MpAvatar`, `MpAvatarGroup` — initials with a plate derived from the name, presence reusing the badge tones, and an overlapped group. |
 | `mp/text.rs` | Measuring and clipping one line, shared by the three row-painting widgets. |
 | `mp/list.rs` | `MpList`, `MpMenu` — a glyph, a label and a trailing detail; a menu is the same widget with one flag. |
+| `mp/scroll.rs` | `MpScroll`, `MpScrollBoth` — the scroll bar, themed. |
+
+### The chrome nobody looked at
+
+Every page in the gallery scrolled inside a bare Makepad `ScrollYView`, whose handle
+is painted from **Makepad's own theme** (`theme.color_outset` and its hover and drag
+siblings) — not from this palette. So the one piece of chrome on every page was the
+one piece that was not designed here, and it stayed that way through twenty-four
+pages because **a scroll bar is chrome and nobody looks at chrome**.
+
+`mp/scroll.rs` themes it and the gallery's page area uses `MpScroll` now, so the fix
+lands on every page rather than on a demo page. The general lesson: a component
+library that does not theme the parts of the framework it uses has a hole in it
+exactly where nobody looks, and "I built the components" is not the same claim as
+"every pixel on the screen came from this library".
 | `mp/feedback.rs` | `MpProgressRing`, `MpSkeleton` — the determinate ring and the shape of content that has not arrived. |
 | `mp/scaffolding.rs` | `MpGroupBox`, `MpGroupBoxPlain`, `MpKbd`, `MpStatCard`, `MpStatRow`, `MpEmptyState` — the assembly-only components: no Rust, and each is a rhythm rather than a drawing. |
 | `mp/pagination.rs` | `MpPagination` — **the arithmetic is tested and the row renders; the page numbers do not draw.** See below. |

@@ -110,6 +110,7 @@ script_mod! {
                         rail_page_21 := RailRow{text: ""}
                         rail_page_22 := RailRow{text: ""}
                         rail_page_23 := RailRow{text: ""}
+                        rail_page_24 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -133,7 +134,12 @@ script_mod! {
                         flow: Down
                         padding: Inset{left: 28, right: 28, top: 24, bottom: 24}
 
-                        ScrollYView{
+                        // The library's scroll, not Makepad's bare one: this is
+                        // what every page scrolls inside, and a bare
+                        // `ScrollYView` would paint its handle from Makepad's own
+                        // theme — the one piece of chrome on every page that was
+                        // not designed here.
+                        mod.mp.MpScroll{
                             width: Fill
                             height: Fill
                             flow: Down
@@ -163,6 +169,7 @@ script_mod! {
                             page_21 := mod.gallery.pages.content{}
                             page_22 := mod.gallery.pages.pagination{}
                             page_23 := mod.gallery.pages.menu{}
+                            page_24 := mod.gallery.pages.scroll{}
                         }
                     }
                 }
@@ -176,7 +183,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 24] = [
+const PAGE_SLOTS: [&[LiveId]; 25] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -201,10 +208,11 @@ const PAGE_SLOTS: [&[LiveId]; 24] = [
     ids!(page_21),
     ids!(page_22),
     ids!(page_23),
+    ids!(page_24),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 24] = [
+const RAIL_ROWS: [&[LiveId]; 25] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -229,6 +237,7 @@ const RAIL_ROWS: [&[LiveId]; 24] = [
     ids!(rail_page_21),
     ids!(rail_page_22),
     ids!(rail_page_23),
+    ids!(rail_page_24),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1100,7 +1109,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 24] = [
+    const SLOT_PAGES: [&str; 25] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -1125,6 +1134,7 @@ mod tests {
         "mod.gallery.pages.content",
         "mod.gallery.pages.pagination",
         "mod.gallery.pages.menu",
+        "mod.gallery.pages.scroll",
     ];
 
     #[test]
