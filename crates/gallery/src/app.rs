@@ -19,6 +19,7 @@ use makepad_component::mp::{
     feedback::MpProgressRingWidgetRefExt,
     loaders::MpProgressWidgetRefExt,
     popover::MpPopoverWidgetRefExt,
+    scaffolding::MpKbdWidgetRefExt,
     list::{ListItem, MpListWidgetRefExt},
     table::MpTableWidgetRefExt,
     avatar::MpAvatarWidgetRefExt,
@@ -104,6 +105,7 @@ script_mod! {
                         rail_page_18 := RailRow{text: ""}
                         rail_page_19 := RailRow{text: ""}
                         rail_page_20 := RailRow{text: ""}
+                        rail_page_21 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -154,6 +156,7 @@ script_mod! {
                             page_18 := mod.gallery.pages.list{}
                             page_19 := mod.gallery.pages.select{}
                             page_20 := mod.gallery.pages.feedback{}
+                            page_21 := mod.gallery.pages.content{}
                         }
                     }
                 }
@@ -167,7 +170,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 21] = [
+const PAGE_SLOTS: [&[LiveId]; 22] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -189,10 +192,11 @@ const PAGE_SLOTS: [&[LiveId]; 21] = [
     ids!(page_18),
     ids!(page_19),
     ids!(page_20),
+    ids!(page_21),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 21] = [
+const RAIL_ROWS: [&[LiveId]; 22] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -214,6 +218,7 @@ const RAIL_ROWS: [&[LiveId]; 21] = [
     ids!(rail_page_18),
     ids!(rail_page_19),
     ids!(rail_page_20),
+    ids!(rail_page_21),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -518,6 +523,7 @@ impl App {
         self.seed_lists(cx);
         self.seed_selects(cx);
         self.seed_feedback(cx);
+        self.seed_content(cx);
     }
 
     /// Fill the table page's tables.
@@ -777,6 +783,28 @@ impl App {
         }
     }
 
+    /// Set the content page's key caps and its group box's list.
+    fn seed_content(&mut self, cx: &mut Cx) {
+        // A chord as three caps rather than one cap with a string in it: the caps
+        // share a face and a height, so three of them read as keys pressed
+        // together and one string reads as a label.
+        self.ui.mp_kbd(cx, ids!(kbd_cmd)).set_text(cx, "⌘");
+        self.ui.mp_kbd(cx, ids!(kbd_shift)).set_text(cx, "⇧");
+        self.ui.mp_kbd(cx, ids!(kbd_p)).set_text(cx, "P");
+
+        use makepad_component::mp::list::ListItem;
+        self.ui
+            .mp_list(cx, ids!(group_list))
+            .set_items(
+                cx,
+                vec![
+                    ListItem::new("agent-workbench").glyph("\u{f120}").detail("3"),
+                    ListItem::new("cef-browsers").glyph("\u{f0ac}").detail("2"),
+                    ListItem::new("nightly-sync").glyph("\u{f017}").detail("1"),
+                ],
+            );
+    }
+
     /// Write each slider's starting value into its readout.
     fn seed_readouts(&mut self, cx: &mut Cx) {
         const PAIRS: [(&[LiveId], &[LiveId]); 7] = [
@@ -977,7 +1005,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 21] = [
+    const SLOT_PAGES: [&str; 22] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -999,6 +1027,7 @@ mod tests {
         "mod.gallery.pages.list",
         "mod.gallery.pages.select",
         "mod.gallery.pages.feedback",
+        "mod.gallery.pages.content",
     ];
 
     #[test]

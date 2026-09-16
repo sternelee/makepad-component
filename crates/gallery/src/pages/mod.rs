@@ -10,6 +10,7 @@
 
 pub mod avatar;
 pub mod button;
+pub mod content;
 pub mod controls;
 pub mod feedback;
 pub mod foundation;
@@ -58,6 +59,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     list::script_mod(vm);
     select::script_mod(vm);
     feedback::script_mod(vm);
+    content::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -202,6 +204,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/feedback.rs",
         blurb: "The ring and the skeleton",
     },
+    Page {
+        title: "Content",
+        path: "mod.gallery.pages.content",
+        source: "crates/gallery/src/pages/content.rs",
+        blurb: "Group boxes and key caps",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -283,6 +291,7 @@ mod tests {
             ("crates/gallery/src/pages/list.rs", "list"),
             ("crates/gallery/src/pages/select.rs", "select"),
             ("crates/gallery/src/pages/feedback.rs", "feedback"),
+            ("crates/gallery/src/pages/content.rs", "content"),
         ]
         .into_iter()
         .collect();

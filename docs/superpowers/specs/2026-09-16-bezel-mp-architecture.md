@@ -147,6 +147,7 @@ build on).
 | `mp/text.rs` | Measuring and clipping one line, shared by the three row-painting widgets. |
 | `mp/list.rs` | `MpList` — a glyph, a label and a trailing detail. The third data widget and the simplest. |
 | `mp/feedback.rs` | `MpProgressRing`, `MpSkeleton` — the determinate ring and the shape of content that has not arrived. |
+| `mp/scaffolding.rs` | `MpGroupBox`, `MpGroupBoxPlain`, `MpKbd` — a titled card, and a key cap. |
 
 ### An `#[live]` field lost a Rust write, and the cause is still unknown
 
