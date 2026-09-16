@@ -13,6 +13,8 @@ makepad-syntax = { path = "../syntax" }
 makepad-markdown = { path = "../markdown" }
 makepad-editor = { path = "../editor" }
 makepad-canvas = { path = "../canvas" }
+makepad-blocks = { path = "../blocks" }
+makepad-plot = { path = "../makepad-plot" }
 makepad-widgets = { workspace = true }
 # For the local timezone offset only. The date arithmetic lives in
 # `makepad_component::mp::date` and is tested; what a library cannot know is **which

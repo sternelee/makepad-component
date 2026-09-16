@@ -1,0 +1,9 @@
+[package]
+name = "makepad-blocks"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Fenced blocks a document can paint: a fence tag routed to a renderer"
+
+[dependencies]
+makepad-plot = { path = "../makepad-plot" }

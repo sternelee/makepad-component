@@ -134,6 +134,7 @@ script_mod! {
                         rail_page_35 := RailRow{text: ""}
                         rail_page_36 := RailRow{text: ""}
                         rail_page_37 := RailRow{text: ""}
+                        rail_page_38 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -206,6 +207,7 @@ script_mod! {
                             page_35 := mod.gallery.pages.document{}
                             page_36 := mod.gallery.pages.editor{}
                             page_37 := mod.gallery.pages.canvas{}
+                            page_38 := mod.gallery.pages.blocks{}
                         }
                     }
                 }
@@ -219,7 +221,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 38] = [
+const PAGE_SLOTS: [&[LiveId]; 39] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -258,10 +260,11 @@ const PAGE_SLOTS: [&[LiveId]; 38] = [
     ids!(page_35),
     ids!(page_36),
     ids!(page_37),
+    ids!(page_38),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 38] = [
+const RAIL_ROWS: [&[LiveId]; 39] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -300,6 +303,7 @@ const RAIL_ROWS: [&[LiveId]; 38] = [
     ids!(rail_page_35),
     ids!(rail_page_36),
     ids!(rail_page_37),
+    ids!(rail_page_38),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1465,6 +1469,110 @@ use makepad_component::mp::hover_card::HoverIntent;
             .set_highlighted(cx, &written, &[]);
     }
 
+    /// Parse a ```chart fence and drive a real plot with what it produced.
+    ///
+    /// The **fence drives the plot**, which is the whole point of the seam: the block returns series and the page
+    /// hands them to a widget it declared. And a second fence that is **prose** is shown **declining**, because a
+    /// block that claimed every fence would turn a document's shell session into an empty chart.
+    fn seed_blocks(&mut self, cx: &mut Cx) {
+        use makepad_blocks::{self as blocks, Block};
+        use makepad_plot::LinePlotWidgetRefExt;
+
+        let fence = "title: Monthly users\n\
+                     xlabel: Month\n\
+                     ylabel: Active users\n\
+                     series: Desktop\n\
+                     1, 12\n\
+                     2, 19\n\
+                     3, 27\n\
+                     4, 31\n\
+                     5, 44\n\
+                     series: Mobile\n\
+                     1, 5\n\
+                     2, 14\n\
+                     3, 22\n\
+                     4, 38\n\
+                     5, 51\n";
+
+        let plot = self.ui.line_plot(cx, ids!(plot));
+        plot.clear();
+
+        let mut line = String::new();
+        let parsed = match blocks::render("chart", fence) {
+            Some(Block::Chart(chart)) => {
+                if let Some(title) = &chart.title {
+                    plot.set_title(title.clone());
+                }
+                if let Some(label) = &chart.x_label {
+                    plot.set_xlabel(label.clone());
+                }
+                if let Some(label) = &chart.y_label {
+                    plot.set_ylabel(label.clone());
+                }
+                println!(
+                    "BLOCKS chart title={:?} xlabel={:?} ylabel={:?} series={}",
+                    chart.title,
+                    chart.x_label,
+                    chart.y_label,
+                    chart.series.len()
+                );
+                for series in &chart.series {
+                    println!(
+                        "BLOCKS   series {:?} points={} x={:?} y={:?}",
+                        series.label,
+                        series.x.len(),
+                        series.x,
+                        series.y
+                    );
+                    line.push_str(&format!(
+                        "{}: {} points, y {} to {}\n",
+                        series.label,
+                        series.x.len(),
+                        series.y.first().copied().unwrap_or(0.0),
+                        series.y.last().copied().unwrap_or(0.0)
+                    ));
+                }
+                chart.series
+            }
+            _ => Vec::new(),
+        };
+        for series in parsed {
+            plot.add_series(series);
+        }
+
+        // The fence itself, painted as code.
+        self.ui
+            .mp_code_block(cx, ids!(blocks_fence))
+            .set_highlighted(cx, fence, &[]);
+
+        let languages = blocks::languages().join(", ");
+        self.ui.label(cx, ids!(blocks_stats)).set_text(
+            cx,
+            &format!("tags the router answers to: {languages}\n{line}"),
+        );
+
+        // **The decliner.** A fence for a tag nothing claims, and a fence for `chart` whose body is prose: both come
+        // back as `None`, so the caller renders the fence's own text — which is what a document does when it has
+        // nothing better, and the reason a `chart` fence is safe to enable everywhere.
+        let prose = "Just a paragraph of prose that happens to be fenced.\nNo numbers, no series.";
+        let unclaimed = blocks::render("mermaid", "graph TD\nA-->B\n");
+        let declined = blocks::render("chart", prose);
+        println!(
+            "BLOCKS unclaimed_tag_is_none={} prose_chart_is_none={}",
+            unclaimed.is_none(),
+            declined.is_none()
+        );
+        self.ui.label(cx, ids!(blocks_declined)).set_text(
+            cx,
+            &format!(
+                "a `mermaid` fence answers None ({}), and a `chart` fence whose body is **prose** answers None too \
+                 ({}). A block that claimed every fence would turn a document's shell session into an empty chart.",
+                unclaimed.is_none(),
+                declined.is_none()
+            ),
+        );
+    }
+
     /// Declare a keymap and fill the sheet from it.
     ///
     /// **Nothing below writes a chord.** Each row's trailing text is
@@ -1919,6 +2027,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_document(cx);
         self.seed_editor(cx);
         self.seed_canvas(cx);
+        self.seed_blocks(cx);
     }
 
     /// Fill the table page's tables.
@@ -2545,7 +2654,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 38] = [
+    const SLOT_PAGES: [&str; 39] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -2584,6 +2693,7 @@ mod tests {
         "mod.gallery.pages.document",
         "mod.gallery.pages.editor",
         "mod.gallery.pages.canvas",
+        "mod.gallery.pages.blocks",
     ];
 
     #[test]

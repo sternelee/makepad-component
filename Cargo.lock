@@ -1474,11 +1474,13 @@ name = "gallery"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "makepad-blocks",
  "makepad-canvas",
  "makepad-component",
  "makepad-editor",
  "makepad-markdown",
  "makepad-motion",
+ "makepad-plot",
  "makepad-syntax",
  "makepad-theme",
  "makepad-widgets",
@@ -2424,6 +2426,13 @@ name = "makepad-apple-sys"
 version = "1.0.0"
 dependencies = [
  "makepad-objc-sys",
+]
+
+[[package]]
+name = "makepad-blocks"
+version = "0.1.0"
+dependencies = [
+ "makepad-plot",
 ]
 
 [[package]]

@@ -2,6 +2,7 @@
 members = [
   "crates/theme",
   "crates/motion",
+  "crates/blocks",
   "crates/canvas",
   "crates/editor",
   "crates/markdown",
