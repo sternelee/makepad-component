@@ -148,6 +148,20 @@ impl Shadow {
 }
 
 impl Paint {
+    /// The colour a reader actually sees behind code: the wash composited over the page.
+    ///
+    /// **Use this, not [`Paint::code_wash`], for anything that measures contrast.** The wash is a
+    /// translucent ink — `ink(1.0, 0.08)` in dark — and [`crate::color::contrast_ratio`] treats its
+    /// argument as opaque, so measuring against the raw wash measures against **pure white** in
+    /// dark and **pure black** in light. That is not a close approximation of the truth; it is a
+    /// different colour, and a palette tuned against it is tuned against nothing.
+    ///
+    /// Found while building `syntax.rs`, where the first contrast test reported 2.38:1 for every
+    /// kind in dark mode and looked like a palette fault.
+    pub fn code_ground(self) -> Vec4f {
+        crate::color::flatten(self.code_wash, self.bg)
+    }
+
     /// Every colour token, mutably, in a fixed order.
     ///
     /// The one place the token list is written down. [`Brand::apply`] walks it
@@ -312,6 +326,34 @@ impl Paint {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_the_code_ground_is_the_wash_composited_and_not_the_wash() {
+        // The accessor exists because measuring against the raw wash measures against a different
+        // colour — white in dark, black in light. This is the assertion that it does what its doc
+        // says, and that the difference is large enough to matter rather than a rounding step.
+        for appearance in [crate::appearance::Appearance::Dark, crate::appearance::Appearance::Light]
+        {
+            let paint = crate::palette::for_appearance(appearance);
+            let ground = paint.code_ground();
+            let raw = paint.code_wash;
+            assert_ne!(ground, raw, "the ground is the raw wash in {appearance:?}");
+            assert!(
+                (ground.w - 1.0).abs() < 1e-6,
+                "the composited ground is still translucent ({})",
+                ground.w
+            );
+            // The raw wash's luminance is 1.0 in dark and 0.0 in light, because those are the
+            // colours it is made of — so the gap between the two is the whole page.
+            let raw_lum = crate::color::relative_luminance(raw);
+            let ground_lum = crate::color::relative_luminance(ground);
+            assert!(
+                (raw_lum - ground_lum).abs() > 0.3,
+                "{appearance:?}: the wash's luminance is {raw_lum:.3} and the ground's is \
+                 {ground_lum:.3}, so measuring against one is not measuring against the other"
+            );
+        }
+    }
+
     use super::*;
     use crate::{appearance::Appearance, theme::Theme};
 

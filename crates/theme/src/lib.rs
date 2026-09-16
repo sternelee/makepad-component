@@ -32,6 +32,7 @@ pub mod legacy;
 pub mod material;
 pub mod paint;
 pub mod palette;
+pub mod syntax;
 pub mod theme;
 pub mod typography;
 
@@ -78,6 +79,11 @@ script_mod! {
     mod.mpc.tokens = #(crate::install::paint_namespace(vm, &crate::palette::dark()))
     mod.mpc.type = #(crate::install::type_namespace(vm))
     mod.mpc.ControlSize = set_type_default() do #(crate::layout::ControlSize::script_api(vm))
+    // The syntax kind vocabulary, so a highlighter built on this theme names its kinds the same way
+    // every other vocabulary here is named. Registered even though no widget reads it yet: the
+    // crate's convention is that a public vocabulary reaches the script heap, and a vocabulary that
+    // exists in Rust only is one the next layer would re-declare.
+    mod.mpc.HighlightKind = set_type_default() do #(crate::syntax::HighlightKind::script_api(vm))
     mod.mpc.text = mod.mpc.type
     mod.mpc.layout = #(crate::install::layout_namespace(vm, &crate::layout::Layout::default()))
     mod.mpc.material = #(crate::install::material_namespace(vm, &crate::theme::Theme::dark()))

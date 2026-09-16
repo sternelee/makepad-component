@@ -49,6 +49,35 @@ fn lookup(cx: &mut Cx, path: &[&str]) -> ScriptValue {
     })
 }
 
+/// The last name in a path, or `None` when it is not there.
+///
+/// The non-panicking counterpart of [`lookup`], for a test whose subject is that a name is
+/// **absent**. The first version of the syntax vocabulary test asserted `NotAKind` resolves to
+/// `NIL` through `lookup`, which panics instead — so the negative case was testing the helper.
+fn try_lookup(cx: &mut Cx, path: &[&str]) -> Option<ScriptValue> {
+    cx.with_vm(|vm| {
+        let mut object = vm.bx.heap.module(LiveId::from_str(path[0]));
+        for name in &path[1..path.len() - 1] {
+            object = vm
+                .bx
+                .heap
+                .value(object, LiveId::from_str(name).into(), NoTrap)
+                .as_object()?;
+        }
+        let value = vm.bx.heap.value(
+            object,
+            LiveId::from_str(path[path.len() - 1]).into(),
+            NoTrap,
+        );
+        // `ERR_NOT_FOUND` as well as nil: Makepad's `NoTrap` lookup answers a missing name with a
+        // `NotFound` **error value** rather than with nil — `ScriptValue` is a struct of typed
+        // constants rather than an enum, so the absence of a name is a kind of error and not a
+        // kind of nothing. Excluding only nil made this helper report `Some(NotFound)` for a name
+        // that is genuinely absent, which made the negative case untestable.
+        (!matches!(value, ScriptValue::NIL) && !value.is_err()).then_some(value)
+    })
+}
+
 fn field(cx: &mut Cx, path: &[&str], name: &str) -> ScriptValue {
     let object = lookup(cx, path).as_object().expect("object");
     cx.with_vm(|vm| vm.bx.heap.value(object, LiveId::from_str(name).into(), NoTrap))
@@ -299,4 +328,41 @@ fn the_namespace_constants_name_real_paths() {
         let parts: Vec<&str> = path.split('.').collect();
         assert!(!lookup(&mut cx, &parts).is_nil(), "{path}");
     }
+}
+
+#[test]
+fn test_the_syntax_kind_vocabulary_resolves_by_name() {
+    // The registration's own test. "The build did not break" is not the claim — the claim is that
+    // a DSL block can write `kind: mod.mpc.HighlightKind.Keyword` and get the rung it named, which
+    // is what the theme's other vocabularies provide and what the v2 theme got wrong by adding a
+    // token to Rust and missing it in the script emission.
+    let mut cx = cx();
+    for kind in [
+        "Keyword",
+        "Function",
+        "Type",
+        "Constant",
+        "Variable",
+        "String",
+        "Number",
+        "Comment",
+        "Operator",
+        "Punctuation",
+        "Attribute",
+        "Tag",
+        "Invalid",
+    ] {
+        let value = lookup(&mut cx, &["mpc", "HighlightKind", kind]);
+        assert!(
+            !matches!(value, ScriptValue::NIL),
+            "mod.mpc.HighlightKind.{kind} did not resolve"
+        );
+    }
+    // And a name that is not a kind does **not** resolve, so the loop above is not passing by
+    // returning something for every possible string.
+    assert_eq!(try_lookup(&mut cx, &["mpc", "HighlightKind", "NotAKind"]), None);
+    assert_eq!(try_lookup(&mut cx, &["mpc", "NotAVocabulary", "Keyword"]), None);
+    // ...and the helper does find a real one, so the two assertions above are not passing because
+    // `try_lookup` returns `None` for everything.
+    assert!(try_lookup(&mut cx, &["mpc", "HighlightKind", "Keyword"]).is_some());
 }

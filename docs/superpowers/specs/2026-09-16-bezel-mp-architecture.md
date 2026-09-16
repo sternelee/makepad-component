@@ -378,6 +378,66 @@ doc block shows how `MpCheckbox` declares itself. That is documentation *about* 
 rather than an edge in it, so the scanner strips comments — a check that cannot tell the
 difference reports a violation for every well-documented module.
 
+### `syntax`: the half that does not depend on how spans were produced
+
+bezel's `syntax` runs tree-sitter and returns `(byte range, HighlightKind)` spans. The classifier
+is a **material open decision** for this port — tree-sitter plus a grammar per language, a
+hand-written tokenizer like the one Makepad's own editor ships, or a bridge to that editor — and
+the decision is deliberately not taken here. What is taken is the half bezel also separates out:
+*"there is no color and no rendering here — kinds map to colors through `SyntaxPalette::color`."*
+
+So `crates/theme/src/syntax.rs` carries the **kind vocabulary** (13 kinds, a closed set like every
+other vocabulary in this theme), the **palette**, and the **span contract** every classifier has to
+satisfy — `normalize`, which sorts into document order, clips to the source, and drops overlaps.
+That split is not tidiness: it is what lets the classifier be chosen later without touching a
+colour, a test, or a call site.
+
+`normalize` exists rather than a convention because painting two overlapping spans paints one
+twice, and nesting them paints the inner one then the outer one's background over it — a colour
+that is subtly wrong rather than an error. The three faults it fixes are the three a real grammar
+produces: spans **out of document order** (a query with several patterns descends in pattern
+order), **overlapping** (one pattern's `(identifier)` contains another's `(function_name)`), and
+**past the end** (the grammar parsed a stale buffer — the document can be edited between the parse
+and the paint, and a span one byte past the end is a panic in a slicing renderer). Its test walks
+**every permutation of a four-span set**, so an accidental dependence on input order cannot hide
+in one of them.
+
+### Two real bugs the palette's tests found, and one bad test of my own
+
+1. **A contrast measured against a translucent ground is measured against a different colour.**
+   `code_wash` is `ink(1.0, 0.08)` in dark — a *translucent* white — and `contrast_ratio` treats its
+   argument as opaque, so comparing against the raw wash compares against **pure white** in dark
+   and **pure black** in light. The first version of the test reported `2.38:1` for every kind in
+   dark mode and looked like a palette fault. The fix is `Paint::code_ground()`, which composites
+   the wash over the page — added as an **API** so the mistake cannot recur, with a test asserting
+   the two differ by more than 0.3 in luminance. Checked across the theme: every other contrast
+   test uses an opaque ground (`bg`, `solid`, `accent_strong`, the surface ladder), so this was the
+   new test's flaw rather than a systemic one.
+
+2. **"Recede" is a different direction in each appearance.** A comment sits closer to its ground
+   than the code does. On a dark ground that means darker; on a light ground it means **lighter**.
+   The first version used one sign for both. Getting the direction right was not enough either:
+   `l + 0.12` receded so far that the light comment measured **3.76:1**, under the floor — which
+   only became visible *after* the ground was flattened. Both comments now clear **5.09** and
+   **5.05**.
+
+3. **My test's proxy for chroma was not a proxy for chroma.** The assertion that `Invalid` is the
+   loudest kind used the spread between sRGB channels, and it failed on `Function`: red at chroma
+   0.16 and blue at 0.11 do not have channel spreads in that order, because conversion to sRGB is
+   not chroma-preserving across hues. The claim was about the palette's **intent**, and the intent
+   is the table — so it is asserted against the table now, with one line confirming the conversion
+   produced a colour so the test is not a table checked against itself.
+
+### Reading `blocks` changed the plan
+
+`blocks` was next by size — 123 lines, the smallest of the six missing crates. Reading it showed it
+is a **seam *on* markdown**: *"a fence already round trips byte for byte, already holds a caret, and
+already degrades to its own source where nothing paints it — so a block is a renderer over a ```chart
+fence rather than a new `BlockKind`."* Its whole substance is `render(language, code) -> Option<…>`
+routed from a fence tag that markdown produces. Porting it before `markdown` exists would build the
+dependent before the dependency, so it is deferred — the same "read it before assuming" rule that
+`stack`, `stats`, `menu` and `floating` each paid for once.
+
 ### Three of bezel's modules were already covered in substance
 
 The audit compares *filenames*, which over-reports the gap. Three of bezel's `ui` modules
