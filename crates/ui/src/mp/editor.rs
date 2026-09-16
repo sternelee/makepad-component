@@ -34,6 +34,7 @@
 
 use makepad_widgets::*;
 
+use makepad_editor::slash::{self, SlashMenu};
 use makepad_editor::{EditKind, History};
 use makepad_markdown::edit::{self, Selection, Shortcut};
 use makepad_markdown::layout::{self, Laid, Metrics};
@@ -159,6 +160,9 @@ pub struct MpEditor {
     /// Whether a press is down and dragging a selection.
     #[rust]
     dragging: bool,
+    /// The slash menu, while one is open. `None` the rest of the time — see `refresh_slash`.
+    #[rust]
+    slash: Option<SlashMenu>,
     #[rust]
     area: Area,
 }
@@ -265,6 +269,11 @@ impl MpEditor {
     /// character is not one of those — it is text arriving. Inserting it here rather than adding a
     /// `Shortcut::Insert(char)` keeps that set closed for the reason it is closed: a shortcut changes *shape*, and
     /// text does not.
+    /// The one internal insert path, shared by the typed-text event and the public `insert_text`.
+    ///
+    /// **The menu is re-derived here rather than at the event**, so a driver that inserts text through the public API
+    /// gets the behaviour a keypress gets. Refreshing at the event instead would leave two paths that resemble each
+    /// other, and a page would then verify something an app does not do — the trap `shortcut_for_key` exists to avoid.
     fn insert(&mut self, cx: &mut Cx, input: &str) {
         if input.is_empty() {
             return;
@@ -305,6 +314,7 @@ impl MpEditor {
         self.selection = caret;
         self.laid = None;
         self.redraw(cx);
+        self.refresh_slash(cx);
     }
 
     /// Move the caret without changing the document.
@@ -409,6 +419,33 @@ impl MpEditor {
             .unwrap_or((0, 0))
     }
 
+}
+
+/// A copy of the open slash menu's state. See `MpEditor::slash_state`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SlashState {
+    /// Where the `/` is, in the block's text.
+    pub at: usize,
+    /// What has been typed after it.
+    pub query: String,
+    /// The matching rows' labels, in the menu's own order.
+    pub rows: Vec<&'static str>,
+    /// Which matching row is chosen.
+    pub active: usize,
+    /// What choosing it makes the block, or `None` when nothing matches.
+    pub choice: Option<makepad_markdown::SetKind>,
+}
+
+impl SlashState {
+    fn of(menu: &SlashMenu) -> Self {
+        Self {
+            at: menu.at(),
+            query: menu.query().to_string(),
+            rows: menu.matches().map(|item| item.label).collect(),
+            active: menu.active(),
+            choice: menu.choice(),
+        }
+    }
 }
 
 /// The block's own text, replaced.
@@ -623,6 +660,16 @@ impl Widget for MpEditor {
                 }
             }
             Event::KeyDown(ke) if !ke.is_repeat => {
+                // **The menu owns these keys while it is open.** An open menu that let Up/Down move the caret would
+                // move the text under the menu the person is reading, and Enter would insert a newline instead of
+                // taking the row.
+                match ke.key_code {
+                    KeyCode::ArrowUp if self.slash_step(cx, -1) => return,
+                    KeyCode::ArrowDown if self.slash_step(cx, 1) => return,
+                    KeyCode::ReturnKey if self.slash_commit(cx) => return,
+                    KeyCode::Escape if self.slash_close(cx) => return,
+                    _ => {}
+                }
                 let extend = ke.modifiers.shift;
                 // **One mapping, not two.** `shortcut_for_key` is what the page's script drives as well, so the
                 // behaviour a run checks is the behaviour a keypress gets rather than a second path that
@@ -893,6 +940,122 @@ impl Widget for MpEditor {
 
 impl MpEditor {
     /// Where the caret is, as a line index in its block and an x offset from the document's left edge.
+    /// The slash menu, if one is open.
+    pub fn slash(&self) -> Option<&SlashMenu> {
+        self.slash.as_ref()
+    }
+
+    /// A **copy** of the open menu's state, for a caller that cannot hold a borrow.
+    ///
+    /// A `WidgetRef` is one — it borrows the widget per call — and anything that *draws* the menu is another, because
+    /// a painter that held the borrow while walking the layout would borrow the widget for the length of the paint.
+    /// So the state is owned: the rows are `&'static str` because the menu's items are `const`, which keeps the copy
+    /// cheap without copying the labels themselves.
+    pub fn slash_state(&self) -> Option<SlashState> {
+        self.slash.as_ref().map(SlashState::of)
+    }
+
+    /// Open, refilter, or close the menu from where the caret is now.
+    ///
+    /// **The menu's state is derived, not remembered.** Every path that can move the caret or change the text calls
+    /// this, so the menu cannot be open somewhere it should not be — which is the failure a remembered "is the menu
+    /// open" flag produces, because every new path that moves the caret is a path that has to remember to close it.
+    ///
+    /// Whether a menu **should** open is decided here rather than in the parser: not inside a `Code` block, because a
+    /// fence holds slashes that are not a menu. And a `Divider` has no text, so there is nothing to type into.
+    fn refresh_slash(&mut self, cx: &mut Cx) {
+        let block = self.selection.block;
+        let text = match self.doc.blocks.get(block).map(|block| &block.kind) {
+            Some(BlockKind::Code { .. }) | Some(BlockKind::Divider) | None => None,
+            Some(kind) => kind.text().map(|text| text.text.clone()),
+        };
+        let Some(text) = text else {
+            self.slash_close(cx);
+            return;
+        };
+        let offset = clamp(&text, self.selection.range.end);
+        let Some(query) = slash::query(offset, &text) else {
+            self.slash_close(cx);
+            return;
+        };
+        // The `/` is `query.len()` characters plus itself back from the caret.
+        let at = offset - query.len() - 1;
+        match self.slash.as_mut() {
+            // The same `/` is still being typed into: narrow it. A **new** menu for a different `/`, because a menu
+            // that kept its position across two different slashes would apply a row the person never looked at.
+            Some(menu) if menu.at() == at => menu.refilter(&query),
+            _ => {
+                let mut menu = SlashMenu::open(at);
+                menu.refilter(&query);
+                self.slash = Some(menu);
+            }
+        }
+        self.redraw(cx);
+    }
+
+    /// Close the menu, redrawing only if one was open.
+    pub fn slash_close(&mut self, cx: &mut Cx) -> bool {
+        if self.slash.take().is_some() {
+            self.redraw(cx);
+            return true;
+        }
+        false
+    }
+
+    /// Walk the chosen row by `delta`. Answers whether a menu was open, which is what makes this safe to call
+    /// unconditionally: **a caller offers Up and Enter to the menu first, and moves the caret only if it declined.**
+    ///
+    /// **A public operation, and the key handler is one of its callers.** The menu first existed only inside the key
+    /// handler, and a driver typing through the public API then could not walk or commit it — the run showed
+    /// `active=0` after a `down` and a menu still open after an `enter`, while a real keypress worked. Two paths that
+    /// resemble each other again: the same defect `insert`'s doc warns about, made in the same change that wrote the
+    /// warning.
+    pub fn slash_step(&mut self, cx: &mut Cx, delta: isize) -> bool {
+        let Some(menu) = self.slash.as_mut() else {
+            return false;
+        };
+        menu.step(delta);
+        let _ = cx;
+        if let Some(menu) = self.slash.as_ref() {
+            let _ = menu;
+        }
+        self.redraw(cx);
+        true
+    }
+
+    /// Apply the chosen row: **splice out the typed query, then take a shortcut that already exists**.
+    ///
+    /// The splice is what separates this from a combobox — the `/query` was never the block's text, so removing it
+    /// leaves the block as it was. And the kind is applied with `Shortcut::SetKind`, the same edit a keyboard
+    /// shortcut runs, so the menu does not bring its own edit path.
+    pub fn slash_commit(&mut self, cx: &mut Cx) -> bool {
+        let Some(menu) = self.slash.take() else {
+            return false;
+        };
+        let Some(kind) = menu.choice() else {
+            // Nothing matched, so Enter inserts nothing rather than taking a row that is not there.
+            self.redraw(cx);
+            return true;
+        };
+        let block = self.selection.block;
+        let text = self
+            .doc
+            .blocks
+            .get(block)
+            .and_then(|block| block.kind.text())
+            .map(|text| text.text.clone());
+        if let Some(text) = text {
+            let (start, end) = menu.span(clamp(&text, self.selection.range.end));
+            let spliced = format!("{}{}", &text[..start], &text[end..]);
+            set_block_text(&mut self.doc, block, makepad_markdown::Text::plain(spliced));
+            // The caret goes where the removed query was, which is where the chosen kind's text now begins.
+            self.selection = Selection::caret(block, start);
+        }
+        self.press(cx, Shortcut::SetKind(kind), EditKind::Formatting);
+        self.redraw(cx);
+        true
+    }
+
     fn caret_position(&self, laid: &Laid) -> Option<(usize, f64)> {
         let block_box = laid.blocks.iter().find(|b| b.block == self.selection.block)?;
         let text = self.doc.blocks.get(self.selection.block)?.kind.text()?.text.as_str();
@@ -911,6 +1074,26 @@ impl MpEditor {
 }
 
 impl MpEditorRef {
+    /// A copy of the open menu's state. See `MpEditor::slash_state`.
+    pub fn slash_state(&self) -> Option<SlashState> {
+        self.borrow().and_then(|inner| inner.slash_state())
+    }
+
+    /// Walk the chosen row. Answers whether a menu was open. See `MpEditor::slash_step`.
+    pub fn slash_step(&self, cx: &mut Cx, delta: isize) -> bool {
+        self.borrow_mut().is_some_and(|mut inner| inner.slash_step(cx, delta))
+    }
+
+    /// Take the chosen row. Answers whether a menu was open. See `MpEditor::slash_commit`.
+    pub fn slash_commit(&self, cx: &mut Cx) -> bool {
+        self.borrow_mut().is_some_and(|mut inner| inner.slash_commit(cx))
+    }
+
+    /// Close the menu. Answers whether one was open. See `MpEditor::slash_close`.
+    pub fn slash_close(&self, cx: &mut Cx) -> bool {
+        self.borrow_mut().is_some_and(|mut inner| inner.slash_close(cx))
+    }
+
     pub fn set_source(&self, cx: &mut Cx, source: &str) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.set_source(cx, source);

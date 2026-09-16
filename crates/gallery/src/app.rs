@@ -1294,8 +1294,11 @@ use makepad_component::mp::hover_card::HoverIntent;
                       environment.\n\n- a bullet\n- another\n\n";
         let script = std::env::var("GALLERY_EDITOR").unwrap_or_else(|_| {
             // A session that exercises every rule: type at a caret, split with Enter, merge with Backspace,
-            // indent, move, and undo twice — which has to land on the text and then on the split.
-            "end,type: one,type: two,enter,type:next,home,tab,left,left,type:X,undo,undo"
+            // indent, move, and undo twice — which has to land on the text and then on the split. It ends with the
+            // slash menu: `/`, a query that narrows it, a walk down it, and Enter to take the row.
+            "end,type: one,type: two,enter,type:next,home,tab,left,left,type:X,undo,undo,\
+             enter,type:/,slash,type:head,slash,slash-down,slash,slash-down,slash,\
+             slash-up,slash,slash-enter,slash"
                 .to_string()
         });
 
@@ -1312,6 +1315,33 @@ use makepad_component::mp::hover_card::HoverIntent;
                     "delete" => view.press(cx, Shortcut::Delete, EditKind::Deleting),
                     "tab" => view.press(cx, Shortcut::Indent, EditKind::Structural),
                     "outdent" => view.press(cx, Shortcut::Outdent, EditKind::Structural),
+                    // Print the slash menu's whole state, so the run's own output is the evidence for what the
+                    // wiring did rather than a claim about it.
+                    "slash" => match view.slash_state() {
+                        Some(state) => println!(
+                            "SLASH open at={} query={:?} rows={:?} active={} choice={:?}",
+                            state.at, state.query, state.rows, state.active, state.choice
+                        ),
+                        None => println!("SLASH closed"),
+                    },
+                    // The menu's **public** operations, which the key handler calls too — so a scripted step and a
+                    // keypress cannot diverge.
+                    "slash-down" => {
+                        let consumed = view.slash_step(cx, 1);
+                        println!("SLASH step +1 consumed={consumed}");
+                    }
+                    "slash-up" => {
+                        let consumed = view.slash_step(cx, -1);
+                        println!("SLASH step -1 consumed={consumed}");
+                    }
+                    "slash-enter" => {
+                        let consumed = view.slash_commit(cx);
+                        println!("SLASH commit consumed={consumed}");
+                    }
+                    "slash-esc" => {
+                        let consumed = view.slash_close(cx);
+                        println!("SLASH close consumed={consumed}");
+                    }
                     "left" => view.move_by(cx, Motion::Left, false),
                     "right" => view.move_by(cx, Motion::Right, false),
                     "up" => view.move_by(cx, Motion::Up, false),

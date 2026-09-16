@@ -58,11 +58,11 @@ script_mod! {
         Label{
             width: Fill, height: Fit
             draw_text +: {text_style: footnote, color: text_muted}
-            text: "An editing surface over the document model: keys, a caret, a selection and undo. Everything under it is testable without a window and is tested — the model and its layout, what a key does to a document, and what counts as one undo step — so what is left here is deliberately the small part: which key means which shortcut, where the caret is, where a click lands, and painting it. Click in the text to place the caret, or drag to select; the selection is drawn before the text and the caret after it, so neither is painted over."
+            text: "An editing surface over the document model: keys, a caret, a selection and undo. Everything under it is testable without a window and is tested — the model and its layout, what a key does to a document, and what counts as one undo step — so what is left here is deliberately the small part: which key means which shortcut, where the caret is, where a click lands, and painting it. Click in the text to place the caret, or drag to select; the selection is drawn before the text and the caret after it, so neither is painted over.\n\nType / at the start of a block for the slash menu: it opens showing every kind, narrows as you type, walks with the arrow keys, and Enter turns the block into the row you chose. The menu's rows are not painted yet — its state, its key routing and the edit it commits are, and the session below prints each step and the document after it."
         }
 
         Section{
-            Caption{ text: "The surface. Set GALLERY_EDITOR to drive it from a run — typing cannot be delivered by the screenshot script, so the session is applied through the same methods a keypress uses" }
+            Caption{ text: "The surface. Set GALLERY_EDITOR to drive it from a run — typing cannot be delivered by the screenshot script, so the session is applied through the same methods a keypress uses. Its default session ends with the slash menu: /, a query, two steps down, one up, and Enter" }
             editor_surface := mod.mp.MpEditor{}
         }
 
