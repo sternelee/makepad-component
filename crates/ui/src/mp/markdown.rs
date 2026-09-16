@@ -441,6 +441,10 @@ mod tests {
     fn metrics(body: f64) -> Metrics {
         Metrics {
             advance: text::width("a", body),
+            body_size: body,
+            // The theme's title rungs are about 1.7×, 1.3× and 1.15× the body size; these are the same ratios
+            // without a `Cx`, so a test can tell a heading's line from a paragraph's by arithmetic.
+            heading_size: [body * 1.7, body * 1.3, body * 1.15],
             line_height: body * 1.6,
             indent: body * 1.6,
             gap: body * 0.7,

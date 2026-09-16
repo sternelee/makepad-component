@@ -779,6 +779,17 @@ Verified at runtime: a 13-action sheet declares with **0 conflicts**, and a deli
 broken map of 6 reports **3**, including `⇧⌘D` found from `cmd+shift+d` and the glyph run
 `⇧⌘D` — a config spelling and a menu paste recognized as one chord.
 
+### `cargo check` does not build tests, and that is how a broken suite was committed
+
+Adding two fields to `Metrics` broke `MpMarkdown`'s own **test** fixture — and `cargo check -p makepad-component`
+passed, because `check` builds the library and not the test target. The commit was made on that green signal and the
+suite was red: `error[E0063]: missing fields body_size and heading_size`.
+
+`cargo check` is this port's habit for the crates that are not the one being changed, and it is the right tool for
+*"does this still build against the rest of the workspace"*. It is **not** evidence that a suite passes, and a
+struct change is exactly the case where the two diverge. The rule that follows: when a change touches a **public
+type's shape**, run `cargo test` for every crate that constructs it, not `cargo check`.
+
 ### Screen capture came back, and the first thing it showed
 
 `GALLERY_PAGE=Document` verified `MpMarkdown`'s paint, which had been unverified for two turns: a heading, a
