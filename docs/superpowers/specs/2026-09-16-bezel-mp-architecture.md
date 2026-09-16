@@ -137,7 +137,8 @@ build on).
 | `mp/layout.rs` | `Row`, `Column`, `Divider`, `DividerVertical`, `Spacer`. The system gap, carried by a prototype so a call site that wants 8pt writes no number. |
 | `mp/loaders.rs` | `MpSpinner`, `MpPulse`, `MpProgress`. The payoff for `motion::phase` — its constants are injected as instances from Rust rather than restated in the DSL. |
 | `mp/slider.rs` | `MpSlider`, and the four free functions that turn a pointer into a value. |
-| `mp/tooltip.rs` | `MpTooltip` — the overlay mechanism, verified; the gallery's hover wiring for it is not. See below. |
+| `mp/tooltip.rs` | `MpTooltip` — the overlay mechanism, verified; the gallery's hover wiring for it is proven by signal, not by capture. See below. |
+| `mp/popover.rs` | `MpPopover` — **implemented and does not open.** The click reaches the trigger's hover state; the panel never draws. See below. |
 | `mp/input.rs` | `MpTextInput`, `MpField`, `MpTextInputSearch`. The one component with no Rust: the caret, selection, IME, scroll-into-view and platform keys are Makepad's `TextInput`, so this styles it rather than reimplementing it. |
 
 `MpButton` is the demonstration — the v2 button against this one:
@@ -459,3 +460,39 @@ Two things it cost, both worth recording:
 **Delete `legacy.rs`, the `LEGACY_MODULE` constant, the `mod.mpc_theme` line in
 `lib.rs`'s `script_mod!` and the legacy half of `install::stamp` with the last
 v2 widget.**
+
+## Open: the popover does not open
+
+`mp/popover.rs` compiles, its page renders, and its panels are correctly invisible
+while closed. Clicking a trigger reaches the button — the hover highlight appears,
+so synthetic input does arrive — and **the panel does not draw**.
+
+Two real faults were found and fixed on the way, neither of which was the cause:
+
+1. The panels were nested in their trigger rows, so a `Fill`/`Fill` popover had no
+   rectangle to draw in. They are siblings of the content at the page root now —
+   the overlay region a real app declares once at the window root.
+2. `MpPopover` forwarded its view's children, so `panel` drew **inline**, beside
+   its trigger, whether or not the popover was open. It returns `DrawStep::done()`
+   now and the panel is drawn only in the overlay, which is what `MpTooltip` does
+   and for the same reason.
+
+Where to look next:
+
+1. **Whether the app's listener runs.** `MpButton` was migrated onto
+   `control::handle` in the same session; its `Clicked` is now derived from
+   `Signals::activate` rather than emitted from `Hit::FingerUp`, and `activate`
+   requires a `FingerUp` with `is_over`. The hover highlight only proves
+   `FingerHoverIn` arrived.
+2. **Whether an overlay opened from an action listener is scheduled for the next
+   composite.** `MpTooltip` is opened from `handle_actions` too, but only through
+   the `GALLERY_TOOLTIP=1` path, which runs before any paint.
+
+## A workflow finding worth keeping: `act_ui` takes look-image coordinates
+
+Several wrong turns came from passing **screen points** to `act_ui`. Its
+coordinates are in the *look image*'s space — a 900×506 stretched rendering of the
+window — not screen points and not the window's own points, and it rejects a value
+outside those bounds. Mapping a click needs the look image's size, not the
+window's frame. The error message says so ("outside the latest look image bounds"),
+which is how it was finally caught.

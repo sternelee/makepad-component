@@ -17,6 +17,7 @@ pub mod loaders;
 pub mod slider;
 pub mod motion;
 pub mod overlay;
+pub mod popover;
 
 use makepad_widgets::*;
 
@@ -38,6 +39,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     slider::script_mod(vm);
     input::script_mod(vm);
     overlay::script_mod(vm);
+    popover::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -122,6 +124,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/controls.rs",
         blurb: "Checkbox, switch, radio — one contract",
     },
+    Page {
+        title: "Popover",
+        path: "mod.gallery.pages.popover",
+        source: "crates/gallery/src/pages/popover.rs",
+        blurb: "A floating panel, opened by a click",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -193,6 +201,7 @@ mod tests {
             ("crates/gallery/src/pages/slider.rs", "slider"),
             ("crates/gallery/src/pages/input.rs", "input"),
             ("crates/gallery/src/pages/overlay.rs", "overlay"),
+            ("crates/gallery/src/pages/popover.rs", "popover"),
         ]
         .into_iter()
         .collect();

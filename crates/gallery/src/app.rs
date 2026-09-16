@@ -16,6 +16,7 @@ use makepad_component::mp::{
     checkbox::MpCheckboxWidgetRefExt,
     radio::MpRadioWidgetRefExt,
     loaders::MpProgressWidgetRefExt,
+    popover::MpPopoverWidgetRefExt,
     tooltip::MpTooltipWidgetRefExt,
     slider::MpSliderWidgetRefExt,
     switch::MpSwitchWidgetRefExt,
@@ -87,6 +88,7 @@ script_mod! {
                         rail_page_8 := RailRow{text: ""}
                         rail_page_9 := RailRow{text: ""}
                         rail_page_10 := RailRow{text: ""}
+                        rail_page_11 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -127,6 +129,7 @@ script_mod! {
                             page_8 := mod.gallery.pages.overlay{}
                             page_9 := mod.gallery.pages.input{}
                             page_10 := mod.gallery.pages.controls{}
+                            page_11 := mod.gallery.pages.popover{}
                         }
                     }
                 }
@@ -140,7 +143,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 11] = [
+const PAGE_SLOTS: [&[LiveId]; 12] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -152,10 +155,11 @@ const PAGE_SLOTS: [&[LiveId]; 11] = [
     ids!(page_8),
     ids!(page_9),
     ids!(page_10),
+    ids!(page_11),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 11] = [
+const RAIL_ROWS: [&[LiveId]; 12] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -167,6 +171,7 @@ const RAIL_ROWS: [&[LiveId]; 11] = [
     ids!(rail_page_8),
     ids!(rail_page_9),
     ids!(rail_page_10),
+    ids!(rail_page_11),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -249,6 +254,7 @@ impl MatchEvent for App {
         }
 
         self.handle_hover_tooltips(cx, actions);
+        self.handle_popovers(cx, actions);
         self.handle_controls(cx, actions);
         self.handle_sliders(cx, actions);
         self.handle_input(cx, actions);
@@ -413,6 +419,36 @@ impl App {
         }
     }
 
+    /// Click a trigger to open or close its panel.
+    ///
+    /// The whole point of the popover page being verifiable where the tooltip's
+    /// is not: a **click is synthesizable**, so a capture script can exercise
+    /// this path end to end — the trigger's action, this listener, the anchor
+    /// from an `Area`, and the plate. A hover is not, which is why the tooltip
+    /// needs `GALLERY_TOOLTIP=1` instead.
+    fn handle_popovers(&mut self, cx: &mut Cx, actions: &Actions) {
+        const TRIGGERS: [(&[LiveId], &[LiveId]); 3] = [
+            (ids!(pop_form), ids!(pop_form_panel)),
+            (ids!(pop_menu), ids!(pop_menu_panel)),
+            (ids!(pop_tall), ids!(pop_tall_panel)),
+        ];
+        for (trigger, panel) in TRIGGERS {
+            if !self.ui.mp_button(cx, trigger).clicked(actions) {
+                continue;
+            }
+            let popover = self.ui.mp_popover(cx, panel);
+            if popover.is_open() {
+                popover.close(cx);
+            } else {
+                // Anchored to the trigger that was clicked, so the panel is
+                // placed from the widget's own `Area` rather than from a
+                // rectangle this function computed.
+                let area = self.ui.widget(cx, trigger).area();
+                popover.open_for(cx, area);
+            }
+        }
+    }
+
     /// The slider page's readouts, and the one slider that drives something.
     ///
     /// A readout per slider is the page's own test: it shows the *value* the
@@ -549,7 +585,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 11] = [
+    const SLOT_PAGES: [&str; 12] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -561,6 +597,7 @@ mod tests {
         "mod.gallery.pages.overlay",
         "mod.gallery.pages.input",
         "mod.gallery.pages.controls",
+        "mod.gallery.pages.popover",
     ];
 
     #[test]
