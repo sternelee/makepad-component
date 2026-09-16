@@ -154,6 +154,75 @@ build on).
 | `mp/date.rs` | `is_leap` / `weekday` / `month_grid` / `shift_month` / `MpDate` — the calendar. |
 | `mp/keys.rs` | `parse` / `format` / `Keymap` — the chord behind a printed shortcut. |
 | `mp/history.rs` | `History<T>` — undo/redo as a value, not a widget. |
+| `mp/combobox.rs` | `Combobox` / `MpCombobox` / `MpComboboxPanel` — a field over a list. |
+
+### A combobox is the only control that holds two things which can disagree
+
+Every other control in the library holds one value. A combobox holds **what is typed** and
+**what is chosen**, they agree after a choice, and they disagree the moment the reader types.
+The question answered on every keystroke is *"is what is in the field still the thing that
+was chosen?"*
+
+**The rule: a choice survives typing only while the text still names it.** Type one more
+character and the value is cleared — a stale value is worse than no value, because "nothing
+chosen" is a state an app can handle and "something else chosen" is not. The failure it
+prevents is invisible in the way this port keeps running into: the field shows `Split Right`,
+the app's value still says `New Terminal`, and nothing complains until the next action runs
+the wrong command.
+
+Two consequences, one of which was in the first version's doc comment **and wrong**:
+
+- Clearing the text clears the value.
+- **A cleared value does not come back by retyping.** The obvious alternative — remembering
+  the last choice so an exact match restores it — makes the value a *third thing*: neither
+  what the text says nor nothing at all. That is the stale-value fault in a quieter costume.
+  The doc claimed the opposite and its own test said so.
+
+### The default highlighted row is *no* row
+
+`palette::remap` defaults an absent cursor to the top row, because a **palette's** Enter must
+always run something and its top row is its best answer. A combobox is the opposite: nothing
+is highlighted until the reader moves, and committing with nothing highlighted chooses
+**nothing** — entering an item the reader never saw is how a combobox runs the wrong command.
+The identity arithmetic is shared; this policy is not, and **six tests failed at once** when
+the first version used the palette's default directly.
+
+### The registration order is now checked, not documented
+
+`script_mod!` names other widgets' prototypes, and a name that registers *after* its user is
+not there yet. The failure is runtime-only and its message points at the **user** of the name
+rather than the line in the wrong place:
+
+```text
+property MpMenu not found in prototype chain. Did you mean: MpMenubar, MpIcon, ...
+```
+
+This port paid for it **three times** — `palette` before `list`, then `combobox` before
+`input` and `popover` (twice in one file, because a widget composing two others has two ways
+to be too early). A comment prevented neither the second nor the third, so
+`crates/ui/tests/registration_order.rs` checks it statically: it reads `src/mp/*.rs`, strips
+tests and comments, collects each module's `mod.mp.<Name> =` definitions and every
+`mod.mp.<Name>` reference in its DSL, and asserts every referenced prototype is defined by a
+module registering **no later** than its user. It also asserts every module that *has* DSL is
+registered at all, since an unregistered `script_mod!` is a prototype that silently does not
+exist.
+
+Two things about writing that check are worth recording:
+
+1. **It asserts its own scan found something plausible** before asserting anything about
+   order — a parser that matched nothing would pass vacuously. This port has already been
+   bitten by a `grep -c` that counted a struct definition and reported thirty-four pages when
+   there were thirty-one.
+2. **It was falsified before it was trusted.** Planting the exact historical bug made it fail
+   with `palette (registered #24) uses mod.mp.MpMenu, which list defines at #25`, and restoring
+   made it pass. A check that has never failed is not evidence.
+
+It also reported one **false positive** first: `mp/control.rs`, whose ````
+
+```ignore ````
+doc block shows how `MpCheckbox` declares itself. That is documentation *about* the order
+rather than an edge in it, so the scanner strips comments — a check that cannot tell the
+difference reports a violation for every well-documented module.
 
 ### Three of bezel's modules were already covered in substance
 

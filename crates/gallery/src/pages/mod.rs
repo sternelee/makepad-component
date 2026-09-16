@@ -30,6 +30,7 @@ pub mod slider;
 pub mod status;
 pub mod surface;
 pub mod table;
+pub mod combobox;
 pub mod tree;
 pub mod menu;
 pub mod motion;
@@ -66,6 +67,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     icon::script_mod(vm);
     status::script_mod(vm);
     table::script_mod(vm);
+    combobox::script_mod(vm);
     tree::script_mod(vm);
     avatar::script_mod(vm);
     surface::script_mod(vm);
@@ -286,6 +288,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/history.rs",
         blurb: "Undo and redo, as a stack",
     },
+    Page {
+        title: "Combobox",
+        path: "mod.gallery.pages.combobox",
+        source: "crates/gallery/src/pages/combobox.rs",
+        blurb: "A field over a list, and the choice it holds",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -365,6 +373,7 @@ mod tests {
             ("crates/gallery/src/pages/icon.rs", "icon"),
             ("crates/gallery/src/pages/status.rs", "status"),
             ("crates/gallery/src/pages/table.rs", "table"),
+            ("crates/gallery/src/pages/combobox.rs", "combobox"),
             ("crates/gallery/src/pages/tree.rs", "tree"),
             ("crates/gallery/src/pages/avatar.rs", "avatar"),
             ("crates/gallery/src/pages/surface.rs", "surface"),

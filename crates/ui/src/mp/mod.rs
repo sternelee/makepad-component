@@ -41,6 +41,7 @@ pub mod avatar;
 pub mod bars;
 pub mod button;
 pub mod checkbox;
+pub mod combobox;
 pub mod control;
 pub mod date;
 pub mod feedback;
@@ -118,4 +119,16 @@ pub fn script_mod(vm: &mut ScriptVm) {
     // from where the author put it in the tree.
     crate::mp::popover::script_mod(vm);
     crate::mp::tooltip::script_mod(vm);
+    // **Last, because it composes two prototypes that register earlier** — an
+    // `MpTextInput` (from `input`) and an `MpPopover` (from `popover`). This is the third
+    // time this port has paid for this rule: `palette` before `list` failed on `MpMenu`, and
+    // this one failed on both of its dependencies at once, with "property MpTextInput not
+    // found in prototype chain" pointing at the *user* of the name rather than at the line
+    // that is in the wrong place.
+    //
+    // The rule, stated as the order it implies: **a widget that names another widget's
+    // prototype in its own `script_mod!` registers after it.** The three failures are what
+    // makes the ordering a rule rather than a preference, and `tests/registration_order.rs`
+    // now checks it statically so a fourth one cannot happen.
+    crate::mp::combobox::script_mod(vm);
 }

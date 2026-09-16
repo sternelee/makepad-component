@@ -54,6 +54,19 @@ use makepad_widgets::*;
 /// Returns the cursor's new **position in `ranked`**. The row the reader was on
 /// stays under them if it survived the query; otherwise the cursor goes to the top,
 /// which is where the best match is.
+///
+/// ## The `None` → top default is a *palette's* policy, not a general rule
+///
+/// A palette always has a highlighted row, because its Enter must run something and its top
+/// row is its best answer to whatever is typed. `mp/combobox.rs` is the opposite case: a
+/// combobox highlights **nothing** until the reader moves, and committing with nothing
+/// highlighted chooses nothing — entering an item the reader never saw is how a combobox
+/// runs the wrong command. So it preserves `None` itself rather than passing it here, and
+/// shares only the identity arithmetic below.
+///
+/// Recorded because the first version of the combobox used this function directly and six
+/// tests failed at once: the highlight appeared on the top row after the first keystroke,
+/// which is right for a palette and wrong for a combobox.
 pub fn remap(previous: Option<usize>, ranked: &[usize]) -> Option<usize> {
     if ranked.is_empty() {
         return None;

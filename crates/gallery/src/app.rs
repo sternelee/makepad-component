@@ -34,6 +34,7 @@ use makepad_component::mp::{
 };
 
 use crate::pages::PAGES;
+use makepad_component::mp::combobox::Combobox;
 use makepad_component::mp::history::History;
 
 script_mod! {
@@ -120,6 +121,7 @@ script_mod! {
                         rail_page_28 := RailRow{text: ""}
                         rail_page_29 := RailRow{text: ""}
                         rail_page_30 := RailRow{text: ""}
+                        rail_page_31 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -185,6 +187,7 @@ script_mod! {
                             page_28 := mod.gallery.pages.calendar{}
                             page_29 := mod.gallery.pages.shortcuts{}
                             page_30 := mod.gallery.pages.history{}
+                            page_31 := mod.gallery.pages.combobox{}
                         }
                     }
                 }
@@ -198,7 +201,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 31] = [
+const PAGE_SLOTS: [&[LiveId]; 32] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -230,10 +233,11 @@ const PAGE_SLOTS: [&[LiveId]; 31] = [
     ids!(page_28),
     ids!(page_29),
     ids!(page_30),
+    ids!(page_31),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 31] = [
+const RAIL_ROWS: [&[LiveId]; 32] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -265,6 +269,7 @@ const RAIL_ROWS: [&[LiveId]; 31] = [
     ids!(rail_page_28),
     ids!(rail_page_29),
     ids!(rail_page_30),
+    ids!(rail_page_31),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -288,6 +293,16 @@ pub struct App {
     // which is a trap this port has recorded and has now hit twice.
     #[rust]
     history: History<String>,
+    // The combobox the Combobox page shows: the field's text and the item it names.
+    //
+    // Short name and a `use` alias, not a path: this is the third time this port has hit
+    // the script derive's rejection of full paths in a field type — twice in this one
+    // session, the second time immediately after fixing the first. The convention it
+    // implies is worth stating plainly: **a `#[derive(Script)]` struct's fields are types
+    // that must already be in scope by name, and doc comments are not allowed on them at
+    // all.**
+    #[rust]
+    combobox: Combobox,
     /// The palette's command list, in its **original** order.
     ///
     /// The indices `rank` returns are into this, and they are what a selection
@@ -397,6 +412,7 @@ impl MatchEvent for App {
         self.handle_segmented(cx, actions);
         self.handle_date(cx, actions);
         self.handle_history(cx, actions);
+        self.handle_combobox(cx, actions);
         self.handle_palette(cx, actions);
         self.handle_input(cx, actions);
     }
@@ -530,7 +546,8 @@ impl App {
     /// move the cursor with it. Each step is printed, because a state-order fault is
     /// invisible in a screenshot.
     fn seed_history(&mut self, cx: &mut Cx) {
-        use makepad_component::mp::history::History;
+        use makepad_component::mp::combobox::Combobox;
+use makepad_component::mp::history::History;
 
         // Eight states of capacity: enough that a script can exceed it and still have a
         // readable stack.
@@ -652,6 +669,146 @@ impl App {
                 ),
             );
             self.buttons(cx);
+        }
+    }
+
+    /// Fill the combobox and, if asked, drive it from a script.
+    ///
+    /// `GALLERY_COMBOBOX` is a comma-separated list of `type:X`, `step`, `back`, `commit`
+    /// and `clear`, applied through the same `Combobox` the page's field and list are wired
+    /// to. Every step prints the state, because the two things a combobox holds agreeing or
+    /// disagreeing is invisible in a screenshot and this is a state machine.
+    fn seed_combobox(&mut self, cx: &mut Cx) {
+        self.combobox = Combobox::new(
+            [
+                "New Terminal",
+                "Toggle Terminal",
+                "Split Right",
+                "Close Window",
+                "Command Palette",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        );
+        let script = std::env::var("GALLERY_COMBOBOX").unwrap_or_default();
+        for step in script.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            match step.split_once(':') {
+                Some(("type", text)) => self.combobox.type_text(text),
+                _ if step == "step" => self.combobox.step(1),
+                _ if step == "back" => self.combobox.step(-1),
+                _ if step == "commit" => {
+                    let chosen = self.combobox.commit_active();
+                    println!("COMBO commit -> {chosen:?}");
+                }
+                _ if step == "clear" => self.combobox.clear(),
+                _ => println!("COMBO ignoring unrecognised step {step:?}"),
+            }
+            println!(
+                "COMBO after {step:?} query={:?} value={:?} offered={:?} highlight={:?}",
+                self.combobox.query(),
+                self.combobox.value(),
+                self.combobox.filtered(),
+                self.combobox.active(),
+            );
+        }
+        // The field shows the query the script produced, so the page and the run agree.
+        let query = self.combobox.query().to_string();
+        if !query.is_empty() {
+            self.ui
+                .text_input(cx, ids!(combobox_field))
+                .set_text(cx, &query);
+        }
+        self.paint_combobox(cx, &script);
+    }
+
+    /// Push the combobox's state to the page: the panel's rows and the readouts.
+    fn paint_combobox(&mut self, cx: &mut Cx, script: &str) {
+        let offered = self.combobox.filtered();
+        let items: Vec<ListItem> = offered
+            .iter()
+            .map(|index| {
+                let mut item = ListItem::new(self.combobox.items()[*index].clone());
+                if Some(*index) == self.combobox.active() {
+                    item = item.detail("enter");
+                }
+                item
+            })
+            .collect();
+        self.ui.mp_list(cx, ids!(combobox_list)).set_items(cx, items);
+
+        let value = match self.combobox.value_label() {
+            Some(label) => format!(
+                "value = {label:?} at index {}",
+                self.combobox.value().unwrap()
+            ),
+            None => "value = nothing chosen".to_string(),
+        };
+        let offered_text = if offered.is_empty() {
+            "offered = (nothing matches)".to_string()
+        } else {
+            format!(
+                "offered = {:?}",
+                offered
+                    .iter()
+                    .map(|i| self.combobox.items()[*i].as_str())
+                    .collect::<Vec<_>>()
+            )
+        };
+        let highlight = match self.combobox.active() {
+            Some(index) => format!(
+                "highlight = {} (index {index}), what Enter would take",
+                self.combobox.items()[index]
+            ),
+            None => "highlight = nothing, so Enter takes nothing".to_string(),
+        };
+        self.ui
+            .label(cx, ids!(combo_query))
+            .set_text(cx, &format!("query = {:?}", self.combobox.query()));
+        self.ui.label(cx, ids!(combo_value)).set_text(cx, &value);
+        self.ui
+            .label(cx, ids!(combo_offered))
+            .set_text(cx, &offered_text);
+        self.ui
+            .label(cx, ids!(combo_highlight))
+            .set_text(cx, &highlight);
+        self.ui.label(cx, ids!(combo_script)).set_text(
+            cx,
+            &format!(
+                "script: {}. Set GALLERY_COMBOBOX to change it: type:spl,step,commit chooses Split Right; type:Split Righ clears the value.",
+                if script.is_empty() { "(none)" } else { script },
+            ),
+        );
+    }
+
+    /// The field and the list, wired to the one `Combobox`.
+    fn handle_combobox(&mut self, cx: &mut Cx, actions: &Actions) {
+        let mut changed = false;
+        if let Some(text) = self.ui.text_input(cx, ids!(combobox_field)).changed(actions) {
+            self.combobox.type_text(&text);
+            changed = true;
+        }
+        if let Some(position) = self
+            .ui
+            .mp_list(cx, ids!(combobox_list))
+            .row_selected(actions)
+        {
+            // A click on a row is a commit of that row, and it follows the same rule as
+            // Enter: the index is resolved through the *current view* rather than used as a
+            // filtered position.
+            let view = self.combobox.filtered();
+            if let Some(original) = makepad_component::mp::palette::original(&view, position) {
+                self.combobox.choose(original);
+                let label = self.combobox.query().to_string();
+                self.ui
+                    .text_input(cx, ids!(combobox_field))
+                    .set_text(cx, &label);
+                changed = true;
+            }
+        }
+        if changed {
+            let script = std::env::var("GALLERY_COMBOBOX").unwrap_or_default();
+            self.paint_combobox(cx, &script);
         }
     }
 
@@ -1037,7 +1194,7 @@ impl App {
         // widgets are laid out, so the others' triggers have empty rects and are
         // skipped — which is what lets one environment variable serve every page
         // rather than one variable per page.
-        const PINS: [(&[LiveId], &[LiveId]); 7] = [
+        const PINS: [(&[LiveId], &[LiveId]); 8] = [
             (ids!(pop_form), ids!(pop_form_panel)),
             (ids!(pop_menu), ids!(pop_menu_panel)),
             (ids!(pop_tall), ids!(pop_tall_panel)),
@@ -1049,6 +1206,7 @@ impl App {
             // that the destructive row at its bottom cannot be seen — which makes
             // the capture useless for the one thing that page exists to check.
             (ids!(menu_face_a), ids!(menu_panel_a)),
+            (ids!(combo_field), ids!(combo_panel)),
         ];
         // **Re-asserted on every event, not fired once.** A popover closes on any
         // press outside its panel, and a capture run is not a clean room: raising
@@ -1100,6 +1258,7 @@ impl App {
         self.seed_date(cx);
         self.seed_keys(cx);
         self.seed_history(cx);
+        self.seed_combobox(cx);
     }
 
     /// Fill the table page's tables.
@@ -1720,7 +1879,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 31] = [
+    const SLOT_PAGES: [&str; 32] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -1752,6 +1911,7 @@ mod tests {
         "mod.gallery.pages.calendar",
         "mod.gallery.pages.shortcuts",
         "mod.gallery.pages.history",
+        "mod.gallery.pages.combobox",
     ];
 
     #[test]
