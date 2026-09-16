@@ -31,6 +31,7 @@ use makepad_component::mp::{
     segmented::MpSegmentedWidgetRefExt,
     switch::MpSwitchWidgetRefExt,
     floating::MpFloatingWidgetRefExt,
+    code::MpCodeBlockWidgetRefExt,
     date::MpDateWidgetRefExt,
 };
 
@@ -126,6 +127,7 @@ script_mod! {
                         rail_page_31 := RailRow{text: ""}
                         rail_page_32 := RailRow{text: ""}
                         rail_page_33 := RailRow{text: ""}
+                        rail_page_34 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -194,6 +196,7 @@ script_mod! {
                             page_31 := mod.gallery.pages.combobox{}
                             page_32 := mod.gallery.pages.hover_card{}
                             page_33 := mod.gallery.pages.floating{}
+                            page_34 := mod.gallery.pages.code{}
                         }
                     }
                 }
@@ -207,7 +210,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 34] = [
+const PAGE_SLOTS: [&[LiveId]; 35] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -242,10 +245,11 @@ const PAGE_SLOTS: [&[LiveId]; 34] = [
     ids!(page_31),
     ids!(page_32),
     ids!(page_33),
+    ids!(page_34),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 34] = [
+const RAIL_ROWS: [&[LiveId]; 35] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -280,6 +284,7 @@ const RAIL_ROWS: [&[LiveId]; 34] = [
     ids!(rail_page_31),
     ids!(rail_page_32),
     ids!(rail_page_33),
+    ids!(rail_page_34),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1031,6 +1036,132 @@ use makepad_component::mp::hover_card::HoverIntent;
         );
     }
 
+    /// Classify a JSON document and hand it to the code block.
+    ///
+    /// The wiring the module docs describe as "one line": the classifier produces spans, the widget
+    /// paints them, and neither knows about the other. The legend is built the same way — one word
+    /// per kind, each word spanned with that kind — so it is drawn by the widget rather than
+    /// hand-coloured, and cannot fall out of step with the palette.
+    fn seed_code(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::code::MpCodeBlockWidgetRefExt;
+        use makepad_theme::syntax::HighlightKind;
+
+        // An A2UI message with three deliberate faults, so the three cases the widget is built around
+        // are on screen rather than only in a test: a multi-line token, an escaped quote, and a
+        // misspelling. `classify` is per-line JSON, so the comment markers below are what a reader
+        // would see rather than something JSON has.
+        let source = r#"{
+  "beginRendering": {
+    "surfaceId": "main",
+    "root": "card"
+  },
+  "surfaceUpdate": {
+    "components": [
+      { "id": "card", "component": { "Card": { "child": "title" } } },
+      { "id": "title", "component": { "Text": { "text": "Hello \"world\" — 世界" } } }
+    ]
+  },
+  "dataModelUpdate": { "contents": [ { "key": "count", "valueNumber": -1.5e3 } ] },
+  "deleted": nul,
+  "ok": true
+}"#;
+
+        let spans = makepad_syntax::classify(source, "json").unwrap_or_default();
+        let (mut counts, mut total) = ([0usize; 13], 0usize);
+        for span in &spans {
+            counts[makepad_theme::syntax::SyntaxPalette::index_of(span.kind)] += 1;
+            total += span.range.len();
+        }
+        println!(
+            "CODE classified {} chars of json into {} spans covering {total} bytes",
+            source.len(),
+            spans.len()
+        );
+        self.ui
+            .mp_code_block(cx, ids!(code_json))
+            .set_highlighted(cx, source, &spans);
+
+        // The legend, built from the kind table itself.
+        let names: Vec<&str> = HighlightKind::ALL
+            .iter()
+            .map(|kind| match kind {
+                HighlightKind::Keyword => "keyword",
+                HighlightKind::Function => "function",
+                HighlightKind::Type => "type",
+                HighlightKind::Constant => "constant",
+                HighlightKind::Variable => "variable",
+                HighlightKind::String => "string",
+                HighlightKind::Number => "number",
+                HighlightKind::Comment => "comment",
+                HighlightKind::Operator => "operator",
+                HighlightKind::Punctuation => "punctuation",
+                HighlightKind::Attribute => "key",
+                HighlightKind::Tag => "tag",
+                HighlightKind::Invalid => "invalid",
+            })
+            .collect();
+        // Two rows of words, each word one span, so the legend uses the same paint path as the code.
+        let mut legend = String::new();
+        let mut legend_spans = Vec::new();
+        for (index, name) in names.iter().enumerate() {
+            if index == 7 {
+                legend.push('\n');
+            }
+            let start = legend.len();
+            legend.push_str(name);
+            legend_spans.push(makepad_theme::syntax::Highlight {
+                range: start..legend.len(),
+                kind: HighlightKind::ALL[index],
+            });
+            legend.push_str("  ");
+        }
+        self.ui
+            .mp_code_block(cx, ids!(code_legend))
+            .set_highlighted(cx, &legend, &legend_spans);
+        println!("CODE legend built with {} spans", legend_spans.len());
+
+        let palette = makepad_theme::syntax::SyntaxPalette::for_appearance(
+            makepad_theme::Appearance::Dark,
+        );
+        let present: Vec<String> = HighlightKind::ALL
+            .iter()
+            .filter(|kind| counts[makepad_theme::syntax::SyntaxPalette::index_of(**kind)] > 0)
+            .map(|kind| {
+                format!(
+                    "{kind:?} x{}",
+                    counts[makepad_theme::syntax::SyntaxPalette::index_of(*kind)]
+                )
+            })
+            .collect();
+        self.ui.label(cx, ids!(code_stats)).set_text(
+            cx,
+            &format!(
+                "{} spans over {} bytes of source; kinds present: {}",
+                spans.len(),
+                source.len(),
+                present.join(", ")
+            ),
+        );
+        // The traps, reported rather than only painted: a page that claims a case works should say
+        // which case it put on screen.
+        let invalid = counts[makepad_theme::syntax::SyntaxPalette::index_of(HighlightKind::Invalid)];
+        let strings =
+            counts[makepad_theme::syntax::SyntaxPalette::index_of(HighlightKind::String)];
+        self.ui.label(cx, ids!(code_traps)).set_text(
+            cx,
+            &format!(
+                "cases on screen: {invalid} invalid span (the misspelled `nul`), {strings} string spans \
+                 (one of them containing an escaped quote), and the palette's Invalid colour is the \
+                 most saturated of the thirteen at {:.2},{:.2},{:.2}",
+                palette
+                    .color(HighlightKind::Invalid)
+                    .x,
+                palette.color(HighlightKind::Invalid).y,
+                palette.color(HighlightKind::Invalid).z,
+            ),
+        );
+    }
+
     /// Declare a keymap and fill the sheet from it.
     ///
     /// **Nothing below writes a chord.** Each row's trailing text is
@@ -1481,6 +1612,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_combobox(cx);
         self.seed_hover_card(cx);
         self.seed_floating(cx);
+        self.seed_code(cx);
     }
 
     /// Fill the table page's tables.
@@ -2107,7 +2239,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 34] = [
+    const SLOT_PAGES: [&str; 35] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -2142,6 +2274,7 @@ mod tests {
         "mod.gallery.pages.combobox",
         "mod.gallery.pages.hover_card",
         "mod.gallery.pages.floating",
+        "mod.gallery.pages.code",
     ];
 
     #[test]

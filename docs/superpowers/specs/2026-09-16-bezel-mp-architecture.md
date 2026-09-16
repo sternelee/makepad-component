@@ -548,6 +548,37 @@ crate's estimator is not involved. The property the tests stood for was untouche
 both went red. They are removed, with a note saying why, and what is asserted instead is
 the estimator's own behaviour in `mp/text.rs` — where it belongs.
 
+### The declared font size is not the painted one
+
+`mp/text.rs` estimated every width from the **declared** `font_size`, and Makepad lays text out at
+96 dpi — so a `font_size` is multiplied by `96 / 72` before a glyph is placed, and **every estimate in
+this port was about 25% under the paint.**
+
+That is the real cause of two faults that were each "fixed" with padding before the constant was
+found:
+
+| symptom | the padding fix | the real cause |
+|---|---|---|
+| a segmented control's last label clipped — `Preview` drawn as `Previ` | `SLOT_PAD_X` raised to 16 to carry "the measurement's error margin" | the estimate was 25% under |
+| a list's trailing chord past its panel, under the scroll bar | `DETAIL_SLACK` added, after a symbol correction was raised | the same 25% |
+
+Both fudges stay at their values — the two points are indistinguishable in the rendered control, and
+a number whose fault was fixed elsewhere is the last one to change — but their **reasons** are
+corrected, because a fudge documented as load-bearing when it is not is how the next person tunes the
+wrong thing.
+
+**The derivation, and the measurement that pinned it.** Both mono faces this workspace bundles
+advance **0.6 em** per character, read from their own `hmtx` tables rather than assumed
+(`LiberationMono-Regular.ttf` is 1229/2048, `jetbrains_mono_variable.ttf` is 600/1000, and every
+glyph in each takes the same advance). `MpCodeBlock` then drew a 16-character run at 12pt and read
+back the `Rect` — 153.62 wide, **9.6016pt per character** — and the same run at 24pt came back 307.25,
+**19.2031**. The ratio is `0.8001 / 0.6 = 1.3336`, and `96 / 72 = 1.3333`, at both sizes. So
+`MONO_ADVANCE = 0.6 × 4/3` and `ADVANCE = 0.508 × 4/3`.
+
+Verified after the fix, from the widget's own numbers rather than a picture: `advance = 9.600` against
+the paint's `9.6016`, so **the estimate and the paint agree to 0.0016pt per character** — 0.13pt over
+the 84-character widest line, where the gap had been 200pt.
+
 ### The estimate's font size must be the painted one
 
 `mp/list.rs` measured its rows with `theme.metrics(Body)` / `theme.metrics(Caption)` while

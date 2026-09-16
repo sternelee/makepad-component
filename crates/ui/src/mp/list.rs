@@ -174,18 +174,21 @@ const PAD: f64 = 10.0;
 
 /// Extra room the row's **trailing** text keeps from the panel's edge.
 ///
-/// The detail is right-aligned, and its position is arithmetic on an *estimate* of its
-/// width ([`crate::mp::text`]). An estimate cannot be exact for every string, and the
-/// direction that hurts is an under-estimate: the text runs past the edge instead of
-/// stopping short of it. That is what the Shortcuts page showed — `⇧⌘S` with its `S`
-/// drawn under the page's scroll bar, which **overlays** the panel's right edge.
+/// ## It was compensating for a bug that has since been found
 ///
-/// Raising the estimator's symbol correction as far as the measurements justified (see
-/// `mp/text.rs`) closed most of the gap; this closes the rest, and it is the same
-/// decision `mp/segmented.rs` reached for the same reason: **a slot that carries the
-/// measurement's error margin is better than a label that collides.** Fourteen points is
-/// the residual for a three-glyph chord, and it reads as a wider gap before the panel's
-/// edge, which is a change nobody minds.
+/// The Shortcuts page drew `⇧⌘S` with its `S` **past the panel**, under the page's scroll bar, which
+/// overlays the panel's right edge. The diagnosis was that the right-alignment is arithmetic on an
+/// *estimate* of the text's width and that the estimate came out under; two rounds of correction
+/// followed — a larger symbol correction in `mp/text.rs`, then this gap.
+///
+/// **The real cause was found later and is a missing constant, not an estimate:** `text::width`
+/// omitted the factor between a declared font size and the size Makepad lays text out at, so every
+/// estimate was about **25% under the paint**. `mp/text.rs` carries the derivation and the
+/// measurement; with it in place the estimate agrees with the paint to **0.0016pt per character**.
+///
+/// The value stays at 14 rather than being reduced, because the remaining proportional error on a
+/// three-glyph chord is not something this port can measure from a picture, and a number whose fault
+/// was fixed elsewhere is the last one to change. What changed is the reason written down.
 const DETAIL_SLACK: f64 = 14.0;
 const GLYPH_W: f64 = 22.0;
 

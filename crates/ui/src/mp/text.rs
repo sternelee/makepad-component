@@ -37,16 +37,72 @@
 //! Shortcuts page, where a matching list's trailing chord is right-aligned and
 //! `⇧⌘S` was drawn with its `S` **past the panel**, on top of the page's scroll bar.
 //!
-//! Both had one cause: **a glyph is not an average character.** `⌘`, `⇧` and `⌥` were
-//! each counted at the average Latin advance, when their real advance is close to
-//! double it. So non-ASCII characters now get [`SYMBOL`] instead, which is the
-//! string-specific correction the rest of this module already does, extended to the
-//! characters it had missed. Symbols are exactly what a shortcut label is made of,
-//! which is why the fault showed up there first.
+//! Both had **two** causes, and the second was found later and is the larger one:
+//!
+//! 1. **A glyph is not an average character.** `⌘`, `⇧` and `⌥` were each counted at the average
+//!    Latin advance when their real advance is close to double it, so non-ASCII characters now get
+//!    [`SYMBOL`].
+//! 2. **The declared font size is not the painted one.** Makepad lays text out at 96 dpi, so a
+//!    `font_size` is multiplied by `96 / 72` before any glyph is placed — and this module did not
+//!    know that, which made **every estimate about 25% under the paint**. That is the real reason a
+//!    segmented control's last label was clipped and a list's chord ran past its panel; the symbol
+//!    correction above addressed a smaller error with the same symptom, and both faults were "fixed"
+//!    with padding before the constant was found.
+//!
+//! [`DPI`] carries the derivation and the measurement that pins it, and with it in place the
+//! estimate for a monospace run agrees with the paint to **0.0016pt per character** — checked in
+//! `MpCodeBlock`, which prints both.
+
+/// Which face a string is measured in.
+///
+/// **The same estimator cannot serve both, and this crate now has a widget of each.** A proportional
+/// face gives `⌘` and `A` different advances, so an average-character estimate needs per-character
+/// corrections. A monospace face gives every character one advance, so those corrections are exactly
+/// wrong for it.
+///
+/// This was removed once, when nothing measured a monospace string — `MpKbd` draws its text with
+/// `Walk::fit()` and lets Makepad lay it out, so the estimator was never involved. `mp/code.rs` is
+/// the consumer that brought it back: a code block advances its pen by hand, span by span, and it
+/// has nothing to lay out.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Face {
+    /// A proportional face: an average Latin advance, corrected per character.
+    Proportional,
+    /// A monospace face: one advance for every character, glyphs included.
+    Mono,
+}
+
+/// The factor between a declared font size and the size Makepad **lays text out at**.
+///
+/// Makepad converts a `font_size` from points to pixels at 96 dpi: `96 / 72`. Every measurement in
+/// this module used to omit it, so **every estimate was about 25% under the paint** — which is why a
+/// segmented control's last label was clipped and a list's trailing chord ran past its panel, and why
+/// both were "fixed" with a padding fudge rather than with the number that was wrong.
+///
+/// Measured rather than taken from the constant: `MpCodeBlock` drew a 16-character run at 12pt and
+/// the rect came back 153.62 wide, and the same run at 24pt came back 307.25 — `9.6016` and `19.2031`
+/// per character, the same ratio to five decimal places. Against the mono face's own `hmtx` advance
+/// of 0.6 em (LiberationMono is 1229/2048, JetBrains Mono is 600/1000), that ratio is
+/// `0.8001 / 0.6 = 1.3336`, and `96 / 72 = 1.3333`.
+const DPI: f64 = 96.0 / 72.0;
 
 /// The advance of an average character, as a fraction of the font size, for the
 /// proportional faces this crate bundles.
-const ADVANCE: f64 = 0.508;
+///
+/// The `0.508` is the face's own average advance **per em**; [`DPI`] is what turns the declared size
+/// into the size it is painted at.
+const ADVANCE: f64 = 0.508 * DPI;
+
+/// The advance of **every** character in the monospace face this crate bundles, as a fraction of the
+/// font size.
+///
+/// Higher than [`ADVANCE`], which is what a monospace advance is: a mono face reserves the width of
+/// its widest glyph for all of them.
+/// The mono faces are **0.6 em** per character, read from their own `hmtx` tables rather than
+/// assumed: `LiberationMono-Regular.ttf` advances 1229/2048 and `jetbrains_mono_variable.ttf` 600/1000,
+/// with every glyph in each taking the same advance — which is what makes a code block's pen
+/// legitimate. See [`DPI`] for the rest of the ratio.
+pub const MONO_ADVANCE: f64 = 0.6 * DPI;
 
 /// How far a narrow or wide character moves the estimate, as a fraction of the
 /// average advance.
@@ -112,11 +168,25 @@ fn is_symbol(ch: char) -> bool {
 /// `base_advance` is the font's own per-character advance at that size; the two
 /// corrections are applied on top of it.
 pub fn width(text: &str, font_size: f64) -> f64 {
+    width_in(text, font_size, Face::Proportional)
+}
+
+/// How wide `text` paints in `face` at `font_size`, in points.
+///
+/// The face matters: see [`Face`].
+pub fn width_in(text: &str, font_size: f64, face: Face) -> f64 {
+    if matches!(face, Face::Mono) {
+        // One advance for every character, which is the definition of the face — and exact rather
+        // than estimated, so a code block's pen lands where the glyph does.
+        return text.chars().count() as f64 * font_size * MONO_ADVANCE;
+    }
     let base = font_size * ADVANCE;
     let mut w = 0.0;
     for ch in text.chars() {
         w += base;
         if is_symbol(ch) {
+            // A glyph is wider than a Latin character in **any** face, on top of the DPI factor that
+            // `base` already carries.
             // Checked before the Latin corrections, because `—` and `…` are neither
             // narrow nor merely wide and used to be caught by the wide table.
             w += base * SYMBOL;
@@ -168,6 +238,25 @@ pub fn right_aligned_x(text: &str, box_x: f64, box_w: f64, pad: f64, font_size: 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_the_estimate_carries_the_dpi_factor_that_makepad_lays_text_out_at() {
+        // **The constant that was missing.** Makepad converts a `font_size` from points to pixels at
+        // 96 dpi, so every estimate here was about 25% under the paint until this was applied. The
+        // test pins the ratio to its derivation rather than to a remembered number, and pins the
+        // measurement that identified it: `MpCodeBlock` drew 16 characters at 12pt and the rect came
+        // back 153.62 wide — 9.6016pt per character — against a mono face whose own `hmtx` advance is
+        // 0.6 em.
+        assert!((DPI - 4.0 / 3.0).abs() < 1e-9, "96/72 is 4/3");
+        let measured_per_char = 153.62 / 16.0;
+        let estimated_per_char = width_in("m", 12.0, Face::Mono);
+        assert!(
+            (measured_per_char - estimated_per_char).abs() < 0.01,
+            "the measurement is {measured_per_char:.4} per character and the estimate {estimated_per_char:.4},              so the DPI factor is wrong"
+        );
+        // And the mono advance is the face's own 0.6 em scaled by it, not a number chosen here.
+        assert!((MONO_ADVANCE - 0.6 * 4.0 / 3.0).abs() < 1e-9);
+    }
 
     #[test]
     fn test_a_glyph_is_wider_than_any_latin_letter() {

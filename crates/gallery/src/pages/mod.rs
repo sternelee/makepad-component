@@ -32,6 +32,7 @@ pub mod slider;
 pub mod status;
 pub mod surface;
 pub mod table;
+pub mod code;
 pub mod combobox;
 pub mod tree;
 pub mod menu;
@@ -71,6 +72,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     icon::script_mod(vm);
     status::script_mod(vm);
     table::script_mod(vm);
+    code::script_mod(vm);
     combobox::script_mod(vm);
     tree::script_mod(vm);
     avatar::script_mod(vm);
@@ -310,6 +312,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/floating.rs",
         blurb: "A panel the reader drags",
     },
+    Page {
+        title: "Code",
+        path: "mod.gallery.pages.code",
+        source: "crates/gallery/src/pages/code.rs",
+        blurb: "Source classified, coloured and painted",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -391,6 +399,7 @@ mod tests {
             ("crates/gallery/src/pages/icon.rs", "icon"),
             ("crates/gallery/src/pages/status.rs", "status"),
             ("crates/gallery/src/pages/table.rs", "table"),
+            ("crates/gallery/src/pages/code.rs", "code"),
             ("crates/gallery/src/pages/combobox.rs", "combobox"),
             ("crates/gallery/src/pages/tree.rs", "tree"),
             ("crates/gallery/src/pages/avatar.rs", "avatar"),

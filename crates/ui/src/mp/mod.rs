@@ -41,6 +41,7 @@ pub mod avatar;
 pub mod bars;
 pub mod button;
 pub mod checkbox;
+pub mod code;
 pub mod combobox;
 pub mod control;
 pub mod date;
@@ -137,4 +138,5 @@ pub fn script_mod(vm: &mut ScriptVm) {
     // makes the ordering a rule rather than a preference, and `tests/registration_order.rs`
     // now checks it statically so a fourth one cannot happen.
     crate::mp::combobox::script_mod(vm);
+    crate::mp::code::script_mod(vm);
 }

@@ -50,15 +50,23 @@ use crate::mp::text;
 
 /// The label's breathing room inside its slot, on each side.
 ///
-/// Chosen, and doing two jobs: a word needs air on both sides before it reads as a
-/// target rather than as text, and it carries the **measurement's error margin**.
-/// [`crate::mp::text::width`] is a heuristic — a base advance with narrow and wide
-/// corrections — and on a proportional label it can come out slightly under the
-/// real painted width. An underestimate makes the control's box too small and the
-/// last label overflows it, which is what the first render of the Bars toolbar
-/// showed: `Preview` drawn as `Previ`. Sixteen points per side has room for the
-/// error as well as for the air; a real text measurement would let this be chosen
-/// for the air alone.
+/// Air on each side of a slot's label, so a segment reads as a target rather than as text.
+///
+/// ## It was 16 because it was carrying a bug
+///
+/// The Bars toolbar's first render drew `Preview` as **`Previ`**, and the diagnosis at the time was
+/// that [`crate::mp::text::width`] is a heuristic that can come out under the painted width on a
+/// proportional label — so this was raised to 16 to absorb the error.
+///
+/// **The real cause was elsewhere and was found later:** `width` omitted the factor between a
+/// declared font size and the size Makepad lays text out at, so **every estimate was about 25%
+/// under**. `mp/text.rs` carries the derivation and the measurement now, and with it in place the
+/// estimate agrees with the paint to **0.0016pt per character**.
+///
+/// The value stays at 16 rather than going back to 14, because the two points are indistinguishable
+/// in the rendered control and changing a number whose fault has been fixed somewhere else is how a
+/// fix becomes a regression nobody can attribute. What changed is the reason written down: this is
+/// air, not a margin.
 const SLOT_PAD_X: f64 = 16.0;
 
 /// How far the plate is inset from its slot.

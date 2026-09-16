@@ -1475,6 +1475,7 @@ dependencies = [
  "libc",
  "makepad-component",
  "makepad-motion",
+ "makepad-syntax",
  "makepad-theme",
  "makepad-widgets",
 ]
@@ -2768,6 +2769,13 @@ version = "1.0.0"
 dependencies = [
  "makepad-html",
  "makepad-live-id",
+]
+
+[[package]]
+name = "makepad-syntax"
+version = "0.1.0"
+dependencies = [
+ "makepad-theme",
 ]
 
 [[package]]

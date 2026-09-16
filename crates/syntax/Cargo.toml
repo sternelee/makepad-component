@@ -1,0 +1,9 @@
+[package]
+name = "makepad-syntax"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Syntax classification into the theme's highlight kinds"
+
+[dependencies]
+makepad-theme = { workspace = true }
