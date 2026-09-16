@@ -20,6 +20,7 @@ pub mod layout;
 pub mod list;
 pub mod loaders;
 pub mod scroll;
+pub mod search;
 pub mod select;
 pub mod slider;
 pub mod status;
@@ -66,6 +67,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     pagination::script_mod(vm);
     menu::script_mod(vm);
     scroll::script_mod(vm);
+    search::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -234,6 +236,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/scroll.rs",
         blurb: "The chrome every page already used",
     },
+    Page {
+        title: "Search",
+        path: "mod.gallery.pages.search",
+        source: "crates/gallery/src/pages/search.rs",
+        blurb: "The match behind a palette",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -319,6 +327,7 @@ mod tests {
             ("crates/gallery/src/pages/pagination.rs", "pagination"),
             ("crates/gallery/src/pages/menu.rs", "menu"),
             ("crates/gallery/src/pages/scroll.rs", "scroll"),
+            ("crates/gallery/src/pages/search.rs", "search"),
         ]
         .into_iter()
         .collect();

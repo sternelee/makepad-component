@@ -111,6 +111,7 @@ script_mod! {
                         rail_page_22 := RailRow{text: ""}
                         rail_page_23 := RailRow{text: ""}
                         rail_page_24 := RailRow{text: ""}
+                        rail_page_25 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -170,6 +171,7 @@ script_mod! {
                             page_22 := mod.gallery.pages.pagination{}
                             page_23 := mod.gallery.pages.menu{}
                             page_24 := mod.gallery.pages.scroll{}
+                            page_25 := mod.gallery.pages.search{}
                         }
                     }
                 }
@@ -183,7 +185,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 25] = [
+const PAGE_SLOTS: [&[LiveId]; 26] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -209,10 +211,11 @@ const PAGE_SLOTS: [&[LiveId]; 25] = [
     ids!(page_22),
     ids!(page_23),
     ids!(page_24),
+    ids!(page_25),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 25] = [
+const RAIL_ROWS: [&[LiveId]; 26] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -238,6 +241,7 @@ const RAIL_ROWS: [&[LiveId]; 25] = [
     ids!(rail_page_22),
     ids!(rail_page_23),
     ids!(rail_page_24),
+    ids!(rail_page_25),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -550,6 +554,7 @@ impl App {
         self.seed_content(cx);
         self.seed_pagination(cx);
         self.seed_menus(cx);
+        self.seed_search(cx);
     }
 
     /// Fill the table page's tables.
@@ -870,6 +875,46 @@ impl App {
         }
     }
 
+    /// Fill the search page from `rank()` itself.
+    ///
+    /// The candidate set is a real palette's, chosen to contain every case the
+    /// ranking rules were written for: a command with a two-word label, a
+    /// scattered match across two words, a long contiguous run, and a
+    /// path-shaped label whose separators are word starts.
+    ///
+    /// Running the function rather than copying its output into the page is
+    /// deliberate. A page that shows the expected answer is a second copy of the
+    /// tests; a page that calls the function shows what a reader will actually
+    /// see, and regresses visibly if the function does.
+    fn seed_search(&mut self, cx: &mut Cx) {
+        const CANDIDATES: [&str; 8] = [
+            "New Terminal",
+            "Toggle Terminal",
+            "Go to File",
+            "Command Palette",
+            "Split Right",
+            "Rename\u{2026}",
+            "Delete",
+            "The remote endpoint",
+        ];
+        const OR_SET: [&str; 4] = ["Word", "Off Road", "Go to File", "Order"];
+        let all: Vec<String> = CANDIDATES.iter().map(|s| s.to_string()).collect();
+        let or_all: Vec<String> = OR_SET.iter().map(|s| s.to_string()).collect();
+
+        for (path, candidates, query) in [
+            (ids!(search_all), &all, ""),
+            (ids!(search_nt), &all, "nt"),
+            (ids!(search_term), &all, "term"),
+            (ids!(search_or), &or_all, "or"),
+        ] {
+            let items: Vec<ListItem> = makepad_component::mp::search::rank(candidates, query)
+                .into_iter()
+                .map(|i| ListItem::new(&candidates[i]))
+                .collect();
+            self.ui.mp_list(cx, path).set_items(cx, items);
+        }
+    }
+
     /// Fill the menu page's three menus.
     ///
     /// Built from data, which is the point of the separator being a *row's* flag:
@@ -1109,7 +1154,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 25] = [
+    const SLOT_PAGES: [&str; 26] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -1135,6 +1180,7 @@ mod tests {
         "mod.gallery.pages.pagination",
         "mod.gallery.pages.menu",
         "mod.gallery.pages.scroll",
+        "mod.gallery.pages.search",
     ];
 
     #[test]

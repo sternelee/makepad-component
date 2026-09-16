@@ -52,6 +52,7 @@ pub mod popover;
 pub mod radio;
 pub mod scaffolding;
 pub mod scroll;
+pub mod search;
 pub mod slider;
 pub mod status;
 pub mod table;
@@ -88,6 +89,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::scaffolding::script_mod(vm);
     crate::mp::pagination::script_mod(vm);
     crate::mp::scroll::script_mod(vm);
+    crate::mp::search::script_mod(vm);
     crate::mp::table::script_mod(vm);
     // After `status`: the avatar names `mod.mp.StatusTone` for its presence dot,
     // and a type that is not registered yet is 3 runtime errors per use site.

@@ -147,6 +147,42 @@ build on).
 | `mp/text.rs` | Measuring and clipping one line, shared by the three row-painting widgets. |
 | `mp/list.rs` | `MpList`, `MpMenu` — a glyph, a label and a trailing detail; a menu is the same widget with one flag. |
 | `mp/scroll.rs` | `MpScroll`, `MpScrollBoth` — the scroll bar, themed. |
+| `mp/search.rs` | `rank` / `matches` / `MpSearch` — the match behind a command palette. |
+
+### A ranking is a weighted score, not a comparison order
+
+The first version of `mp/search.rs` ranked matches with a derived `Ord` on three
+keys — first hit, longest run, word starts — and it was wrong, in a way that took
+three passes to see because **two of the preferences point in opposite directions**:
+
+- `nt` must find `New Terminal` rather than a substring of an untyped word, so a
+  **word start has to be able to dominate**.
+- `term` must find `New Terminal` rather than `The remote endpoint`, which also
+  matches two word starts (`T` of `The`, `r` of `remote`) but scatters — so a
+  **contiguous run has to be able to dominate a word start**.
+
+No lexicographic order satisfies both. `first_hit, run, boundaries` passed `term`
+and got `nt` wrong; the documented `boundaries, run, first_hit` passed `nt` and got
+`term` wrong; and **each order passed a majority of the tests**, which is how the
+disagreement survived the first reading. The fix is the thing real matchers do —
+`WORD_START = 8`, `CONTIGUOUS = 4`, chosen rather than measured, with the position
+kept out of the score entirely and used only as a tie-break. `or` fixes the ratio:
+it must find `Off Road` (two word starts, 16) over `Word` (one contiguous run, 4).
+
+Two lessons worth keeping:
+
+1. **A derived `Ord` makes the field order the rule.** The struct declared
+   `first_hit` first while its own doc comment claimed word starts outranked
+   everything, and the tests passed anyway. Code and comment disagreeing is
+   invisible when a majority of cases agree under both.
+2. **Folding a tie-break into the score is not a tie-break.** Subtracting the
+   match position ("a mild preference for matching sooner") tied `New Terminal`'s
+   20 down to `The remote endpoint`'s 16 and handed the row to the worse match. A
+   tie-break only breaks ties if it runs after the score.
+
+The page shows all four cases seeded **from `rank()` itself** rather than from
+expected output written into the page — a page showing the expected answer is a
+second copy of the tests, and a page calling the function regresses visibly.
 
 ### The chrome nobody looked at
 
