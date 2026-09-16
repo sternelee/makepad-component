@@ -1,4 +1,12 @@
-//! `MpHistory` — undo and redo, as a value rather than as a widget.
+//! Undo and redo, as a value: the **generic** stack, with no policy of its own.
+//!
+//! This is bezel's `SnapshotHistory` — a `Vec` of states and a cursor — and it is deliberately ignorant of
+//! what a state *is* and of when two edits should become one undo step. That policy is `history.rs`, one
+//! level up, because **only the caller knows what an edit means**.
+//!
+//! It used to live in `crates/ui/src/mp/history.rs`, a **widget** crate, which is the wrong home for a data
+//! structure with no widgets in it. Moving it here is what let the document history be written on top of it
+//! rather than beside it.
 //!
 //! ## Why this is a type and not a pair of buttons
 //!
@@ -38,13 +46,13 @@
 //! groups by word), and no transactions. Both are policies layered on top, and both need
 //! to know what the states *mean* — which is the caller's business, not this type's.
 
-/// A linear undo/redo history over states of type `T`.
+/// A linear undo/redo stack over states of type `T`.
 ///
 /// `T` is cloned in and cloned out, which is what keeps the type free of any assumption
 /// about how a state is produced. An editor clones a document; a settings pane clones a
 /// struct; neither has to hand over ownership.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct History<T> {
+pub struct SnapshotHistory<T> {
     /// Every retained state, **oldest first**.
     entries: Vec<T>,
     /// The index of the current state. Always a valid index while `entries` is non-empty,
@@ -54,7 +62,7 @@ pub struct History<T> {
     capacity: Option<usize>,
 }
 
-impl<T: Clone> History<T> {
+impl<T: Clone> SnapshotHistory<T> {
     /// A history whose only state is `initial`.
     ///
     /// Nothing is undoable yet, which is the correct answer for a document that has not
@@ -138,7 +146,31 @@ impl<T: Clone> History<T> {
         Some(self.current())
     }
 
+    /// Replace the current state **without** moving the cursor.
+    ///
+    /// For coalescing: a run of edits that counts as one undo step keeps the *first* state of the run as the
+    /// step's snapshot, so a later state in the same run has to overwrite it rather than push. Written as an
+    /// explicit method because the alternative — remembering to push only the first time — is a rule a caller
+    /// has to get right in two places.
+    pub fn replace_current(&mut self, state: T) -> bool {
+        match self.entries.get_mut(self.cursor) {
+            Some(slot) => {
+                *slot = state;
+                true
+            }
+            None => false,
+        }
+    }
+
     /// How many states are retained, the current one included.
+    /// The limit this stack was built with, or `None` when it has none.
+    ///
+    /// An accessor rather than a public field, and it exists for `History::reset`: replacing the contents of a
+    /// history must not silently drop the limit the caller chose.
+    pub fn capacity(&self) -> Option<usize> {
+        self.capacity
+    }
+
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -189,7 +221,7 @@ impl<T: Clone> History<T> {
 /// smallest thing that is still a history. It is here because a host needs its state
 /// fields to be constructible before the first event, and a state container that could not
 /// be defaulted would force every caller to wrap it in an `Option` for that reason alone.
-impl<T: Clone + Default> Default for History<T> {
+impl<T: Clone + Default> Default for SnapshotHistory<T> {
     fn default() -> Self {
         Self::new(T::default())
     }
@@ -200,14 +232,14 @@ mod tests {
     use super::*;
 
     /// A history of single characters, which is the smallest state that reads clearly.
-    fn history() -> History<char> {
-        History::new('a')
+    fn history() -> SnapshotHistory<char> {
+        SnapshotHistory::new('a')
     }
 
     #[test]
     fn test_the_default_history_holds_the_default_state_and_offers_nothing() {
         // What a host gets before it has seeded anything.
-        let h = History::<u32>::default();
+        let h = SnapshotHistory::<u32>::default();
         assert_eq!(*h.current(), 0);
         assert!(!h.can_undo());
         assert!(!h.can_redo());
@@ -316,7 +348,7 @@ mod tests {
     fn test_a_bounded_history_drops_the_oldest_and_keeps_the_current_state() {
         // The capacity case, without the cursor being tested yet: what the user sees must
         // not change when an old state falls off the back.
-        let mut h = History::with_capacity('a', 3);
+        let mut h = SnapshotHistory::with_capacity('a', 3);
         for c in ['b', 'c', 'd'] {
             h.push(c);
         }
@@ -330,7 +362,7 @@ mod tests {
         // **The cursor fault.** After the oldest entry is dropped the cursor has to move
         // with it, or undo jumps two states at once and the user sees a document that
         // skipped an edit. Undone step by step here, so a skip shows as a missing value.
-        let mut h = History::with_capacity('a', 3);
+        let mut h = SnapshotHistory::with_capacity('a', 3);
         for c in ['b', 'c', 'd'] {
             h.push(c);
         }
@@ -345,7 +377,7 @@ mod tests {
     fn test_a_bounded_history_drops_from_the_front_while_the_cursor_is_in_the_middle() {
         // The case where the cursor is not at the end when the front is dropped: it still
         // has to point at the same *state*, not the same index.
-        let mut h = History::with_capacity('a', 3);
+        let mut h = SnapshotHistory::with_capacity('a', 3);
         h.push('b');
         h.push('c');
         // [a, b, c], cursor on `c`. Go back to `a`.
@@ -376,7 +408,7 @@ mod tests {
     fn test_a_capacity_of_one_retains_only_the_current_state() {
         // The degenerate bound, where every push drops the previous state — so undo is
         // never available and that is the correct answer rather than a bug.
-        let mut h = History::with_capacity('a', 1);
+        let mut h = SnapshotHistory::with_capacity('a', 1);
         assert_eq!(h.len(), 1);
         h.push('b');
         assert_eq!(h.entries(), &['b']);
@@ -388,7 +420,7 @@ mod tests {
     fn test_a_capacity_of_zero_is_treated_as_one_rather_than_as_no_states() {
         // Zero would mean a history with no current state, which every method would have
         // to answer for. One is the smallest thing that is still a history.
-        let mut h = History::with_capacity('a', 0);
+        let mut h = SnapshotHistory::with_capacity('a', 0);
         assert_eq!(h.len(), 1);
         assert_eq!(*h.current(), 'a');
         h.push('b');
@@ -421,7 +453,7 @@ mod tests {
         // entries could disagree, this finds it.
         let mut seed = 0x5eed_1234_u64;
         for capacity in [1usize, 2, 3, 8, 64] {
-            let mut h = History::with_capacity(0u32, capacity);
+            let mut h = SnapshotHistory::with_capacity(0u32, capacity);
             for step in 0..400u32 {
                 match lcg(&mut seed) % 3 {
                     0 => h.push(step),
@@ -482,7 +514,7 @@ mod tests {
         // A session in the shape an editor produces, so the type is exercised the way it
         // will be used rather than only in the abstract: type, undo, retype, then edit
         // past the capacity.
-        let mut h = History::with_capacity(String::new(), 4);
+        let mut h = SnapshotHistory::with_capacity(String::new(), 4);
         let mut doc = String::new();
         for ch in ['h', 'e', 'l', 'l', 'o'] {
             doc.push(ch);

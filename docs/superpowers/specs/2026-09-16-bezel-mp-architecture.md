@@ -557,6 +557,41 @@ And the fix's first attempt was wrong in an instructive way: it also had an `on_
 DSL value across again, which is *the wipe it was written to prevent, one apply later*. `on_after_new` is
 the only hook that runs before a caller can set anything.
 
+### `makepad-editor`: a data structure that was in the wrong crate
+
+`History<T>` lived in `crates/ui/src/mp/history.rs` — a **widget** crate — while its own doc said the one thing
+it cannot do is decide when two edits are one undo step, because *"only the caller knows what an edit means"*.
+That caller is the editor, so the crate now exists and the stack moved into it, renamed `SnapshotHistory` to
+free the name `History` for the document policy — which is bezel's vocabulary for the same split.
+
+**Moving it is what let the document history be written *on top of* it rather than beside it.** The
+alternative — a second stack in `markdown`, which must stay dependency-free — would have been sixty duplicated
+lines and a second place to get the cursor arithmetic wrong. Fifteen tests moved with the stack, which is why
+`makepad-component`'s count went *down* by fifteen.
+
+### The undo model: states in the stack, with an explicit base
+
+The policy is the substance, and the four rules are the ones a reader feels:
+
+| a run of | is |
+|---|---|
+| typing | **one** step, however many characters |
+| deleting | one step — and **not** the same as typing, so type-then-delete undoes to the text, not to the deletion undone |
+| a structural change (Enter, Tab, a kind change, a merge) | **its own** step, always |
+| a caret move | the **end** of the run before it |
+
+The first version of the model was wrong in a way worth keeping: it recorded the state **before** each edit, so
+the stack's current entry was the state before the most recent *run* — and pressing undo after typing `ab`,
+pausing, and typing `cd` gave the **empty document** rather than `ab`. One undo skipped a run. The tests caught
+it, and the fault was the model rather than the arithmetic: the stack now holds **states**, `History::new`
+takes the document an editor has open as an explicit **base** (without which an undo cannot reach the state
+before the first edit), and a run overwrites its own entry so its snapshot is the state after its *last* edit.
+
+Two more of my errors the tests caught, both of the same kind: `parse("\n")` gives a document with **no blocks
+at all** (a blank line is a separator, not a block), so a fixture that indexed block 0 of it panicked; and an
+inline loop in one test still recorded *before* applying after the shared helper had been converted, which made
+that test fail a step later than the others and looked like an off-by-one in the undo.
+
 ### The editing half: where the flat model's claim is cashed
 
 `lib.rs` says the shape was chosen because *"editing a flat list means Enter splits, Backspace merges and

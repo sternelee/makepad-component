@@ -37,6 +37,10 @@
 pub mod edit;
 pub mod layout;
 
+// The editing vocabulary, reachable from the crate root — the same shape `markdown`'s reference has, and what
+// lets an editor crate ring a document's edits without reaching into a submodule for each name.
+pub use edit::{apply, apply as apply_shortcut, Edited, Selection, SetKind, Shortcut};
+
 use std::ops::Range;
 
 /// A markdown document: blocks in document order.

@@ -38,7 +38,7 @@ use makepad_component::mp::{
 
 use crate::pages::PAGES;
 use makepad_component::mp::combobox::Combobox;
-use makepad_component::mp::history::History;
+use makepad_editor::SnapshotHistory;
 use makepad_component::mp::hover_card::HoverIntent;
 
 script_mod! {
@@ -312,7 +312,7 @@ pub struct App {
     // derive's field parser rejects doc comments on fields and full paths in types,
     // which is a trap this port has recorded and has now hit twice.
     #[rust]
-    history: History<String>,
+    history: SnapshotHistory<String>,
     // The combobox the Combobox page shows: the field's text and the item it names.
     //
     // Short name and a `use` alias, not a path: this is the third time this port has hit
@@ -567,12 +567,12 @@ impl App {
     /// invisible in a screenshot.
     fn seed_history(&mut self, cx: &mut Cx) {
         use makepad_component::mp::combobox::Combobox;
-use makepad_component::mp::history::History;
+use makepad_editor::SnapshotHistory;
 use makepad_component::mp::hover_card::HoverIntent;
 
         // Eight states of capacity: enough that a script can exceed it and still have a
         // readable stack.
-        let mut history: History<String> = History::with_capacity("doc:0".to_string(), 8);
+        let mut history: SnapshotHistory<String> = SnapshotHistory::with_capacity("doc:0".to_string(), 8);
         let script = std::env::var("GALLERY_HISTORY").unwrap_or_else(|_| {
             // The default session: five edits, undo twice, then a different edit — which
             // is the shape that abandons a redo branch.

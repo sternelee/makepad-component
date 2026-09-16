@@ -11,6 +11,7 @@ makepad-theme = { workspace = true }
 makepad-motion = { workspace = true }
 makepad-syntax = { path = "../syntax" }
 makepad-markdown = { path = "../markdown" }
+makepad-editor = { path = "../editor" }
 makepad-widgets = { workspace = true }
 # For the local timezone offset only. The date arithmetic lives in
 # `makepad_component::mp::date` and is tested; what a library cannot know is **which

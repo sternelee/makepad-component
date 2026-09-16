@@ -48,7 +48,6 @@ pub mod date;
 pub mod feedback;
 pub mod floating;
 pub mod focus;
-pub mod history;
 pub mod hover_card;
 pub mod icon;
 pub mod icons;

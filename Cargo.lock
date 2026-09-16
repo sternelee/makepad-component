@@ -1474,6 +1474,7 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "makepad-component",
+ "makepad-editor",
  "makepad-markdown",
  "makepad-motion",
  "makepad-syntax",
@@ -2511,6 +2512,13 @@ dependencies = [
  "unicode-bidi 0.3.18",
  "unicode-linebreak",
  "unicode-segmentation 1.12.0",
+]
+
+[[package]]
+name = "makepad-editor"
+version = "0.1.0"
+dependencies = [
+ "makepad-markdown",
 ]
 
 [[package]]
