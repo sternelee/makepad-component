@@ -18,6 +18,7 @@ use makepad_component::mp::{
     radio::MpRadioWidgetRefExt,
     loaders::MpProgressWidgetRefExt,
     popover::MpPopoverWidgetRefExt,
+    list::{ListItem, MpListWidgetRefExt},
     table::MpTableWidgetRefExt,
     avatar::MpAvatarWidgetRefExt,
     tree::{MpTreeWidgetRefExt, TreeItem},
@@ -99,6 +100,7 @@ script_mod! {
                         rail_page_15 := RailRow{text: ""}
                         rail_page_16 := RailRow{text: ""}
                         rail_page_17 := RailRow{text: ""}
+                        rail_page_18 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -146,6 +148,7 @@ script_mod! {
                             page_15 := mod.gallery.pages.tree{}
                             page_16 := mod.gallery.pages.avatar{}
                             page_17 := mod.gallery.pages.surface{}
+                            page_18 := mod.gallery.pages.list{}
                         }
                     }
                 }
@@ -159,7 +162,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 18] = [
+const PAGE_SLOTS: [&[LiveId]; 19] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -178,10 +181,11 @@ const PAGE_SLOTS: [&[LiveId]; 18] = [
     ids!(page_15),
     ids!(page_16),
     ids!(page_17),
+    ids!(page_18),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 18] = [
+const RAIL_ROWS: [&[LiveId]; 19] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -200,6 +204,7 @@ const RAIL_ROWS: [&[LiveId]; 18] = [
     ids!(rail_page_15),
     ids!(rail_page_16),
     ids!(rail_page_17),
+    ids!(rail_page_18),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -248,6 +253,7 @@ impl MatchEvent for App {
         self.seed_tables(cx);
         self.seed_trees(cx);
         self.seed_avatars(cx);
+        self.seed_lists(cx);
         // `GALLERY_TOOLTIP=1` pins the overlay open, anchored to the first
         // trigger. Same justification as `GALLERY_PAGE`: Makepad exposes no
         // accessibility tree, so a capture script cannot hover a button, and an
@@ -609,6 +615,50 @@ impl App {
         group.mp_avatar(cx, ids!(tail)).set_text(cx, "+3");
     }
 
+    /// Fill the list page's lists.
+    fn seed_lists(&mut self, cx: &mut Cx) {
+        // A sidebar: glyphs, one row carrying a detail.
+        self.ui.mp_list(cx, ids!(sidebar_list)).set_items(
+            cx,
+            vec![
+                ListItem::new("Terminals").glyph("\u{f120}").detail("4"),
+                ListItem::new("Browsers").glyph("\u{f0ac}").detail("2"),
+                ListItem::new("Notes").glyph("\u{f044}"),
+                ListItem::new("Music").glyph("\u{f001}"),
+                ListItem::new("Media").glyph("\u{f03e}").detail("48"),
+                ListItem::new("Archive").glyph("\u{f187}"),
+            ],
+        );
+
+        // A picker's options: no glyphs at all, and the labels keep the same
+        // origin as the sidebar's.
+        self.ui.mp_list(cx, ids!(options_list)).set_items(
+            cx,
+            vec![
+                ListItem::new("Every day"),
+                ListItem::new("Every week").detail("Mon"),
+                ListItem::new("Every month").detail("1st"),
+                ListItem::new("Never"),
+            ],
+        );
+
+        // A command palette: glyph, name, shortcut at the far edge.
+        self.ui.mp_list(cx, ids!(palette_list)).set_items(
+            cx,
+            vec![
+                ListItem::new("Format Document").glyph("\u{f0d7}").detail("⇧⌥F"),
+                ListItem::new("Toggle Terminal").glyph("\u{f120}").detail("⌃`"),
+                ListItem::new("Go to File").glyph("\u{f002}").detail("⌘P"),
+                ListItem::new("Save All").glyph("\u{f0c7}").detail("⌥⌘S"),
+                ListItem::new("A command with a very long name so the label clips").glyph("\u{f013}").detail("⌃⇧⌘P"),
+            ],
+        );
+
+        self.ui
+            .mp_list(cx, ids!(empty_list))
+            .set_items(cx, Vec::new());
+    }
+
     /// Write each slider's starting value into its readout.
     fn seed_readouts(&mut self, cx: &mut Cx) {
         const PAIRS: [(&[LiveId], &[LiveId]); 7] = [
@@ -805,7 +855,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 18] = [
+    const SLOT_PAGES: [&str; 19] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -824,6 +874,7 @@ mod tests {
         "mod.gallery.pages.tree",
         "mod.gallery.pages.avatar",
         "mod.gallery.pages.surface",
+        "mod.gallery.pages.list",
     ];
 
     #[test]

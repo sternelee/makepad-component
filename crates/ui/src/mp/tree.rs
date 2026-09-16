@@ -26,6 +26,8 @@
 
 use makepad_widgets::*;
 
+use crate::mp::text;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -542,29 +544,12 @@ impl MpTree {
     }
 }
 
-/// `text` cut to `width` points at `font_size`, with an ellipsis when it had to
-/// be cut.
+/// `text` cut to `width` points at `font_size`.
 ///
-/// The advance is a fraction of the font size rather than a measured run, for the
-/// reason `mp/table.rs` records: `DrawText` has no measure entry point that does
-/// not also draw, and a tree row is one line of chrome where a per-character
-/// estimate is exact enough to keep a name inside its plate.
-fn clip_to_width(text: &str, width: f64, font_size: f64) -> String {
-    if width <= 0.0 {
-        return String::new();
-    }
-    let advance = font_size as f64 * 0.51;
-    let fits = (width / advance).floor().max(0.0) as usize;
-    let chars: Vec<char> = text.chars().collect();
-    if chars.len() <= fits {
-        return text.to_string();
-    }
-    if fits == 0 {
-        return String::new();
-    }
-    let mut out: String = chars[..fits.saturating_sub(1)].iter().collect();
-    out.push('…');
-    out
+/// Delegates to [`crate::mp::text`], which is where the arithmetic lives for all
+/// three row-painting widgets.
+fn clip_to_width(value: &str, width: f64, font_size: f64) -> String {
+    text::clip(value, width, font_size)
 }
 
 impl MpTreeRef {

@@ -44,12 +44,14 @@ pub mod control;
 pub mod icon;
 pub mod input;
 pub mod layout;
+pub mod list;
 pub mod loaders;
 pub mod popover;
 pub mod radio;
 pub mod slider;
 pub mod status;
 pub mod table;
+pub mod text;
 pub mod tree;
 pub mod surface;
 pub mod tooltip;
@@ -83,6 +85,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     // and a type that is not registered yet is 3 runtime errors per use site.
     crate::mp::avatar::script_mod(vm);
     crate::mp::tree::script_mod(vm);
+    crate::mp::list::script_mod(vm);
     // The overlay family, whose z-order comes from a DrawList2d rather than
     // from where the author put it in the tree.
     crate::mp::popover::script_mod(vm);

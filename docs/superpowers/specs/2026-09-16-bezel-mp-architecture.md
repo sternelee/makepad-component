@@ -144,6 +144,21 @@ build on).
 | `mp/table.rs` | `MpTable` — columns, rows, row hover and selection. One widget rather than one per cell, with the layout arithmetic in a single function the painter, the hover and the click all read. |
 | `mp/tree.rs` | `MpTree` — a flat list where each item carries its depth, with the collapsed set owned by the widget. Ten tests, all on the visibility model. |
 | `mp/avatar.rs` | `MpAvatar`, `MpAvatarGroup` — initials with a plate derived from the name, presence reusing the badge tones, and an overlapped group. |
+| `mp/text.rs` | Measuring and clipping one line, shared by the three row-painting widgets. |
+| `mp/list.rs` | `MpList` — a glyph, a label and a trailing detail. The third data widget and the simplest. |
+
+### One arithmetic, three widgets
+
+`MpTable` and `MpTree` each grew their own line-measurement — one with a
+narrow/wide correction and one with a flat estimate — which means two widgets
+could clip the same string at different points. `mp/text.rs` holds it once now and
+all three call it, including the right-alignment the table and the list both need.
+
+The general shape is worth naming, because it is the same one `mp::control` has:
+**two widgets that need the same arithmetic are one module, not two copies.**
+Three of this crate's recorded faults came from a duplicated copy — the canvas
+terminal's minimised strip and `mp::control`'s hit contract both had a layout
+written twice, and a row clickable where it was not drawn is what that produces.
 
 ### The glass is real, and the page that proved it had to be built twice
 

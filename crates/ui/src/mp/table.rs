@@ -25,6 +25,8 @@
 
 use makepad_widgets::*;
 
+use crate::mp::text;
+
 script_mod! {
     use mod.prelude.widgets_internal.*
     use mod.widgets.*
@@ -409,7 +411,13 @@ impl Widget for MpTable {
             let Some(b) = cols.get(i) else { continue };
             let text = self.fit(col.label.as_str(), b.w, &self.draw_head, cx);
             let x = if col.align_end {
-                b.x + b.w - CELL_PAD - self.text_width(&text, &self.draw_head, cx)
+                text::right_aligned_x(
+                    &text,
+                    b.x,
+                    b.w,
+                    CELL_PAD,
+                    self.draw_head.text_style.font_size as f64,
+                )
             } else {
                 b.x + CELL_PAD
             };
@@ -430,7 +438,13 @@ impl Widget for MpTable {
                 let Some(cb) = cols.get(i) else { continue };
                 let text = self.fit(self.cell_text(row, i), cb.w, &self.draw_cell, cx);
                 let x = if col.align_end {
-                    cb.x + cb.w - CELL_PAD - self.text_width(&text, &self.draw_cell, cx)
+                    text::right_aligned_x(
+                        &text,
+                        cb.x,
+                        cb.w,
+                        CELL_PAD,
+                        self.draw_cell.text_style.font_size as f64,
+                    )
                 } else {
                     cb.x + CELL_PAD
                 };
@@ -455,74 +469,13 @@ impl Widget for MpTable {
 impl MpTable {
     /// A cell's text, clipped to its column.
     ///
-    /// Measured rather than estimated: a table's columns are whatever the
-    /// container happened to be, so a per-character width — the shortcut the
-    /// canvas terminal's fixed-size strip can take — would clip different content
-    /// at different window widths.
-    fn fit(&self, text: &str, column_w: f64, draw: &DrawText, cx: &mut Cx2d) -> String {
+    /// The arithmetic lives in [`crate::mp::text`], shared with the tree and the
+    /// list: each of the three grew its own copy first, which means two widgets
+    /// could clip the same string at different points.
+    fn fit(&self, value: &str, column_w: f64, draw: &DrawText, _cx: &mut Cx2d) -> String {
         let avail = column_w - CELL_PAD * 2.0;
-        if avail <= 0.0 {
-            return String::new();
-        }
-        if self.text_width(text, draw, cx) <= avail {
-            return text.to_string();
-        }
-        // Drop characters until the ellipsis fits. A binary search would be
-        // faster and a table has tens of cells, not thousands.
-        let chars: Vec<char> = text.chars().collect();
-        for take in (0..chars.len()).rev() {
-            let mut candidate: String = chars[..take].iter().collect();
-            candidate.push('…');
-            if self.text_width(&candidate, draw, cx) <= avail {
-                return candidate;
-            }
-        }
-        String::new()
+        text::clip(value, avail, draw.text_style.font_size as f64)
     }
-
-    /// How wide `text` paints at this drawer's current style.
-    fn text_width(&self, text: &str, draw: &DrawText, cx: &mut Cx2d) -> f64 {
-        // `DrawText` has no measure entry point that does not also draw, so this
-        // uses the font's own advance for the size in force: one number per
-        // character is exact for the monospaced face a table normally uses and a
-        // good approximation for a proportional one at this scale.
-        let size = draw.text_style.font_size as f64;
-        let mut w = 0.0;
-        let mut prev: Option<char> = None;
-        for ch in text.chars() {
-            w += ADVANCE;
-            // A proportional face is not uniform; the correction below is what
-            // keeps a title from overflowing while a column of digits does not
-            // clip. `i`, `l` and friends are about half an em; `W`, `M` and `@`
-            // are about one.
-            if is_narrow(ch) {
-                w -= ADVANCE * 0.45;
-            }
-            if is_wide(ch) {
-                w += ADVANCE * 0.25;
-            }
-            prev = Some(ch);
-            let _ = (size, prev);
-        }
-        let _ = size;
-        w
-    }
-}
-
-/// The advance of an average character, as a fraction of the font size, for the
-/// faces this crate bundles.
-const ADVANCE: f64 = 6.6;
-
-fn is_narrow(ch: char) -> bool {
-    matches!(
-        ch,
-        'i' | 'l' | 'j' | 't' | 'f' | 'r' | '.' | ',' | ':' | ';' | '!' | '|' | '\'' | '(' | ')'
-            | '[' | ']'
-    )
-}
-
-fn is_wide(ch: char) -> bool {
-    matches!(ch, 'm' | 'w' | 'M' | 'W' | '@' | '%' | '&' | '—' | '…')
 }
 
 impl MpTableRef {
@@ -722,14 +675,4 @@ mod tests {
         assert!((cols[0].1 - 50.0).abs() < 1e-9);
     }
 
-    #[test]
-    fn test_the_narrow_and_wide_corrections_move_in_opposite_directions() {
-        // The advance correction is what keeps a title from overflowing while a
-        // column of digits does not clip; if both pushed the same way it would be
-        // a fudge factor rather than a correction.
-        assert!(is_narrow('i') && is_narrow('.'));
-        assert!(is_wide('W') && is_wide('m'));
-        assert!(!is_narrow('W') && !is_wide('i'));
-        assert!(!is_wide('a') && !is_narrow('a'));
-    }
 }
