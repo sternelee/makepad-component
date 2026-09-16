@@ -134,6 +134,8 @@ build on).
 | `mp/checkbox.rs` | `MpCheckbox` — two independent states. |
 | `mp/switch.rs` | `MpSwitch` — the same value as a position. |
 | `mp/radio.rs` | `MpRadio` — one choice, and the group is the caller's. |
+| `mp/layout.rs` | `Row`, `Column`, `Divider`, `DividerVertical`, `Spacer`. The system gap, carried by a prototype so a call site that wants 8pt writes no number. |
+| `mp/loaders.rs` | `MpSpinner`, `MpPulse`, `MpProgress`. The payoff for `motion::phase` — its constants are injected as instances from Rust rather than restated in the DSL. |
 
 `MpButton` is the demonstration — the v2 button against this one:
 
@@ -195,6 +197,50 @@ One more Makepad trap, recorded because it will bite again: **a module made from
 Rust with `ScriptHeap::new_module` is not reachable as `mod.<name>` from a
 script.** `mod.motion` had to be published through a `script_mod!` block
 (`mod.motion = #(...)`), the same form `makepad_theme` uses for `mod.mpc`.
+
+### The loaders, and three more Makepad traps
+
+`mp/loaders.rs` is where `motion::phase` finally pays for itself: the period, the
+resting opacity and the per-cell stagger are the crate's constants, injected into
+the shaders as instances from Rust. Only two lines of arithmetic are restated —
+the stagger offset and the pulse wave — because a Makepad shader has no loops and
+no way to call into Rust, so a shader that draws a breathing dot has to say what
+breathing is. Numbers drift; `fract(phase - i * stagger)` does not.
+
+The clock is a looping animator, not a timer. `Play::Loop` holds `phase` at
+`(elapsed / duration) % 1` and reports `must_redraw` while it runs, so a loader
+needs no lease, no tick list and no `Instant` — and a window with no loader
+mounted schedules nothing. The v2 loaders each carried their own frame
+accounting.
+
+Four traps found, three of them only by rendering and probing pixels:
+
+- **`mod.mp = {}` is an assignment, not a declaration.** Two modules each opening
+  with it reset the namespace and silently destroy every prototype registered
+  before them. Four modules doing so produced 107 runtime errors, all of the form
+  "property SurfaceSunken not found in prototype chain" — pointing at the *users*
+  of the erased prototypes rather than at the line that erased them. It is
+  created once, in `surface.rs`, and nowhere else.
+- **`fill_keep` retains the shape.** It composites the colour and leaves `shape`
+  in place, so the next primitive *unions* with what was just drawn. The progress
+  bar drew its track with `fill_keep` and its fill after, which unioned the two
+  and made every value read 100%; the pulse drew three cells with `fill_keep`,
+  which merged them into one blob. `fill` consumes the shape, `fill_keep` does
+  not — use `fill_keep` when you are about to `stroke` the same shape, and `fill`
+  when the next shape is independent. A pixel probe of the 62% bar (uniform
+  `#969696` along its whole length) is what found it; no test would have.
+- **A widget whose only drawing is a `draw_bg` shader has nothing to size it.**
+  `width: Fit` measured zero, so the pulse drew three invisible cells in an empty
+  row. The widget now derives its walk from `cell` at paint.
+- **`use mod.motion.*` does not make `motion.x` resolvable**, and
+  `script_eval!` does not retain a `mod.*` assignment the way a `script_mod!`
+  block does.
+
+The gallery's rail is also hand-maintained against `PAGES` (`ids!` needs
+literals), which drifted: `GALLERY_PAGE=Loaders` opened the Layout page because
+the two lists disagreed about which slot held which page. There is now a
+`SLOT_PAGES` table in Rust naming what each slot holds, and a test that asserts it
+against `PAGES` — the only place the two can be compared.
 
 ### Two findings from building it
 

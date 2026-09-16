@@ -79,6 +79,8 @@ script_mod! {
                         rail_page_3 := RailRow{text: ""}
                         rail_page_4 := RailRow{text: ""}
                         rail_page_5 := RailRow{text: ""}
+                        rail_page_6 := RailRow{text: ""}
+                        rail_page_7 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -113,7 +115,9 @@ script_mod! {
                             page_2 := mod.gallery.pages.metrics{}
                             page_3 := mod.gallery.pages.motion{}
                             page_4 := mod.gallery.pages.button{}
-                            page_5 := mod.gallery.pages.controls{}
+                            page_5 := mod.gallery.pages.layout{}
+                            page_6 := mod.gallery.pages.loaders{}
+                            page_7 := mod.gallery.pages.controls{}
                         }
                     }
                 }
@@ -127,23 +131,27 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 6] = [
+const PAGE_SLOTS: [&[LiveId]; 8] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
     ids!(page_3),
     ids!(page_4),
     ids!(page_5),
+    ids!(page_6),
+    ids!(page_7),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 6] = [
+const RAIL_ROWS: [&[LiveId]; 8] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
     ids!(rail_page_3),
     ids!(rail_page_4),
     ids!(rail_page_5),
+    ids!(rail_page_6),
+    ids!(rail_page_7),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -319,5 +327,73 @@ impl AppMain for App {
         // `Cx` and no traversal, so the app owns the pass.
         makepad_component::widgets::focus::handle_key(cx, event);
         self.ui.handle_event(cx, event, &mut Scope::empty());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_the_slot_tables_cover_every_page() {
+        // `ids!` needs literals, so the slot tables are hand-maintained while
+        // `PAGES` is data — which means adding a page without adding a slot
+        // compiles, and the new page simply never becomes visible. This is what
+        // turns that into a failing test instead.
+        assert_eq!(
+            PAGE_SLOTS.len(),
+            PAGES.len(),
+            "a page was added to or removed from PAGES without a slot"
+        );
+        assert_eq!(
+            RAIL_ROWS.len(),
+            PAGES.len(),
+            "a page was added to or removed from PAGES without a rail row"
+        );
+    }
+
+    /// The page each slot holds, in `PAGE_SLOTS` order.
+    ///
+    /// The *DSL* is what actually wires a slot to a page — `page_5 :=
+    /// mod.gallery.pages.layout{}` is a literal in a `script_mod!` block — so
+    /// the only way to compare it against `PAGES` is to restate it here and
+    /// assert the two agree. Without this the order can drift silently, and it
+    /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
+    /// lists disagreed about which slot was which.
+    const SLOT_PAGES: [&str; 8] = [
+        "mod.gallery.pages.palette",
+        "mod.gallery.pages.typography",
+        "mod.gallery.pages.metrics",
+        "mod.gallery.pages.motion",
+        "mod.gallery.pages.button",
+        "mod.gallery.pages.layout",
+        "mod.gallery.pages.loaders",
+        "mod.gallery.pages.controls",
+    ];
+
+    #[test]
+    fn test_each_slot_holds_the_page_pages_says_it_does() {
+        assert_eq!(SLOT_PAGES.len(), PAGES.len());
+        for (index, page) in PAGES.iter().enumerate() {
+            assert_eq!(
+                SLOT_PAGES[index], page.path,
+                "slot {index} holds {} but PAGES[{index}] is {:?}",
+                SLOT_PAGES[index], page.title
+            );
+        }
+    }
+
+    #[test]
+    fn test_no_two_slots_are_the_same_id() {
+        // A copy-paste in the table would make two pages show at once, and the
+        // second would paint over the first.
+        let mut seen = std::collections::HashSet::new();
+        for (index, slot) in PAGE_SLOTS.iter().enumerate() {
+            assert!(seen.insert(slot[0]), "slot {index} is a duplicate");
+        }
+        let mut seen = std::collections::HashSet::new();
+        for (index, row) in RAIL_ROWS.iter().enumerate() {
+            assert!(seen.insert(row[0]), "rail row {index} is a duplicate");
+        }
     }
 }

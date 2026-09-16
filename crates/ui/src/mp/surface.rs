@@ -35,9 +35,9 @@ script_mod! {
     use mod.mpc.tokens.*
     use mod.mpc.layout.*
 
-    // The namespace has to exist before a nested assignment reaches it — the
-    // same reason the theme creates `mod.mpc` before `mod.mpc.tokens`. A page
-    // that assigns into a missing module fails at runtime, not at compile time.
+    // The namespace. Created here, once, and nowhere else in this crate — see
+    // `mp::script_mod`. Every later module assigns into it and must not reset
+    // it.
     mod.mp = {}
 
     // ---- the opaque surface ----

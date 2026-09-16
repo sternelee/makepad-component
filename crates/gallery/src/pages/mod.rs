@@ -11,6 +11,8 @@
 pub mod button;
 pub mod controls;
 pub mod foundation;
+pub mod layout;
+pub mod loaders;
 pub mod motion;
 
 use makepad_widgets::*;
@@ -28,6 +30,8 @@ pub fn script_mod(vm: &mut ScriptVm) {
     motion::script_mod(vm);
     button::script_mod(vm);
     controls::script_mod(vm);
+    layout::script_mod(vm);
+    loaders::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -75,6 +79,18 @@ pub const PAGES: &[Page] = &[
         path: "mod.gallery.pages.button",
         source: "crates/gallery/src/pages/button.rs",
         blurb: "The four shipped looks",
+    },
+    Page {
+        title: "Layout",
+        path: "mod.gallery.pages.layout",
+        source: "crates/gallery/src/pages/layout.rs",
+        blurb: "Row, column, divider, spacer",
+    },
+    Page {
+        title: "Loaders",
+        path: "mod.gallery.pages.loaders",
+        source: "crates/gallery/src/pages/loaders.rs",
+        blurb: "Spinner, pulse, progress",
     },
     Page {
         title: "Controls",
@@ -148,6 +164,8 @@ mod tests {
             ("crates/gallery/src/pages/motion.rs", "motion"),
             ("crates/gallery/src/pages/button.rs", "button"),
             ("crates/gallery/src/pages/controls.rs", "controls"),
+            ("crates/gallery/src/pages/layout.rs", "layout"),
+            ("crates/gallery/src/pages/loaders.rs", "loaders"),
         ]
         .into_iter()
         .collect();
