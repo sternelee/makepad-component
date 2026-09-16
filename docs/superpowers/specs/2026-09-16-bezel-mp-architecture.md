@@ -716,7 +716,26 @@ So the floors are per-slot and its own doc says which: [`GROUND_CEILING`] for `b
 *close* to the ground), a floor and a ceiling for `bright black` (real dim text), and
 [`TEXT_FLOOR`] for the other fourteen.
 
-**The wiring is deferred, with the reason recorded.** `canvas-terminal`'s `Cell` carries
+**The wiring is done.** `canvas-terminal/src/terminal/state.rs` now reads its colours from
+`makepad_theme::TerminalPalette`: the sixteen ANSI slots through `ansi(index)` and the foreground and background
+through `default_fg()`/`default_bg()`, with the `const` array gone. Two things about it:
+
+- **One palette per process, and that is a limitation worth naming.** A `Cell` stores its colours **by value**, so a
+  cell painted before an appearance change keeps the old colour until it is rewritten — which means switching to the
+  light palette needs the grid **reset**, not just the palette changed. Reading through a `OnceLock` therefore gives
+  one appearance for the life of the process, and the fix would be a terminal that repaints from history, which that
+  file does not keep.
+- **An index past fifteen falls back to the default foreground** rather than inventing a colour, because the theme
+  answers `None` for the 256-colour cube it does not model — which is what a terminal without the cube does.
+
+Verified: `canvas-terminal` builds; its **39 tests pass** (including the daemon end-to-end ones); and a real run
+paints with **zero `[E]`** — the log shows `canvas: terminal cell 10.00x22.00px (font_size 12.5pt) — grid follows
+the face`, so the grid lays out and draws. **The colours themselves were not confirmed visually**: the window is
+slower to present than the capture window I gave it (it starts a tokio runtime and decodes PNGs first), so the
+screenshot came back uniform. The change is mechanical — the same sixteen colours, now sourced from the theme — and
+the crate's own suite covers the path, but "the terminal still looks right" is a claim this run did not make.
+
+**The original deferral, for the record.** `canvas-terminal`'s `Cell` carries
 `fg: [f32; 3]` and its palette is a `const`, so switching it ripples through `Cell::default()` and the
 grid initialisation in a 12,000-line crate with daemon end-to-end tests — and at the time of writing,
 screen capture in this session was returning black, so the terminal's rendering could not be checked

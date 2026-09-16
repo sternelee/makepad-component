@@ -649,6 +649,7 @@ dependencies = [
  "libc",
  "makepad-cef",
  "makepad-script",
+ "makepad-theme",
  "makepad-widgets",
  "rmux-ipc",
  "rmux-pty",

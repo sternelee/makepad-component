@@ -34,6 +34,8 @@ pub mod paint;
 pub mod palette;
 pub mod syntax;
 pub mod terminal;
+
+pub use terminal::TerminalPalette;
 pub mod theme;
 pub mod typography;
 

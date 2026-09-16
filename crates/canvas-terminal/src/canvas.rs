@@ -9,7 +9,7 @@ use crate::command::{self, Command};
 use crate::items::{
     path_file_name, AgentStatus, CanvasItem, DrawnShape, ItemKind, MediaKind, NoteShape, NoteTool,
 };
-use crate::terminal::state::{Cell, DEFAULT_BG};
+use crate::terminal::state::{default_bg, Cell};
 
 /// Grid spacing in world units.
 const GRID_SIZE: f64 = 24.0;
@@ -4851,12 +4851,12 @@ impl CanvasPanel {
             let eff_bg = if selected {
                 // Selection highlight (semi-transparent blue).
                 [0.20, 0.45, 0.90, 0.55]
-            } else if bg != DEFAULT_BG {
+            } else if bg != default_bg() {
                 [bg[0], bg[1], bg[2], 1.0]
             } else {
                 [0.0, 0.0, 0.0, 0.0]
             };
-            if selected || bg != DEFAULT_BG {
+            if selected || bg != default_bg() {
                 let a = eff_bg[3];
                 let c = if dim {
                     [eff_bg[0] * 0.6, eff_bg[1] * 0.6, eff_bg[2] * 0.6, a]

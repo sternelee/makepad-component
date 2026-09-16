@@ -12,6 +12,9 @@ path = "src/main.rs"
 # `cef` = embedded browser cards; `pdf` = native PdfView (makepad's own PDF
 # renderer) backing dropped-PDF preview cards.
 makepad-widgets = { workspace = true, features = ["cef", "pdf"] }
+# For the ANSI palette only: the sixteen colours a terminal paints are a design decision, and this workspace
+# already has a tested, appearance-aware set of them.
+makepad-theme = { workspace = true }
 makepad-script = { workspace = true }
 makepad-cef = { path = "/Users/sternelee/www/github/makepad/libs/cef" }
 
