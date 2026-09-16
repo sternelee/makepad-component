@@ -137,6 +137,7 @@ build on).
 | `mp/layout.rs` | `Row`, `Column`, `Divider`, `DividerVertical`, `Spacer`. The system gap, carried by a prototype so a call site that wants 8pt writes no number. |
 | `mp/loaders.rs` | `MpSpinner`, `MpPulse`, `MpProgress`. The payoff for `motion::phase` — its constants are injected as instances from Rust rather than restated in the DSL. |
 | `mp/slider.rs` | `MpSlider`, and the four free functions that turn a pointer into a value. |
+| `mp/tooltip.rs` | `MpTooltip` — **implemented and not drawing.** See below. |
 | `mp/input.rs` | `MpTextInput`, `MpField`, `MpTextInputSearch`. The one component with no Rust: the caret, selection, IME, scroll-into-view and platform keys are Makepad's `TextInput`, so this styles it rather than reimplementing it. |
 
 `MpButton` is the demonstration — the v2 button against this one:
@@ -330,6 +331,38 @@ module whose members you name — never a parent.
 - **`mod.mp` has to be created** before `mod.mp.Surface = …` — same rule as
   `mod.mpc = {}` in the theme. Assigning into a missing module produced 215
   runtime errors that all pointed at innocuous-looking lines.
+
+## Open: the overlay does not draw
+
+`mp/tooltip.rs` is the first component in this port that is **implemented,
+compiles, runs with zero `[E]` lines, and does not work**. The plate never
+appears — not on a hover over a trigger, and not with a startup call anchored to a
+laid-out trigger.
+
+What is ruled out: the first suspicion was `handle_startup`, which runs before
+layout, so `area().rect()` is empty there. Moving the call to the first
+`handle_event` (after layout) changed nothing, so the fault is in `draw_walk` or
+the draw list rather than in when `show` is called.
+
+Next suspects, in order:
+
+1. `cx.begin_root_turtle(size, self.view.layout)` inside an overlay draw list,
+   with `draw_bg.begin(cx, self.view.walk, ...)` using a walk whose `abs_pos` is
+   unset. If the root turtle is at the pass origin rather than at `pos`, the plate
+   is drawn off-screen or at zero size.
+2. `#[deref] view` alongside a manually-owned `DrawList2d`. The deref field may
+   mean the *view's* draw list is the one composited, leaving this one unused.
+3. `end_pass_sized_turtle` against `begin_root_turtle` — a mismatch that does not
+   error could still produce an empty pass.
+
+The approach is not in question: a `DrawList2d` bracketed with
+`begin_overlay_reuse` is how Makepad orders overlays, and v2's alternative —
+managing an overlay pass by hand and resolving z-order with geometry hit-tests —
+is what produced the two hardest bugs in `docs/WIDGETS_PROGRESS_CN.md`. What is
+wrong is the plumbing.
+
+**The whole overlay family (popover, menu, select, combobox) depends on this
+working, so it is the next thing to fix rather than something to work around.**
 
 ## What Phase 1 and 2 actually verify
 

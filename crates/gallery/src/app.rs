@@ -16,6 +16,7 @@ use makepad_component::mp::{
     checkbox::MpCheckboxWidgetRefExt,
     radio::MpRadioWidgetRefExt,
     loaders::MpProgressWidgetRefExt,
+    tooltip::MpTooltipWidgetRefExt,
     slider::MpSliderWidgetRefExt,
     switch::MpSwitchWidgetRefExt,
 };
@@ -85,6 +86,7 @@ script_mod! {
                         rail_page_7 := RailRow{text: ""}
                         rail_page_8 := RailRow{text: ""}
                         rail_page_9 := RailRow{text: ""}
+                        rail_page_10 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -122,8 +124,9 @@ script_mod! {
                             page_5 := mod.gallery.pages.layout{}
                             page_6 := mod.gallery.pages.loaders{}
                             page_7 := mod.gallery.pages.slider{}
-                            page_8 := mod.gallery.pages.input{}
-                            page_9 := mod.gallery.pages.controls{}
+                            page_8 := mod.gallery.pages.overlay{}
+                            page_9 := mod.gallery.pages.input{}
+                            page_10 := mod.gallery.pages.controls{}
                         }
                     }
                 }
@@ -137,7 +140,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 10] = [
+const PAGE_SLOTS: [&[LiveId]; 11] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -148,10 +151,11 @@ const PAGE_SLOTS: [&[LiveId]; 10] = [
     ids!(page_7),
     ids!(page_8),
     ids!(page_9),
+    ids!(page_10),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 10] = [
+const RAIL_ROWS: [&[LiveId]; 11] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -162,6 +166,7 @@ const RAIL_ROWS: [&[LiveId]; 10] = [
     ids!(rail_page_7),
     ids!(rail_page_8),
     ids!(rail_page_9),
+    ids!(rail_page_10),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -175,6 +180,15 @@ pub struct App {
     /// proves the action path rather than only painting.
     #[rust]
     clicks: usize,
+    /// Whether to pin the overlay open on the first event.
+    ///
+    /// A flag rather than a call in `handle_startup`, because startup runs
+    /// *before* the tree is laid out: `widget(...).area()` is unlaid and
+    /// `rect()` is empty there, so anchoring to it puts the plate at the origin
+    /// and it is never seen. The first `handle_event` is after layout, which is
+    /// the earliest a caller can anchor anything to a widget.
+    #[rust]
+    want_tooltip: bool,
 }
 
 app_main!(App);
@@ -195,6 +209,13 @@ impl MatchEvent for App {
         // and so a slider whose value never reaches its readout is visible in a
         // screenshot rather than only after a drag.
         self.seed_readouts(cx);
+        // `GALLERY_TOOLTIP=1` pins the overlay open, anchored to the first
+        // trigger. Same justification as `GALLERY_PAGE`: Makepad exposes no
+        // accessibility tree, so a capture script cannot hover a button, and an
+        // overlay that can only be shown by a pointer cannot be verified from a
+        // script. It is also the only way to see the *hardest* property this
+        // page exists for — that the plate draws over the card below it.
+        self.want_tooltip = std::env::var("GALLERY_TOOLTIP").is_ok();
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -294,6 +315,37 @@ impl App {
                 .label(cx, ids!(radio_readout))
                 .set_text(cx, labels.get(picked).copied().unwrap_or("?"));
         }
+    }
+
+    /// Hover tooltips for the overlay page.
+    ///
+    /// Driven from `Event::MouseMove` rather than from an action, because hover
+    /// is not an action in Makepad and inventing one would mean a widget
+    /// emitting an event per mouse move. The trigger's `Area` comes from the
+    /// widget itself — `WidgetRef::area()` — so the page never does arithmetic on
+    /// a rectangle, which is exactly the arithmetic that went wrong in v2.
+    fn handle_hover_tooltips(&mut self, cx: &mut Cx, event: &Event) {
+        let Event::MouseMove(me) = event else {
+            return;
+        };
+        const TRIGGERS: [(&[LiveId], &str); 5] = [
+            (ids!(tip_primary), "Runs the primary action"),
+            (ids!(tip_default), "Saves without closing"),
+            (ids!(tip_ghost), "Dismisses what you were doing"),
+            (ids!(tip_danger), "Cannot be undone"),
+            (ids!(tip_one), "Anchored from the trigger's own Area"),
+        ];
+        for (trigger, text) in TRIGGERS {
+            let area = self.ui.widget(cx, trigger).area();
+            if area.rect(cx).contains(me.abs) {
+                let tooltip = self.ui.mp_tooltip(cx, ids!(tip));
+                if !tooltip.is_opened() {
+                    tooltip.show_for(cx, area, text);
+                }
+                return;
+            }
+        }
+        self.ui.mp_tooltip(cx, ids!(tip)).hide(cx);
     }
 
     /// Echo what the text field reports, which is the page's own check that the
@@ -409,7 +461,15 @@ impl AppMain for App {
     }
 
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
+        if self.want_tooltip {
+            self.want_tooltip = false;
+            let trigger = self.ui.widget(cx, ids!(tip_primary)).area();
+            self.ui
+                .mp_tooltip(cx, ids!(tip))
+                .show_for(cx, trigger, "Runs the primary action");
+        }
         self.match_event(cx, event);
+        self.handle_hover_tooltips(cx, event);
         // Tab and Shift-Tab traversal. Makepad has a single key-focus area on
         // `Cx` and no traversal, so the app owns the pass.
         makepad_component::widgets::focus::handle_key(cx, event);
@@ -441,13 +501,21 @@ mod tests {
 
     /// The page each slot holds, in `PAGE_SLOTS` order.
     ///
+    /// **Append new pages at the end of `PAGES`, `PAGE_SLOTS`, `RAIL_ROWS` and
+    /// this table, and nowhere else.** Inserting one in the middle means editing
+    /// four ordered lists, and a missed edit is invisible until a rail row opens
+    /// the wrong page — which is what happened adding the Overlay page, twice in
+    /// one change: the DSL slots and this table each disagreed with `PAGES`
+    /// about which index held which page, and the test caught the second only
+    /// after the first was fixed.
+    ///
     /// The *DSL* is what actually wires a slot to a page — `page_5 :=
     /// mod.gallery.pages.layout{}` is a literal in a `script_mod!` block — so
     /// the only way to compare it against `PAGES` is to restate it here and
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 10] = [
+    const SLOT_PAGES: [&str; 11] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -456,6 +524,7 @@ mod tests {
         "mod.gallery.pages.layout",
         "mod.gallery.pages.loaders",
         "mod.gallery.pages.slider",
+        "mod.gallery.pages.overlay",
         "mod.gallery.pages.input",
         "mod.gallery.pages.controls",
     ];

@@ -16,6 +16,7 @@ pub mod layout;
 pub mod loaders;
 pub mod slider;
 pub mod motion;
+pub mod overlay;
 
 use makepad_widgets::*;
 
@@ -36,6 +37,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     loaders::script_mod(vm);
     slider::script_mod(vm);
     input::script_mod(vm);
+    overlay::script_mod(vm);
 }
 
 /// One row of the rail.
@@ -101,6 +103,12 @@ pub const PAGES: &[Page] = &[
         path: "mod.gallery.pages.slider",
         source: "crates/gallery/src/pages/slider.rs",
         blurb: "Grab-anywhere drag, steps, arrows",
+    },
+    Page {
+        title: "Overlay",
+        path: "mod.gallery.pages.overlay",
+        source: "crates/gallery/src/pages/overlay.rs",
+        blurb: "A tooltip, and the pass that puts it on top",
     },
     Page {
         title: "Input",
@@ -184,6 +192,7 @@ mod tests {
             ("crates/gallery/src/pages/loaders.rs", "loaders"),
             ("crates/gallery/src/pages/slider.rs", "slider"),
             ("crates/gallery/src/pages/input.rs", "input"),
+            ("crates/gallery/src/pages/overlay.rs", "overlay"),
         ]
         .into_iter()
         .collect();
