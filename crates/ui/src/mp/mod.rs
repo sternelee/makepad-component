@@ -60,6 +60,7 @@ pub mod layout;
 pub mod list;
 pub mod markdown;
 pub mod loaders;
+pub mod number_input;
 pub mod pagination;
 pub mod palette;
 pub mod popover;
@@ -112,6 +113,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::feedback::script_mod(vm);
     crate::mp::status::script_mod(vm);
     crate::mp::scaffolding::script_mod(vm);
+    crate::mp::number_input::script_mod(vm);
     crate::mp::pagination::script_mod(vm);
     crate::mp::scroll::script_mod(vm);
     crate::mp::canvas::script_mod(vm);

@@ -137,6 +137,7 @@ script_mod! {
                         rail_page_38 := RailRow{text: ""}
                         rail_page_39 := RailRow{text: ""}
                         rail_page_40 := RailRow{text: ""}
+                        rail_page_41 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -212,6 +213,7 @@ script_mod! {
                             page_38 := mod.gallery.pages.blocks{}
                             page_39 := mod.gallery.pages.details{}
                             page_40 := mod.gallery.pages.steps{}
+                            page_41 := mod.gallery.pages.numbers{}
                         }
                     }
                 }
@@ -225,7 +227,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 41] = [
+const PAGE_SLOTS: [&[LiveId]; 42] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -267,10 +269,11 @@ const PAGE_SLOTS: [&[LiveId]; 41] = [
     ids!(page_38),
     ids!(page_39),
     ids!(page_40),
+    ids!(page_41),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 41] = [
+const RAIL_ROWS: [&[LiveId]; 42] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -312,6 +315,7 @@ const RAIL_ROWS: [&[LiveId]; 41] = [
     ids!(rail_page_38),
     ids!(rail_page_39),
     ids!(rail_page_40),
+    ids!(rail_page_41),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1507,6 +1511,43 @@ use makepad_component::mp::hover_card::HoverIntent;
             .set_highlighted(cx, &written, &[]);
     }
 
+    /// Fill the number inputs on the numbers page, and print what each holds after it disagreed with its input.
+    ///
+    /// **Every case prints the value the widget landed on, not the value it was sent** — because three of the four are
+    /// cases where those differ, and a print of the input would show the disagreement as an absence of one.
+    fn seed_numbers(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::number_input::{format_number, nudge, MpNumberInputWidgetRefExt};
+
+        // (id, value sent, min sent, max sent, step, decimals)
+        let cases = [
+            (ids!(numbers_plain), 5.0, 0.0, 100.0, 1.0, 0usize),
+            (ids!(numbers_fractional), 2.5, 0.0, 10.0, 0.5, 2),
+            (ids!(numbers_clamped), 999.0, 0.0, 10.0, 1.0, 0),
+            // **The bounds the wrong way round**, which is the case the v2 widget panicked on.
+            (ids!(numbers_backwards), 5.0, 100.0, 0.0, 1.0, 0),
+        ];
+        for (id, value, min, max, step, decimals) in cases {
+            let view = self.ui.mp_number_input(cx, id);
+            view.set_bounds(cx, min, max, step, decimals);
+            view.set_value(cx, value);
+            let (low, high, held_step, held_decimals) = view
+                .borrow()
+                .map(|inner| inner.bounds())
+                .unwrap_or((min, max, step, decimals));
+            let held = view.value();
+            // One step up from where it landed, so the page's own output shows the grid and the bound in the same line.
+            let up = nudge(held, low, high, held_step, 1.0);
+            println!(
+                "NUMBERS sent={} held={} clamped={} bounds=({low}, {high}) step={held_step} shown={:?} up={}",
+                format_number(value, held_decimals),
+                format_number(held, held_decimals),
+                (held - value).abs() > f64::EPSILON,
+                format_number(held, held_decimals),
+                format_number(up, held_decimals),
+            );
+        }
+    }
+
     /// Fill the step indicators on the steps page, and print where each stands.
     ///
     /// The three cases are the current step at the **start**, in the **middle**, and past the end in the truncating case
@@ -2231,6 +2272,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_numbers(cx);
         self.seed_steps(cx);
         self.seed_details(cx);
         self.seed_v3_pool(cx);
@@ -2862,7 +2904,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 41] = [
+    const SLOT_PAGES: [&str; 42] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -2904,6 +2946,7 @@ mod tests {
         "mod.gallery.pages.blocks",
         "mod.gallery.pages.details",
         "mod.gallery.pages.steps",
+        "mod.gallery.pages.numbers",
     ];
 
     #[test]

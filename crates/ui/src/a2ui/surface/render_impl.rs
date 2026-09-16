@@ -817,8 +817,25 @@ impl A2uiSurface {
         });
 
         let widget = self.pool_number_input(cx, idx);
-        widget.set_bounds(cx, min, max, step, decimals);
-        widget.set_value(cx, value);
+        // v3's two calls take a `&mut Cx` rather than a `&mut Cx2d`, which is the only difference at this site.
+        widget.set_bounds(cx.cx, min, max, step, decimals);
+        widget.set_value(cx.cx, value);
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            // The bounds as the **widget** holds them, not as the protocol sent them: `set_bounds` orders them, so a
+            // protocol that passed them backwards is visible here rather than only in the field's behaviour.
+            // Read from the widget already in hand rather than looking it up again: `pool_number_input` holds a mutable
+            // borrow of the pool, and a second borrow of the same field is the error that says so.
+            let (low, high, step, decimals) = widget.bounds();
+            // **The widget's own value**, not the protocol's: printing the protocol's `value` showed `999` next to a
+            // clamped `10`, which reads as a clamping failure and was a print that formatted the wrong number.
+            let held = widget.value();
+            println!(
+                "A2UI v3_number_input sent={} value={held} bounds=({low}, {high}, step {step}, {decimals}dp) shown={:?} clamped={} from=mp::number_input::MpNumberInput",
+                number_input::format_number(value, decimals),
+                number_input::format_number(held, decimals),
+                (held - value).abs() > f64::EPSILON,
+            );
+        }
         let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
 
         self.number_input_meta

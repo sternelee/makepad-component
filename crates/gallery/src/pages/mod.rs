@@ -44,6 +44,7 @@ pub mod tree;
 pub mod menu;
 pub mod motion;
 pub mod overlay;
+pub mod numbers;
 pub mod pagination;
 pub mod palette;
 pub mod popover;
@@ -94,6 +95,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     feedback::script_mod(vm);
     content::script_mod(vm);
     pagination::script_mod(vm);
+    numbers::script_mod(vm);
     palette::script_mod(vm);
     menu::script_mod(vm);
     scroll::script_mod(vm);
@@ -366,6 +368,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/steps.rs",
         blurb: "A numbered path, and where it stands",
     },
+    Page {
+        title: "Numbers",
+        path: "mod.gallery.pages.numbers",
+        source: "crates/gallery/src/pages/numbers.rs",
+        blurb: "A number, and the cases where it disagrees with its input",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -463,6 +471,7 @@ mod tests {
             ("crates/gallery/src/pages/feedback.rs", "feedback"),
             ("crates/gallery/src/pages/content.rs", "content"),
             ("crates/gallery/src/pages/pagination.rs", "pagination"),
+            ("crates/gallery/src/pages/numbers.rs", "numbers"),
             ("crates/gallery/src/pages/palette.rs", "palette"),
             ("crates/gallery/src/pages/menu.rs", "menu"),
             ("crates/gallery/src/pages/scroll.rs", "scroll"),

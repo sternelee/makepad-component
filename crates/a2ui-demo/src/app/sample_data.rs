@@ -730,3 +730,55 @@ pub(crate) fn get_sample_steps() -> String {
     ]"##
     .to_string()
 }
+
+/// A fixture whose only job is to reach the **number input**, named `A2UI_SAMPLE=number`.
+///
+/// The fourth of these, and the pattern is settled: no shipped sample contains a `NumberInput`, so the pool migration
+/// had nothing that would exercise it. Four fields, and the reasons they are these four:
+///
+/// - one plain, so the ordinary case is on screen;
+/// - one with a **fractional step and two decimals**, because that is where formatting and snapping have to agree;
+/// - one with a **value outside its bounds**, because `set_bounds` orders and clamps rather than trusting the protocol —
+///   the v2 widget would have panicked here if the bounds had arrived the wrong way round;
+/// - one with **bounds the wrong way round**, which is the case the v2 `clamp_number` took the process down for.
+pub(crate) fn get_sample_number() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "plain", "fractional", "out-of-range", "backwards"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Quantities"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {"id": "plain", "component": {"NumberInput": {"value": {"literalNumber": 5}, "min": 0, "max": 100, "step": 1}}},
+                    {"id": "fractional", "component": {"NumberInput": {"value": {"literalNumber": 2.5}, "min": 0, "max": 10, "step": 0.5, "decimals": 2}}},
+                    {"id": "out-of-range", "component": {"NumberInput": {"value": {"literalNumber": 999}, "min": 0, "max": 10, "step": 1}}},
+                    {"id": "backwards", "component": {"NumberInput": {"value": {"literalNumber": 5}, "min": 100, "max": 0, "step": 1}}}
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}

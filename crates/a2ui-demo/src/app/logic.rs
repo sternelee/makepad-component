@@ -9,7 +9,8 @@ use std::sync::{Arc, Mutex};
 
 use super::audio_player::{decode_audio_file, start_audio_output, AudioPlaybackState};
 use super::sample_data::{
-    get_sample_detail, get_sample_icons, get_sample_music_player, get_sample_product_catalog, get_sample_steps,
+    get_sample_detail, get_sample_icons, get_sample_music_player, get_sample_number, get_sample_product_catalog,
+    get_sample_steps,
 };
 use super::theme::Theme;
 
@@ -1449,6 +1450,7 @@ impl AppMain for App {
                 Ok("icons") => self.load_a2ui_json(cx, &get_sample_icons(), "🔣 Icons"),
                 Ok("detail") => self.load_a2ui_json(cx, &get_sample_detail(), "📋 Details"),
                 Ok("steps") => self.load_a2ui_json(cx, &get_sample_steps(), "🪜 Checkout"),
+                Ok("number") => self.load_a2ui_json(cx, &get_sample_number(), "🔢 Quantities"),
                 Ok("music") => self.load_json_file(cx, "music_test.json", "🎵 Makepad Music Player"),
                 Ok(_) | Err(_) => {
                     if std::path::Path::new("music_test.json").exists() {
