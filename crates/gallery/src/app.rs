@@ -174,6 +174,7 @@ script_mod! {
                         rail_page_53 := RailRow{text: ""}
                         rail_page_54 := RailRow{text: ""}
                         rail_page_55 := RailRow{text: ""}
+                        rail_page_56 := RailRow{text: ""}
                             }
                         }
 
@@ -264,6 +265,7 @@ script_mod! {
                             page_53 := mod.gallery.pages.breadcrumbs{}
                             page_54 := mod.gallery.pages.collapsible{}
                             page_55 := mod.gallery.pages.option_cards{}
+                            page_56 := mod.gallery.pages.sheets{}
                         }
                     }
                 }
@@ -277,7 +279,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 56] = [
+const PAGE_SLOTS: [&[LiveId]; 57] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -334,10 +336,11 @@ const PAGE_SLOTS: [&[LiveId]; 56] = [
     ids!(page_53),
     ids!(page_54),
     ids!(page_55),
+    ids!(page_56),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 56] = [
+const RAIL_ROWS: [&[LiveId]; 57] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -394,6 +397,7 @@ const RAIL_ROWS: [&[LiveId]; 56] = [
     ids!(rail_page_53),
     ids!(rail_page_54),
     ids!(rail_page_55),
+    ids!(rail_page_56),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1590,6 +1594,62 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.ui
             .mp_code_block(cx, ids!(canvas_wire))
             .set_highlighted(cx, &written, &[]);
+    }
+
+    /// Open the sheets and print the travel, the corner rule and the dismissal test.
+    ///
+    /// **A sheet is geometry, so the print is geometry**: the panel's rect at each stage of its travel, which corners are free
+    /// on each side, how far the plate overshoots so the pinned corners stay square, and where a click counts as a dismissal.
+    fn seed_sheets(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::sheet::{
+            clamp_progress, free_corners, is_outside, panel_rect, plate_overshoot, seat_inset, SheetSide,
+            MpSheetWidgetRefExt,
+        };
+
+        for (id, open) in [
+            (ids!(sheet_left), true),
+            (ids!(sheet_bottom), true),
+            (ids!(sheet_closed), false),
+        ] {
+            let sheet = self.ui.mp_sheet(cx, id);
+            if open {
+                sheet.open(cx);
+            }
+        }
+
+        // The viewport the gallery's page area has, near enough, so the printed rects are real numbers.
+        let viewport = dvec2(1280.0, 800.0);
+        let extent = 320.0f64;
+        for t in [0.0, 0.5, 1.0] {
+            let rect = panel_rect(SheetSide::Left, extent, viewport, t);
+            println!(
+                "SHEET left t={t} panel=({:.0},{:.0} {:.0}x{:.0}) inset={:.0}",
+                rect.pos.x, rect.pos.y, rect.size.x, rect.size.y, seat_inset(extent, t)
+            );
+        }
+        let bottom = panel_rect(SheetSide::Bottom, 240.0, viewport, 1.0);
+        println!(
+            "SHEET bottom seated=({:.0},{:.0} {:.0}x{:.0}) — the same extent read as a height",
+            bottom.pos.x, bottom.pos.y, bottom.size.x, bottom.size.y
+        );
+        println!(
+            "SHEET corners left={:?} right={:?} bottom={:?} overshoot_left={:?} overshoot_bottom={:?}",
+            free_corners(SheetSide::Left),
+            free_corners(SheetSide::Right),
+            free_corners(SheetSide::Bottom),
+            plate_overshoot(SheetSide::Left, 12.0),
+            plate_overshoot(SheetSide::Bottom, 12.0),
+        );
+        let seated = panel_rect(SheetSide::Left, extent, viewport, 1.0);
+        println!(
+            "SHEET dismissal inside={} outside={} clamped_progress=[{:.1},{:.1},{:.1}] nan_seats={:.1}",
+            is_outside(dvec2(100.0, 100.0), seated),
+            is_outside(dvec2(600.0, 100.0), seated),
+            clamp_progress(-3.0),
+            clamp_progress(0.4),
+            clamp_progress(9.0),
+            clamp_progress(f64::NAN),
+        );
     }
 
     /// Choose the middle card and print the two rules the page demonstrates.
@@ -3203,6 +3263,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_sheets(cx);
         self.seed_option_cards(cx);
         self.seed_collapsible(cx);
         self.seed_breadcrumbs(cx);
@@ -3228,6 +3289,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_sheets(cx);
         self.seed_option_cards(cx);
         self.seed_collapsible(cx);
         self.seed_breadcrumbs(cx);
@@ -3908,7 +3970,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 56] = [
+    const SLOT_PAGES: [&str; 57] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3965,6 +4027,7 @@ mod tests {
         "mod.gallery.pages.breadcrumbs",
         "mod.gallery.pages.collapsible",
         "mod.gallery.pages.option_cards",
+        "mod.gallery.pages.sheets",
     ];
 
     #[test]

@@ -58,6 +58,7 @@ pub mod motion;
 pub mod overlay;
 pub mod numbers;
 pub mod option_cards;
+pub mod sheets;
 pub mod pagination;
 pub mod palette;
 pub mod picking;
@@ -122,6 +123,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     pagination::script_mod(vm);
     numbers::script_mod(vm);
     option_cards::script_mod(vm);
+    sheets::script_mod(vm);
     palette::script_mod(vm);
     menu::script_mod(vm);
     menu_cards::script_mod(vm);
@@ -486,6 +488,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/option_cards.rs",
         blurb: "A selection ring drawn as a concentric border, so choosing cannot reflow",
     },
+    Page {
+        title: "Sheets",
+        path: "mod.gallery.pages.sheets",
+        source: "crates/gallery/src/pages/sheets.rs",
+        blurb: "An edge-pinned panel whose extent is read across the edge it travels from",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -602,6 +610,7 @@ mod tests {
             ("crates/gallery/src/pages/breadcrumbs.rs", "breadcrumbs"),
             ("crates/gallery/src/pages/collapsible.rs", "collapsible"),
             ("crates/gallery/src/pages/option_cards.rs", "option_cards"),
+            ("crates/gallery/src/pages/sheets.rs", "sheets"),
         ]
         .into_iter()
         .collect();

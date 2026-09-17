@@ -206,6 +206,7 @@ impl MotionSpec {
         ("menu_in", MENU_IN),
         ("menu_out", MENU_OUT),
         ("dialog_in", DIALOG_IN),
+    ("sheet_in", SHEET_IN),
         ("splash_out", SPLASH_OUT),
         ("resize", RESIZE),
         ("tab_slide", TAB_SLIDE),
@@ -235,6 +236,12 @@ pub const MENU_IN: MotionSpec = MotionSpec::new(140, EASE);
 pub const MENU_OUT: MotionSpec = MotionSpec::new(100, EASE);
 /// A dialog arriving. Slower than a menu because it takes over the window.
 pub const DIALOG_IN: MotionSpec = MotionSpec::new(180, EASE);
+/// A sheet arriving: a surface travelling in from the edge it is pinned to.
+///
+/// Its own entry rather than a dialog's, because the motion is a different one — a dialog grows in place and a sheet
+/// **travels**, and a travel read at a grow's duration arrives before the eye has followed it. Slightly longer than
+/// `DIALOG_IN` for that reason.
+pub const SHEET_IN: MotionSpec = MotionSpec::new(220, EASE_OUT);
 /// A splash leaving.
 pub const SPLASH_OUT: MotionSpec = MotionSpec::new(500, EASE).with_delay(150);
 /// A pane resizing under a drag that has ended.
@@ -475,6 +482,19 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn test_a_sheet_arrives_slower_than_a_dialog_and_that_is_the_point_of_its_own_entry() {
+        // **The reason it is not simply `dialog_in`.** A dialog grows in place; a sheet **travels** from an edge, and a travel
+        // read at a grow's duration arrives before the eye has followed it. So the sheet's entry has to be the slower one, and
+        // that is asserted rather than left to whoever edits the catalog next.
+        assert!(
+            SHEET_IN.duration_ms > DIALOG_IN.duration_ms,
+            "the sheet's travel is not slower than the dialog's grow"
+        );
+        assert!(SHEET_IN.duration_ms < FADE_IN.duration_ms, "a sheet is not a page entrance");
+        assert!(SHEET_IN.duration_ms > 0);
+    }
+
     fn test_every_named_entry_is_unique_and_resolvable() {
         let mut names: Vec<&str> = MotionSpec::NAMED.iter().map(|(n, _)| *n).collect();
         let count = names.len();
@@ -507,6 +527,8 @@ mod tests {
             ("menu_in", MENU_IN),
             ("menu_out", MENU_OUT),
             ("dialog_in", DIALOG_IN),
+            ("sheet_in", SHEET_IN),
+    ("sheet_in", SHEET_IN),
         ] {
             assert!(
                 spec.duration_ms < FADE_IN.duration_ms,
