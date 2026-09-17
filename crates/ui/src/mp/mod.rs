@@ -77,6 +77,7 @@ pub mod scaffolding;
 pub mod scroll;
 pub mod search;
 pub mod searchable_list;
+pub mod select;
 pub mod segmented;
 pub mod slider;
 pub mod stats;
@@ -145,6 +146,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::calendar::script_mod(vm);
     crate::mp::dialog::script_mod(vm);
     crate::mp::split_pane::script_mod(vm);
+    crate::mp::select::script_mod(vm);
     crate::mp::menubar_strip::script_mod(vm);
     crate::mp::menu_card::script_mod(vm);
     crate::mp::description_list::script_mod(vm);

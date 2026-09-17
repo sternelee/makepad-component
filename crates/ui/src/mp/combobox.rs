@@ -170,6 +170,15 @@ impl Combobox {
         self.query = self.items[index].clone();
     }
 
+    /// Put the highlight on an item by its index in the original list.
+    ///
+    /// The sibling of `step` for a caller that knows **which** row rather than which direction — opening a select on its
+    /// chosen row, or a pointer resting on a row. An index that is not in the list clears the highlight rather than
+    /// clamping: a highlight on the wrong row is worse than none, because the next commit would choose it.
+    pub fn step_to(&mut self, index: usize) {
+        self.active = if index < self.items.len() { Some(index) } else { None };
+    }
+
     /// Move the highlight, wrapping, over the current filtered view.
     pub fn step(&mut self, delta: i32) {
         let view = self.filtered();

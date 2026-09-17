@@ -168,6 +168,7 @@ script_mod! {
                         rail_page_47 := RailRow{text: ""}
                         rail_page_48 := RailRow{text: ""}
                         rail_page_49 := RailRow{text: ""}
+                        rail_page_50 := RailRow{text: ""}
                             }
                         }
 
@@ -252,6 +253,7 @@ script_mod! {
                             page_47 := mod.gallery.pages.timetable{}
                             page_48 := mod.gallery.pages.dialogs{}
                             page_49 := mod.gallery.pages.split{}
+                            page_50 := mod.gallery.pages.selects{}
                         }
                     }
                 }
@@ -265,7 +267,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 50] = [
+const PAGE_SLOTS: [&[LiveId]; 51] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -316,10 +318,11 @@ const PAGE_SLOTS: [&[LiveId]; 50] = [
     ids!(page_47),
     ids!(page_48),
     ids!(page_49),
+    ids!(page_50),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 50] = [
+const RAIL_ROWS: [&[LiveId]; 51] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -370,6 +373,7 @@ const RAIL_ROWS: [&[LiveId]; 50] = [
     ids!(rail_page_47),
     ids!(rail_page_48),
     ids!(rail_page_49),
+    ids!(rail_page_50),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1566,6 +1570,63 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.ui
             .mp_code_block(cx, ids!(canvas_wire))
             .set_highlighted(cx, &written, &[]);
+    }
+
+    /// Drive a **v3** select and print the rules its wrapper states.
+    ///
+    /// **The "never filters" rule is the one to watch.** A combobox narrows its panel as you type; a select cannot be typed
+    /// into, so choosing an option must not narrow anything — and if a later change made the panel read the combobox's
+    /// *filtered* view, the row count below would drop from three to one and nothing else would look wrong.
+    fn seed_select_rows(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::select::Select;
+
+        // **`MpSelectTrigger` is a DSL alias of makepad's `RoundedView`**, not a Rust type, so there is no ext trait to
+        // import and the trigger is reached through its `label` slot — the same path form a caller would use.
+        let trigger_label = self.ui.label(cx, &[id!(select_trigger), id!(label)]);
+        let mut select = Select::new(vec![
+            "SQLite".to_string(),
+            "MySQL".to_string(),
+            "PostgreSQL".to_string(),
+        ]);
+        select.set_value(Some(2));
+        trigger_label.set_text(cx, select.label().unwrap_or(""));
+
+        let rows = select.rows();
+        let row_going = |label: &str, row: (usize, String, bool)| {
+            if row.2 {
+                format!("{label}: {} (current)", row.1)
+            } else {
+                format!("{label}: {}", row.1)
+            }
+        };
+        for (path, row, label) in [
+            (ids!(row_0), rows.first().cloned(), "row_0"),
+            (ids!(row_1), rows.get(1).cloned(), "row_1"),
+            (ids!(row_2), rows.get(2).cloned(), "row_2"),
+        ] {
+            let text = row.map(|row| row_going(label, row)).unwrap_or_default();
+            self.ui.label(cx, path).set_text(cx, &text);
+        }
+
+        // The rules, walked.
+        let rows_before = select.rows().len();
+        select.set_value(Some(1));
+        let rows_after_choosing = select.rows().len();
+        let label = select.label().unwrap_or("").to_string();
+        // A value the list no longer covers is dropped rather than clamped.
+        select.set_options(vec!["SQLite".to_string(), "MySQL".to_string()]);
+        let value_after_shortening = select.value();
+        // Opening highlights the chosen row, or the first.
+        let mut fresh = Select::new(vec!["a".to_string(), "b".to_string()]);
+        let active_before = fresh.active();
+        fresh.show();
+        let active_after = fresh.active();
+        println!(
+            "SELECT rows_before={rows_before} rows_after_choosing={rows_after_choosing} label={label:?} \
+value_after_shortening={value_after_shortening:?} active_before_show={active_before:?} active_after_show={active_after:?} \
+trigger_label={:?}",
+            trigger_label.text(),
+        );
     }
 
     /// Print the split pane's two arithmetic rules, which no picture can show.
@@ -2880,6 +2941,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_select_rows(cx);
         self.seed_split(cx);
         self.seed_dialogs(cx);
         self.seed_timetable(cx);
@@ -2899,6 +2961,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_select_rows(cx);
         self.seed_split(cx);
         self.seed_dialogs(cx);
         self.seed_timetable(cx);
@@ -3573,7 +3636,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 50] = [
+    const SLOT_PAGES: [&str; 51] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3624,6 +3687,7 @@ mod tests {
         "mod.gallery.pages.timetable",
         "mod.gallery.pages.dialogs",
         "mod.gallery.pages.split",
+        "mod.gallery.pages.selects",
     ];
 
     #[test]

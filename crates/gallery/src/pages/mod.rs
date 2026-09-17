@@ -32,6 +32,7 @@ pub mod loaders;
 pub mod scroll;
 pub mod search;
 pub mod select;
+pub mod selects;
 pub mod shortcuts;
 pub mod searching;
 pub mod slider;
@@ -105,6 +106,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     surface::script_mod(vm);
     list::script_mod(vm);
     select::script_mod(vm);
+    selects::script_mod(vm);
     feedback::script_mod(vm);
     content::script_mod(vm);
     dialogs::script_mod(vm);
@@ -438,6 +440,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/split.rs",
         blurb: "Two panes, and a drag measured from the press rather than accumulated",
     },
+    Page {
+        title: "Selects",
+        path: "mod.gallery.pages.selects",
+        source: "crates/gallery/src/pages/selects.rs",
+        blurb: "A combobox that is never typed into, and the rows it would show",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -548,6 +556,7 @@ mod tests {
             ("crates/gallery/src/pages/timetable.rs", "timetable"),
             ("crates/gallery/src/pages/dialogs.rs", "dialogs"),
             ("crates/gallery/src/pages/split.rs", "split"),
+            ("crates/gallery/src/pages/selects.rs", "selects"),
         ]
         .into_iter()
         .collect();
