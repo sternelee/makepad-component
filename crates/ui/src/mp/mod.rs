@@ -38,6 +38,7 @@
 
 pub mod action;
 pub mod avatar;
+pub mod avatar_group;
 pub mod bars;
 pub mod button;
 pub mod canvas;
@@ -126,6 +127,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     // After `status`: the avatar names `mod.mp.StatusTone` for its presence dot,
     // and a type that is not registered yet is 3 runtime errors per use site.
     crate::mp::avatar::script_mod(vm);
+    crate::mp::avatar_group::script_mod(vm);
     crate::mp::tree::script_mod(vm);
     crate::mp::list::script_mod(vm);
     crate::mp::markdown::script_mod(vm);

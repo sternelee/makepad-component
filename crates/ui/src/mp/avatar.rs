@@ -115,11 +115,15 @@ script_mod! {
 
     /// A row of faces, overlapped.
     ///
-    /// The negative margin is a ratio of the avatar's size rather than a number:
-    /// `-28%` of a 28pt face is 8pt, and of a 40pt face is 11 — the same fraction
-    /// of a face at either size, which is what makes a small group and a large one
-    /// look like the same object.
-    mod.mp.MpAvatarGroup = View{
+    /// **A hand-written stack of five faces, for a showcase.** It is not the component: there is no way to give a DSL
+    /// block a list of names, so a group whose members come from data is `mod.mp.MpAvatarGroup` (the Rust one, whose
+    /// overlap is a ratio of the face). This is the honest way to draw a fixed stack you already know the members of.
+    ///
+    /// **The margins here are literals, not the ratio the Rust group uses** — and the comment that said otherwise was
+    /// wrong: it claimed `-28%` while the code wrote `-8`, so at a 40pt face the overlap stayed 8pt instead of 11. The
+    /// ratio lives in `mp/avatar_group.rs` where it is implemented; these five numbers are what a hand-tuned stack looks
+    /// like, and they are correct for the 28pt face they were tuned at.
+    mod.mp.MpAvatarRow = View{
         width: Fit
         height: Fit
         flow: Right
@@ -255,6 +259,21 @@ impl MpAvatar {
     pub fn set_text(&mut self, cx: &mut Cx, text: &str) {
         self.text.as_mut_empty().push_str(text);
         self.redraw(cx);
+    }
+
+    /// Set what a face shows, **without asking for a redraw**.
+    ///
+    /// For a container that draws a face on every one of its own paints — a group of them sets a dozen faces per frame, and
+    /// a setter that redraws would ask for a redraw *while drawing*, which is a frame that never ends. So the redraw is the
+    /// caller's here, and the two fields a container legitimately owns are the two it sets: what the face says and which
+    /// plate it sits on. The size is included because a group draws its faces at its own size rather than the DSL's.
+    ///
+    /// The three setters above stay what they are — a caller changing one face's name from an event handler does want the
+    /// redraw, and asking for it is the whole point of a setter.
+    pub(crate) fn prepare(&mut self, text: &str, tone: f64, control: ControlSize) {
+        self.text.as_mut_empty().push_str(text);
+        self.tone = tone;
+        self.control = control;
     }
 
     pub fn set_presence(&mut self, cx: &mut Cx, tone: StatusTone) {

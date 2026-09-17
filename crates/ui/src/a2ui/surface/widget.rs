@@ -16,10 +16,11 @@ use crate::a2ui::{
         A2uiMessageProcessor, ProcessorEvent,
     },
 };
-use crate::widgets::{
-    avatar_group::MpAvatarGroup,
-    calendar::MpCalendar,
-};
+/// **The last v2 import in this file**: `MpCalendar` has no v3 counterpart yet, so it is the one pool left. Every other
+/// pool now builds a `mp` widget, and the `crate::widgets` path is gone from everything above this line.
+use crate::widgets::calendar::MpCalendar;
+
+use crate::mp::avatar_group::MpAvatarGroup;
 
 use super::draw_types::*;
 

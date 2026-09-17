@@ -85,6 +85,7 @@ script_mod! {
 
         Section{
             Caption{ text: "An overlapped group — the gap is a fraction of a face, so the group reads as one object at any size, and the tail is a count rather than a person" }
+            avatar_row := mod.mp.MpAvatarRow{}
             avatar_group := mod.mp.MpAvatarGroup{}
         }
 

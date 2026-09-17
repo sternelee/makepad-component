@@ -902,3 +902,77 @@ pub(crate) fn get_sample_colors() -> String {
     ]"##
     .to_string()
 }
+
+/// A fixture for the **avatar group**, named `A2UI_SAMPLE=avatars`.
+///
+/// Nine members with `maxVisible` of four, which is the case the component's whole design turns on: **four faces and
+/// then `+5`** — five circles, not four. The tail being in addition to the shown faces rather than replacing one is only
+/// visible exactly here, so a fixture that showed nine with no limit would exercise none of it.
+pub(crate) fn get_sample_avatars() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "group", "everyone"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Reviewers"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {
+                        "id": "group",
+                        "component": {
+                            "AvatarGroup": {
+                                "names": [
+                                    {"literalString": "Ada Lovelace"},
+                                    {"literalString": "Grace Hopper"},
+                                    {"literalString": "Alan Turing"},
+                                    {"literalString": "Barbara Liskov"},
+                                    {"literalString": "Margaret Hamilton"},
+                                    {"literalString": "Katherine Johnson"},
+                                    {"literalString": "Edsger Dijkstra"},
+                                    {"literalString": "Donald Knuth"},
+                                    {"literalString": "Tony Hoare"}
+                                ],
+                                "maxVisible": 4
+                            }
+                        }
+                    },
+                    {
+                        "id": "everyone",
+                        "component": {
+                            "AvatarGroup": {
+                                "names": [
+                                    {"literalString": "Ada Lovelace"},
+                                    {"literalString": "Grace Hopper"},
+                                    {"literalString": "Alan Turing"}
+                                ]
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}

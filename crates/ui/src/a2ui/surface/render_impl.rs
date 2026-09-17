@@ -934,9 +934,21 @@ impl A2uiSurface {
             .map(|n| resolve_string_value_scoped(n, data_model, scope))
             .collect();
         let widget = self.pool_avatar_group(cx, idx);
-        widget.set_avatars(cx, &names);
+        widget.set_avatars(cx.cx, &names);
         if let Some(limit) = ag.max_visible {
-            widget.set_limit(cx, limit.max(1.0) as usize);
+            // **`max(1.0)` is not a bound, it is a guess at the protocol's intent.** `maxVisible` is a `f32` in the
+            // protocol and a count here, so a fractional or absurd value has to land somewhere; `max(1.0)` says "at least
+            // one face", and the widget's own ceiling (`SLOTS`) bounds the top. A limit of 0 in the protocol would mean
+            // "as many slots as there are", which is a different thing that `max(1.0)` deliberately forbids.
+            widget.set_limit(cx.cx, limit.max(1.0) as usize);
+        }
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            println!(
+                "A2UI v3_avatar_group members={} limit={} circles={} from=mp::avatar_group::MpAvatarGroup",
+                widget.avatars().len(),
+                widget.limit(),
+                widget.circles(),
+            );
         }
         let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
     }

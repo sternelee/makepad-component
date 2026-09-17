@@ -25,6 +25,7 @@ use makepad_component::mp::{
     list::{ListItem, MpListWidgetRefExt},
     table::MpTableWidgetRefExt,
     avatar::MpAvatarWidgetRefExt,
+    avatar_group::MpAvatarGroupWidgetRefExt,
     tree::{MpTreeWidgetRefExt, TreeItem},
     tooltip::MpTooltipWidgetRefExt,
     slider::MpSliderWidgetRefExt,
@@ -2538,16 +2539,44 @@ use makepad_component::mp::hover_card::HoverIntent;
         // presence, which is different from one who is offline.
         self.ui.mp_avatar(cx, ids!(pres_none)).set_name(cx, "Alan Turing");
 
-        let group = self.ui.view(cx, ids!(avatar_group));
+        // The **hand-written row**: five faces named by hand, which is what a DSL block can do. Its margins are literals
+        // tuned at the 28pt face.
+        let row = self.ui.view(cx, ids!(avatar_row));
         for (path, name) in [
             (ids!(one), "Ada Lovelace"),
             (ids!(two), "Grace Hopper"),
             (ids!(three), "Alan Turing"),
             (ids!(four), "Barbara Liskov"),
         ] {
-            group.mp_avatar(cx, path).set_name(cx, name);
+            row.mp_avatar(cx, path).set_name(cx, name);
         }
-        group.mp_avatar(cx, ids!(tail)).set_text(cx, "+3");
+        row.mp_avatar(cx, ids!(tail)).set_text(cx, "+3");
+
+        // The **data-driven group**: the same faces from a list, with the overlap a ratio of the face. Two groups with the
+        // same look and different jobs — and the difference is visible in what each can be told, not in how it draws.
+        let names: Vec<String> = [
+            "Ada Lovelace",
+            "Grace Hopper",
+            "Alan Turing",
+            "Barbara Liskov",
+            "Margaret Hamilton",
+            "Katherine Johnson",
+            "Edsger Dijkstra",
+        ]
+        .iter()
+        .map(|name| name.to_string())
+        .collect();
+        let group = self.ui.mp_avatar_group(cx, ids!(avatar_group));
+        group.set_avatars(cx, &names);
+        group.set_limit(cx, 4);
+        // Print what the group decided, because the decision is the component: **four faces and then `+3`** — five
+        // circles, not four. A limit is not a count of circles.
+        println!(
+            "AVATARS group members={} limit={} circles={} from=mp::avatar_group::MpAvatarGroup",
+            names.len(),
+            group.limit(),
+            group.circles(),
+        );
     }
 
     /// Fill the list page's lists.
