@@ -1963,3 +1963,43 @@ split_pane status_bar stepper tab toggle toggle_group
 **结论**：dbpro 的迁移要在**一次坐下去**里做完（或者开分支做）。这也是为什么不能「顺手先换一半」——中间的树必然是不绿的，
 而留下一个编译不过的 app 比一个尚未迁移的 app 更糟。已经回滚，工作区干净。
 
+# 阶段 6 现在只差一个决定（2026-09-17）
+
+dbpro 迁移完成（88 个编译错误 → 0，64 个运行期 `[E]` → 0），于是 v2 半边的**代码使用者只剩一个**：
+
+```
+grep -rn "crate::widgets::\|makepad_component::widgets::" crates/*/src crates/*/tests | grep -v "^crates/ui/src/widgets/"
+```
+
+两个命中，都不是「使用者」：
+
+| 命中 | 性质 |
+| --- | --- |
+| `crates/ui/src/lib.rs:15` 的 `crate::widgets::script_mod(vm)` | **注册本身**，删 v2 时自然一起去掉 |
+| `crates/ui/src/a2ui/surface/widget.rs:35` 的一句 | **文档注释**里提到路径，不是代码 |
+
+**所以剩下的唯一使用者是 `component-zoo`**（9250 行，即 v2 的展馆本身）——也就是「要删的那个 app」。
+
+## 但这个删除现在是一个**产品决定**，不是一个清理动作
+
+用两把尺子量出来的结论（见上文「对等审计用了错的标尺」）：v3 覆盖了 76 个 v2 组件里的 50 个，
+**26 个没有 v3 对应物**（accordion、alert、card、modal、sheet、tab、toggle、rating、orb…）。
+
+而这些组件现在**唯一的使用者是它们自己的展馆**。所以「删掉 v2 半边」不是「删掉没人用的旧代码」，
+而是**从库里删掉这 26 个组件**：
+
+- 保留 v2 半边 = 库里继续有两个组件体系（那正是这次重写要消除的东西）；
+- 删掉 v2 半边 = 这 26 个组件消失，除非先补 v3 版本。
+
+**两条路都不是我能替 owner 定的**，而且删除本身是不可逆的（36,000 行）。所以这里是阶段 6 的真前置：
+一个需要明确同意的删除，外加一个「要不要先把那 26 个补上」的范围决定。
+
+## dbpro 迁移暴露的第三类缺口：**变体**级的
+
+组件名对等审计查不出来的东西：v2 的 `MpButton` 有 **6 种样式**（Default/Prominent/Ghost/Secondary/Link/Text），
+v3 的 `MpButtonStyle` 有 **4 种**（Default/Prominent/Ghost/Destructive）✗ —— 名字对得上（`MpButton` 对 `MpButton`），
+词表对不上。同类还有：v3 的 `MpTextInput` 没有 password 模式、`MpTable`/`MpTree` 没有 `row_height` 覆盖点。
+
+**教训**：按**名字**比组件，会把「同一个组件的不同能力」整个漏掉。下一轮如果要补 v3 缺口，要按**变体/能力**
+再量一次，而不是按文件。
+
