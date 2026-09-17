@@ -1773,6 +1773,15 @@ bezel 的 `crates/ui/src/` 是 35 个模块名（`widgets/` 只有 9 个文件�
 
 **所以答案不是「44 > 34，领先了」，而是「还差 4 个，其中 2 个是真组件」。**
 
+**进度更新（同一天的后续提交）**：`menu` 这一格的**模型与面板都已落地** —— `mp/menu.rs`
+（`Item`/`Cursor`/`Hit` + `next_selectable`/`items_at`/`open_depth`，14 测试）与 `mp/menu_card.rs`
+（`reserves_gutter`/`panel_width`/`row_height`/`row_top`/`row_rect`/`panel_height`/`row_at`/
+`submenu_origin`/`within`，10 测试），gallery 第 45 页 "Menu Cards"。运行时证据：
+`MENUS plain rows=6 width=180 gutter=false` / `glyphs … gutter=true` / `described … width=280`，`[E]=0`。
+
+**仍未做**：`menubar`（现在卡在卡片上，所以可做）、`stats`、`titlebar`，以及 A2UI 的 `calendar` 池
+（它需要一个第 6 个 v2-only 组件：一个**可配置的timetable 网格**，不是月历）。
+
 ## 这 4 个缺口各自是什么性质，不能一概而论
 
 - **`menu` + `menubar`（合计 1092 行）是真组件**，而且是常用件：一个 `Item::Submenu` 行、一个 `Cursor`（哪些子菜单打开、哪一行是 live，指针与键盘**都**移动它，所以两者不可能对同一行有分歧）、一个 `Hit`（指针做了什么，返回给调用方，**动作仍归调用方**）。我这边的 `mp/combobox.rs` 有面板+行的模型，但**没有子菜单**。这是下一个该做的。
