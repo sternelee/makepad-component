@@ -1,5 +1,8 @@
 use makepad_component::a2ui::*;
-use makepad_component::widgets::button::MpButtonAction;
+// **The v3 button, not the v2 one.** These two imports were the last things in this app holding the v2 path open, and with
+// them the only remaining user of `makepad_component::widgets` is `component-zoo` — which is the app that will be deleted
+// when the v2 half goes. The variant names are identical (`Clicked`), so this is a pure change of where the type comes from.
+use makepad_component::mp::button::MpButtonAction;
 use makepad_widgets::*;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -1543,7 +1546,7 @@ impl AppMain for App {
         }
 
         // Tab / Shift-Tab keyboard focus traversal (bezel focus port)
-        makepad_component::widgets::focus::handle_key(cx, event);
+        makepad_component::mp::focus::handle_key(cx, event);
 
         // Capture actions from UI event handling (must run for ALL events)
         let actions = cx.capture_actions(|cx| {

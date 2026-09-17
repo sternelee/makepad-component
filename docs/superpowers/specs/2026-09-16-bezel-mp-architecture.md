@@ -1834,3 +1834,39 @@ bezel 的 `crates/ui/src/` 是 35 个模块名（`widgets/` 只有 9 个文件�
 - `pages/mod.rs` 的 `declared` 表里没有 `picking` 条目（锚点同样不存在）→ **测试** `every_page_module_is_declared` 抓到。
 
 **教训**：编辑之后的锚点断言（`assert anchor in s`）不是仪式，是唯一能在同一个命令里发现自己什么都没改的办法。
+
+# 阶段 6 的真实前置：v2 半边的使用者盘查（2026-09-17）
+
+之前写「阶段 6 = 删 80 个 v2 文件 + `component-zoo`」，并把它标为「只差用户同意」。**这个判断是错的**，
+因为我只是猜的。把 `crate::widgets::`（v2 路径）的所有引用查一遍之后：
+
+```
+grep -rn "crate::widgets::\|makepad_component::widgets::" crates/*/src crates/*/tests | grep -v "^crates/ui/src/widgets/"
+```
+
+盘查结果（`crates/ui/src/widgets/` 自身除外）：
+
+| 使用者 | 用了什么 | 性质 |
+| --- | --- | --- |
+| `crates/ui/src/lib.rs` | `crate::widgets::script_mod(vm)` | **注册本身**，删 v2 时自然一起去掉 |
+| `crates/component-zoo/` | 整个 v2 展馆（9250 行） | **就是要删的那个 app** |
+| `crates/a2ui-demo/` | `widgets::button::MpButtonAction`、`widgets::focus::handle_key` | **已修**：两者 v3 都有同名变体/函数，两行改成 `mp::` 即可 |
+| `crates/dbpro/` | **12 个 v2 组件**：`mod.widgets.MpTree`、`MpTable`、`MpTextArea`、`MpButton`(+Ghost/Prominent/Secondary)、`MpDialog`、`MpDropdown`、`MpInput`(+Password)、`MpScrollXYArea`、`MpSelect`(+Trigger/Option)、`MpSplitPane`；外加 `widgets::sizing::MpSize` 与 `use widgets::*` | **真前置**：删掉 v2 半边会让 dbpro 完全不可编译 |
+
+**所以「删 v2」不是一个删除动作，而是一个 app 迁移动作**：`dbpro` 是一个完整的数据库 GUI，它的 DSL 里直接写着
+`mod.widgets.*`。在它迁移到 `mod.mp.*` 之前，v2 半边**仍然有真实使用者**，删不得。
+
+另外两条也要记：
+
+- `widgets::sizing::MpSize` 在 v3 里**没有对应类型**——v3 是逐组件丢掉 `MpSize` 的（`step_indicator` 与 `color_picker`
+  的模块文档都写着为什么：五档尺寸是主题排版的事，调用方选一个就等于同时选了字号/圆角/内边距）。dbpro 迁移时
+  要么改用 `ControlSize`，要么把它自己那处尺寸写成常量。
+- **v3 没有 `MpTable`、`MpTree`、`MpTextArea` 的完全对等物**吗？有的：`mp/table.rs`、`mp/tree.rs`、`mp/editor.rs`
+  都在，但 API 形状不同（v3 用 Rust 侧的数据 API，不是 DSL 里写子节点）。**这正是 dbpro 迁移不是改个前缀的原因。**
+
+**结论：阶段 6 的完成判据不是「用户同意」这一条，而是**
+1. `dbpro` 迁移到 `mod.mp.*`（一个 app 重写，含 `MpSize` 的替换）；
+2. 用户明确同意删除 `component-zoo`（9250 行）与 80 个 v2 文件（27,172 行）。
+
+第 1 条之前没有人知道它存在，因为没人查过引用。
+
