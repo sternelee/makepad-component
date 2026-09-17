@@ -1950,3 +1950,16 @@ split_pane status_bar stepper tab toggle toggle_group
 **顺序**：先修 import 与类型（这一步不改变行为，只改变名字的来源），**再**翻 DSL 前缀，最后才动阶段 6 的删除。
 实验已回滚，工作区干净，dbpro 仍是 0 错误。
 
+## 这个迁移是**原子的**，不能在中间保持绿色
+
+试过之后确认的一条性质：dbpro 的 Rust 半边与 DSL 半边必须**同时**换。
+
+- 只换 Rust（`use mp::...` 的 trait 与类型）：`self.ui.mp_button(cx, path)` 返回的是 v3 的 `MpButtonRef`，而 DSL 里
+  那个 id 仍然是 **v2** 的 `mod.widgets.MpButton` ✗ —— 它能编译，但返回的是一个指向不存在子控件的 ref，运行时静默失效；
+- 只换 DSL：`mod.mp.MpButton` 是 v3 的，而 Rust 侧还在用 `widgets::*` 的类型与 trait ✗ —— 编译不过。
+
+而且 v2 与 v3 的扩展 trait **同名同方法**（`mp_button`），所以「两边都留、让编译器挑」也不行：那是歧义，不是兼容。
+
+**结论**：dbpro 的迁移要在**一次坐下去**里做完（或者开分支做）。这也是为什么不能「顺手先换一半」——中间的树必然是不绿的，
+而留下一个编译不过的 app 比一个尚未迁移的 app 更糟。已经回滚，工作区干净。
+
