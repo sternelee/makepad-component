@@ -123,6 +123,19 @@ PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH" cargo +stable build -p canvas-termina
 Verify: `file target/debug/build/makepad-cef-*/out/makepad-cef-helper` must
 report `arm64`. (`/usr/bin/clang` → arm64; NDK clang → x86_64.)
 
+### ⚠️ Killing a canvas-terminal GUI (and why one instance at a time)
+
+The GUI re-execs itself out of the makepad-cef runtime bundle, so a running
+instance's command line is
+`.../canvas-terminal.app/Contents/MacOS/canvas-terminal --remote=<port>` —
+`pkill -f "canvas-terminal$"` never matches it. Kill test instances with
+`pkill -f "MacOS/canvas-terminal"` (or `/quit` through the remote surface, which
+saves first), and keep at most **one** GUI alive: every instance writes the same
+`~/Library/Application Support/canvas-terminal/workspace.json`, so a stale window
+holding a stale canvas silently clobbers the live one on its next save. The
+`--daemon` process is a different thing — it hosts the PTYs that survive GUI
+restarts, so leave it running.
+
 ## 4. Build, Test, and Lint Commands
 
 All commands run from the repository root.
