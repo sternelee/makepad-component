@@ -80,6 +80,7 @@ pub mod searchable_list;
 pub mod segmented;
 pub mod slider;
 pub mod stats;
+pub mod split_pane;
 pub mod status;
 pub mod table;
 pub mod titlebar;
@@ -143,6 +144,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::stats::script_mod(vm);
     crate::mp::calendar::script_mod(vm);
     crate::mp::dialog::script_mod(vm);
+    crate::mp::split_pane::script_mod(vm);
     crate::mp::menubar_strip::script_mod(vm);
     crate::mp::menu_card::script_mod(vm);
     crate::mp::description_list::script_mod(vm);

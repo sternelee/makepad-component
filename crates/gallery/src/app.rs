@@ -167,6 +167,7 @@ script_mod! {
                         rail_page_46 := RailRow{text: ""}
                         rail_page_47 := RailRow{text: ""}
                         rail_page_48 := RailRow{text: ""}
+                        rail_page_49 := RailRow{text: ""}
                             }
                         }
 
@@ -250,6 +251,7 @@ script_mod! {
                             page_46 := mod.gallery.pages.frame_meter{}
                             page_47 := mod.gallery.pages.timetable{}
                             page_48 := mod.gallery.pages.dialogs{}
+                            page_49 := mod.gallery.pages.split{}
                         }
                     }
                 }
@@ -263,7 +265,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 49] = [
+const PAGE_SLOTS: [&[LiveId]; 50] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -313,10 +315,11 @@ const PAGE_SLOTS: [&[LiveId]; 49] = [
     ids!(page_46),
     ids!(page_47),
     ids!(page_48),
+    ids!(page_49),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 49] = [
+const RAIL_ROWS: [&[LiveId]; 50] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -366,6 +369,7 @@ const RAIL_ROWS: [&[LiveId]; 49] = [
     ids!(rail_page_46),
     ids!(rail_page_47),
     ids!(rail_page_48),
+    ids!(rail_page_49),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1562,6 +1566,47 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.ui
             .mp_code_block(cx, ids!(canvas_wire))
             .set_highlighted(cx, &written, &[]);
+    }
+
+    /// Print the split pane's two arithmetic rules, which no picture can show.
+    ///
+    /// **The drift is the important one.** An accumulated drag drifts as soon as a clamp bites, so the print walks the case:
+    /// slam the divider past the minimum, then come back to a position inside the range — and the pane must be where the
+    /// pointer is, not short of it by the amount the clamp swallowed.
+    fn seed_split(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::split_pane::{
+            clamp_left, left_after_drag, on_divider, right_width, DIVIDER, DIVIDER_HIT, MIN_PANE,
+            MpSplitPaneWidgetRefExt,
+        };
+
+        let _ = self.ui.mp_split_pane(cx, ids!(split_a));
+        let _ = self.ui.mp_split_pane(cx, ids!(split_b));
+
+        let width = 1000.0f64;
+        let (start_left, start_x) = (300.0f64, 300.0f64);
+        let slammed = left_after_drag(start_left, start_x, -500.0, width);
+        let back = left_after_drag(start_left, start_x, 320.0, width);
+        let maxed = left_after_drag(start_left, start_x, 9_000.0, width);
+        // The grab region's edges, against the drawn divider's.
+        let centre = start_left + DIVIDER * 0.5;
+        println!(
+            "SPLIT width={width} divider={DIVIDER} grab={DIVIDER_HIT} min_pane={MIN_PANE} \
+slammed={slammed} came_back={back} maxed={maxed} right_at_max={} \
+on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
+            right_width(width, maxed),
+            on_divider(centre, width, start_left),
+            on_divider(centre + DIVIDER_HIT * 0.5, width, start_left),
+            on_divider(centre + DIVIDER_HIT * 0.5 + 0.5, width, start_left),
+            on_divider(10.0, width, start_left),
+        );
+        // A window too narrow for both minimums, which must give two narrow panes rather than a negative one.
+        let narrow = MIN_PANE + 10.0;
+        let left = clamp_left(MIN_PANE, narrow);
+        println!(
+            "SPLIT narrow_window={narrow} left={left} right={} both_non_negative={}",
+            right_width(narrow, left),
+            left >= 0.0 && right_width(narrow, left) >= 0.0,
+        );
     }
 
     /// Open the form dialog, leave the alert one closed, and print the rule a picture cannot show.
@@ -2835,6 +2880,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_split(cx);
         self.seed_dialogs(cx);
         self.seed_timetable(cx);
         self.seed_frame_meter(cx);
@@ -2853,6 +2899,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_split(cx);
         self.seed_dialogs(cx);
         self.seed_timetable(cx);
         self.seed_frame_meter(cx);
@@ -3526,7 +3573,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 49] = [
+    const SLOT_PAGES: [&str; 50] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3576,6 +3623,7 @@ mod tests {
         "mod.gallery.pages.frame_meter",
         "mod.gallery.pages.timetable",
         "mod.gallery.pages.dialogs",
+        "mod.gallery.pages.split",
     ];
 
     #[test]

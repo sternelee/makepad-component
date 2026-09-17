@@ -35,6 +35,7 @@ pub mod select;
 pub mod shortcuts;
 pub mod searching;
 pub mod slider;
+pub mod split;
 pub mod status;
 pub mod steps;
 pub mod surface;
@@ -92,6 +93,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     editor::script_mod(vm);
     icon::script_mod(vm);
     status::script_mod(vm);
+    split::script_mod(vm);
     steps::script_mod(vm);
     table::script_mod(vm);
     blocks::script_mod(vm);
@@ -430,6 +432,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/dialogs.rs",
         blurb: "A modal whose entry animation is played only when it opens",
     },
+    Page {
+        title: "Split Pane",
+        path: "mod.gallery.pages.split",
+        source: "crates/gallery/src/pages/split.rs",
+        blurb: "Two panes, and a drag measured from the press rather than accumulated",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -539,6 +547,7 @@ mod tests {
             ("crates/gallery/src/pages/frame_meter.rs", "frame_meter"),
             ("crates/gallery/src/pages/timetable.rs", "timetable"),
             ("crates/gallery/src/pages/dialogs.rs", "dialogs"),
+            ("crates/gallery/src/pages/split.rs", "split"),
         ]
         .into_iter()
         .collect();
