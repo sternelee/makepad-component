@@ -166,6 +166,7 @@ script_mod! {
                         rail_page_45 := RailRow{text: ""}
                         rail_page_46 := RailRow{text: ""}
                         rail_page_47 := RailRow{text: ""}
+                        rail_page_48 := RailRow{text: ""}
                             }
                         }
 
@@ -248,6 +249,7 @@ script_mod! {
                             page_45 := mod.gallery.pages.titlebars{}
                             page_46 := mod.gallery.pages.frame_meter{}
                             page_47 := mod.gallery.pages.timetable{}
+                            page_48 := mod.gallery.pages.dialogs{}
                         }
                     }
                 }
@@ -261,7 +263,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 48] = [
+const PAGE_SLOTS: [&[LiveId]; 49] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -310,10 +312,11 @@ const PAGE_SLOTS: [&[LiveId]; 48] = [
     ids!(page_45),
     ids!(page_46),
     ids!(page_47),
+    ids!(page_48),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 48] = [
+const RAIL_ROWS: [&[LiveId]; 49] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -362,6 +365,7 @@ const RAIL_ROWS: [&[LiveId]; 48] = [
     ids!(rail_page_45),
     ids!(rail_page_46),
     ids!(rail_page_47),
+    ids!(rail_page_48),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1558,6 +1562,47 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.ui
             .mp_code_block(cx, ids!(canvas_wire))
             .set_highlighted(cx, &written, &[]);
+    }
+
+    /// Open the form dialog, leave the alert one closed, and print the rule a picture cannot show.
+    ///
+    /// **`open` twice is the test.** The second call is idempotent because re-playing the entry animation while the dialog is
+    /// up makes it flash — so a caller that opened on every unrelated event would get a strobing dialog. Printed here rather
+    /// than asserted only in a unit test, because the animator is the thing that would get replayed.
+    fn seed_dialogs(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::dialog::{
+            MpDialogWidgetRefExt, Shown, BACKDROP_OPACITY, CARD_WIDTH_ALERT, CARD_WIDTH_LARGE,
+        };
+
+        let form = self.ui.mp_dialog(cx, ids!(dialog_form));
+        form.set_title(cx, "New Connection");
+        form.set_description(cx, "Point at a database to browse.");
+        let first = !form.is_open();
+        form.open(cx);
+        let after_open = form.is_open();
+        // The second open must not replay the animation, and the state must not change.
+        form.open(cx);
+        let after_second_open = form.is_open();
+
+        let alert = self.ui.mp_dialog(cx, ids!(dialog_alert));
+        alert.set_title(cx, "Discard changes?");
+        alert.set_description(cx, "This cannot be undone.");
+
+        let closed = self.ui.mp_dialog(cx, ids!(dialog_closed));
+
+        // The boolean's own rule, walked here so the page prints it even when nothing is animating.
+        let mut shown = Shown::default();
+        let opens = (shown.open(), shown.open(), shown.close(), shown.close());
+
+        println!(
+            "DIALOG form first={first} after_open={after_open} after_second_open={after_second_open} alert_open={} closed_open={} backdrop_opacity={BACKDROP_OPACITY} widths=[{CARD_WIDTH_ALERT},{CARD_WIDTH_LARGE}] shown_changes=[{:?},{:?},{:?},{:?}]",
+            alert.is_open(),
+            closed.is_open(),
+            opens.0,
+            opens.1,
+            opens.2,
+            opens.3,
+        );
     }
 
     /// Fill the two timetable grids and print what each band decided and what a few points hit.
@@ -2790,6 +2835,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_dialogs(cx);
         self.seed_timetable(cx);
         self.seed_frame_meter(cx);
         self.seed_titlebars(cx);
@@ -2807,6 +2853,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_dialogs(cx);
         self.seed_timetable(cx);
         self.seed_frame_meter(cx);
         self.seed_titlebars(cx);
@@ -3479,7 +3526,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 48] = [
+    const SLOT_PAGES: [&str; 49] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3528,6 +3575,7 @@ mod tests {
         "mod.gallery.pages.titlebars",
         "mod.gallery.pages.frame_meter",
         "mod.gallery.pages.timetable",
+        "mod.gallery.pages.dialogs",
     ];
 
     #[test]

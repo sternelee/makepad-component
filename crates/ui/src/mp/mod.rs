@@ -50,6 +50,7 @@ pub mod combobox;
 pub mod control;
 pub mod date;
 pub mod description_list;
+pub mod dialog;
 pub mod editor;
 pub mod feedback;
 pub mod floating;
@@ -141,6 +142,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::titlebar::script_mod(vm);
     crate::mp::stats::script_mod(vm);
     crate::mp::calendar::script_mod(vm);
+    crate::mp::dialog::script_mod(vm);
     crate::mp::menubar_strip::script_mod(vm);
     crate::mp::menu_card::script_mod(vm);
     crate::mp::description_list::script_mod(vm);

@@ -13,6 +13,7 @@ pub mod bars;
 pub mod button;
 pub mod calendar;
 pub mod content;
+pub mod dialogs;
 pub mod controls;
 pub mod document;
 pub mod details;
@@ -104,6 +105,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     select::script_mod(vm);
     feedback::script_mod(vm);
     content::script_mod(vm);
+    dialogs::script_mod(vm);
     pagination::script_mod(vm);
     numbers::script_mod(vm);
     palette::script_mod(vm);
@@ -422,6 +424,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/timetable.rs",
         blurb: "A banded grid whose row heights and meanings come from colour hints",
     },
+    Page {
+        title: "Dialogs",
+        path: "mod.gallery.pages.dialogs",
+        source: "crates/gallery/src/pages/dialogs.rs",
+        blurb: "A modal whose entry animation is played only when it opens",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -530,6 +538,7 @@ mod tests {
             ("crates/gallery/src/pages/titlebars.rs", "titlebars"),
             ("crates/gallery/src/pages/frame_meter.rs", "frame_meter"),
             ("crates/gallery/src/pages/timetable.rs", "timetable"),
+            ("crates/gallery/src/pages/dialogs.rs", "dialogs"),
         ]
         .into_iter()
         .collect();
