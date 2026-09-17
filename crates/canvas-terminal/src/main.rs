@@ -289,201 +289,154 @@ script_mod! {
             draw_selection +: { color: #00000000 }
         }
 
-        // ── Unified command bar (bottom overlay) ──
-        command_wrap := View{
+        // ── Status strip: the app's one line of feedback ──
+        // Commands are summoned now (see the palette below), so the docked bar
+        // left only this behind: "sent", a card's new name and the shortcut
+        // hint, over the canvas' bottom-left corner.
+        status_wrap := View{
             width: Fill
             height: Fill
             flow: Down
-            align: Align{y: 1.0}
+            align: Align{x: 0.0 y: 1.0}
+            padding: Inset{left: 14 bottom: 10}
+
+            status_label := Label{
+                width: Fit
+                height: Fit
+                text: "Ready — ⌘K for commands, drag to move, scroll to pan, ⌘+scroll to zoom"
+                draw_text +: {
+                    text_style: theme.font_regular{font_size: 11}
+                    color: mod.tc.text_secondary
+                }
+            }
+        }
+
+        // ── Command palette (⌘K) ──
+        // Commands are summoned, not docked: the canvas keeps the whole window
+        // and this scrim is hidden until the shortcut arrives. The panel keeps
+        // the docked bar's ids, so the input, the suggestions and the history
+        // all still work; only where it appears has changed.
+        command_wrap := View{
+            width: Fill
+            height: Fill
+            visible: false
+            flow: Down
+            align: Align{x: 0.5 y: 0.0}
+            padding: Inset{top: 54}
+            show_bg: true
+            draw_bg +: {
+                color: #x05060add
+                pixel: fn() {
+                    return vec4(self.color.x, self.color.y, self.color.z, self.color.w)
+                }
+            }
 
             command_bar := View{
-                width: Fill
+                width: 620
                 height: Fit
                 flow: Down
+                spacing: 8
                 show_bg: true
                 draw_bg +: {
                     color: #x15161cff
-                    pixel: fn() {
-                        let p = self.pos * self.rect_size
-                        let d = self.rect_size.y - p.y
-                        let a = clamp(d / 1.0, 0.0, 1.0)
-                        return vec4(self.color.x, self.color.y, self.color.z, self.color.w * a)
-                    }
-                }
-                padding: Inset{left: 16 right: 16 top: 8 bottom: 10}
-
-            // ── "New item" popup menu (hidden by default; shown above the
-            // input row when menu_button is clicked) ──
-            new_item_menu := View{
-                width: 190
-                height: Fit
-                flow: Down
-                spacing: 2
-                visible: false
-                margin: Inset{bottom: 8}
-                show_bg: true
-                draw_bg +: {
-                    color: #x1c1f28ff
-                    pixel: fn() {
-                        let p = self.pos * self.rect_size
-                        let d = min(min(p.x, self.rect_size.x - p.x), min(p.y, self.rect_size.y - p.y))
-                        let a = 1.0 - smoothstep(0.0, 1.0, d)
-                        return vec4(self.color.x, self.color.y, self.color.z, self.color.w * a)
-                    }
-                }
-                padding: Inset{top: 4 bottom: 4 left: 4 right: 4}
-
-                menu_new_terminal := Button{
-                    text: "Terminal"
-                    width: Fill
-                    height: 30
-                    draw_text +: {
-                        text_style: theme.font_regular{font_size: 13}
-                        color: mod.tc.text_primary
-                    }
-                }
-                menu_new_note := Button{
-                    text: "Note"
-                    width: Fill
-                    height: 30
-                    draw_text +: {
-                        text_style: theme.font_regular{font_size: 13}
-                        color: mod.tc.text_primary
-                    }
-                }
-                menu_new_browser := Button{
-                    text: "Browser"
-                    width: Fill
-                    height: 30
-                    draw_text +: {
-                        text_style: theme.font_regular{font_size: 13}
-                        color: mod.tc.text_primary
-                    }
-                }
-            }
-
-            input_row := View{
-                width: Fill
-                height: Fit
-                flow: Right
-                spacing: 10
-                align: Align{y: 0.5}
-
-                // ── "New item" menu button ──
-                menu_button := Button{
-                    text: "＋"
-                    width: 32
-                    height: 32
-                    draw_text +: {
-                        text_style: theme.font_regular{font_size: 16}
-                        color: mod.tc.text_primary
-                    }
-                }
-
-                // ── CNVS-style rounded command capsule ──
-                input_capsule := View{
-                    width: Fill
-                    height: Fit
-                    flow: Right
-                    spacing: 6
-                    align: Align{y: 0.5}
-                    padding: Inset{left: 12 right: 8 top: 4 bottom: 4}
-                    show_bg: true
-                    draw_bg +: {
-                        color: #x1a1c24ff
-                        border_color: #x2a2e3aff
-                        radius: instance(6.0)
-                        pixel: fn() {
-                            let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, self.radius)
-                            sdf.fill(self.color)
-                            sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, self.radius)
-                            sdf.stroke(self.border_color, 1.0)
-                            return sdf.result
-                        }
-                    }
-
-                    prompt_label := Label{
-                        text: "⌘"
-                        width: Fit
-                        height: Fit
-                        draw_text +: {
-                            text_style: theme.font_bold{font_size: 14}
-                            color: mod.tc.accent
-                        }
-                    }
-
-                    command_input := TextInput{
-                        width: Fill
-                        height: 26
-                        empty_text: "@agent text · /new agent NAME · /new terminal NAME · /help"
-                        // Transparent background/border so the capsule's rounded corners show through.
-                        draw_bg +: {
-                            color: #00000000
-                            border_color: #00000000
-                        }
-                        draw_text +: {
-                            text_style: theme.font_regular{font_size: 13}
-                            color: mod.tc.text_primary
-                        }
-                    }
-
-                    mic_button := Button{
-                        text: "🎤"
-                        width: 26
-                        height: 26
-                        draw_text +: {
-                            text_style: theme.font_regular{font_size: 12}
-                            color: mod.tc.text_secondary
-                        }
-                    }
-                }
-            }
-
-            // ── Command suggestion dropdown ──
-            suggestion_list := View{
-                width: Fill
-                height: Fit
-                flow: Down
-                visible: false
-                margin: Inset{left: 46 bottom: 6}
-                padding: Inset{top: 4 bottom: 4 left: 4 right: 4}
-                show_bg: true
-                draw_bg +: {
-                    color: #x1a1c24ff
                     border_color: #x2a2e3aff
-                    radius: instance(10.0)
+                    radius: instance(12.0)
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, self.radius)
+                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, self.radius)
                         sdf.fill(self.color)
                         sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, self.radius)
                         sdf.stroke(self.border_color, 1.0)
                         return sdf.result
                     }
                 }
+                padding: Inset{left: 12 right: 12 top: 12 bottom: 12}
 
-                suggestion_0 := Label{width: Fill height: Fit padding: Inset{left: 8 right: 8 top: 5 bottom: 5} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
-                suggestion_1 := Label{width: Fill height: Fit padding: Inset{left: 8 right: 8 top: 5 bottom: 5} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
-                suggestion_2 := Label{width: Fill height: Fit padding: Inset{left: 8 right: 8 top: 5 bottom: 5} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
-                suggestion_3 := Label{width: Fill height: Fit padding: Inset{left: 8 right: 8 top: 5 bottom: 5} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
-                suggestion_4 := Label{width: Fill height: Fit padding: Inset{left: 8 right: 8 top: 5 bottom: 5} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
-                suggestion_5 := Label{width: Fill height: Fit padding: Inset{left: 8 right: 8 top: 5 bottom: 5} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
-            }
+                input_row := View{
+                    width: Fill
+                    height: Fit
+                    flow: Right
+                    spacing: 8
+                    align: Align{y: 0.5}
 
-            status_label := Label{
-                width: Fill
-                height: Fit
-                margin: Inset{top: 6}
-                text: "Ready — drag items, scroll to pan, hold ⌘ + scroll to zoom"
-                draw_text +: {
-                    text_style: theme.font_regular{font_size: 11}
-                    color: mod.tc.text_secondary
+                    // ── Search capsule (the docked input, same ids) ──
+                    input_capsule := View{
+                        width: Fill
+                        height: Fit
+                        flow: Right
+                        spacing: 6
+                        align: Align{y: 0.5}
+                        padding: Inset{left: 12 right: 10 top: 6 bottom: 6}
+                        show_bg: true
+                        draw_bg +: {
+                            color: #x1a1c24ff
+                            border_color: #x2a2e3aff
+                            radius: instance(6.0)
+                            pixel: fn() {
+                                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, self.radius)
+                                sdf.fill(self.color)
+                                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, self.radius)
+                                sdf.stroke(self.border_color, 1.0)
+                                return sdf.result
+                            }
+                        }
+
+                        prompt_label := Label{
+                            text: "⌘"
+                            width: Fit
+                            height: Fit
+                            draw_text +: {
+                                text_style: theme.font_bold{font_size: 14}
+                                color: mod.tc.accent
+                            }
+                        }
+
+                        command_input := TextInput{
+                            width: Fill
+                            height: 26
+                            empty_text: "Search commands — /new terminal, /new note, @card message"
+                            // Transparent background/border so the capsule's rounded corners show through.
+                            draw_bg +: {
+                                color: #x00000000
+                                border_color: #x00000000
+                            }
+                            draw_text +: {
+                                text_style: theme.font_regular{font_size: 13}
+                                color: mod.tc.text_primary
+                            }
+                        }
+                    }
+                }
+
+                // ── Command catalogue ──
+                // One label per row, `PALETTE_ROW_H` tall in canvas.rs: that
+                // stride is how a press maps back to a row, so the two stay in
+                // step (and the panel's own padding is zero for the same
+                // reason).
+                suggestion_list := View{
+                    width: Fill
+                    height: Fit
+                    flow: Down
+                    visible: false
+                    suggestion_0 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_1 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_2 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_3 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_4 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_5 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_6 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_7 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_8 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_9 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_10 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_11 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_12 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_13 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
                 }
             }
-            }
-
         }
+
 
         // ── Right-side properties panel container (CNVS style) ──
         right_panel_container := View{
@@ -635,21 +588,9 @@ impl AppMain for App {
             }
         }
         if let Event::Startup = event {
-            self.ui
-                .text_input(
-                    cx,
-                    ids!(
-                        main_window
-                            .body
-                            .canvas
-                            .command_wrap
-                            .command_bar
-                            .input_row
-                            .input_capsule
-                            .command_input
-                    ),
-                )
-                .set_key_focus(cx);
+            // No input holds the keyboard at startup — the palette is summoned
+            // — so the canvas takes it on its first draw, and a restored card
+            // sees typing without a click first.
             if let Some(mut panel) = self
                 .ui
                 .widget(cx, ids!(main_window.body.canvas))

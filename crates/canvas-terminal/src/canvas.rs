@@ -36,6 +36,13 @@ fn saved_item_kind(item: &crate::persist::SavedItem) -> ItemKind {
     }
 }
 
+/// One row of the command palette: what accepting it writes into the input,
+/// and how the row reads (`/new terminal   New terminal card — NAME[:CWD]`).
+struct PaletteRow {
+    insert: String,
+    label: String,
+}
+
 /// One canvas item in its saved form. Shared by the on-canvas list and the
 /// parked tab strip, so a parked card persists exactly like a placed one.
 fn saved_item(item: &CanvasItem) -> Option<crate::persist::SavedItem> {
@@ -354,6 +361,33 @@ const CARD_TAB_BG: [f32; 4] = [0.17, 0.19, 0.25, 1.0];
 /// Inactive tab titles read back a step, like a browser's unfocused tabs.
 const TAB_TITLE_DIM: [f32; 4] = [0.66, 0.71, 0.82, 1.0];
 
+/// The command palette's catalogue: what a row inserts, and what it does.
+/// Kept beside `command::parse`'s grammar (and rendered by
+/// [`CanvasPanel::palette_rows`]), so a new command is one line here.
+const PALETTE_COMMANDS: &[(&str, &str)] = &[
+    ("/new terminal ", "New terminal card — NAME[:CWD]"),
+    ("/new note", "New note card"),
+    ("/new browser ", "New browser card — URL"),
+    ("/new agent ", "New agent card — NAME, a coding CLI"),
+    ("/new music ", "New music player card — TITLE"),
+    ("/open ", "Open a local file as an image/video/PDF card"),
+    ("@", "Send text to a card — @name message"),
+    ("/focus ", "Focus a terminal by name"),
+    ("/rename ", "Rename a terminal — OLD NEW"),
+    ("/status ", "Set a card's status badge — NAME STATUS"),
+    ("/zoom ", "Set the canvas zoom — /zoom 1.5"),
+    ("/grid", "Toggle the grid overlay"),
+    ("/clear", "Clear the whiteboard"),
+    ("/help", "List every command"),
+];
+
+/// Rows the palette can show, matching the `suggestion_0..` labels in the DSL.
+const PALETTE_ROWS: usize = 14;
+/// Row stride in the palette's list. `main.rs` sets the same height on each
+/// suggestion label: a press is mapped back to a row by this step, so the two
+/// have to stay in step (they are also why the list carries no padding).
+const PALETTE_ROW_H: f64 = 24.0;
+
 /// Top workspace tab bar.
 const TAB_BAR_H: f64 = 34.0;
 const TAB_BG: [f32; 4] = [0.10, 0.11, 0.15, 1.0];
@@ -575,6 +609,14 @@ pub struct CanvasPanel {
     area: Area,
     #[rust]
     viewport: Vec2d,
+    /// The command palette is up (⌘K). Mirrors `command_wrap`'s visibility so
+    /// the input and mouse paths can ask without a widget lookup.
+    #[rust]
+    command_open: bool,
+    /// The rows the palette is currently showing, in display order: what a
+    /// press or Tab inserts, and how the row reads.
+    #[rust]
+    palette_rows: Vec<PaletteRow>,
     /// Where the panel's rect starts in *draw* space. The window's title bar
     /// occupies the first 32px of that space, so the walk rect is at (0, 32) and
     /// everything drawn by hand has to be offset by it — otherwise the top bar
@@ -1221,21 +1263,10 @@ impl CanvasPanel {
             // this used to save *before* writing the buffer, so the last edit
             // only reached disk if something else saved later.
             self.set_note_body(cx, id, buffer);
-            // Release the hidden editor and return focus to the command bar
-            // without changing the current selection.
+            // Release the hidden editor and hand the keyboard back to the
+            // canvas without changing the current selection.
             self.view.text_input(cx, ids!(note_editor)).set_text(cx, "");
-            self.view
-                .text_input(
-                    cx,
-                    ids!(
-                        command_wrap
-                            .command_bar
-                            .input_row
-                            .input_capsule
-                            .command_input
-                    ),
-                )
-                .set_key_focus(cx);
+            self.set_canvas_focus(cx);
             self.save_canvas();
             self.redraw(cx);
         }
@@ -1407,19 +1438,8 @@ impl CanvasPanel {
             // A sent prompt should be read at the tail again.
             self.agent_scroll.remove(&id);
         }
-        // Focus returns to the command bar, matching note editing.
-        self.view
-            .text_input(
-                cx,
-                ids!(
-                    command_wrap
-                        .command_bar
-                        .input_row
-                        .input_capsule
-                        .command_input
-                ),
-            )
-            .set_key_focus(cx);
+        // Focus returns to the canvas, matching note editing.
+        self.set_canvas_focus(cx);
         self.redraw(cx);
     }
 
@@ -2158,22 +2178,10 @@ impl CanvasPanel {
     fn focus_terminal(&mut self, cx: &mut Cx, id: Option<u64>) {
         self.focused_terminal = id;
         self.selected = id;
-        if id.is_some() {
-            self.set_canvas_focus(cx);
-        } else {
-            // Return focus to the command bar.
-            let ti = self.view.text_input(
-                cx,
-                ids!(
-                    command_wrap
-                        .command_bar
-                        .input_row
-                        .input_capsule
-                        .command_input
-                ),
-            );
-            ti.set_key_focus(cx);
-        }
+        // Either way the keyboard belongs to the canvas: with a card focused
+        // it is forwarded to that card's shell, without one the canvas takes
+        // the shortcuts.
+        self.set_canvas_focus(cx);
         self.redraw(cx);
     }
 
@@ -2787,19 +2795,15 @@ impl CanvasPanel {
     }
 
     /// Return whether a screen point belongs to the fixed UI overlays rather
-    /// than the drawable canvas. The bottom band contains the command bar and
-    /// dock; the right-side properties panel and an open new-item menu are also
-    /// UI and must remain clickable.
+    /// than the drawable canvas. The command palette is modal and owns every
+    /// press while it is up; the right-side properties panel is UI and must
+    /// remain clickable.
     fn is_canvas_ui_hit(&self, cx: &Cx, screen: Vec2d) -> bool {
         if screen.y <= TAB_BAR_H {
             return true;
         }
-        const BOTTOM_UI_H: f64 = 112.0;
-        if screen.y >= self.view_bottom_right().y - BOTTOM_UI_H {
-            return true;
-        }
-        let menu = self.view.view(cx, ids!(new_item_menu));
-        if menu.visible() && menu.area().is_valid(cx) && menu.area().rect(cx).contains(screen) {
+        // The palette is modal: while it is up, nothing behind it is a hit.
+        if self.command_open {
             return true;
         }
         // Right-side properties panel (known geometry fallback in case the
@@ -3032,7 +3036,7 @@ impl CanvasPanel {
                 );
             }
             Command::Forward { text } => {
-                // A selected agent turns the command bar into its composer.
+                // A selected agent takes the prompt instead of a terminal.
                 let selected_agent = self
                     .items
                     .iter()
@@ -3076,46 +3080,43 @@ impl CanvasPanel {
         }
     }
 
-    /// All static command templates offered as suggestions.
-    fn command_templates() -> &'static [&'static str] {
-        &[
-            "@",
-            "/new agent ",
-            "/new terminal ",
-            "/new browser ",
-            "/new note",
-            "/new music ",
-            "/open ",
-            "/status ",
-            "/focus ",
-            "/rename ",
-            "/zoom ",
-            "/grid",
-            "/clear",
-            "/help",
-        ]
-    }
-
-    /// Suggestions for the current command input text.
-    fn suggestions_for(&self, text: &str) -> Vec<String> {
-        let text = text.trim_start();
-        let mut out: Vec<String> = Vec::new();
-        // Static templates that start with the typed prefix.
-        for t in Self::command_templates() {
-            if t.starts_with(text) && !out.contains(&t.to_string()) {
-                out.push(t.to_string());
+    /// The palette's rows for the current query, in display order.
+    ///
+    /// An empty query lists the whole catalogue — that is the point of the
+    /// palette: the commands are visible instead of remembered. A query
+    /// matches a row by its template prefix or anywhere in its description, so
+    /// "terminal" finds `/new terminal`; recent lines follow the catalogue.
+    fn palette_rows(&self, text: &str) -> Vec<PaletteRow> {
+        let query = text.trim();
+        let needle = query.to_lowercase();
+        let mut out: Vec<PaletteRow> = Vec::new();
+        for (insert, hint) in PALETTE_COMMANDS {
+            let matches = query.is_empty()
+                || insert.starts_with(query)
+                || hint.to_lowercase().contains(&needle);
+            if matches {
+                out.push(PaletteRow {
+                    insert: (*insert).to_string(),
+                    label: format!("{}   {hint}", insert.trim_end()),
+                });
             }
         }
-        // History items that start with the typed prefix.
-        for h in self.command_history.iter().rev() {
-            if h.starts_with(text) && !out.contains(h) {
-                out.push(h.clone());
+        if !query.is_empty() {
+            for h in self.command_history.iter().rev() {
+                if h.starts_with(query) && !out.iter().any(|r| r.insert == *h) {
+                    out.push(PaletteRow {
+                        insert: h.clone(),
+                        label: format!("{h}   recent"),
+                    });
+                }
             }
         }
-        out.into_iter().take(6).collect()
+        out.truncate(PALETTE_ROWS);
+        out
     }
 
-    /// Update the suggestion dropdown labels and visibility.
+    /// Recompute the palette's rows and repaint its labels. Called whenever the
+    /// query changes, the selection moves, or the palette opens.
     fn update_suggestions(&mut self, cx: &mut Cx) {
         let input_id = ids!(
             command_wrap
@@ -3128,33 +3129,38 @@ impl CanvasPanel {
         if text != self.last_input_text {
             self.last_input_text = text.clone();
             self.suggestion_index = 0;
-            let suggestions = self.suggestions_for(&text);
-            let list = self
-                .view
-                .view(cx, ids!(command_wrap.command_bar.suggestion_list));
-            let has_suggestions = !suggestions.is_empty() && !text.is_empty();
-            list.set_visible(cx, has_suggestions);
-            for i in 0..6 {
-                let id = LiveId::from_str(&format!("suggestion_{i}"));
-                let label = list.label(cx, &[id]);
-                if let Some(s) = suggestions.get(i) {
+        }
+        let rows = self.palette_rows(&text);
+        let index = self.suggestion_index.min(rows.len().saturating_sub(1));
+        self.suggestion_index = index;
+        let list = self
+            .view
+            .view(cx, ids!(command_wrap.command_bar.suggestion_list));
+        list.set_visible(cx, self.command_open && !rows.is_empty());
+        for i in 0..PALETTE_ROWS {
+            let id = LiveId::from_str(&format!("suggestion_{i}"));
+            let label = list.label(cx, &[id]);
+            match rows.get(i) {
+                Some(row) => {
+                    let marker = if i == index { "› " } else { "  " };
                     label.set_visible(cx, true);
-                    let prefix = if i == self.suggestion_index {
-                        "▸ "
-                    } else {
-                        "  "
-                    };
-                    label.set_text(cx, &format!("{prefix}{s}"));
-                } else {
+                    label.set_text(cx, &format!("{marker}{}", row.label));
+                }
+                None => {
                     label.set_visible(cx, false);
                     label.set_text(cx, "");
                 }
             }
         }
+        self.palette_rows = rows;
     }
 
-    /// Accept the currently selected suggestion into the command input.
-    fn accept_suggestion(&mut self, cx: &mut Cx) {
+    /// Write the row at `index` into the input, leaving the palette open so
+    /// arguments can follow (`/new terminal my-term`).
+    fn accept_suggestion_at(&mut self, cx: &mut Cx, index: usize) {
+        let Some(insert) = self.palette_rows.get(index).map(|r| r.insert.clone()) else {
+            return;
+        };
         let input_id = ids!(
             command_wrap
                 .command_bar
@@ -3162,17 +3168,141 @@ impl CanvasPanel {
                 .input_capsule
                 .command_input
         );
-        let text = self.view.text_input(cx, input_id).text();
-        let suggestions = self.suggestions_for(&text);
-        if let Some(s) = suggestions.get(self.suggestion_index) {
-            let ti = self.view.text_input(cx, input_id);
-            ti.set_text(cx, s);
-            ti.set_key_focus(cx);
-            self.last_input_text = s.clone();
+        let ti = self.view.text_input(cx, input_id);
+        ti.set_text(cx, &insert);
+        ti.set_cursor(
+            cx,
+            makepad_widgets::makepad_draw::text::selection::Cursor {
+                index: insert.len(),
+                prefer_next_row: false,
+            },
+            true,
+        );
+        ti.take_key_focus(cx);
+        self.last_input_text = insert;
+        self.suggestion_index = index;
+        self.update_suggestions(cx);
+        self.redraw(cx);
+    }
+
+    /// Summon the palette (⌘K): centred over the canvas, focused, and showing
+    /// the whole catalogue until a query narrows it.
+    fn open_command_palette(&mut self, cx: &mut Cx) {
+        if self.command_open {
+            return;
         }
+        self.command_open = true;
         self.view
-            .view(cx, ids!(command_wrap.command_bar.suggestion_list))
+            .view(cx, ids!(command_wrap))
+            .set_visible(cx, true);
+        let input_id = ids!(
+            command_wrap
+                .command_bar
+                .input_row
+                .input_capsule
+                .command_input
+        );
+        let ti = self.view.text_input(cx, input_id);
+        ti.set_text(cx, "");
+        ti.take_key_focus(cx);
+        self.last_input_text.clear();
+        self.history_index = None;
+        self.suggestion_index = 0;
+        self.update_suggestions(cx);
+        self.redraw(cx);
+    }
+
+    /// Dismiss the palette and hand the keyboard back to the canvas (and on to
+    /// whatever card is focused).
+    fn close_command_palette(&mut self, cx: &mut Cx) {
+        if !self.command_open {
+            return;
+        }
+        self.command_open = false;
+        self.view
+            .view(cx, ids!(command_wrap))
             .set_visible(cx, false);
+        self.view
+            .text_input(
+                cx,
+                ids!(
+                    command_wrap
+                        .command_bar
+                        .input_row
+                        .input_capsule
+                        .command_input
+                ),
+            )
+            .set_text(cx, "");
+        self.last_input_text.clear();
+        self.palette_rows.clear();
+        // Hand the keyboard back to whoever was using it: an inline note edit
+        // that is still open keeps it (with the same MouseUp re-take the edit
+        // started with), otherwise it goes to the canvas.
+        if self.note_edit_id.is_some() {
+            self.view
+                .text_input(cx, ids!(note_editor))
+                .set_key_focus(cx);
+            self.note_focus_repair = true;
+        } else {
+            self.set_canvas_focus(cx);
+        }
+        self.redraw(cx);
+    }
+
+    /// Put the caret in the palette's input. A press inside the panel lands
+    /// here: the palette is modal, so that press never reaches the widget
+    /// dispatch, and the input is already the only thing that can own it.
+    ///
+    /// `take_key_focus` rather than `set_key_focus`: a TextInput lives on its
+    /// `draw_bg` area, and only this call focuses that one *and* lights the
+    /// caret (see its own docs — the plain `Widget::set_key_focus` leaves the
+    /// field typable-looking but deaf).
+    fn focus_command_input(&mut self, cx: &mut Cx) {
+        self.view
+            .text_input(
+                cx,
+                ids!(
+                    command_wrap
+                        .command_bar
+                        .input_row
+                        .input_capsule
+                        .command_input
+                ),
+            )
+            .take_key_focus(cx);
+    }
+
+    /// The palette panel's rect, in draw space (as last laid out).
+    fn palette_rect(&mut self, cx: &mut Cx) -> Option<Rect> {
+        let rect = self
+            .view
+            .view(cx, ids!(command_wrap.command_bar))
+            .area()
+            .rect(cx);
+        if rect.size.x <= 0.0 || rect.size.y <= 0.0 {
+            return None;
+        }
+        Some(rect)
+    }
+
+    /// The row a press landed on, mapped back through `PALETTE_ROW_H` (the
+    /// stride the DSL lays the rows out with).
+    fn palette_row_under(&mut self, cx: &mut Cx, screen: Vec2d) -> Option<usize> {
+        let list = self
+            .view
+            .view(cx, ids!(command_wrap.command_bar.suggestion_list))
+            .area()
+            .rect(cx);
+        if list.size.x <= 0.0 || screen.x < list.pos.x || screen.x > list.pos.x + list.size.x {
+            return None;
+        }
+        let row = ((screen.y - list.pos.y) / PALETTE_ROW_H).floor();
+        if row < 0.0 {
+            return None;
+        }
+        let index = row as usize;
+        (index < self.palette_rows.len()).then_some(index)
     }
 
     /// Sync the right-side properties panel with the currently selected item.
@@ -3254,9 +3384,9 @@ impl CanvasPanel {
         }
     }
 
-    /// True if any text widget (command bar, note editor, properties panel)
-    /// currently holds key focus. While one does, keystrokes belong to it and
-    /// must NOT be forwarded to a focused terminal.
+    /// True if any text widget (the palette, a note editor, a properties
+    /// field) currently holds key focus. While one does, keystrokes belong to
+    /// it and must NOT be forwarded to a focused terminal.
     fn any_text_focused(&self, cx: &Cx) -> bool {
         let command_input = ids!(
             command_wrap
@@ -3265,7 +3395,7 @@ impl CanvasPanel {
                 .input_capsule
                 .command_input
         );
-        self.view.text_input(cx, command_input).key_focus(cx)
+        (self.command_open && self.view.text_input(cx, command_input).key_focus(cx))
             || self.view.text_input(cx, ids!(note_editor)).key_focus(cx)
             || self
                 .view
@@ -3380,13 +3510,13 @@ impl CanvasPanel {
         if !self.items.is_empty() || !self.shapes.is_empty() || !self.minimized.is_empty() {
             return;
         }
-        // Center within the free area above the bottom command bar (~114px)
+        // Center within the free area above the status strip (~114px)
         // and left of the tool palette (~44px), so the hint isn't crowded
         // against the chrome.
         let cx_pos = rect.pos.x + (rect.size.x - 44.0) * 0.5 + 44.0;
         let cy = rect.pos.y + (rect.size.y - 114.0) * 0.42;
         let title = "No items yet";
-        let sub = "⌘ ＋  or  /new terminal  /new note  /new browser";
+        let sub = "⌘K  or  /new terminal  /new note  /new browser";
         // Approximate glyph advance for the bold font at each scale.
         let avg = |s: f64| s * 0.60;
         // Small accent “＋” badge above the title, echoing the menu button.
@@ -4910,7 +5040,7 @@ impl CanvasPanel {
     /// Draw a note whiteboard: title bar, left vertical tool palette, and
     /// the drawing canvas with all shapes (cnvs-style).
     /// Global whiteboard palette: a fixed vertical tool bar on the LEFT edge
-    /// of the canvas (screen-fixed, like the dock), always available.
+    /// of the canvas (screen-fixed, always available).
     fn draw_tool_palette(&mut self, cx: &mut Cx2d) {
         let (palette_rect, tools_y, colors_y, widths_y) = self.palette_layout();
         self.draw_item_bg_rect(cx, palette_rect, [0.13, 0.15, 0.21, 0.92]);
@@ -6069,7 +6199,7 @@ impl CanvasPanel {
                     x: body_rect.pos.x + 4.0,
                     y: body_rect.pos.y + line_h * 4.0,
                 },
-                "@name text from the command bar.",
+                "@name text from the palette.",
             );
         }
 
@@ -6939,16 +7069,25 @@ impl Widget for CanvasPanel {
                 .input_capsule
                 .command_input
         );
-        let list_id = ids!(command_wrap.command_bar.suggestion_list);
 
-        // Intercept command-bar navigation keys before TextInput consumes them.
+        // The palette sees its keys first: ⌘K toggles it, and while it is up
+        // the arrows/Tab/Escape belong to its list, not to the shell behind.
         if let Event::KeyDown(key) = event {
-            let suggestions_visible = self.view.view(cx, list_id).visible();
-            if suggestions_visible {
+            // ⌘K (Ctrl+K off Apple) summons the palette from anywhere — the
+            // platform's `is_primary` is what keeps Ctrl+K free for a focused
+            // shell's own binding.
+            if key.modifiers.is_primary() && key.key_code == KeyCode::KeyK {
+                if self.command_open {
+                    self.close_command_palette(cx);
+                } else {
+                    self.open_command_palette(cx);
+                }
+                return;
+            }
+            if self.command_open {
                 match key.key_code {
                     KeyCode::ArrowDown => {
                         self.suggestion_index += 1;
-                        self.last_input_text.clear();
                         self.update_suggestions(cx);
                         return;
                     }
@@ -6956,24 +7095,31 @@ impl Widget for CanvasPanel {
                         if self.suggestion_index > 0 {
                             self.suggestion_index -= 1;
                         }
-                        self.last_input_text.clear();
                         self.update_suggestions(cx);
                         return;
                     }
                     KeyCode::Tab => {
-                        self.accept_suggestion(cx);
+                        self.accept_suggestion_at(cx, self.suggestion_index);
                         return;
                     }
                     KeyCode::Escape => {
-                        self.view.view(cx, list_id).set_visible(cx, false);
+                        self.close_command_palette(cx);
                         return;
+                    }
+                    KeyCode::ReturnKey => {
+                        // An empty query picks the highlighted command rather
+                        // than sending a bare newline to whatever is behind.
+                        if self.view.text_input(cx, input_id).text().trim().is_empty() {
+                            self.accept_suggestion_at(cx, self.suggestion_index);
+                            return;
+                        }
                     }
                     _ => {}
                 }
             }
             // Ctrl+Up/Down browses command history when the command input is focused.
             let ctrl = key.modifiers.control;
-            let input_focused = self.view.text_input(cx, input_id).key_focus(cx);
+            let input_focused = self.command_open && self.view.text_input(cx, input_id).key_focus(cx);
             if input_focused && ctrl {
                 match key.key_code {
                     KeyCode::ArrowUp => {
@@ -7208,6 +7354,24 @@ impl Widget for CanvasPanel {
 
         if let Event::MouseDown(me) = event {
             if me.button.contains(MouseButton::PRIMARY) {
+                // The palette is modal. A press on a row accepts it, a press
+                // inside the panel refocuses the input, and a press anywhere
+                // else dismisses it — in every case the canvas and the cards
+                // underneath stay untouched, and the widget dispatch at the
+                // bottom of this handler is skipped.
+                if self.command_open {
+                    if let Some(index) = self.palette_row_under(cx, me.abs) {
+                        self.accept_suggestion_at(cx, index);
+                    } else if self
+                        .palette_rect(cx)
+                        .is_some_and(|rect| rect.contains(me.abs))
+                    {
+                        self.focus_command_input(cx);
+                    } else {
+                        self.close_command_palette(cx);
+                    }
+                    return;
+                }
                 if std::env::var_os("CANVAS_TRACE_INPUT").is_some() {
                     // Same shape as MAKEPAD_TRACE_FONT_LOAD: what the press hit,
                     // in the draw space the app and the pointer share.
@@ -7485,9 +7649,9 @@ impl Widget for CanvasPanel {
                                     }
                                 }
                             }
-                            // Clicking the content area focuses the terminal too
-                            // (otherwise keyboard input stays routed to the
-                            // command bar after focus left the terminal).
+                            // Clicking the content area focuses the terminal too,
+                            // so keys follow the click instead of staying with
+                            // whatever held the keyboard.
                             // `item` borrow ends here; focus_terminal needs &mut self.
                             self.focus_terminal(cx, Some(id));
                         } else {
@@ -7509,7 +7673,7 @@ impl Widget for CanvasPanel {
                     // Empty canvas press: start a global whiteboard stroke
                     // with the active tool. Canvas panning stays on the
                     // trackpad scroll (or middle-drag) like other whiteboards.
-                    // UI overlays (command bar, right panel, etc.) should stay
+                    // UI overlays (the right panel, the palette) stay
                     // interactive and must not clear the current selection.
                     let ui_hit = self.is_canvas_ui_hit(cx, me.abs);
                     if !ui_hit {
@@ -8277,67 +8441,8 @@ impl Widget for CanvasPanel {
             }
         }
 
-        // ── New-item menu ──
-        let menu_btn = self.view.button(cx, ids!(menu_button));
-        if menu_btn.clicked(&actions) {
-            log!("canvas: menu_button clicked");
-            let menu = self.view.view(cx, ids!(new_item_menu));
-            let menu_visible = menu.visible();
-            log!("canvas: menu visible was {menu_visible}");
-            menu.set_visible(cx, !menu_visible);
-            self.redraw(cx);
-        }
-        if self
-            .view
-            .button(cx, ids!(menu_new_terminal))
-            .clicked(&actions)
-        {
-            let cmd = std::env::var("SHELL").unwrap_or_else(|_| "zsh".to_string());
-            self.spawn_terminal(cx, "term", None, &cmd);
-            self.view
-                .view(cx, ids!(new_item_menu))
-                .set_visible(cx, false);
-            self.redraw(cx);
-        }
-        if self.view.button(cx, ids!(menu_new_note)).clicked(&actions) {
-            self.spawn_note(cx);
-            self.view
-                .view(cx, ids!(new_item_menu))
-                .set_visible(cx, false);
-            self.redraw(cx);
-        }
-        if self
-            .view
-            .button(cx, ids!(menu_new_browser))
-            .clicked(&actions)
-        {
-            self.view
-                .view(cx, ids!(new_item_menu))
-                .set_visible(cx, false);
-            let ti = self.view.text_input(
-                cx,
-                ids!(
-                    command_wrap
-                        .command_bar
-                        .input_row
-                        .input_capsule
-                        .command_input
-                ),
-            );
-            let prefix = "/new browser ";
-            ti.set_text(cx, prefix);
-            ti.set_key_focus(cx);
-            ti.set_cursor(
-                cx,
-                makepad_widgets::makepad_draw::text::selection::Cursor {
-                    index: prefix.len(),
-                    prefer_next_row: false,
-                },
-                true,
-            );
-            self.redraw(cx);
-        }
-        // Unified command input.
+        // Unified command input: the palette runs a command and puts itself
+        // away, like every other palette — ⌘K brings it back.
         let input_id = ids!(
             command_wrap
                 .command_bar
@@ -8348,12 +8453,7 @@ impl Widget for CanvasPanel {
         if let Some((text, _mods)) = self.view.text_input(cx, input_id).returned(&actions) {
             self.push_command_history(text.clone());
             self.exec_command(cx, &text);
-            let ti = self.view.text_input(cx, input_id);
-            ti.set_text(cx, "");
-            self.view
-                .view(cx, ids!(command_wrap.command_bar.suggestion_list))
-                .set_visible(cx, false);
-            self.redraw(cx);
+            self.close_command_palette(cx);
         }
     }
 
@@ -8368,9 +8468,27 @@ impl Widget for CanvasPanel {
 
         if self.timer.is_none() {
             self.timer = Some(cx.cx.start_interval(0.05));
+            // Nothing holds the keyboard on a fresh window, and makepad only
+            // delivers key events to the focused area: give it to the canvas,
+            // so a restored card sees typing without a click first.
+            self.set_canvas_focus(cx);
         }
 
         self.ensure_workspace();
+        // The palette owns the keyboard while it is up. A field that was laid
+        // out while the wrap was hidden cannot keep the focus taken on open —
+        // makepad drops it — so re-take it whenever the keyboard ends up
+        // unowned. Idempotent: the moment it holds, this stops firing.
+        if self.command_open && cx.key_focus().is_empty() {
+            let input_id = ids!(
+                command_wrap
+                    .command_bar
+                    .input_row
+                    .input_capsule
+                    .command_input
+            );
+            self.view.text_input(cx, input_id).set_key_focus(cx);
+        }
         // Measure the mono cell from the face before anything lays out text:
         // the grid, the PTY resize and the hit-tests all read it.
         self.refresh_cell_metrics(cx);
@@ -8680,7 +8798,7 @@ impl Widget for CanvasPanel {
         let pending = self.pending.clone();
         self.draw_canvas_shapes(cx, rect.size, &shapes, pending.as_ref());
 
-        // Children (command bar, status label, popup menu).
+        // Children (the palette, the status label, the popup menu).
         while self.view.draw_walk(cx, scope, walk).step().is_some() {}
 
         // Video/PDF preview slots draw after the child pass so each widget's
@@ -8692,7 +8810,7 @@ impl Widget for CanvasPanel {
         }
 
         // The top bar (workspace tabs + the parked cards' tabs) sits on top of
-        // the canvas items and the command bar.
+        // the canvas items and the palette.
         self.draw_top_bar(cx);
 
         // Global tool palette: fixed to the left edge, always on top.
