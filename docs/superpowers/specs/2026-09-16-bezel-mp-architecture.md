@@ -1779,8 +1779,28 @@ bezel 的 `crates/ui/src/` 是 35 个模块名（`widgets/` 只有 9 个文件�
 `submenu_origin`/`within`，10 测试），gallery 第 45 页 "Menu Cards"。运行时证据：
 `MENUS plain rows=6 width=180 gutter=false` / `glyphs … gutter=true` / `described … width=280`，`[E]=0`。
 
-**仍未做**：`menubar`（现在卡在卡片上，所以可做）、`stats`、`titlebar`，以及 A2UI 的 `calendar` 池
-（它需要一个第 6 个 v2-only 组件：一个**可配置的timetable 网格**，不是月历）。
+**四个缺口现在都有了模块与 gallery 预览**（同一天的继续）：
+
+| 缺口 | 落地 | 运行时证据 |
+| --- | --- | --- |
+| `menu` | `mp/menu.rs`（模型，14 测试）+ `mp/menu_card.rs`（面板，10） | `MENUS plain width=180 gutter=false` / `glyphs gutter=true` / `described width=280` |
+| `menubar` | `mp/menubar.rs`（状态机，14）+ `mp/menubar_strip.rs`（标题条，6） | `hover_closed=none … hover_open=changed`；`strip content_width=190 rects=[File@+0w58, Edit@+58w61, View@+119w71]` |
+| `stats` | `mp/stats.rs`（模型 + 控件，9） | `STATS counted=74 span_frames=75 excluded=1 span=1.250s fps=59.2` |
+| `titlebar` | `mp/titlebar.rs`（模型 + 控件，7） | `TITLEBAR region width=320 controls=80 draggable=[0,240) inside_at_end=false` |
+
+**仍未做**：A2UI 的 `calendar` 池（需要一个第 6 个 v2-only 组件：一个**可配置的 timetable 网格**，不是月历），
+以及阶段 6 的删除（**需要用户明确同意**）。
+
+**这一轮由「测量」而不是「阅读」抓到的两个真缺陷**：
+
+1. **`HOLD` 与 timer 周期相等 → 读数抖动。** 实测跨度 `1.0s, 2.0s, 1.0s, 2.0s`：timer 的真实周期落在标称值头发丝
+   之下（`delta=Some(0.9998091250000001)`），`elapsed >= HOLD` 失败，读数只好等下一个 tick。**一个随机抖动会落在
+   两侧的边界不是 hold。** `TICK = 0.25` 给出 4× 余量。
+2. **单位阶梯漏了 KiB**：1024 字节打印成 `0.0 MiB` —— 一个测量值被四舍五入掉、显示成了零。
+
+**还有一个「格式化自己输入」的诊断**：`span` 在 `take` 之后才读，于是每次读数都打印 `span_frames=0`；更早的一行
+写死了 `own_ticks_excluded=yes` —— 那是我写的字符串，不是代码算出的数。现在打印的是平台帧号与计数之差，
+**`excluded=0` 会说明规则根本没触发**。
 
 ## 这 4 个缺口各自是什么性质，不能一概而论
 
