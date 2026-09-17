@@ -50,6 +50,26 @@ impl DbKind {
         }
     }
 
+    /// The kinds in the order a chooser shows them.
+    ///
+    /// **The order is a decision, and it lives here** so that the segmented control's segments and the index it reports
+    /// cannot come from two lists that disagree — which would make choosing "MySQL" open a Postgres connection.
+    pub const ALL: [DbKind; 3] = [DbKind::Sqlite, DbKind::Mysql, DbKind::Postgres];
+
+    /// This kind's position in [`DbKind::ALL`].
+    pub fn index(&self) -> usize {
+        match self {
+            DbKind::Sqlite => 0,
+            DbKind::Mysql => 1,
+            DbKind::Postgres => 2,
+        }
+    }
+
+    /// The kind at a position, for a chooser that reports one.
+    pub fn from_index(index: usize) -> Option<Self> {
+        DbKind::ALL.get(index).copied()
+    }
+
     pub fn from_label(s: &str) -> Option<Self> {
         match s {
             "SQLite" => Some(DbKind::Sqlite),

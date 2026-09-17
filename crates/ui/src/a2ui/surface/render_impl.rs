@@ -386,9 +386,8 @@ impl A2uiSurface {
             let label_idx = self.label_count;
             self.label_count += 1;
             let label = self.pool_label(cx, label_idx);
-            label.set_text(&text_value);
-            label.draw_text.text_style.font_size = font_size;
-            let _ = label.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+            label.text_style.font_size = font_size;
+            let _ = label.draw_walk(cx, Walk::fit(), Align::default(), &text_value);
         }
     }
 
@@ -515,10 +514,26 @@ impl A2uiSurface {
         let button = self.pool_button(cx, button_idx);
 
         // Set button text
-        button.set_text(&button_text);
+        button.set_text(cx.cx, &button_text);
 
         // Draw the button widget
         let _ = button.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+
+        // **Positive evidence, not the absence of an error.** A pool that silently built nothing would also leave the
+        // log at `[E]=0`, so what the renderer did is printed under an env var and the run's own output is the evidence:
+        // which library the button came from, and whether it took its text. Kept in place because the remaining
+        // thirteen pools need the same check, and a proof that has to be re-invented per pool is one that will be
+        // skipped for the twelfth.
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            static COUNT: AtomicUsize = AtomicUsize::new(0);
+            println!(
+                "A2UI v3_button #{} id={:?} text={:?} from=mp::button::MpButton",
+                COUNT.fetch_add(1, Ordering::Relaxed),
+                component_id,
+                button_text,
+            );
+        }
 
         // Store metadata
         self.button_meta.push((
@@ -640,13 +655,26 @@ impl A2uiSurface {
         let cb = self.pool_checkbox(cx, checkbox_idx);
 
         // Set state
-        cb.set_checked(cx, is_checked);
+        cb.set_checked(cx.cx, is_checked);
         if !label.is_empty() {
-            cb.set_text(&label);
+            // v3's `set_text` takes a `&mut Cx`, like the button's — the second of the two differences the migration
+            // consists of, and the reason a pool is a small but not a one-line change.
+            cb.set_text(cx.cx, &label);
         }
 
         // Draw the checkbox widget
         let _ = cb.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            static COUNT: AtomicUsize = AtomicUsize::new(0);
+            println!(
+                "A2UI v3_checkbox #{} checked={} label={:?} from=mp::checkbox::MpCheckbox",
+                COUNT.fetch_add(1, Ordering::Relaxed),
+                is_checked,
+                label,
+            );
+        }
 
         // Store metadata
         self.checkbox_meta
@@ -692,9 +720,9 @@ impl A2uiSurface {
         let sl = self.pool_slider(cx, slider_idx);
 
         // Set range and value (but NOT during active drag - let user control position)
-        sl.set_range(min, max);
+        sl.set_range(cx.cx, min, max);
         if !sl.is_dragging() {
-            sl.set_single_value(cx, current_value);
+            sl.set_value(cx.cx, current_value);
         }
 
         // Draw the slider widget
@@ -748,8 +776,21 @@ impl A2uiSurface {
             .collect();
         let current = si.current.unwrap_or(0.0);
         let widget = self.pool_step_indicator(cx, idx);
-        widget.set_items(cx, titles);
-        widget.set_step(cx, (current.max(0.0) as usize).saturating_sub(1));
+        // `set_items` takes the full list and the widget applies the bound itself — so a protocol that sends twelve steps
+        // gets eight drawn rather than twelve truncated here, and **the truncation is the widget's rule in one place**
+        // rather than a second `min` at this call site that could disagree with it.
+        widget.set_items(cx.cx, &titles);
+        // The protocol's `current` is one-based; the widget's step is zero-based. Converting here rather than inside the
+        // widget keeps the widget's own meaning ("step 0 is the first") intact for a Rust caller.
+        widget.set_step(cx.cx, (current.max(0.0) as usize).saturating_sub(1));
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            println!(
+                "A2UI v3_step_indicator steps={} shown={} current={} from=mp::step_indicator::MpStepIndicator",
+                titles.len(),
+                step_indicator::rows_shown_for(titles.len()),
+                (current.max(0.0) as usize).saturating_sub(1),
+            );
+        }
         let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
     }
 
@@ -776,8 +817,25 @@ impl A2uiSurface {
         });
 
         let widget = self.pool_number_input(cx, idx);
-        widget.set_bounds(cx, min, max, step, decimals);
-        widget.set_value(cx, value);
+        // v3's two calls take a `&mut Cx` rather than a `&mut Cx2d`, which is the only difference at this site.
+        widget.set_bounds(cx.cx, min, max, step, decimals);
+        widget.set_value(cx.cx, value);
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            // The bounds as the **widget** holds them, not as the protocol sent them: `set_bounds` orders them, so a
+            // protocol that passed them backwards is visible here rather than only in the field's behaviour.
+            // Read from the widget already in hand rather than looking it up again: `pool_number_input` holds a mutable
+            // borrow of the pool, and a second borrow of the same field is the error that says so.
+            let (low, high, step, decimals) = widget.bounds();
+            // **The widget's own value**, not the protocol's: printing the protocol's `value` showed `999` next to a
+            // clamped `10`, which reads as a clamping failure and was a print that formatted the wrong number.
+            let held = widget.value();
+            println!(
+                "A2UI v3_number_input sent={} value={held} bounds=({low}, {high}, step {step}, {decimals}dp) shown={:?} clamped={} from=mp::number_input::MpNumberInput",
+                number_input::format_number(value, decimals),
+                number_input::format_number(held, decimals),
+                (held - value).abs() > f64::EPSILON,
+            );
+        }
         let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
 
         self.number_input_meta
@@ -804,9 +862,29 @@ impl A2uiSurface {
             .map(|p| resolve_string_value_scoped(p, data_model, scope))
             .unwrap_or_else(|| "Search...".to_string());
         let widget = self.pool_searchable_list(cx, idx);
-        widget.set_items(cx, items);
-        widget.set_query(cx, &placeholder);
+        widget.set_items(cx.cx, items);
+        // **An empty query, not the placeholder — and the line this replaces was a defect.**
+        //
+        // It read `set_query(cx, &placeholder)`, which *filters by* the placeholder: with `placeholder` being
+        // `"Search..."`, a searchable list was narrowed to the items containing that text, which is none of them — so
+        // every `SearchableList` this renderer drew was **empty**. The placeholder is the field's own empty-text, not a
+        // filter, and the v3 widget's field carries one.
+        //
+        // The `cx.cx` is the other half: v3's `set_items` and `set_query` take a `&mut Cx` rather than a `&mut Cx2d`,
+        // which is the same one-word difference every pool has needed.
+        widget.set_query(cx.cx, "");
+        // ...and the placeholder goes where a placeholder goes, which is the setter this migration had to add.
+        widget.set_placeholder(cx.cx, &placeholder);
         let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            println!(
+                "A2UI v3_searchable_list items={} query={:?} shown={} placeholder={:?} from=mp::searchable_list::MpSearchableList",
+                widget.items().len(),
+                widget.query(),
+                widget.rows().len(),
+                placeholder,
+            );
+        }
     }
 
     fn render_status_bar(
@@ -856,9 +934,21 @@ impl A2uiSurface {
             .map(|n| resolve_string_value_scoped(n, data_model, scope))
             .collect();
         let widget = self.pool_avatar_group(cx, idx);
-        widget.set_avatars(cx, &names);
+        widget.set_avatars(cx.cx, &names);
         if let Some(limit) = ag.max_visible {
-            widget.set_limit(cx, limit.max(1.0) as usize);
+            // **`max(1.0)` is not a bound, it is a guess at the protocol's intent.** `maxVisible` is a `f32` in the
+            // protocol and a count here, so a fractional or absurd value has to land somewhere; `max(1.0)` says "at least
+            // one face", and the widget's own ceiling (`SLOTS`) bounds the top. A limit of 0 in the protocol would mean
+            // "as many slots as there are", which is a different thing that `max(1.0)` deliberately forbids.
+            widget.set_limit(cx.cx, limit.max(1.0) as usize);
+        }
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            println!(
+                "A2UI v3_avatar_group members={} limit={} circles={} from=mp::avatar_group::MpAvatarGroup",
+                widget.avatars().len(),
+                widget.limit(),
+                widget.circles(),
+            );
         }
         let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
     }
@@ -901,8 +991,18 @@ impl A2uiSurface {
         });
 
         let widget = self.pool_color_picker(cx, idx);
-        widget.set_colors(cx, palette.clone());
-        widget.set_selected(cx, selected);
+        // The two calls take a `&mut Cx`, as every v3 pool has needed.
+        widget.set_colors(cx.cx, palette.clone());
+        widget.set_selected(cx.cx, selected);
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            println!(
+                "A2UI v3_color_picker swatches={} columns={} selected={:?} row_px={} from=mp::color_picker::MpColorPicker",
+                widget.colors().len(),
+                widget.columns(),
+                widget.selected(),
+                crate::mp::color_picker::grid_width(widget.columns()),
+            );
+        }
         let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
 
         self.color_picker_meta
@@ -918,16 +1018,26 @@ impl A2uiSurface {
         let idx = self.description_list_count;
         self.description_list_count += 1;
         let scope = self.current_scope.as_deref();
-        let items: Vec<MpDescriptionItem> = dl
+        let items: Vec<DescriptionItem> = dl
             .items
             .iter()
-            .map(|it| MpDescriptionItem::new(
+            .map(|it| DescriptionItem::new(
                 &resolve_string_value_scoped(&it.term, data_model, scope),
                 &resolve_string_value_scoped(&it.description, data_model, scope),
             ))
             .collect();
         let widget = self.pool_description_list(cx, idx);
-        widget.set_items(cx, &items);
+        widget.set_items(cx.cx, &items);
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            // `shown` is printed as well as `items`, because the widget's bound is eight and **a run that only printed
+            // `items` could not tell a correct fill from a truncated one.**
+            println!(
+                "A2UI v3_description_list items={} shown={} first={:?} from=mp::description_list::MpDescriptionList",
+                items.len(),
+                crate::mp::description_list::rows_shown(items.len()),
+                items.first().map(|item| (item.label.as_str(), item.value.as_str())),
+            );
+        }
         let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
     }
 
@@ -943,9 +1053,33 @@ impl A2uiSurface {
             data_model,
             self.current_scope.as_deref(),
         );
-        let widget = self.pool_icon(cx, idx);
-        widget.set_name(cx, &name);
-        let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+        // **The two icon vocabularies meet here.** The protocol names its icons with Material Symbols names and this
+        // library draws FontAwesome, so the name is resolved through `icons::by_name`.
+        //
+        // An unknown name draws **nothing**, and says so under the debug flag. The v2 icon resolved any name, because it
+        // loaded an SVG by name — so a name nothing had was a missing image. A glyph face has no such fallback: an
+        // unknown name would have to become a *guessed* glyph, which is a lie about what the document asked for.
+        match icons::by_name(&name) {
+            Some(glyph) => {
+                let widget = self.pool_icon(cx, idx);
+                widget.set_glyph(cx.cx, glyph);
+                let _ = widget.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+                if std::env::var("MP_A2UI_DEBUG").is_ok() {
+                    // **The resolved case prints too**, because "nothing was rejected" is not evidence that anything
+                    // was drawn — the same reason `[E]=0` was worth distrusting. Both branches report, so the log says
+                    // which of the two happened for every icon.
+                    println!(
+                        "A2UI icon name={name:?} glyph={:?} from=mp::icon::MpIcon",
+                        icons::codepoint(glyph),
+                    );
+                }
+            }
+            None => {
+                if std::env::var("MP_A2UI_DEBUG").is_ok() {
+                    println!("A2UI icon_unknown name={name:?} drew=nothing");
+                }
+            }
+        }
     }
 
     // ============================================================================
@@ -1094,8 +1228,12 @@ impl A2uiSurface {
                 let label_idx = self.label_count;
                 self.label_count += 1;
                 let label = self.pool_label(cx, label_idx);
-                label.set_text(&format!("{}: {}", key, value));
-                let _ = label.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+                let _ = label.draw_walk(
+                    cx,
+                    Walk::fit(),
+                    Align::default(),
+                    &format!("{}: {}", key, value),
+                );
             }
         }
 
@@ -1551,8 +1689,7 @@ impl A2uiSurface {
             let label_idx = self.label_count;
             self.label_count += 1;
             let label = self.pool_label(cx, label_idx);
-            label.set_text(&format!("[{}]", icon_name));
-            let _ = label.draw_walk(cx, &mut Scope::empty(), Walk::fit());
+            let _ = label.draw_walk(cx, Walk::fit(), Align::default(), &format!("[{}]", icon_name));
         }
 
         // Render child content

@@ -6,7 +6,6 @@
 // quads + hit-tested Areas + widget actions.
 use makepad_widgets::*;
 
-use makepad_component::widgets::sizing::MpSize;
 
 script_mod! {
     use mod.prelude.widgets_internal.*
@@ -149,6 +148,12 @@ pub struct DbTabBar {
     #[layout]
     layout: Layout,
 
+    /// The bar's height. **A height, not a five-step size ladder.** The ladder it replaces — a `size: MpSize`
+    /// field beside this one — was dead state: it only overwrote this number when it was not `Medium`, nothing in
+    /// this app ever set it, so its default (`Medium`) meant the overwrite never happened and four of its five
+    /// branches were unreachable. Two fields for one height, one of them unreachable, is worse than one.
+    ///
+    /// 36 and not the theme's `row_height`: a tab bar is shorter than a control row.
     #[live(36.0)]
     tab_height: f64,
 
@@ -158,9 +163,6 @@ pub struct DbTabBar {
 
     #[live(120.0)]
     min_tab_width: f64,
-
-    #[live]
-    size: MpSize,
 
     // Model (set by the app)
     #[rust]
@@ -303,16 +305,6 @@ impl Widget for DbTabBar {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
-        if self.size != MpSize::Medium {
-            self.tab_height = match self.size {
-                MpSize::XSmall => 28.0,
-                MpSize::Small => 32.0,
-                MpSize::Large => 40.0,
-                MpSize::XLarge => 44.0,
-                MpSize::Medium => 36.0,
-            };
-        }
-
         self.tab_areas.clear();
         self.close_areas.clear();
 

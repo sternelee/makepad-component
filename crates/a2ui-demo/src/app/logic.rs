@@ -1,5 +1,8 @@
 use makepad_component::a2ui::*;
-use makepad_component::widgets::button::MpButtonAction;
+// **The v3 button, not the v2 one.** These two imports were the last things in this app holding the v2 path open, and with
+// them the only remaining user of `makepad_component::widgets` is `component-zoo` — which is the app that will be deleted
+// when the v2 half goes. The variant names are identical (`Clicked`), so this is a pure change of where the type comes from.
+use makepad_component::mp::button::MpButtonAction;
 use makepad_widgets::*;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -8,7 +11,10 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use super::audio_player::{decode_audio_file, start_audio_output, AudioPlaybackState};
-use super::sample_data::{get_sample_music_player, get_sample_product_catalog};
+use super::sample_data::{
+    get_sample_avatars, get_sample_calendar, get_sample_colors, get_sample_detail, get_sample_icons, get_sample_music_player, get_sample_number,
+    get_sample_product_catalog, get_sample_search, get_sample_steps,
+};
 use super::theme::Theme;
 
 /// Compute the local cache path for an audio URL.
@@ -1033,6 +1039,28 @@ impl App {
         }
     }
 
+    /// Load an A2UI document given as a string, rather than from a file or a sample function.
+    ///
+    /// Extracted so a fixture can be processed without a file on disk — the icon fixture needs a sample that reaches a
+    /// component no shipped sample reaches, and writing it to a temporary file to read it back would be a file dance
+    /// around a borrow that is already free here.
+    fn load_a2ui_json(&mut self, cx: &mut Cx, json: &str, title: &str) {
+        self.host = None;
+        self.live_host = None;
+        self.is_streaming = false;
+        self.live_mode = false;
+        self.ui.label(cx, ids!(title_label)).set_text(cx, title);
+        let surface_ref = self.ui.widget(cx, ids!(a2ui_surface));
+        if let Some(mut surface) = surface_ref.borrow_mut::<A2uiSurface>() {
+            surface.clear();
+            match surface.process_json(json) {
+                Ok(events) => log!("A2UI fixture events: {}", events.len()),
+                Err(e) => log!("Error parsing A2UI fixture: {}", e),
+            }
+        }
+        self.ui.redraw(cx);
+    }
+
     fn load_a2ui_data(&mut self, cx: &mut Cx) {
         // Disconnect from server if connected
         if self.host.is_some() {
@@ -1412,12 +1440,37 @@ impl AppMain for App {
         // Auto-load math charts on startup if math_test.json exists
         if let Event::Startup = event {
             self.apply_theme(cx);
-            if std::path::Path::new("music_test.json").exists() {
-                self.load_json_file(cx, "music_test.json", "🎵 Makepad Music Player");
-            } else if std::path::Path::new("math_test.json").exists() {
-                self.load_math_charts(cx);
-            } else {
-                self.connect_to_server(cx);
+            // **A sample named in the environment, because otherwise a pooled widget cannot be confirmed to render.**
+            // The catalog sample — the one with buttons, checkboxes and sliders — is reachable only by *clicking* a
+            // button, and a synthetic pointer does not reach this app's widgets (127,564 `event.hits` calls all came
+            // back `Nothing`). So without a path like this, moving a widget pool from the deprecated set to `mp` could
+            // not be verified at all: `[E]=0` is what a renderer that built nothing also prints. `A2UI_SAMPLE` selects
+            // the sample, and `MP_A2UI_DEBUG` makes the pools print what they built.
+            match std::env::var("A2UI_SAMPLE").as_deref() {
+                Ok("catalog") => self.load_a2ui_data(cx),
+                Ok("cyber") => self.load_json_file(cx, "cyber_art.json", "🎨 Cyber Sound Art"),
+                // The icon fixture: see `get_sample_icons` for why it exists.
+                Ok("icons") => self.load_a2ui_json(cx, &get_sample_icons(), "🔣 Icons"),
+                Ok("detail") => self.load_a2ui_json(cx, &get_sample_detail(), "📋 Details"),
+                Ok("steps") => self.load_a2ui_json(cx, &get_sample_steps(), "🪜 Checkout"),
+                Ok("number") => self.load_a2ui_json(cx, &get_sample_number(), "🔢 Quantities"),
+                Ok("search") => self.load_a2ui_json(cx, &get_sample_search(), "🔍 Components"),
+                Ok("colors") => self.load_a2ui_json(cx, &get_sample_colors(), "🎨 Accent"),
+                // The group needs **nine members and a limit of four**: without a limit the tail never appears, and the
+                // tail is the whole design question (in addition to the shown faces, or instead of one).
+                Ok("avatars") => self.load_a2ui_json(cx, &get_sample_avatars(), "👥 Reviewers"),
+                // Three different colour hints, so the row-height rule has something to decide.
+                Ok("calendar") => self.load_a2ui_json(cx, &get_sample_calendar(), "🗓 Studio"),
+                Ok("music") => self.load_json_file(cx, "music_test.json", "🎵 Makepad Music Player"),
+                Ok(_) | Err(_) => {
+                    if std::path::Path::new("music_test.json").exists() {
+                        self.load_json_file(cx, "music_test.json", "🎵 Makepad Music Player");
+                    } else if std::path::Path::new("math_test.json").exists() {
+                        self.load_math_charts(cx);
+                    } else {
+                        self.connect_to_server(cx);
+                    }
+                }
             }
             // Start interval timer for polling instead of continuous frame requests
             self.poll_timer = cx.start_interval(1.0);
@@ -1493,7 +1546,7 @@ impl AppMain for App {
         }
 
         // Tab / Shift-Tab keyboard focus traversal (bezel focus port)
-        makepad_component::widgets::focus::handle_key(cx, event);
+        makepad_component::mp::focus::handle_key(cx, event);
 
         // Capture actions from UI event handling (must run for ALL events)
         let actions = cx.capture_actions(|cx| {

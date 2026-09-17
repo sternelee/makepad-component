@@ -1,265 +1,128 @@
-//! makepad-theme: design tokens + color math for the component library.
+//! makepad-theme: design tokens, the type ladder, layout metrics and the
+//! material layer for the component library.
 //!
-//! Single source of truth lives in Rust (`color` / `palette`); the
-//! `script_mod` below bakes both palettes into the script heap:
+//! The single source of truth is Rust. The script heap copy a widget's DSL
+//! block names (`mod.mpc_theme.*`, `mod.mpc_type.*`, `mod.mpc_layout.*`) is
+//! *generated* from these structures by [`install`], so there is exactly one
+//! place a token is written down.
 //!
-//! - `mod.mpc_theme.dark`  — dark appearance
-//! - `mod.mpc_theme.light` — light appearance
-//! - `mod.mpc_theme`       — ACTIVE copy; widgets import this one.
-//!   Appearance switching rewrites these values on the heap
-//!   (see MpThemeState) then requests a script re-apply.
+//! ```no_run
+//! use makepad_theme::{appearance::Appearance, theme::Theme};
+//!
+//! // At startup, once:
+//! # fn install(cx: &mut makepad_widgets::Cx) {
+//! Theme::install(Theme::dark(), cx);
+//! # }
+//!
+//! // Anywhere that paints:
+//! # fn paint(cx: &mut makepad_widgets::Cx) {
+//! let theme = Theme::of(cx);
+//! let ink = theme.paint.text;
+//! let body = theme.metrics(makepad_theme::typography::TextStyle::Body);
+//! # let _ = (ink, body);
+//! # }
+//! ```
 
+pub mod appearance;
+pub mod brand;
 pub mod color;
+pub mod install;
+pub mod layout;
+pub mod legacy;
+pub mod material;
+pub mod paint;
 pub mod palette;
+pub mod syntax;
+pub mod terminal;
+
+pub use terminal::TerminalPalette;
+pub mod theme;
+pub mod typography;
+
+/// The v2 token names, re-exported so `MpThemeState` keeps compiling while the
+/// v2 widget set is replaced. **Temporary** — see [`legacy`].
+pub use legacy::TOKEN_NAMES;
+
+/// Everything a component needs, in one import.
+pub mod prelude {
+    pub use crate::{
+        appearance::Appearance,
+        brand::{Brand, Tint},
+        layout::ControlSize,
+        material::{Glass, Material, SurfaceStyle},
+        paint::{Paint, Shadow},
+        theme::Theme,
+        typography::{Face, Metrics, TextStyle, Weight},
+    };
+}
+
+pub use appearance::Appearance;
+pub use brand::Brand;
+pub use layout::ControlSize;
+pub use material::{Glass, Material, SurfaceStyle};
+pub use paint::{Paint, Shadow};
+pub use theme::Theme;
+pub use typography::{Face, Metrics, TextStyle, Weight};
 
 use makepad_widgets::*;
 
-// Named layout constants. Numbers drive layout; colors are paint.
-pub const RADIUS_SURFACE: f64 = 12.0;
-pub const RADIUS_PANEL: f64 = 10.0;
-pub const RADIUS_CONTROL: f64 = 8.0;
-pub const RADIUS_SMALL: f64 = 6.0;
-
-/// Concentric-radius rule (SwiftUI ContainerRelativeShape arithmetic):
-/// a child inset by `inset` px inside a parent with `outer` radius.
-pub fn inset_radius(outer: f64, inset: f64) -> f64 {
-    (outer - inset).max(0.0)
-}
-
-/// All token names in emission order. MpThemeState iterates this list
-/// when copying a full palette over the active namespace on the heap.
-pub const TOKEN_NAMES: &[&str] = &[
-    "BG",
-    "SURFACE",
-    "SURFACE_RAISED",
-    "SURFACE_CARD",
-    "SURFACE_DIALOG",
-    "SURFACE_OVERLAY",
-    "ELEMENT_HOVER",
-    "ELEMENT_ACTIVE",
-    "BORDER",
-    "BORDER_STRONG",
-    "DIVIDER",
-    "TEXT",
-    "TEXT_MUTED",
-    "TEXT_FAINT",
-    "SOLID",
-    "SOLID_HOVER",
-    "ON_SOLID",
-    "ACCENT",
-    "ACCENT_HOVER",
-    "ACCENT_MUTED",
-    "ON_ACCENT",
-    "SECONDARY",
-    "SECONDARY_HOVER",
-    "ON_SECONDARY",
-    "DANGER",
-    "DANGER_HOVER",
-    "DANGER_MUTED",
-    "WARNING",
-    "WARNING_MUTED",
-    "SUCCESS",
-    "SUCCESS_MUTED",
-    "INFO",
-    "INFO_MUTED",
-    "BUSY",
-    "INPUT_BG",
-    "SELECTION",
-    "CARET",
-    "CODE_TEXT",
-    "CODE_WASH",
-];
-
+// Register the theme namespaces on the script heap.
+//
+// The modules are created here — before any widget registers — so a widget's
+// `script_mod!` block can name them while the crate is loading, and every one
+// starts at the shipped dark palette. `Theme::install` rewrites them when the
+// app says which theme it wants.
+//
+// `mod.mpc.*` is the v3 vocabulary. `mod.mpc_theme` is the v2 one, kept alive
+// for the widgets that have not been replaced yet; see [`legacy`].
 script_mod! {
     use mod.prelude.widgets_internal.*
 
-    // Create the namespace first; nested field assignment requires it.
-    mod.mpc_theme = {}
-
-    mod.mpc_theme.dark = {
-        BG: #(crate::palette::dark().bg)
-        SURFACE: #(crate::palette::dark().surface)
-        SURFACE_RAISED: #(crate::palette::dark().surface_raised)
-        SURFACE_CARD: #(crate::palette::dark().surface_card)
-        SURFACE_DIALOG: #(crate::palette::dark().surface_dialog)
-        SURFACE_OVERLAY: #(crate::palette::dark().surface_overlay)
-        ELEMENT_HOVER: #(crate::palette::dark().element_hover)
-        ELEMENT_ACTIVE: #(crate::palette::dark().element_active)
-        BORDER: #(crate::palette::dark().border)
-        BORDER_STRONG: #(crate::palette::dark().border_strong)
-        DIVIDER: #(crate::palette::dark().divider)
-        TEXT: #(crate::palette::dark().text)
-        TEXT_MUTED: #(crate::palette::dark().text_muted)
-        TEXT_FAINT: #(crate::palette::dark().text_faint)
-        SOLID: #(crate::palette::dark().solid)
-        SOLID_HOVER: #(crate::palette::dark().solid_hover)
-        ON_SOLID: #(crate::palette::dark().on_solid)
-        ACCENT: #(crate::palette::dark().accent)
-        ACCENT_HOVER: #(crate::palette::dark().accent_hover)
-        ON_ACCENT: #(crate::palette::dark().on_accent)
-        ACCENT_MUTED: #(crate::palette::dark().accent_muted)
-        SECONDARY: #(crate::palette::dark().secondary)
-        SECONDARY_HOVER: #(crate::palette::dark().secondary_hover)
-        ON_SECONDARY: #(crate::palette::dark().on_secondary)
-        DANGER: #(crate::palette::dark().danger)
-        DANGER_HOVER: #(crate::palette::dark().danger_hover)
-        DANGER_MUTED: #(crate::palette::dark().danger_muted)
-        WARNING: #(crate::palette::dark().warning)
-        WARNING_MUTED: #(crate::palette::dark().warning_muted)
-        SUCCESS: #(crate::palette::dark().success)
-        SUCCESS_MUTED: #(crate::palette::dark().success_muted)
-        INFO: #(crate::palette::dark().info)
-        INFO_MUTED: #(crate::palette::dark().info_muted)
-        BUSY: #(crate::palette::dark().busy)
-        INPUT_BG: #(crate::palette::dark().input_bg)
-        SELECTION: #(crate::palette::dark().selection)
-        CARET: #(crate::palette::dark().caret)
-        CODE_TEXT: #(crate::palette::dark().code_text)
-        CODE_WASH: #(crate::palette::dark().code_wash)
-        TRANSPARENT: #(
-            Vec4f{x: 0.0, y: 0.0, z: 0.0, w: 0.0}
-        )
-    }
-
-    mod.mpc_theme.light = {
-        BG: #(crate::palette::light().bg)
-        SURFACE: #(crate::palette::light().surface)
-        SURFACE_RAISED: #(crate::palette::light().surface_raised)
-        SURFACE_CARD: #(crate::palette::light().surface_card)
-        SURFACE_DIALOG: #(crate::palette::light().surface_dialog)
-        SURFACE_OVERLAY: #(crate::palette::light().surface_overlay)
-        ELEMENT_HOVER: #(crate::palette::light().element_hover)
-        ELEMENT_ACTIVE: #(crate::palette::light().element_active)
-        BORDER: #(crate::palette::light().border)
-        BORDER_STRONG: #(crate::palette::light().border_strong)
-        DIVIDER: #(crate::palette::light().divider)
-        TEXT: #(crate::palette::light().text)
-        TEXT_MUTED: #(crate::palette::light().text_muted)
-        TEXT_FAINT: #(crate::palette::light().text_faint)
-        SOLID: #(crate::palette::light().solid)
-        SOLID_HOVER: #(crate::palette::light().solid_hover)
-        ON_SOLID: #(crate::palette::light().on_solid)
-        ACCENT: #(crate::palette::light().accent)
-        ACCENT_HOVER: #(crate::palette::light().accent_hover)
-        ON_ACCENT: #(crate::palette::light().on_accent)
-        ACCENT_MUTED: #(crate::palette::light().accent_muted)
-        SECONDARY: #(crate::palette::light().secondary)
-        SECONDARY_HOVER: #(crate::palette::light().secondary_hover)
-        ON_SECONDARY: #(crate::palette::light().on_secondary)
-        DANGER: #(crate::palette::light().danger)
-        DANGER_HOVER: #(crate::palette::light().danger_hover)
-        DANGER_MUTED: #(crate::palette::light().danger_muted)
-        WARNING: #(crate::palette::light().warning)
-        WARNING_MUTED: #(crate::palette::light().warning_muted)
-        SUCCESS: #(crate::palette::light().success)
-        SUCCESS_MUTED: #(crate::palette::light().success_muted)
-        INFO: #(crate::palette::light().info)
-        INFO_MUTED: #(crate::palette::light().info_muted)
-        BUSY: #(crate::palette::light().busy)
-        INPUT_BG: #(crate::palette::light().input_bg)
-        SELECTION: #(crate::palette::light().selection)
-        CARET: #(crate::palette::light().caret)
-        CODE_TEXT: #(crate::palette::light().code_text)
-        CODE_WASH: #(crate::palette::light().code_wash)
-        TRANSPARENT: #(
-            Vec4f{x: 0.0, y: 0.0, z: 0.0, w: 0.0}
-        )
-    }
-
-    // Active copy — defaults to dark.
-    mod.mpc_theme = {
-        BG: #(crate::palette::dark().bg)
-        SURFACE: #(crate::palette::dark().surface)
-        SURFACE_RAISED: #(crate::palette::dark().surface_raised)
-        SURFACE_CARD: #(crate::palette::dark().surface_card)
-        SURFACE_DIALOG: #(crate::palette::dark().surface_dialog)
-        SURFACE_OVERLAY: #(crate::palette::dark().surface_overlay)
-        ELEMENT_HOVER: #(crate::palette::dark().element_hover)
-        ELEMENT_ACTIVE: #(crate::palette::dark().element_active)
-        BORDER: #(crate::palette::dark().border)
-        BORDER_STRONG: #(crate::palette::dark().border_strong)
-        DIVIDER: #(crate::palette::dark().divider)
-        TEXT: #(crate::palette::dark().text)
-        TEXT_MUTED: #(crate::palette::dark().text_muted)
-        TEXT_FAINT: #(crate::palette::dark().text_faint)
-        SOLID: #(crate::palette::dark().solid)
-        SOLID_HOVER: #(crate::palette::dark().solid_hover)
-        ON_SOLID: #(crate::palette::dark().on_solid)
-        ACCENT: #(crate::palette::dark().accent)
-        ACCENT_HOVER: #(crate::palette::dark().accent_hover)
-        ON_ACCENT: #(crate::palette::dark().on_accent)
-        ACCENT_MUTED: #(crate::palette::dark().accent_muted)
-        SECONDARY: #(crate::palette::dark().secondary)
-        SECONDARY_HOVER: #(crate::palette::dark().secondary_hover)
-        ON_SECONDARY: #(crate::palette::dark().on_secondary)
-        DANGER: #(crate::palette::dark().danger)
-        DANGER_HOVER: #(crate::palette::dark().danger_hover)
-        DANGER_MUTED: #(crate::palette::dark().danger_muted)
-        WARNING: #(crate::palette::dark().warning)
-        WARNING_MUTED: #(crate::palette::dark().warning_muted)
-        SUCCESS: #(crate::palette::dark().success)
-        SUCCESS_MUTED: #(crate::palette::dark().success_muted)
-        INFO: #(crate::palette::dark().info)
-        INFO_MUTED: #(crate::palette::dark().info_muted)
-        BUSY: #(crate::palette::dark().busy)
-        INPUT_BG: #(crate::palette::dark().input_bg)
-        SELECTION: #(crate::palette::dark().selection)
-        CARET: #(crate::palette::dark().caret)
-        CODE_TEXT: #(crate::palette::dark().code_text)
-        CODE_WASH: #(crate::palette::dark().code_wash)
-        TRANSPARENT: #(
-            Vec4f{x: 0.0, y: 0.0, z: 0.0, w: 0.0}
-        )
-    }
+    mod.mpc = {}
+    mod.mpc.tokens = #(crate::install::paint_namespace(vm, &crate::palette::dark()))
+    mod.mpc.type = #(crate::install::type_namespace(vm))
+    mod.mpc.ControlSize = set_type_default() do #(crate::layout::ControlSize::script_api(vm))
+    // The syntax kind vocabulary, so a highlighter built on this theme names its kinds the same way
+    // every other vocabulary here is named. Registered even though no widget reads it yet: the
+    // crate's convention is that a public vocabulary reaches the script heap, and a vocabulary that
+    // exists in Rust only is one the next layer would re-declare.
+    mod.mpc.HighlightKind = set_type_default() do #(crate::syntax::HighlightKind::script_api(vm))
+    mod.mpc.text = mod.mpc.type
+    mod.mpc.layout = #(crate::install::layout_namespace(vm, &crate::layout::Layout::default()))
+    mod.mpc.material = #(crate::install::material_namespace(vm, &crate::theme::Theme::dark()))
+    mod.mpc_theme = #(crate::legacy::namespace(vm, &crate::palette::dark(), crate::Appearance::Dark))
 }
 
-use crate::palette::Tokens;
+/// Install the shipped dark theme, branded neutral.
+///
+/// A convenience for an app that wants the default look without naming it. The
+/// presentation layer calls this from the widget that owns the switch, because
+/// install needs a `&mut Cx` and the widget that draws first has one.
+pub fn install_default(cx: &mut Cx) {
+    Theme::install(Theme::dark(), cx);
+}
 
-impl Tokens {
-    /// Read a token by name; used by MpThemeState for heap-copy switching.
-    pub fn get_by_name(&self, name: &str) -> Option<Vec4f> {
-        let v: Vec4f = match name {
-            "BG" => self.bg,
-            "SURFACE" => self.surface,
-            "SURFACE_RAISED" => self.surface_raised,
-            "SURFACE_CARD" => self.surface_card,
-            "SURFACE_DIALOG" => self.surface_dialog,
-            "SURFACE_OVERLAY" => self.surface_overlay,
-            "ELEMENT_HOVER" => self.element_hover,
-            "ELEMENT_ACTIVE" => self.element_active,
-            "BORDER" => self.border,
-            "BORDER_STRONG" => self.border_strong,
-            "DIVIDER" => self.divider,
-            "TEXT" => self.text,
-            "TEXT_MUTED" => self.text_muted,
-            "TEXT_FAINT" => self.text_faint,
-            "SOLID" => self.solid,
-            "SOLID_HOVER" => self.solid_hover,
-            "ON_SOLID" => self.on_solid,
-            "ACCENT" => self.accent,
-            "ACCENT_HOVER" => self.accent_hover,
-            "ACCENT_MUTED" => self.accent_muted,
-            "ON_ACCENT" => self.on_accent,
-            "SECONDARY" => self.secondary,
-            "SECONDARY_HOVER" => self.secondary_hover,
-            "ON_SECONDARY" => self.on_secondary,
-            "DANGER" => self.danger,
-            "DANGER_HOVER" => self.danger_hover,
-            "DANGER_MUTED" => self.danger_muted,
-            "WARNING" => self.warning,
-            "WARNING_MUTED" => self.warning_muted,
-            "SUCCESS" => self.success,
-            "SUCCESS_MUTED" => self.success_muted,
-            "INFO" => self.info,
-            "INFO_MUTED" => self.info_muted,
-            "BUSY" => self.busy,
-            "INPUT_BG" => self.input_bg,
-            "SELECTION" => self.selection,
-            "CARET" => self.caret,
-            "CODE_TEXT" => self.code_text,
-            "CODE_WASH" => self.code_wash,
-            _ => return None,
-        };
-        Some(v)
+#[cfg(test)]
+mod tests {
+    use crate::{color, Appearance, Theme};
+
+    #[test]
+    fn test_the_crate_root_re_exports_the_prelude_surface() {
+        // Guards against a re-export being dropped from `lib.rs` while the
+        // module still compiles — the prelude is the public contract.
+        let theme = Theme::for_appearance(Appearance::Light);
+        assert_eq!(theme.appearance, Appearance::Light);
+        let _: crate::Paint = theme.paint;
+        let _: crate::ControlSize = crate::ControlSize::Regular;
+        let _: crate::Material = crate::Material::Regular;
+    }
+
+    #[test]
+    fn test_default_theme_is_legible_end_to_end() {
+        // The one assertion worth making at the top level: whatever a caller
+        // gets without asking, body text on the page is readable.
+        let theme = Theme::dark();
+        let ratio = color::contrast_ratio(theme.paint.text, theme.paint.bg);
+        assert!(ratio >= 4.5, "{ratio}");
     }
 }

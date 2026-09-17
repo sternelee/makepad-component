@@ -649,6 +649,7 @@ dependencies = [
  "libc",
  "makepad-cef",
  "makepad-script",
+ "makepad-theme",
  "makepad-widgets",
  "rmux-ipc",
  "rmux-pty",
@@ -1466,6 +1467,23 @@ name = "fxhash"
 version = "0.2.1"
 dependencies = [
  "byteorder 1.5.0",
+]
+
+[[package]]
+name = "gallery"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "makepad-blocks",
+ "makepad-canvas",
+ "makepad-component",
+ "makepad-editor",
+ "makepad-markdown",
+ "makepad-motion",
+ "makepad-plot",
+ "makepad-syntax",
+ "makepad-theme",
+ "makepad-widgets",
 ]
 
 [[package]]
@@ -2411,8 +2429,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "makepad-blocks"
+version = "0.1.0"
+dependencies = [
+ "makepad-plot",
+]
+
+[[package]]
 name = "makepad-byteorder-lite"
 version = "0.1.0"
+
+[[package]]
+name = "makepad-canvas"
+version = "0.1.0"
+dependencies = [
+ "makepad-theme",
+ "makepad-widgets",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "makepad-cef"
@@ -2450,6 +2485,9 @@ name = "makepad-component"
 version = "0.1.0"
 dependencies = [
  "log",
+ "makepad-canvas",
+ "makepad-editor",
+ "makepad-markdown",
  "makepad-motion",
  "makepad-plot",
  "makepad-theme",
@@ -2497,6 +2535,13 @@ dependencies = [
  "unicode-bidi 0.3.18",
  "unicode-linebreak",
  "unicode-segmentation 1.12.0",
+]
+
+[[package]]
+name = "makepad-editor"
+version = "0.1.0"
+dependencies = [
+ "makepad-markdown",
 ]
 
 [[package]]
@@ -2591,6 +2636,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "makepad-markdown"
+version = "0.1.0"
+
+[[package]]
 name = "makepad-math"
 version = "1.0.0"
 dependencies = [
@@ -2619,6 +2668,9 @@ dependencies = [
 [[package]]
 name = "makepad-motion"
 version = "0.1.0"
+dependencies = [
+ "makepad-widgets",
+]
 
 [[package]]
 name = "makepad-network"
@@ -2754,6 +2806,13 @@ version = "1.0.0"
 dependencies = [
  "makepad-html",
  "makepad-live-id",
+]
+
+[[package]]
+name = "makepad-syntax"
+version = "0.1.0"
+dependencies = [
+ "makepad-theme",
 ]
 
 [[package]]

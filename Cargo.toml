@@ -2,8 +2,14 @@
 members = [
   "crates/theme",
   "crates/motion",
+  "crates/blocks",
+  "crates/canvas",
+  "crates/editor",
+  "crates/markdown",
+  "crates/syntax",
   "crates/ui",
   "crates/component-zoo",
+  "crates/gallery",
   "crates/a2ui-demo",
   "crates/makepad-plot",
   "crates/raycast-launcher",
@@ -31,6 +37,7 @@ makepad-script = { path = "/Users/sternelee/www/github/makepad/platform/script" 
 makepad-component = { path = "crates/ui" }
 makepad-theme = { path = "crates/theme" }
 makepad-motion = { path = "crates/motion" }
+makepad-syntax = { path = "crates/syntax" }
 makepad-plot = { path = "crates/makepad-plot" }
 
 # Optimize audio decoder even in debug builds (symphonia does heavy float math)

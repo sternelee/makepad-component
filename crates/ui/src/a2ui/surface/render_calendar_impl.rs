@@ -1,7 +1,10 @@
 // Calendar rendering bridge: converts A2UI CalendarComponent + DataModel
 // into MpCalendar config/cells and delegates drawing to the standalone widget.
 
-use crate::widgets::calendar::{CalendarCellData, CalendarConfig};
+// **The v3 types**, which is the whole of this migration: the two structs have the same shape and the same names, so the
+// bridge's body is unchanged and only where it gets them from moved. A pool whose config type came from `crate::widgets`
+// would build a v2 widget's input and hand it to a v3 widget, which does not compile — and that is the check that caught it.
+use crate::mp::calendar::{CalendarCellData, CalendarConfig};
 
 impl A2uiSurface {
     /// Render a calendar component by delegating to MpCalendar widget
@@ -81,9 +84,20 @@ impl A2uiSurface {
         // Ensure calendar widget exists
         let cal = self.ensure_calendar(cx);
 
-        // Set data
-        cal.set_config(config);
-        cal.set_all_cells(cells);
+        // Set data. **The two calls take a `&mut Cx` now**, as every v3 pool has needed — the v2 widget mutated its own state
+        // without a context, and the v3 one redraws, which needs one.
+        cal.set_config(cx.cx, config);
+        cal.set_all_cells(cx.cx, cells);
+        if std::env::var("MP_A2UI_DEBUG").is_ok() {
+            let shape = cal.shape();
+            println!(
+                "A2UI v3_calendar columns={} rows={} height={} cells={} from=mp::calendar::MpCalendar",
+                shape.columns,
+                shape.rows,
+                cal.height(),
+                cal.config().row_labels.len(),
+            );
+        }
 
         // Draw
         let _ = cal.draw_walk(cx, scope, Walk::fit());

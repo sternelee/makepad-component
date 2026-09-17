@@ -16,23 +16,40 @@ use crate::a2ui::{
         A2uiMessageProcessor, ProcessorEvent,
     },
 };
-use crate::widgets::{
-    avatar_group::MpAvatarGroup,
-    button::MpButton,
-    calendar::MpCalendar,
-    checkbox::{MpCheckbox, MpCheckboxAction},
-    color_picker::{MpColorPicker, MpColorPickerAction},
-    description_list::{MpDescriptionItem, MpDescriptionList},
-    icon::MpIcon,
-    label::MpLabel,
-    number_input::{MpNumberInput, MpNumberInputAction},
-    searchable_list::MpSearchableList,
-    slider::{MpSlider, MpSliderAction},
-    step_indicator::MpStepIndicator,
-    tag::MpTag,
-};
+/// **Every pool builds a `mp` widget, and `crate::widgets` is no longer imported anywhere in this file.** The calendar was
+/// the last one, and its absence was why the v2 half could not be deleted; the pool it needed is `mp/calendar.rs`, whose
+/// model is a **configurable banded grid** rather than a month view — see that module's doc on why the protocol's name for it
+/// is misleading.
+use crate::mp::calendar::{MpCalendar, MpCalendarAction};
+
+use crate::mp::avatar_group::MpAvatarGroup;
 
 use super::draw_types::*;
+
+/// **The v3 button, from the component library — not the deprecated v2 one.**
+///
+/// The A2UI renderer builds widgets from Rust into a pool, so what it pools is what the library ships. This is the
+/// first pool moved to `mp`, and it is deliberately the smallest one (one call site) so the procedure is proven before
+/// the other thirteen follow it. Two things changed and nothing else:
+///
+/// 1. The import, from `crate::widgets::button::MpButton` to `crate::mp::button::MpButton`.
+/// 2. `set_text` takes a `&mut Cx` in v3 rather than only the text, so its call site passes `cx.cx`.
+///
+/// Everything else is identical on purpose: `script_new_with_default` still yields the type's defaults **including the
+/// DSL ones** (`mod.mp.MpButton = set_type_default() do mod.mp.MpButtonBase{...}` is what `set_type_default` means), and
+/// `draw_walk` has the same signature, so the pool function and the draw call are unchanged.
+use crate::mp::button::MpButton;
+use crate::mp::checkbox::{MpCheckbox, MpCheckboxAction};
+use crate::mp::description_list::{DescriptionItem, MpDescriptionList};
+use crate::mp::color_picker::{MpColorPicker, MpColorPickerAction};
+use crate::mp::icon::MpIcon;
+use crate::mp::searchable_list::{MpSearchableList, MpSearchableListAction};
+use crate::mp::number_input::{self, MpNumberInput, MpNumberInputAction};
+use crate::mp::step_indicator::{self, MpStepIndicator};
+use crate::mp::icons;
+use crate::mp::markdown::MpMarkdown;
+use crate::mp::slider::{MpSlider, MpSliderAction};
+use crate::mp::status::MpTag;
 
 script_mod! {
     use mod.prelude.widgets_internal.*
@@ -427,9 +444,9 @@ pub struct A2uiSurface {
     #[rust]
     mp_sliders: Vec<MpSlider>,
 
-    /// Pool of MpLabel instances
+    /// Pool of label draws — **a `DrawText` rather than a widget, because that is what a label is in v3.**
     #[rust]
-    mp_labels: Vec<MpLabel>,
+    mp_labels: Vec<DrawText>,
 
     /// Pool of MpIcon instances
     #[rust]
@@ -437,7 +454,7 @@ pub struct A2uiSurface {
 
     /// Pool of Markdown instances (rendered from the MpMarkdown template)
     #[rust]
-    mp_markdowns: Vec<Markdown>,
+    mp_markdowns: Vec<MpMarkdown>,
 
     /// Pool of TextInput instances
     #[rust]
@@ -759,6 +776,21 @@ impl A2uiSurface {
         })
     }
 
+    /// The same by-id route as `new_from_mod`, but for a widget the component library registers — **`mod.mp`, not
+    /// `mod.widgets`.**
+    ///
+    /// The two modules are the two widget sets, and the name of the module is the whole difference: v3 widgets live
+    /// under `mod.mp` because that is where `script_mod!` puts them. This was proved before any pool was moved — a
+    /// `mod.mp.MpButton` prototype came back with its own DSL defaults — and it is what lets a widget with **no Rust
+    /// constructor of its own** be pooled at all, like `MpAvatarGroup`, which the DSL composes as a `View`.
+    fn new_from_mp<T: ScriptNew>(cx: &mut Cx, id: LiveId) -> T {
+        cx.with_vm(|vm| {
+            let mp = vm.module(id!(mp));
+            let value = vm.bx.heap.value(mp, id.into(), NoTrap);
+            T::script_from_value(vm, value)
+        })
+    }
+
     /// Get or lazily create the MpCalendar instance
     fn ensure_calendar(&mut self, cx: &mut Cx) -> &mut MpCalendar {
         if self.mp_calendar.is_none() {
@@ -779,9 +811,13 @@ impl A2uiSurface {
     /// Get or grow a checkbox from the pool
     fn pool_checkbox(&mut self, cx: &mut Cx, idx: usize) -> &mut MpCheckbox {
         while self.mp_checkboxes.len() <= idx {
-            let mut new_cb = cx.with_vm(MpCheckbox::script_new_with_default);
-            // Override label color for dark bg
-            script_apply_eval!(cx, new_cb, { draw_label +: { color: #E0E0E0 } });
+            // **No colour override, and that is the port paying off.** The v2 checkbox needed one — it hardcoded its
+            // label colour, so the surface reached in and set it for a dark background. The v3 widget reads its colour
+            // from `Theme::of(cx)` on every paint, so the override is not just unnecessary, it is the thing this port
+            // exists to delete: a colour chosen somewhere other than the theme. (It also named the field wrong —
+            // `draw_label` in v2, `draw_text` in v3 — which is what `[E]=0` caught: four script errors, two per
+            // checkbox drawn.)
+            let new_cb = cx.with_vm(MpCheckbox::script_new_with_default);
             self.mp_checkboxes.push(new_cb);
         }
         &mut self.mp_checkboxes[idx]
@@ -798,19 +834,30 @@ impl A2uiSurface {
     }
 
     /// Get or grow a label from the pool
-    fn pool_label(&mut self, cx: &mut Cx, idx: usize) -> &mut MpLabel {
+    /// A pooled label: **a `DrawText`, not a widget.**
+    ///
+    /// The v2 label was a widget because it owned a shader and resolved its own colours. In v3 a label is a **themed
+    /// text style over a string**, and the surface was already treating it that way — the call sites write
+    /// `font_size` straight onto its `draw_text`. So the honest port is to let the pool hold the `DrawText` the surface
+    /// already reaches into, and to drop the wrapper rather than migrate it. The size stays the caller's, because there
+    /// it comes from the **protocol** (an A2UI `Text` carries a `font_size`) rather than from a style decision — which
+    /// is the one case where a literal number here is right.
+    ///
+    /// The colour comes from the theme, so the v2 code's hardcoded `#E0E0E0` is gone: a second example of the same
+    /// thing the checkbox had, and the reason this port exists.
+    fn pool_label(&mut self, cx: &mut Cx, idx: usize) -> &mut DrawText {
         while self.mp_labels.len() <= idx {
-            let mut new_lb = cx.with_vm(MpLabel::script_new_with_default);
-            script_apply_eval!(cx, new_lb, { draw_text +: { color: #E0E0E0 } });
-            self.mp_labels.push(new_lb);
+            let mut draw = cx.with_vm(DrawText::script_new_with_default);
+            draw.color = makepad_theme::Theme::of(cx).paint.text;
+            self.mp_labels.push(draw);
         }
         &mut self.mp_labels[idx]
     }
 
     /// Get or grow a markdown renderer from the pool (MpMarkdown template)
-    fn pool_markdown(&mut self, cx: &mut Cx, idx: usize) -> &mut Markdown {
+    fn pool_markdown(&mut self, cx: &mut Cx, idx: usize) -> &mut MpMarkdown {
         while self.mp_markdowns.len() <= idx {
-            let new_md = Self::new_from_mod::<Markdown>(cx, id!(MpMarkdown));
+            let new_md = Self::new_from_mp::<MpMarkdown>(cx, id!(MpMarkdown));
             self.mp_markdowns.push(new_md);
         }
         &mut self.mp_markdowns[idx]

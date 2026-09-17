@@ -543,3 +543,521 @@ pub(crate) fn get_sample_music_player() -> String {
         }
     ]"##.to_string()
 }
+
+/// A fixture whose only job is to reach the **icon** path, named `A2UI_SAMPLE=icons`.
+///
+/// **Because nothing else did.** The catalog sample's three `addToCart` strings are the *button action's* name rather
+/// than an Icon component, so the moment the icon pool moved to `mp` it had no sample that would reach it — and a
+/// migration that nothing exercises is not verified, however green the build. That is the same lesson `[E]=0` taught
+/// earlier in this port: a log without errors is what a renderer that did nothing also produces.
+///
+/// It carries **both** answers on purpose. Four names resolve, and `not-a-real-icon` does not, so one run proves the
+/// glyph is drawn and that an unknown name draws **nothing** rather than a guessed box.
+pub(crate) fn get_sample_icons() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "row", "unknown-row"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Icons"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {
+                        "id": "row",
+                        "component": {
+                            "Row": {
+                                "children": {
+                                    "explicitList": ["i-settings", "i-check", "i-close", "i-cart"]
+                                }
+                            }
+                        }
+                    },
+                    {"id": "i-settings", "component": {"Icon": {"name": {"literalString": "settings"}}}},
+                    {"id": "i-check", "component": {"Icon": {"name": {"literalString": "check"}}}},
+                    {"id": "i-close", "component": {"Icon": {"name": {"literalString": "close"}}}},
+                    {"id": "i-cart", "component": {"Icon": {"name": {"literalString": "addToCart"}}}},
+                    {
+                        "id": "unknown-row",
+                        "component": {
+                            "Row": {
+                                "children": {
+                                    "explicitList": ["i-unknown"]
+                                }
+                            }
+                        }
+                    },
+                    {"id": "i-unknown", "component": {"Icon": {"name": {"literalString": "not-a-real-icon"}}}}
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}
+
+/// A fixture whose only job is to reach the **description list**, named `A2UI_SAMPLE=detail`.
+///
+/// The same reason `get_sample_icons` exists: no shipped sample contains a `DescriptionList`, so the moment its pool
+/// moved to `mp` nothing exercised it. Four items, which is inside the widget's eight slots and more than one — so the
+/// run proves the fill **and** the rule that the last visible row has no hairline under it.
+pub(crate) fn get_sample_detail() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "details"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Details"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {
+                        "id": "details",
+                        "component": {
+                            "DescriptionList": {
+                                "items": [
+                                    {"term": {"literalString": "Operating system"}, "description": {"literalString": "macOS 26"}},
+                                    {"term": {"literalString": "Renderer"}, "description": {"literalString": "Metal"}},
+                                    {"term": {"literalString": "Toolkit"}, "description": {"literalString": "Makepad"}},
+                                    {"term": {"literalString": "License"}, "description": {"literalString": "MIT OR Apache-2.0"}}
+                                ]
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}
+
+/// A fixture whose only job is to reach the **step indicator**, named `A2UI_SAMPLE=steps`.
+///
+/// The third of these, and the reason is now a pattern: no shipped sample contains a `StepIndicator`, so the pool
+/// migration had nothing that would exercise it, and **a migration nothing exercises is not verified however green the
+/// build**. Five steps with the third current — so the run shows passed, current and upcoming in one path, and the
+/// connector rule (the line into the current step is filled) with them.
+pub(crate) fn get_sample_steps() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "steps"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Checkout"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {
+                        "id": "steps",
+                        "component": {
+                            "StepIndicator": {
+                                "steps": [
+                                    {"literalString": "Cart"},
+                                    {"literalString": "Address"},
+                                    {"literalString": "Payment"},
+                                    {"literalString": "Review"},
+                                    {"literalString": "Done"}
+                                ],
+                                "current": 3
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}
+
+/// A fixture whose only job is to reach the **number input**, named `A2UI_SAMPLE=number`.
+///
+/// The fourth of these, and the pattern is settled: no shipped sample contains a `NumberInput`, so the pool migration
+/// had nothing that would exercise it. Four fields, and the reasons they are these four:
+///
+/// - one plain, so the ordinary case is on screen;
+/// - one with a **fractional step and two decimals**, because that is where formatting and snapping have to agree;
+/// - one with a **value outside its bounds**, because `set_bounds` orders and clamps rather than trusting the protocol —
+///   the v2 widget would have panicked here if the bounds had arrived the wrong way round;
+/// - one with **bounds the wrong way round**, which is the case the v2 `clamp_number` took the process down for.
+pub(crate) fn get_sample_number() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "plain", "fractional", "out-of-range", "backwards"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Quantities"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {"id": "plain", "component": {"NumberInput": {"value": {"literalNumber": 5}, "min": 0, "max": 100, "step": 1}}},
+                    {"id": "fractional", "component": {"NumberInput": {"value": {"literalNumber": 2.5}, "min": 0, "max": 10, "step": 0.5, "decimals": 2}}},
+                    {"id": "out-of-range", "component": {"NumberInput": {"value": {"literalNumber": 999}, "min": 0, "max": 10, "step": 1}}},
+                    {"id": "backwards", "component": {"NumberInput": {"value": {"literalNumber": 5}, "min": 100, "max": 0, "step": 1}}}
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}
+
+/// A fixture whose only job is to reach the **searchable list**, named `A2UI_SAMPLE=search`.
+///
+/// The fifth of these. It carries **more items than the ten slots** on purpose, so the run's output shows the count and
+/// the shown rows differing — which is the case the ported widget's `more` line exists for, and the case a fixture with
+/// three items would hide.
+pub(crate) fn get_sample_search() -> String {
+    let items: Vec<String> = (1..=15)
+        .map(|index| format!("{{\"literalString\": \"Component {index}\"}}"))
+        .collect();
+    format!(
+        r##"[
+        {{
+            "beginRendering": {{
+                "surfaceId": "main",
+                "root": "root-column"
+            }}
+        }},
+        {{
+            "surfaceUpdate": {{
+                "surfaceId": "main",
+                "components": [
+                    {{
+                        "id": "root-column",
+                        "component": {{
+                            "Column": {{
+                                "children": {{
+                                    "explicitList": ["title", "searchable"]
+                                }}
+                            }}
+                        }}
+                    }},
+                    {{
+                        "id": "title",
+                        "component": {{
+                            "Text": {{
+                                "text": {{"literalString": "Components"}},
+                                "usageHint": "h1"
+                            }}
+                        }}
+                    }},
+                    {{
+                        "id": "searchable",
+                        "component": {{
+                            "SearchableList": {{
+                                "items": [{}],
+                                "placeholder": {{"literalString": "Filter components"}}
+                            }}
+                        }}
+                    }}
+                ]
+            }}
+        }}
+    ]"##,
+        items.join(", ")
+    )
+}
+
+/// A fixture whose only job is to reach the **colour picker**, named `A2UI_SAMPLE=colors`.
+///
+/// The sixth, and the last of these — with it, every pool the A2UI renderer owns has a sample that reaches it, which is
+/// what makes the next migration verifiable rather than hopeful. Nine swatches in rows of four, so the last row is
+/// **partial**: two full rows and one holding a single swatch, which is the case where an off-by-one in the grid's rows
+/// would show as a missing swatch or an empty row.
+pub(crate) fn get_sample_colors() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "picker"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Accent"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {
+                        "id": "picker",
+                        "component": {
+                            "ColorPicker": {
+                                "colors": [
+                                    "#E5484D",
+                                    "#F76B15",
+                                    "#FFB224",
+                                    "#46A758",
+                                    "#12A594",
+                                    "#0090FF",
+                                    "#3E63DD",
+                                    "#8E4EC6",
+                                    "#E93D82"
+                                ],
+                                "value": {"literalString": "#12A594"}
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}
+
+/// A fixture for the **avatar group**, named `A2UI_SAMPLE=avatars`.
+///
+/// Nine members with `maxVisible` of four, which is the case the component's whole design turns on: **four faces and
+/// then `+5`** — five circles, not four. The tail being in addition to the shown faces rather than replacing one is only
+/// visible exactly here, so a fixture that showed nine with no limit would exercise none of it.
+pub(crate) fn get_sample_avatars() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "group", "everyone"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Reviewers"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {
+                        "id": "group",
+                        "component": {
+                            "AvatarGroup": {
+                                "names": [
+                                    {"literalString": "Ada Lovelace"},
+                                    {"literalString": "Grace Hopper"},
+                                    {"literalString": "Alan Turing"},
+                                    {"literalString": "Barbara Liskov"},
+                                    {"literalString": "Margaret Hamilton"},
+                                    {"literalString": "Katherine Johnson"},
+                                    {"literalString": "Edsger Dijkstra"},
+                                    {"literalString": "Donald Knuth"},
+                                    {"literalString": "Tony Hoare"}
+                                ],
+                                "maxVisible": 4
+                            }
+                        }
+                    },
+                    {
+                        "id": "everyone",
+                        "component": {
+                            "AvatarGroup": {
+                                "names": [
+                                    {"literalString": "Ada Lovelace"},
+                                    {"literalString": "Grace Hopper"},
+                                    {"literalString": "Alan Turing"}
+                                ]
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}
+
+/// A fixture for the **calendar grid** — a timetable, not a month view — named `A2UI_SAMPLE=calendar`.
+///
+/// Three columns and three rows with **three different colour hints**, which is the input this component exists to handle:
+/// a `header` row (55pt, showing the column names), a `budget` row (40pt, the compact one) and an un-hinted row (70pt). A
+/// fixture where every hint were the same would set one row height three times and prove nothing about the rule.
+pub(crate) fn get_sample_calendar() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "grid"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Studio"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {
+                        "id": "grid",
+                        "component": {
+                            "Calendar": {
+                                "title": {"literalString": "This week"},
+                                "footer": {"literalString": "2 sessions booked"},
+                                "columnHeaders": ["Mon", "Tue", "Wed"],
+                                "columnSubtitles": ["12", "13", "14"],
+                                "rowLabels": ["Studio A", "Lunch", "Studio B"],
+                                "rowColorHints": ["header", "budget", ""],
+                                "cells": {"path": "/sessions"}
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "dataModelUpdate": {
+                "surfaceId": "main",
+                "contents": [
+                    {
+                        "key": "sessions",
+                        "valueMap": [
+                            {"key": "0", "valueMap": [
+                                {"key": "0", "valueMap": [{"key": "line1", "valueString": "Yoga"}, {"key": "time", "valueString": "09:00"}]},
+                                {"key": "1", "valueMap": [{"key": "line1", "valueString": "Pilates"}, {"key": "time", "valueString": "09:00"}]},
+                                {"key": "2", "valueMap": [{"key": "line1", "valueString": "Spin"}, {"key": "time", "valueString": "09:00"}]}
+                            ]},
+                            {"key": "1", "valueMap": [
+                                {"key": "0", "valueMap": [{"key": "line1", "valueString": "Closed"}]},
+                                {"key": "1", "valueMap": [{"key": "line1", "valueString": "Closed"}]},
+                                {"key": "2", "valueMap": [{"key": "line1", "valueString": "Closed"}]}
+                            ]},
+                            {"key": "2", "valueMap": [
+                                {"key": "0", "valueMap": [{"key": "line1", "valueString": "Weights"}, {"key": "description", "valueString": "Bring shoes"}]},
+                                {"key": "1", "valueMap": [{"key": "line1", "valueString": "HIIT"}, {"key": "time", "valueString": "18:00"}]},
+                                {"key": "2", "valueMap": [{"key": "line1", "valueString": "Stretch"}]}
+                            ]}
+                        ]
+                    }
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}
+

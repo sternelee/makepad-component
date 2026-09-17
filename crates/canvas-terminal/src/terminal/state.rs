@@ -1,27 +1,42 @@
 use vte::Perform;
 
-/// ANSI color index → RGB. Standard 16-color palette (dark background scheme).
-const ANSI_COLORS: [[f32; 3]; 16] = [
-    [0.08, 0.09, 0.11], // 0 black
-    [0.95, 0.26, 0.21], // 1 red
-    [0.62, 0.78, 0.34], // 2 green
-    [0.95, 0.75, 0.28], // 3 yellow
-    [0.37, 0.57, 0.90], // 4 blue
-    [0.90, 0.39, 0.70], // 5 magenta
-    [0.35, 0.82, 0.85], // 6 cyan
-    [0.91, 0.93, 0.95], // 7 white
-    [0.36, 0.39, 0.43], // 8 bright black
-    [0.98, 0.47, 0.42], // 9 bright red
-    [0.78, 0.90, 0.55], // 10 bright green
-    [0.98, 0.86, 0.50], // 11 bright yellow
-    [0.56, 0.72, 0.98], // 12 bright blue
-    [0.98, 0.62, 0.82], // 13 bright magenta
-    [0.55, 0.90, 0.93], // 14 bright cyan
-    [1.0, 1.0, 1.0],    // 15 bright white
-];
+/// The terminal's colours, from the theme.
+///
+/// **These used to be a `const` array at the top of this file** — a hardcoded palette locked to a dark scheme,
+/// which is the first thing this workspace's theme laws forbid: the terminal could not follow an appearance change
+/// and a brand could not reach it. They now come from `makepad_theme::TerminalPalette`, which has all sixteen,
+/// both appearances, and tests for the two rules an ANSI palette has to obey (see `crates/theme/src/terminal.rs`).
+///
+/// ## One palette per process, and why that is a limitation worth naming
+///
+/// A `Cell` stores its colours **by value**, so a cell painted before an appearance change keeps the old colour
+/// until it is rewritten. Reading the palette through a `OnceLock` therefore gives one appearance for the life of
+/// the process: switching to the light palette needs the grid to be reset, not just the palette to change. That is
+/// a real limitation rather than an oversight, and it is here because a terminal that repaints from history would
+/// be the fix and this file does not keep history.
+fn palette() -> &'static makepad_theme::TerminalPalette {
+    static PALETTE: std::sync::OnceLock<makepad_theme::TerminalPalette> = std::sync::OnceLock::new();
+    PALETTE.get_or_init(makepad_theme::TerminalPalette::dark)
+}
 
-pub const DEFAULT_FG: [f32; 3] = [0.86, 0.89, 0.94];
-pub const DEFAULT_BG: [f32; 3] = [0.10, 0.11, 0.14];
+/// The colour at an ANSI index, or the foreground for an index this palette does not carry.
+///
+/// Index 16 and up are the 256-colour cube, which the theme does not model — it answers `None` rather than
+/// inventing a colour, and a terminal falling back to the default foreground is what a terminal without the cube
+/// does.
+fn ansi(index: usize) -> [f32; 3] {
+    palette().rgb(index).unwrap_or_else(default_fg)
+}
+
+/// The default foreground.
+pub fn default_fg() -> [f32; 3] {
+    palette().foreground_rgb()
+}
+
+/// The default background.
+pub fn default_bg() -> [f32; 3] {
+    palette().background_rgb()
+}
 
 /// A single terminal grid cell.
 #[derive(Clone, Debug)]
@@ -38,8 +53,8 @@ impl Default for Cell {
     fn default() -> Self {
         Self {
             ch: ' ',
-            fg: DEFAULT_FG,
-            bg: DEFAULT_BG,
+            fg: default_fg(),
+            bg: default_bg(),
             bold: false,
             wide_padding: false,
         }
@@ -85,8 +100,8 @@ impl TerminalState {
             cursor_style: 0,
             selection: None,
             scroll_offset: 0,
-            cur_fg: DEFAULT_FG,
-            cur_bg: DEFAULT_BG,
+            cur_fg: default_fg(),
+            cur_bg: default_bg(),
             cur_bold: false,
         };
         st.ensure_rows();
@@ -400,8 +415,8 @@ impl Perform for TerminalState {
             'm' => {
                 let values: Vec<u16> = params.iter().flat_map(|p| p.iter().copied()).collect();
                 if values.is_empty() {
-                    self.cur_fg = DEFAULT_FG;
-                    self.cur_bg = DEFAULT_BG;
+                    self.cur_fg = default_fg();
+                    self.cur_bg = default_bg();
                     self.cur_bold = false;
                 } else {
                     let mut i = 0;
@@ -409,14 +424,14 @@ impl Perform for TerminalState {
                         let v = values[i];
                         match v {
                             0 => {
-                                self.cur_fg = DEFAULT_FG;
-                                self.cur_bg = DEFAULT_BG;
+                                self.cur_fg = default_fg();
+                                self.cur_bg = default_bg();
                                 self.cur_bold = false;
                             }
                             1 => self.cur_bold = true,
                             22 => self.cur_bold = false,
                             30..=37 => {
-                                self.cur_fg = ANSI_COLORS[(v - 30) as usize];
+                                self.cur_fg = ansi((v - 30) as usize);
                             }
                             38 => {
                                 if i + 1 < values.len()
@@ -437,9 +452,9 @@ impl Perform for TerminalState {
                                     i += 4;
                                 }
                             }
-                            39 => self.cur_fg = DEFAULT_FG,
+                            39 => self.cur_fg = default_fg(),
                             40..=47 => {
-                                self.cur_bg = ANSI_COLORS[(v - 40) as usize];
+                                self.cur_bg = ansi((v - 40) as usize);
                             }
                             48 => {
                                 if i + 1 < values.len()
@@ -460,12 +475,12 @@ impl Perform for TerminalState {
                                     i += 4;
                                 }
                             }
-                            49 => self.cur_bg = DEFAULT_BG,
+                            49 => self.cur_bg = default_bg(),
                             90..=97 => {
-                                self.cur_fg = ANSI_COLORS[(v - 90 + 8) as usize];
+                                self.cur_fg = ansi((v - 90 + 8) as usize);
                             }
                             100..=107 => {
-                                self.cur_bg = ANSI_COLORS[(v - 100 + 8) as usize];
+                                self.cur_bg = ansi((v - 100 + 8) as usize);
                             }
                             _ => {}
                         }
@@ -511,7 +526,7 @@ fn unicode_width(c: char) -> u8 {
 /// Map a 256-color index to RGB.
 fn index_color(idx: usize) -> [f32; 3] {
     if idx < 16 {
-        return ANSI_COLORS[idx];
+        return ansi(idx);
     }
     if idx < 232 {
         let n = idx - 16;

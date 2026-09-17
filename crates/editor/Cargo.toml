@@ -1,0 +1,9 @@
+[package]
+name = "makepad-editor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The editing half: undo and redo over a document, and the policy that says what one step is"
+
+[dependencies]
+makepad-markdown = { path = "../markdown" }

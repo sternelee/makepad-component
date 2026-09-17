@@ -87,12 +87,11 @@ impl Widget for A2uiSurface {
                 if let MpSliderAction::Changed(slider_value) = action.cast::<MpSliderAction>() {
                     if let Some((_, binding_path, _, _, _)) = self.slider_meta.get(idx) {
                         if let Some(path) = binding_path {
-                            let value = match slider_value {
-                                crate::widgets::slider::SliderValue::Single(v) => serde_json::json!(v),
-                                crate::widgets::slider::SliderValue::Range(start, end) => {
-                                    serde_json::json!({"start": start, "end": end})
-                                }
-                            };
+                            // **v3's action carries the value directly.** v2 wrapped it in a `SliderValue` enum because
+                            // its slider had a range mode; the v3 slider has one value and one action that names it, so
+                            // the match became a plain value and the range arm — which nothing here emitted — is gone
+                            // rather than kept as dead code that reads like a supported feature.
+                            let value = serde_json::json!(slider_value);
                             cx.widget_action(self.widget_uid(), A2uiSurfaceAction::DataModelChanged {
                                     surface_id: surface_id.clone(),
                                     path: path.clone(),
@@ -128,7 +127,10 @@ impl Widget for A2uiSurface {
         // Check color picker actions (write hex string back to the binding)
         for (idx, cp) in self.mp_color_pickers.iter().enumerate() {
             if let Some(action) = actions.find_widget_action(cp.widget_uid()) {
-                if let MpColorPickerAction::Picked(c) = action.cast::<MpColorPickerAction>() {
+                // **The index is ignored here and carried for a caller that needs it.** A palette may repeat a colour, so `Picked`
+    // carries which swatch as well as what colour — the v2 action carried only the colour, which is ambiguous exactly
+    // when a palette repeats itself. The data model is keyed by the hex value, so this site wants the colour.
+                if let MpColorPickerAction::Picked(c, _index) = action.cast::<MpColorPickerAction>() {
                     if let Some((_, binding_path, _)) = self.color_picker_meta.get(idx) {
                         if let Some(path) = binding_path {
                             let hex = format!(
@@ -174,7 +176,20 @@ impl Widget for A2uiSurface {
             let cal_actions = cx.capture_actions(|cx| {
                 cal.handle_event(cx, event, scope);
             });
-            if let Some((row, col)) = cal.cell_clicked(&cal_actions) {
+            // **From the action, not from a `cell_clicked` accessor.** The v3 widget reports `CellClicked` with the cell's
+            // indices *and its first line* — the line is carried so a caller that wants to know what was clicked does not have
+            // to look the indices back up, and it is deliberately **not** put into the protocol payload: a server reading
+            // `calendarCellClick` expects `row` and `col`, and adding a field would change what every existing surface sees.
+            // **`find_widget_action`, not `iter().find_map`** — the iterator over `Actions` yields a type without `cast`, which
+            // is how the other pools read an action and how this one has to. `cal.widget_uid()` is readable here because the
+            // `capture_actions` closure has already returned.
+            let clicked: Option<(usize, usize)> = cal_actions
+                .find_widget_action(cal.widget_uid())
+                .and_then(|action| match action.cast::<MpCalendarAction>() {
+                    MpCalendarAction::CellClicked { row, column, .. } => Some((row, column)),
+                    MpCalendarAction::None => None,
+                });
+            if let Some((row, col)) = clicked {
                 let user_action = crate::a2ui::message::UserAction {
                     surface_id: surface_id.clone(),
                     action: crate::a2ui::message::UserActionPayload {
