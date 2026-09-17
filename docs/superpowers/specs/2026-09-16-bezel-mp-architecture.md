@@ -2003,3 +2003,48 @@ v3 的 `MpButtonStyle` 有 **4 种**（Default/Prominent/Ghost/Destructive）✗
 **教训**：按**名字**比组件，会把「同一个组件的不同能力」整个漏掉。下一轮如果要补 v3 缺口，要按**变体/能力**
 再量一次，而不是按文件。
 
+# 第三次对等审计：用 bezel 的 **API** 量（终于对了）
+
+前两次都量错了：
+
+| 尺子 | 问题 |
+| --- | --- |
+| bezel 的 **35 个模块名** | bezel 一个模块装多个组件（`buttons.rs`/`content.rs`/`controls.rs` 是分组）→ 量不出组件 |
+| 本仓库的 **76 个 v2 组件** | 那回答的是「我们自己的 v2 还剩什么」，不是「bezel 有什么」→ 两把尺子问的不是同一个问题 |
+
+**对的尺子是 bezel 的 API**：它的 8 个组件 trait
+（`Buttons` / `Content` / `Controls` / `Icons` / `Layout` / `Scaffolding` / `Status` / `Surfaced`）
+和它们的方法 —— 那才是它的组件词汇表：
+
+```
+Buttons      button icon_button control_group ghost
+Content      badge badge_active avatar tag breadcrumb breadcrumb_item breadcrumb_separator empty_state
+Controls     toggle checkbox radio_button progress_bar slider select_trigger toggle_group toggle_group_item
+Icons        icon icon_at
+Layout       disclosure collapsible_header nav_row split_handle tab_bar tab
+Scaffolding  page_column page_header page_subtitle field_label option_card_row option_card group_box
+             card_row row_icon row_title meta_line
+Status       step_row step_output error_strip warning_strip
+```
+
+68 个名字，对 v3 的 DSL 组件名量完（去掉子部件、按概念映射），**19 个没有对应物**，逐个查证后：
+
+| 判定 | 项 |
+| --- | --- |
+| **假阳性**（本来就有） | `divider`（`mod.mp.Divider` 在 `mp/layout.rs`）、`status_dot`（= `MpBadgeDot`）、`select_trigger`（`MpSelectTrigger` 已移植）、`page_column`/`page_header`/`page_subtitle`（`mp/scaffolding.rs`）、`virtual_list`（能力而非组件，另算） |
+| **真缺口** | `tab_bar` + `tab`、`breadcrumb`(+item+separator)、`collapsible_header`/`disclosure`、`option_card`(+row)、`sheet`、`error_strip`/`warning_strip` |
+
+**本轮补掉的**：
+
+| 组件 | 状态 | 运行时证据 |
+| --- | --- | --- |
+| `MpTabBar` | ✅ `mp/tab_bar.rs`（8 测试），gallery 第 52 页 | `TABS pressure count=12 tab_width=120 content=1474 overflows=true scroll_to_last=640` |
+| `MpStrip`（error/warning/info/success） | ✅ `mp/strip.rs`（7 测试），第 53 页 | `STRIP tone=error color=(1.00,0.39,0.40) demands_action=true height_1=40 height_2=58` |
+| `MpBreadcrumb` | ✅ `mp/breadcrumb.rs`（8 测试），第 54 页 | `BREADCRUMB is_current=[false,false,false,true] separators=3 widths=[158,158,158,26] hit_on_chevron=None` |
+
+**仍未做（4 个真缺口）**：`collapsible`/`disclosure`、`option_card`、`sheet`、`virtual_list`（后者是一个**能力**——
+虚拟化列表，不是组件；`mp/list.rs` 与 `mp/table.rs` 现在都是全量绘制）。
+
+**顺带发现的一个机会**：`MpTabBar` 落地后，`crates/dbpro/src/tab_bar.rs` 那 439 行的自研标签栏可以被它替掉，
+以及 canvas-terminal 的标签栏需求（本 session 早期提到过）也可以用它。这两处是「新组件立刻有真实消费者」的证据。
+
