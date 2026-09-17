@@ -61,6 +61,7 @@ pub mod keys;
 pub mod layout;
 pub mod list;
 pub mod markdown;
+pub mod menu;
 pub mod loaders;
 pub mod number_input;
 pub mod pagination;

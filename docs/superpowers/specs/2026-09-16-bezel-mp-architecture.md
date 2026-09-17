@@ -1744,3 +1744,56 @@ window — not screen points and not the window's own points, and it rejects a v
 outside those bounds. Mapping a click needs the look image's size, not the
 window's frame. The error message says so ("outside the latest look image bounds"),
 which is how it was finally caught.
+
+# 与 bezel 的对等审计：方法、结果、还差什么（2026-09-17）
+
+## 之前的「44 个模块 vs bezel 34」是没有意义的数字
+
+那是一个**代理指标**：我自己目录里的文件数，对着一个我凭印象记下的数字。两者都不是「组件」。这一轮把它换成一个能回答问题的检查：
+
+```
+ls crates/ui/src/mp/ | sed 's/\.rs$//' | sort > /tmp/mp.txt
+ls crates/ui/src/widgets/*.rs crates/ui/src/*.rs | sed 's|.*/||;s|\.rs$||' | sort -u > /tmp/bezel_all.txt
+comm -23 /tmp/bezel_all.txt /tmp/mp.txt      # bezel 有、我没有同名模块的
+```
+
+bezel 的 `crates/ui/src/` 是 35 个模块名（`widgets/` 只有 9 个文件，因为 `buttons.rs`/`content.rs`/`controls.rs` 是**分组模块**）。11 个名字在我这里没有同名模块，逐个查证后：
+
+| bezel 模块 | bezel 导出的类型 | 我这边 | 结论 |
+| --- | --- | --- | --- |
+| `buttons` / `content` / `controls` | — | 我是按组件拆的（`button.rs`、`checkbox.rs`…） | **不是缺口**：分组方式不同 |
+| `lib` | — | — | 不是组件 |
+| `stack` | 无（22 行） | `mod.row()`/`mod.column()` 是 gpui 的 `HStack`/`VStack` 助手，makepad 的 `flow: Right/Down` 就是它 | **不是缺口** |
+| `history` | `SnapshotHistory` | `crates/editor/src/history.rs` 的 `SnapshotHistory<T>` | **已覆盖**（当初刻意移进数据 crate） |
+| `control_bar` | `Shape` | `mp/bars.rs` 的 `MpControlBar` | **已覆盖** |
+| `menu` | `Item`（含 `Item::Submenu`）、`Cursor`、`Hit`、`card()` | 无 | **缺口**：带子菜单的下拉菜单卡 |
+| `menubar` | `Menu`、`Menubar`、`MenubarEvent` | 无 | **缺口**：菜单栏本体 |
+| `stats` | `Stats` | 无 | **缺口**：FPS/CPU/GPU/内存计量表 |
+| `titlebar` | `DragState` | 无 | **缺口**：自绘标题栏 + 拖拽 |
+
+**所以答案不是「44 > 34，领先了」，而是「还差 4 个，其中 2 个是真组件」。**
+
+## 这 4 个缺口各自是什么性质，不能一概而论
+
+- **`menu` + `menubar`（合计 1092 行）是真组件**，而且是常用件：一个 `Item::Submenu` 行、一个 `Cursor`（哪些子菜单打开、哪一行是 live，指针与键盘**都**移动它，所以两者不可能对同一行有分歧）、一个 `Hit`（指针做了什么，返回给调用方，**动作仍归调用方**）。我这边的 `mp/combobox.rs` 有面板+行的模型，但**没有子菜单**。这是下一个该做的。
+- **`titlebar` 是平台差异，不是组件缺失**：bezel 在 gpui 里自绘标题栏并自己处理拖拽（`DragState`）；makepad 有 `cx.start_dragging()` 与原生窗口控制。移植过来会得到一个**依赖宿主平台**的组件。
+- **`stats` 是诊断件，依赖 gpui 内部**：它数的是「本窗口的渲染次数」，而那个数字之所以等于帧率，是因为 gpui 对每个未缓存 view 每帧渲染一次；`Painter::woken` 用来区分「哪些是它自己 tick 引起的」。makepad 没有对应的 `woken`，GPU 占用也没有对应测量点。**移植会得到一个只剩 FPS+内存的版本**——那是一个诚实的降级，但必须写清楚降了什么，而不是假装对等。
+
+## 这一轮由「运行」而不是「阅读」抓到的三个真缺陷
+
+三次都是同一类：**代码与它自己的注释/声明不一致，而 `cargo build` 对此是绿的**。
+
+1. **`columns_clamped(0)`**：v2 把 0 映射到 8（一个默认网格），我写成 `.max(1)`，把「未设置」读成了「最小的网格」。协议里**根本没有 `columns` 字段**，所以 A2UI 渲染器画出的每一个取色器都是**一列九个**——运行时打印 `columns=1` 才看见。
+2. **`MpAvatarRow` 的注释在撒谎**：注释说负外边距是「脸大小的比例，`-28%`」，代码写的是 `-8` 字面量，于是 40pt 的脸重叠仍是 8 而非注释承诺的 11。v2 原版是一张五行的字面量表（5/7/8/10/12），**没有任何出处**。`OVERLAP_RATIO = 0.28` 把那行表折成注释描述的那一个数：在它覆盖的每个尺寸上都复现原表（28→8，40→11），且对没人量过的尺寸也有定义。
+3. **`mod.mpc.ControlSize.Medium` 不存在**：`ControlSize` 只有 `Small`/`Regular`/`Large`。**脚本里写错的变体名 `cargo build` 不会报错**，它在运行时才炸。
+
+三个都不是靠读 diff 找到的，靠的是**开起来看打印**。
+
+## 两个被测试而不是被人抓到的静默失败
+
+同一个模式出现两次：**`str.replace` 的锚点不存在时它什么都不做，并且报告成功**。
+
+- gallery 的 `picking::script_mod(vm)` 没被插入（锚点写成了 `radio::script_mod(vm)`，那个文件里没有）→ 运行时 `[E]=1 property picking not found`。
+- `pages/mod.rs` 的 `declared` 表里没有 `picking` 条目（锚点同样不存在）→ **测试** `every_page_module_is_declared` 抓到。
+
+**教训**：编辑之后的锚点断言（`assert anchor in s`）不是仪式，是唯一能在同一个命令里发现自己什么都没改的办法。
