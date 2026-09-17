@@ -141,6 +141,7 @@ script_mod! {
                         rail_page_41 := RailRow{text: ""}
                         rail_page_42 := RailRow{text: ""}
                         rail_page_43 := RailRow{text: ""}
+                        rail_page_44 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -219,6 +220,7 @@ script_mod! {
                             page_41 := mod.gallery.pages.numbers{}
                             page_42 := mod.gallery.pages.searching{}
                             page_43 := mod.gallery.pages.picking{}
+                            page_44 := mod.gallery.pages.menu_cards{}
                         }
                     }
                 }
@@ -232,7 +234,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 44] = [
+const PAGE_SLOTS: [&[LiveId]; 45] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -277,10 +279,11 @@ const PAGE_SLOTS: [&[LiveId]; 44] = [
     ids!(page_41),
     ids!(page_42),
     ids!(page_43),
+    ids!(page_44),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 44] = [
+const RAIL_ROWS: [&[LiveId]; 45] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -325,6 +328,7 @@ const RAIL_ROWS: [&[LiveId]; 44] = [
     ids!(rail_page_41),
     ids!(rail_page_42),
     ids!(rail_page_43),
+    ids!(rail_page_44),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1520,6 +1524,66 @@ use makepad_component::mp::hover_card::HoverIntent;
             .set_highlighted(cx, &written, &[]);
     }
 
+    /// Fill the three menu panels and print what each decided.
+    ///
+    /// **The printed lines are the evidence**, because the two decisions that matter are invisible in a picture: whether the
+    /// gutter was reserved and what width the panel took. A screenshot shows a panel; only the numbers show that the gutter
+    /// is absent when nothing uses it.
+    fn seed_menu_cards(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::menu::Item;
+        use makepad_component::mp::menu_card::{
+            line_height, panel_height, panel_width, row_at, MpMenuCardWidgetRefExt,
+        };
+
+        let plain = vec![
+            Item::action("New file").with_keystroke("\u{2318}N"),
+            Item::action("Open folder").with_keystroke("\u{2318}O"),
+            Item::Separator,
+            Item::action("Word wrap").checked(true),
+            Item::action("Save").disabled(),
+            Item::submenu("Share", vec![Item::action("Copy link"), Item::action("Email")]),
+        ];
+        let glyphs = vec![
+            Item::action("New file").with_icon("file").with_keystroke("\u{2318}N"),
+            Item::action("Open folder").with_icon("folder"),
+            Item::Separator,
+            Item::action("Save").with_icon("save"),
+            Item::submenu("Share", vec![Item::action("Copy link")]).with_icon("share"),
+        ];
+        let described = vec![
+            Item::action("Open folder").with_description("Choose a folder to work in"),
+            Item::action("Duplicate").with_description("A copy beside the original"),
+            Item::Separator,
+            Item::action("Delete").disabled().with_description("Moved to the bin, restorable"),
+        ];
+
+        for (id, rows, name) in [
+            (ids!(menu_plain), plain, "plain"),
+            (ids!(menu_glyphs), glyphs, "glyphs"),
+            (ids!(menu_described), described, "described"),
+        ] {
+            let count = rows.len();
+            let card = self.ui.mp_menu_card(cx, id);
+            card.set_items(cx, rows);
+            let line = line_height(cx);
+            let width = card.width();
+            let height = {
+                // The panel's height needs the rows, so it is recomputed here from the same function the card uses.
+                let rows = card.items();
+                panel_height(&rows, line)
+            };
+            let gutter = card.items().iter().any(|item| match item {
+                Item::Action { icon, .. } | Item::Submenu { icon, .. } => icon.is_some(),
+                Item::Separator => false,
+            });
+            // Where a `y` lands, which is the half of the geometry a picture cannot show at all.
+            let third = row_at(&card.items(), height / 3.0, line);
+            println!(
+                "MENUS {name} rows={count} width={width} height={height} gutter={gutter} width_from=panel_width third_row={third:?}"
+            );
+        }
+    }
+
     /// Fill the swatch grids on the picking page, and print the grid's shape and what a few points pick.
     ///
     /// **The points are the point.** A picture shows a grid; only the printed hit tests show that the gaps pick nothing
@@ -2380,7 +2444,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
-        self.seed_menus(cx);
+        self.seed_menu_cards(cx);
         self.seed_search(cx);
         self.seed_palette(cx);
         self.seed_segmented(cx);
@@ -2393,6 +2457,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_menu_cards(cx);
         self.seed_picking(cx);
         self.seed_searching(cx);
         self.seed_numbers(cx);
@@ -3055,7 +3120,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 44] = [
+    const SLOT_PAGES: [&str; 45] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3100,6 +3165,7 @@ mod tests {
         "mod.gallery.pages.numbers",
         "mod.gallery.pages.searching",
         "mod.gallery.pages.picking",
+        "mod.gallery.pages.menu_cards",
     ];
 
     #[test]

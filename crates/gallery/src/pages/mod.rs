@@ -43,6 +43,7 @@ pub mod code;
 pub mod combobox;
 pub mod tree;
 pub mod menu;
+pub mod menu_cards;
 pub mod motion;
 pub mod overlay;
 pub mod numbers;
@@ -101,6 +102,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     numbers::script_mod(vm);
     palette::script_mod(vm);
     menu::script_mod(vm);
+    menu_cards::script_mod(vm);
     scroll::script_mod(vm);
     searching::script_mod(vm);
     search::script_mod(vm);
@@ -390,6 +392,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/picking.rs",
         blurb: "A swatch grid, and the gaps that pick nothing",
     },
+    Page {
+        title: "Menu Cards",
+        path: "mod.gallery.pages.menu_cards",
+        source: "crates/gallery/src/pages/menu_cards.rs",
+        blurb: "The panel a menu drops, and the gutter it reserves only when used",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -494,6 +502,7 @@ mod tests {
             ("crates/gallery/src/pages/searching.rs", "searching"),
             ("crates/gallery/src/pages/search.rs", "search"),
             ("crates/gallery/src/pages/picking.rs", "picking"),
+            ("crates/gallery/src/pages/menu_cards.rs", "menu_cards"),
         ]
         .into_iter()
         .collect();

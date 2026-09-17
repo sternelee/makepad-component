@@ -62,6 +62,7 @@ pub mod layout;
 pub mod list;
 pub mod markdown;
 pub mod menu;
+pub mod menu_card;
 pub mod loaders;
 pub mod number_input;
 pub mod pagination;
@@ -132,6 +133,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::tree::script_mod(vm);
     crate::mp::list::script_mod(vm);
     crate::mp::markdown::script_mod(vm);
+    crate::mp::menu_card::script_mod(vm);
     crate::mp::description_list::script_mod(vm);
     crate::mp::editor::script_mod(vm);
     // **After `list`.** `MpPalette` composes an `MpMenu`, which `list.rs` defines,
