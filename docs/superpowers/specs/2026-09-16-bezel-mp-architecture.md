@@ -1886,3 +1886,41 @@ grep -rn "crate::widgets::\|makepad_component::widgets::" crates/*/src crates/*/
 **88 是一个 app 重写的规模，不是一次重命名。** 所以它是独立的一轮工作，不该顺手开始；记在这里，让下一轮从
 测量过的地方开始，而不是从猜测开始。
 
+# 对等审计用了错的标尺：bezel 的模块表 vs 本仓库的 v2 组件表（2026-09-17）
+
+## 两个问题，两个不同的答案
+
+我之前所有「对等完成」的结论都建立在**一把错的尺子**上：拿 bezel 的 **35 个模块名** 去比。问题是
+**bezel 一个模块装多个组件**（`buttons.rs`/`content.rs`/`controls.rs` 是分组），所以那把尺子量不出组件。
+
+现在用另一把尺子：**本仓库自己的 v2 组件表**（`crates/ui/src/widgets/*.rs`，一个文件一个组件，76 个）
+对 **v3 的 DSL 组件名**（`mod.mp.Mp*` 定义，去掉 `Base`/尺寸变体后约 57 个）。
+
+| | 结论 |
+| --- | --- |
+| **对 bezel 的对等** | **完成**：4 个真缺口（`menu`/`menubar`/`stats`/`titlebar`）本轮全部落地，其余名字逐个查证后确认不是缺口 |
+| **本仓库 v2 → v3 的迁移** | **未完成**：76 个 v2 组件模块里 **26 个在 v3 没有对应组件** |
+
+**两个结论都对，因为它们回答的不是同一个问题。** 目标是「类似 gpui-bezel 的组件库」，按那把尺子完成了；
+但本仓库的 v2 半边比 bezel 大得多（很多组件是它自己的扩展，bezel 根本没有），所以「删掉 v2」这件事按
+bezel 的尺子看永远看不出还差什么。
+
+## v3 里没有的 26 个 v2 组件
+
+```
+accordion alert attachment breadcrumb bubble card collapsible dialog dropdown link
+message modal notification option_card orb page_flip rating select sheet sidebar
+split_pane status_bar stepper tab toggle toggle_group
+```
+
+（`focus`/`scaffolding`/`status`/`text`/`divider`/`separator` 不在此列：它们是支撑模块，v3 里都在。）
+
+## 其中 4 个卡住 dbpro
+
+`dbpro` 的 DSL 里用了 `MpDialog`（4 处）、`MpDropdown`（1）、`MpSelect`（2 + trigger）、`MpSplitPane`（1），
+**这 4 个 v3 都没有** ✗ 所以 dbpro 的迁移不是「把前缀换掉 + 调和 API」，
+而是**先要有这 4 个组件** —— 我先前把 88 个编译错误当成「API 形状差异」，其实其中一部分是「组件不存在」。
+
+**下一轮的入口因此很具体**：先移植 `MpDialog`、`MpDropdown`、`MpSelect`、`MpSplitPane`（按 dbpro 的使用量，
+`dialog` 优先，17 个调用点），再动 dbpro，最后才是阶段 6 的删除。
+
