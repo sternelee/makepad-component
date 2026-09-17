@@ -1870,3 +1870,19 @@ grep -rn "crate::widgets::\|makepad_component::widgets::" crates/*/src crates/*/
 
 第 1 条之前没有人知道它存在，因为没人查过引用。
 
+## 实测 dbpro 迁移的规模，而不是猜
+
+「不是改个前缀」这句话本身也是猜的。做了一次实验：把 dbpro 里 `mod.widgets.Mp*` **只换前缀**成 `mod.mp.Mp*`，
+`use widgets::*` 换成 `use mp::*`，`widgets::sizing::MpSize` 换成 `ControlSize`，然后编译。
+
+**结果：88 个编译错误。**（实验已回滚，工作区干净，dbpro 仍是 0 错误。）
+
+错误不是命名空间的，是 API 形状的：
+- `TreeItem` 这类**类型在 v3 里不存在**——`mp/tree.rs` 持有自己的条目类型，dbpro 的 `Vec<TreeItem>` 是 v2 的形状；
+- `makepad_theme` **不是 dbpro 的依赖**，所以 `ControlSize` 拿不到（要先加依赖）；
+- `mp/table.rs`/`mp/editor.rs` 的单元格与文本通过 Rust 侧的数据 API 驱动，而 dbpro 的 DSL 里直接写 `mod.widgets.MpTable{...}`
+  的子节点。
+
+**88 是一个 app 重写的规模，不是一次重命名。** 所以它是独立的一轮工作，不该顺手开始；记在这里，让下一轮从
+测量过的地方开始，而不是从猜测开始。
+
