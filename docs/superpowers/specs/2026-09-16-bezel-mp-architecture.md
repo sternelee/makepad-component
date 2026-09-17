@@ -1924,3 +1924,29 @@ split_pane status_bar stepper tab toggle toggle_group
 **下一轮的入口因此很具体**：先移植 `MpDialog`、`MpDropdown`、`MpSelect`、`MpSplitPane`（按 dbpro 的使用量，
 `dialog` 优先，17 个调用点），再动 dbpro，最后才是阶段 6 的删除。
 
+# dbpro 迁移的分步计划（测量后的结果，2026-09-17）
+
+四个组件阻塞项都已解决：
+
+| dbpro 需要 | 结果 |
+| --- | --- |
+| `MpDialog` | **已移植** `mp/dialog.rs`（保留 `backdrop`/`content`/`dialog`/`header`/`title`/`description`/`body`/`footer` 槽位 id） |
+| `MpSplitPane` | **已移植** `mp/split_pane.rs`（保留 `left`/`divider`/`right`） |
+| `MpSelect` | **已移植** `mp/select.rs`（`Select` + `MpSelectTrigger` + `MpSelectAction`） |
+| `MpDropdown` | **不是本仓库的组件**：`mod.widgets.MpDropdown` 是 makepad 自己的 `DropDownFlat` 的样式别名 → 迁到 makepad 的 dropdown 或 `MpCombobox` |
+
+把 DSL 前缀换掉之后的 88 个错误，按种类分好了（这是迁移的清单，不是猜测）：
+
+| 数量 | 类别 | 修法 |
+| --- | --- | --- |
+| 60 | `no method named mp_button / mp_dialog / mp_text_area / mp_table / mp_tree / mp_select` | **缺 `*WidgetRefExt` 在作用域**。v2 的 `widgets/mod.rs` 用 `pub use button::*` 把扩展 trait 带进来了，**v3 的 `mp/mod.rs` 刻意不 re-export** → dbpro 要逐个显式 `use makepad_component::mp::<mod>::MpXWidgetRefExt;` |
+| 9 | `TableColumn` | v3 有这个类型（`mp::table::TableColumn`），只是 dbpro 从 `widgets::` 拿 → 换路径（形状可能也要对） |
+| 8 | `TreeItem` | v3 的 tree 持有自己的条目类型 → 真的改 API |
+| 7 | `MpSize` | v3 **没有**这个类型（逐组件丢掉的），改成 `ControlSize` 或本地常量 |
+| 1 | `MpSelectTrigger` | v3 的触发器是 **DSL 别名**（makepad 的 `RoundedView`），**没有 Rust 类型** → dbpro 里 `.borrow_mut::<MpSelectTrigger>()` 那处要改成走 `label` 槽位 |
+| 1 | `mp_text_area` | v3 没有 textarea → `MpEditor`（`mp_editor`） |
+| 1 | （无） | 上面那些的聚合错误 |
+
+**顺序**：先修 import 与类型（这一步不改变行为，只改变名字的来源），**再**翻 DSL 前缀，最后才动阶段 6 的删除。
+实验已回滚，工作区干净，dbpro 仍是 0 错误。
+
