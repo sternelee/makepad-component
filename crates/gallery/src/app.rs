@@ -171,6 +171,7 @@ script_mod! {
                         rail_page_50 := RailRow{text: ""}
                         rail_page_51 := RailRow{text: ""}
                         rail_page_52 := RailRow{text: ""}
+                        rail_page_53 := RailRow{text: ""}
                             }
                         }
 
@@ -258,6 +259,7 @@ script_mod! {
                             page_50 := mod.gallery.pages.selects{}
                             page_51 := mod.gallery.pages.tabs{}
                             page_52 := mod.gallery.pages.strips{}
+                            page_53 := mod.gallery.pages.breadcrumbs{}
                         }
                     }
                 }
@@ -271,7 +273,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 53] = [
+const PAGE_SLOTS: [&[LiveId]; 54] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -325,10 +327,11 @@ const PAGE_SLOTS: [&[LiveId]; 53] = [
     ids!(page_50),
     ids!(page_51),
     ids!(page_52),
+    ids!(page_53),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 53] = [
+const RAIL_ROWS: [&[LiveId]; 54] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -382,6 +385,7 @@ const RAIL_ROWS: [&[LiveId]; 53] = [
     ids!(rail_page_50),
     ids!(rail_page_51),
     ids!(rail_page_52),
+    ids!(rail_page_53),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1578,6 +1582,79 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.ui
             .mp_code_block(cx, ids!(canvas_wire))
             .set_highlighted(cx, &written, &[]);
+    }
+
+    /// Fill the three trails and print the three rules, which are what the component is.
+    ///
+    /// **The hit tests are the point.** A point on the current crumb must report nothing while points on the others report
+    /// their index — the rule a caller feels as "clicking where I already am did nothing", and the one that stops it pushing a
+    /// second copy of the page.
+    fn seed_breadcrumbs(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::breadcrumb::{
+            allocate, crumb_at, crumb_origin, is_current, overflows, separator_count, trail_width,
+            GAP, MIN_CRUMB, SEP_W, MpBreadcrumbWidgetRefExt,
+        };
+
+        let trail: Vec<String> = ["Files", "Reports", "2026", "Q3"]
+            .iter()
+            .map(|crumb| crumb.to_string())
+            .collect();
+        let many: Vec<String> = (1..=8).map(|n| format!("Level {n}")).collect();
+        let single = vec!["Home".to_string()];
+
+        for (id, crumbs) in [
+            (ids!(crumbs_trail), trail.clone()),
+            (ids!(crumbs_pressure), many.clone()),
+            (ids!(crumbs_single), single.clone()),
+        ] {
+            self.ui.mp_breadcrumb(cx, id).set_trail(cx, crumbs);
+        }
+
+        // The three rules, evaluated for a row the width of the first one.
+        let available = 560.0f64;
+        let natural: Vec<f64> = trail.iter().map(|crumd| 12.0 + crumd.len() as f64 * 7.0).collect();
+        let widths = allocate(&natural, available, GAP, SEP_W);
+        let current = trail.len() - 1;
+        println!(
+            "BREADCRUMB trail={:?} count={} separators={} current_index={} is_current={:?} widths={:?} total={:.0} overflows={} \
+hit_first={:?} hit_on_chevron={:?} hit_current={:?}",
+            trail,
+            trail.len(),
+            separator_count(trail.len()),
+            current,
+            (0..trail.len()).map(|index| is_current(index, trail.len())).collect::<Vec<_>>(),
+            widths.iter().map(|w| w.round()).collect::<Vec<_>>(),
+            trail_width(&widths, GAP, SEP_W),
+            overflows(&widths, available, GAP, SEP_W),
+            // A point inside the first crumb navigates there.
+            crumb_at(crumb_origin(0, &widths, GAP, SEP_W) + 1.0, &widths, GAP, SEP_W),
+            // A point on the chevron between crumbs 0 and 1 is nothing.
+            crumb_at(widths[0] + GAP + SEP_W * 0.5, &widths, GAP, SEP_W),
+            // A point inside the **current** crumb reports the current index from the hit test — and the widget suppresses
+            // it — which is the pair the print is for.
+            crumb_at(crumb_origin(current, &widths, GAP, SEP_W) + 1.0, &widths, GAP, SEP_W),
+        );
+
+        // Under pressure: the ancestors take the minimum and the trail overflows.
+        let many_natural: Vec<f64> = many.iter().map(|_| 70.0).collect();
+        let tight = allocate(&many_natural, 320.0, GAP, SEP_W);
+        println!(
+            "BREADCRUMB pressure crumbs={} min_kept={} overflow={} total={:.0} current_width={:.0}",
+            many.len(),
+            tight.iter().all(|width| *width >= MIN_CRUMB),
+            overflows(&tight, 320.0, GAP, SEP_W),
+            trail_width(&tight, GAP, SEP_W),
+            tight[many.len() - 1],
+        );
+
+        // One crumb: current, no chevron, and the current crumb keeps its own width.
+        let one = allocate(&[60.0], 560.0, GAP, SEP_W);
+        println!(
+            "BREADCRUMB single count=1 separators={} is_current_0={} width={:?}",
+            separator_count(1),
+            is_current(0, 1),
+            one,
+        );
     }
 
     /// Fill the strips and print the tone vocabulary — which is what the component is.
@@ -3044,6 +3121,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_breadcrumbs(cx);
         self.seed_strips(cx);
         self.seed_tabs(cx);
         self.seed_select_rows(cx);
@@ -3066,6 +3144,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_breadcrumbs(cx);
         self.seed_strips(cx);
         self.seed_tabs(cx);
         self.seed_select_rows(cx);
@@ -3743,7 +3822,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 53] = [
+    const SLOT_PAGES: [&str; 54] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3797,6 +3876,7 @@ mod tests {
         "mod.gallery.pages.selects",
         "mod.gallery.pages.tabs",
         "mod.gallery.pages.strips",
+        "mod.gallery.pages.breadcrumbs",
     ];
 
     #[test]

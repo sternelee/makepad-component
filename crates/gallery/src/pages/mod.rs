@@ -46,6 +46,7 @@ pub mod tabs;
 pub mod timetable;
 pub mod titlebars;
 pub mod blocks;
+pub mod breadcrumbs;
 pub mod canvas;
 pub mod code;
 pub mod combobox;
@@ -102,6 +103,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     table::script_mod(vm);
     tabs::script_mod(vm);
     blocks::script_mod(vm);
+    breadcrumbs::script_mod(vm);
     canvas::script_mod(vm);
     code::script_mod(vm);
     combobox::script_mod(vm);
@@ -462,6 +464,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/strips.rs",
         blurb: "A tonal notice, and the tone vocabulary behind it",
     },
+    Page {
+        title: "Breadcrumbs",
+        path: "mod.gallery.pages.breadcrumbs",
+        source: "crates/gallery/src/pages/breadcrumbs.rs",
+        blurb: "A trail whose current crumb is derived and is not a link",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -575,6 +583,7 @@ mod tests {
             ("crates/gallery/src/pages/selects.rs", "selects"),
             ("crates/gallery/src/pages/tabs.rs", "tabs"),
             ("crates/gallery/src/pages/strips.rs", "strips"),
+            ("crates/gallery/src/pages/breadcrumbs.rs", "breadcrumbs"),
         ]
         .into_iter()
         .collect();

@@ -40,6 +40,7 @@ pub mod action;
 pub mod avatar;
 pub mod avatar_group;
 pub mod bars;
+pub mod breadcrumb;
 pub mod button;
 pub mod calendar;
 pub mod canvas;
@@ -151,6 +152,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::select::script_mod(vm);
     crate::mp::tab_bar::script_mod(vm);
     crate::mp::strip::script_mod(vm);
+    crate::mp::breadcrumb::script_mod(vm);
     crate::mp::menubar_strip::script_mod(vm);
     crate::mp::menu_card::script_mod(vm);
     crate::mp::description_list::script_mod(vm);
