@@ -23,7 +23,15 @@ use std::sync::{Arc, Mutex};
 
 use makepad_widgets::*;
 
-use makepad_component::widgets::*;
+// **Every import is explicit, because v3's `mp/mod.rs` does not re-export.** The v2 glob (`widgets::*`) worked
+// because `widgets/mod.rs` did `pub use button::*` for each module, which is what brought the generated
+// `*WidgetRefExt` traits into scope. Naming them here is the price of the v3 layout, and it is a small one.
+use makepad_component::mp::button::MpButtonWidgetRefExt;
+use makepad_component::mp::dialog::MpDialogWidgetRefExt;
+use makepad_component::mp::editor::MpEditorWidgetRefExt;
+use makepad_component::mp::segmented::MpSegmentedWidgetRefExt;
+use makepad_component::mp::table::{MpTableWidgetRefExt, TableColumn};
+use makepad_component::mp::tree::{MpTreeWidgetRefExt, TreeItem};
 
 use crate::db::{
     self, ColumnInfo, ConnectionConfig, DbAction, DbConn, DbKind, FkInfo, IndexInfo, QueryResult,
@@ -404,7 +412,7 @@ impl App {
         // only depth-0 branches auto-expand; grouped connections sit at
         // depth 1, so open them explicitly
         for idx in conn_indices {
-            tree.set_expanded(cx, idx, true);
+            tree.set_collapsed(cx, idx, false);
         }
     }
 
@@ -610,10 +618,10 @@ impl App {
 
     fn render_struct(&mut self, cx: &mut Cx, t: &mut TableTab) {
         let defs = vec![
-            TableColumn::new("Column", 200.0, false),
-            TableColumn::new("Type", 150.0, false),
-            TableColumn::new("Nullable", 90.0, false),
-            TableColumn::new("Key", 70.0, false),
+            TableColumn::new("Column").width(200.0),
+            TableColumn::new("Type").width(150.0),
+            TableColumn::new("Nullable").width(90.0),
+            TableColumn::new("Key").width(70.0),
         ];
         let rows: Vec<Vec<String>> = t
             .columns
@@ -628,7 +636,7 @@ impl App {
             })
             .collect();
         let grid = self.ui.mp_table(cx, ids!(struct_table));
-        grid.set_columns(defs);
+        grid.set_columns(cx, defs);
         grid.set_rows(cx, rows);
         let hint = if t.columns.is_empty() {
             "Structure unavailable — load the table first".to_string()
@@ -645,9 +653,9 @@ impl App {
             }
         }
         let idx_defs = vec![
-            TableColumn::new("Index", 170.0, false),
-            TableColumn::new("Columns", 230.0, false),
-            TableColumn::new("Unique", 70.0, false),
+            TableColumn::new("Index").width(170.0),
+            TableColumn::new("Columns").width(230.0),
+            TableColumn::new("Unique").width(70.0),
         ];
         let idx_rows: Vec<Vec<String>> = match &t.indexes {
             Some(list) => list
@@ -663,7 +671,7 @@ impl App {
             None => Vec::new(),
         };
         let idx_table = self.ui.mp_table(cx, ids!(indexes_table));
-        idx_table.set_columns(idx_defs);
+        idx_table.set_columns(cx, idx_defs);
         idx_table.set_rows(cx, idx_rows);
 
         // DDL preview: fetch once per tab, then reuse
@@ -674,8 +682,8 @@ impl App {
                     if let Some(conn) = self.conns.get(&t.config_id).cloned() {
                         t.pending_ddl = true;
                         self.ui
-                            .mp_text_area(cx, ids!(struct_ddl))
-                            .set_text("-- loading DDL…");
+                            .mp_editor(cx, ids!(struct_ddl))
+                            .set_source(cx, "-- loading DDL…");
                         db::spawn_fetch_ddl(conn, t.config_id, t.table.clone());
                     }
                 }
@@ -683,8 +691,8 @@ impl App {
             }
         };
         self.ui
-            .mp_text_area(cx, ids!(struct_ddl))
-            .set_text(&ddl_text);
+            .mp_editor(cx, ids!(struct_ddl))
+            .set_source(cx, &ddl_text);
         self.set_dot(cx, if t.error.is_some() { Dot::Err } else { Dot::Ok });
     }
 
@@ -961,7 +969,7 @@ impl App {
             None => None,
         };
         if let Some(text) = detail {
-            self.ui.mp_text_area(cx, ids!(detail_text)).set_text(&text);
+            self.ui.mp_editor(cx, ids!(detail_text)).set_source(cx, &text);
             self.ui.mp_dialog(cx, ids!(detail_dialog)).open(cx);
             self.ui.redraw(cx);
         }
@@ -1137,11 +1145,11 @@ impl App {
                 .iter()
                 .map(|c| {
                     let w = (16.0 + c.name.chars().count() as f64 * 7.2).clamp(90.0, 260.0);
-                    TableColumn::new(&c.name, w, false)
+                    TableColumn::new(&c.name).width(w)
                 })
                 .collect();
             let grid = self.ui.mp_table(cx, ids!(query_grid));
-            grid.set_columns(defs);
+            grid.set_columns(cx, defs);
             grid.set_rows(cx, r.rows.clone());
         }
     }
@@ -1515,6 +1523,10 @@ impl App {
         self.dialog_password.clear();
 
         self.dialog_kind = DbKind::Sqlite;
+        self.ui.mp_segmented(cx, ids!(dlg_kind)).set_segments(
+            cx,
+            DbKind::ALL.iter().map(|kind| kind.label().to_string()).collect(),
+        );
         self.set_dialog_kind_label(cx, DbKind::Sqlite);
 
         if let Some(id) = editing {
@@ -1603,13 +1615,11 @@ impl App {
     }
 
     fn set_dialog_kind_label(&self, cx: &mut Cx, kind: DbKind) {
-        if let Some(mut trigger) = self
-            .ui
-            .widget(cx, ids!(dlg_kind.trigger))
-            .borrow_mut::<MpSelectTrigger>()
-        {
-            trigger.set_text(cx, kind.label());
-        }
+        // The segmented control is highlighted by index rather than given text: its segments are set once from
+        // `DbKind::ALL`, so "which kind" is a position and `label()` stays the word that is *stored*.
+        self.ui
+            .mp_segmented(cx, ids!(dlg_kind))
+            .set_active(cx, Some(kind.index()));
     }
 
     fn update_dialog_fields(&mut self, cx: &mut Cx) {
@@ -2220,7 +2230,7 @@ impl App {
         if let Some(idx) = self
             .ui
             .mp_tree(cx, ids!(sidebar_tree))
-            .item_selected(actions)
+            .row_selected(actions)
         {
             self.handle_tree_click(cx, idx);
         }
@@ -2567,8 +2577,13 @@ impl App {
         }
 
         // ── connect dialog ──
-        if let Some(value) = self.ui.mp_select(cx, ids!(dlg_kind)).selected(actions) {
-            if let Some(kind) = DbKind::from_label(&value) {
+        // **A segmented control rather than the v2 select.** Three mutually exclusive kinds is what a segmented control
+        // is for, and it needs no floating panel — which matters because v3's select trigger is a DSL alias of makepad's
+        // `RoundedView` with no Rust type, and because the v2 select declared its options as DSL children where the v3
+        // library takes them as data. The *index* it reports is mapped through `DbKind::ALL`, one list, so the segments
+        // and the mapping cannot disagree.
+        if let Some(index) = self.ui.mp_segmented(cx, ids!(dlg_kind)).selected(actions) {
+            if let Some(kind) = DbKind::from_index(index) {
                 self.dialog_kind = kind;
                 self.update_dialog_fields(cx);
             }
@@ -2804,8 +2819,8 @@ script_mod! {
 
                         View{width: Fill, height: 1}
 
-                        new_query_btn := mod.widgets.MpButtonGhost{ text: "＋ Query" }
-                        new_conn_btn := mod.widgets.MpButtonProminent{ text: "＋ Connection" }
+                        new_query_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "＋ Query" }
+                        new_conn_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Prominent, text: "＋ Connection" }
                     }
 
                     // hairline under toolbar
@@ -2820,7 +2835,7 @@ script_mod! {
                     }
 
                     // ── Main split: sidebar / content ──
-                    main_split := mod.widgets.MpSplitPane{
+                    main_split := mod.mp.MpSplitPane{
                         width: Fill
                         height: Fill
 
@@ -2849,14 +2864,14 @@ script_mod! {
                                     }
                                 }
                                 View{width: Fill, height: 1}
-                                refresh_schema_btn := mod.widgets.MpButtonGhost{
+                                refresh_schema_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost,
                                     text: "Sync"
                                     draw_text +: {
                                         text_style: theme.font_regular{font_size: 13.0}
                                         color: mod.db_theme.text_faint
                                     }
                                 }
-                                edit_conn_btn := mod.widgets.MpButtonGhost{
+                                edit_conn_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost,
                                     text: "⚙"
                                     draw_text +: {
                                         text_style: theme.font_regular{font_size: 13.0}
@@ -2870,7 +2885,7 @@ script_mod! {
                                 height: Fit
                                 padding: Inset{left: 10, right: 10, top: 0, bottom: 6}
 
-                                sidebar_filter_input := mod.widgets.MpInput{
+                                sidebar_filter_input := mod.mp.MpTextInput{
                                     width: Fill
                                     height: Fit
                                     empty_text: "Filter tables…"
@@ -2881,10 +2896,9 @@ script_mod! {
                                 width: Fill
                                 height: Fill
 
-                                sidebar_tree := mod.widgets.MpTree{
+                                sidebar_tree := mod.mp.MpTree{
                                     width: Fill
                                     height: Fit
-                                    row_height: 28.0
                                 }
                             }
                         }
@@ -2942,32 +2956,32 @@ script_mod! {
 
                                             mode_data_on_wrap := View{
                                                 width: Fit, height: Fit
-                                                mode_data_on := mod.widgets.MpButtonSecondary{ text: "◉ Data" }
+                                                mode_data_on := mod.mp.MpButton{style: mod.mp.ButtonStyle.Default, text: "◉ Data" }
                                             }
                                             mode_struct_off_wrap := View{
                                                 width: Fit, height: Fit
-                                                mode_struct_off := mod.widgets.MpButtonGhost{ text: "○ Struct" }
+                                                mode_struct_off := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "○ Struct" }
                                             }
                                             mode_data_off_wrap := View{
                                                 width: Fit, height: Fit
                                                 visible: false
-                                                mode_data_off := mod.widgets.MpButtonGhost{ text: "◉ Data" }
+                                                mode_data_off := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "◉ Data" }
                                             }
                                             mode_struct_on_wrap := View{
                                                 width: Fit, height: Fit
                                                 visible: false
-                                                mode_struct_on := mod.widgets.MpButtonSecondary{ text: "◉ Struct" }
+                                                mode_struct_on := mod.mp.MpButton{style: mod.mp.ButtonStyle.Default, text: "◉ Struct" }
                                             }
 
                                             View{width: 8, height: 1}
 
-                                            search_input := mod.widgets.MpInput{
+                                            search_input := mod.mp.MpTextInput{
                                                 width: 240
                                                 height: Fit
                                                 empty_text: "Filter rows…"
                                             }
 
-                                            page_prev := mod.widgets.MpButtonGhost{
+                                            page_prev := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost,
                                                 width: 30
                                                 text: "◀"
                                             }
@@ -2979,14 +2993,14 @@ script_mod! {
                                                     color: mod.db_theme.text_muted
                                                 }
                                             }
-                                            page_next := mod.widgets.MpButtonGhost{
+                                            page_next := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost,
                                                 width: 30
                                                 text: "▶"
                                             }
 
                                             View{width: Fill, height: 1}
 
-                                            refresh_btn := mod.widgets.MpButtonGhost{ text: "Reload" }
+                                            refresh_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "Reload" }
                                         }
 
                                         // row 2: row ops + import/export
@@ -2997,16 +3011,16 @@ script_mod! {
                                             spacing: 8
                                             align: Align{x: 0.0, y: 0.5}
 
-                                            add_row_btn := mod.widgets.MpButtonGhost{ text: "＋ Row" }
-                                            del_row_btn := mod.widgets.MpButtonGhost{ text: "－ Row" }
-                                            dup_row_btn := mod.widgets.MpButtonGhost{ text: "⧉ Duplicate" }
-                                            detail_btn := mod.widgets.MpButtonGhost{ text: "Detail" }
+                                            add_row_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "＋ Row" }
+                                            del_row_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "－ Row" }
+                                            dup_row_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "⧉ Duplicate" }
+                                            detail_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "Detail" }
 
                                             View{width: Fill, height: 1}
 
-                                            import_csv_btn := mod.widgets.MpButtonGhost{ text: "⬆ Import" }
-                                            grid_export_btn := mod.widgets.MpButtonGhost{ text: "⬇ CSV" }
-                                            export_all_btn := mod.widgets.MpButtonGhost{ text: "⬇ All" }
+                                            import_csv_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "⬆ Import" }
+                                            grid_export_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "⬇ CSV" }
+                                            export_all_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "⬇ All" }
                                         }
                                     }
 
@@ -3079,7 +3093,7 @@ script_mod! {
                                                 }
 
                                                 // FK dropdown editor template
-                                                FkEditor := mod.widgets.MpDropdown{
+                                                FkEditor := mod.widgets.DropDownFlat{
                                                     width: Fill
                                                     height: Fill
                                                     draw_text +: {
@@ -3118,14 +3132,13 @@ script_mod! {
                                             }
                                         }
 
-                                        struct_scroll := mod.widgets.MpScrollXYArea{
+                                        struct_scroll := mod.mp.MpScrollBoth{
                                             width: Fill
                                             height: Fill
 
-                                            struct_table := mod.widgets.MpTable{
+                                            struct_table := mod.mp.MpTable{
                                                 width: Fit
                                                 height: Fit
-                                                row_height: 27.0
                                             }
                                         }
 
@@ -3142,10 +3155,9 @@ script_mod! {
                                             width: Fill
                                             height: 110
 
-                                            indexes_table := mod.widgets.MpTable{
+                                            indexes_table := mod.mp.MpTable{
                                                 width: Fit
                                                 height: Fit
-                                                row_height: 26.0
                                             }
                                         }
 
@@ -3160,19 +3172,12 @@ script_mod! {
 
                                         // display-only text (MpTextArea paints,
                                         // it is not an editor)
-                                        struct_ddl := mod.widgets.MpTextArea{
+                                        // The editor takes its plate and its type from the theme: the v2 text area's
+                                        // colour and size overrides were a call site choosing a style, which is the thing
+                                        // this library's vocabulary refuses, and they no longer name fields that exist.
+                                        struct_ddl := mod.mp.MpEditor{
                                             width: Fill
                                             height: 130
-                                            draw_bg +: {
-                                                bg_color: (INPUT_BG)
-                                                border_color: (BORDER)
-                                                focus_color: (BORDER)
-                                                radius: instance(6.0)
-                                            }
-                                            draw_text +: {
-                                                text_style: theme.font_regular{font_size: 11.0}
-                                                color: mod.db_theme.text_muted
-                                            }
                                         }
                                     }
                                 }
@@ -3192,7 +3197,7 @@ script_mod! {
                                         spacing: 8
                                         align: Align{x: 0.0, y: 0.5}
 
-                                        run_btn := mod.widgets.MpButtonProminent{ text: "▶ Run" }
+                                        run_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Prominent, text: "▶ Run" }
                                         run_hint := Label{
                                             text: "⌘/Ctrl+Enter · ⌘↑/↓ history · ⌘R re-run"
                                             draw_text +: {
@@ -3203,13 +3208,13 @@ script_mod! {
 
                                         View{width: 12, height: 1}
 
-                                        sample_select := mod.widgets.MpButtonGhost{ text: "SELECT *" }
-                                        sample_join := mod.widgets.MpButtonGhost{ text: "JOIN sample" }
-                                        sample_agg := mod.widgets.MpButtonGhost{ text: "GROUP BY sample" }
+                                        sample_select := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "SELECT *" }
+                                        sample_join := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "JOIN sample" }
+                                        sample_agg := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "GROUP BY sample" }
 
                                         View{width: Fill, height: 1}
 
-                                        query_export_btn := mod.widgets.MpButtonGhost{ text: "⬇ CSV" }
+                                        query_export_btn := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "⬇ CSV" }
                                     }
 
                                     // Real multiline text editor (MpTextArea is
@@ -3233,14 +3238,13 @@ script_mod! {
                                         }
                                     }
 
-                                    query_grid_scroll := mod.widgets.MpScrollXYArea{
+                                    query_grid_scroll := mod.mp.MpScrollBoth{
                                         width: Fill
                                         height: Fill
 
-                                        query_grid := mod.widgets.MpTable{
+                                        query_grid := mod.mp.MpTable{
                                             width: Fit
                                             height: Fit
-                                            row_height: 27.0
                                         }
                                     }
                                 }
@@ -3305,7 +3309,7 @@ script_mod! {
                     }
 
                     // ── Connection dialog (overlay) ──
-                    connect_dialog := mod.widgets.MpDialog{
+                    connect_dialog := mod.mp.MpDialog{
                         content +: {
                             dialog +: {
                                 header +: {
@@ -3336,14 +3340,8 @@ script_mod! {
                                                     color: mod.db_theme.text_muted
                                                 }
                                             }
-                                            dlg_kind := mod.widgets.MpSelect{
+                                            dlg_kind := mod.mp.MpSegmented{
                                                 width: Fill
-                                                trigger +: { label +: { text: "SQLite" } }
-                                                dropdown +: {
-                                                    opt_sqlite := mod.widgets.MpSelectOption{ value: "SQLite", label +: { text: "SQLite" } }
-                                                    opt_mysql := mod.widgets.MpSelectOption{ value: "MySQL", label +: { text: "MySQL" } }
-                                                    opt_pg := mod.widgets.MpSelectOption{ value: "PostgreSQL", label +: { text: "PostgreSQL" } }
-                                                }
                                             }
                                         }
 
@@ -3360,7 +3358,7 @@ script_mod! {
                                                     color: mod.db_theme.text_muted
                                                 }
                                             }
-                                            dlg_name := mod.widgets.MpInput{
+                                            dlg_name := mod.mp.MpTextInput{
                                                 width: Fill
                                                 height: Fit
                                                 empty_text: "Display name (optional)"
@@ -3380,7 +3378,7 @@ script_mod! {
                                                     color: mod.db_theme.text_muted
                                                 }
                                             }
-                                            dlg_group := mod.widgets.MpInput{
+                                            dlg_group := mod.mp.MpTextInput{
                                                 width: Fill
                                                 height: Fit
                                                 empty_text: "Sidebar folder (optional)"
@@ -3400,7 +3398,7 @@ script_mod! {
                                                     color: mod.db_theme.text_muted
                                                 }
                                             }
-                                            dlg_path := mod.widgets.MpInput{
+                                            dlg_path := mod.mp.MpTextInput{
                                                 width: Fill
                                                 height: Fit
                                                 empty_text: "/path/to/database.db"
@@ -3421,7 +3419,7 @@ script_mod! {
                                                     color: mod.db_theme.text_muted
                                                 }
                                             }
-                                            dlg_host := mod.widgets.MpInput{
+                                            dlg_host := mod.mp.MpTextInput{
                                                 width: Fill
                                                 height: Fit
                                                 empty_text: "localhost"
@@ -3442,7 +3440,7 @@ script_mod! {
                                                     color: mod.db_theme.text_muted
                                                 }
                                             }
-                                            dlg_port := mod.widgets.MpInput{
+                                            dlg_port := mod.mp.MpTextInput{
                                                 width: Fill
                                                 height: Fit
                                                 empty_text: "3306"
@@ -3463,7 +3461,7 @@ script_mod! {
                                                     color: mod.db_theme.text_muted
                                                 }
                                             }
-                                            dlg_user := mod.widgets.MpInput{
+                                            dlg_user := mod.mp.MpTextInput{
                                                 width: Fill
                                                 height: Fit
                                                 empty_text: "username"
@@ -3484,7 +3482,7 @@ script_mod! {
                                                     color: mod.db_theme.text_muted
                                                 }
                                             }
-                                            dlg_password := mod.widgets.MpInputPassword{
+                                            dlg_password := mod.mp.MpTextInput{
                                                 width: Fill
                                                 height: Fit
                                             }
@@ -3504,7 +3502,7 @@ script_mod! {
                                                     color: mod.db_theme.text_muted
                                                 }
                                             }
-                                            dlg_database := mod.widgets.MpInput{
+                                            dlg_database := mod.mp.MpTextInput{
                                                 width: Fill
                                                 height: Fit
                                                 empty_text: "database name"
@@ -3534,7 +3532,7 @@ script_mod! {
                                                     color: mod.db_theme.text_muted
                                                 }
                                             }
-                                            dlg_ssh_host := mod.widgets.MpInput{
+                                            dlg_ssh_host := mod.mp.MpTextInput{
                                                 width: Fill
                                                 height: Fit
                                                 empty_text: "optional — jump host for tunnel (key auth)"
@@ -3554,7 +3552,7 @@ script_mod! {
                                                     color: mod.db_theme.text_muted
                                                 }
                                             }
-                                            dlg_ssh_user := mod.widgets.MpInput{
+                                            dlg_ssh_user := mod.mp.MpTextInput{
                                                 width: Fill
                                                 height: Fit
                                                 empty_text: "username on the jump host"
@@ -3574,7 +3572,7 @@ script_mod! {
                                                     color: mod.db_theme.text_muted
                                                 }
                                             }
-                                            dlg_ssh_port := mod.widgets.MpInput{
+                                            dlg_ssh_port := mod.mp.MpTextInput{
                                                 width: Fill
                                                 height: Fit
                                                 empty_text: "22"
@@ -3592,18 +3590,18 @@ script_mod! {
                                     }
                                 }
                                 footer +: {
-                                    dlg_disconnect := mod.widgets.MpButtonGhost{ text: "Disconnect" }
-                                    dlg_delete := mod.widgets.MpButtonGhost{ text: "Delete" }
-                                    dlg_test := mod.widgets.MpButtonGhost{ text: "Test" }
-                                    dlg_cancel := mod.widgets.MpButtonGhost{ text: "Cancel" }
-                                    dlg_connect := mod.widgets.MpButtonProminent{ text: "Connect" }
+                                    dlg_disconnect := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "Disconnect" }
+                                    dlg_delete := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "Delete" }
+                                    dlg_test := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "Test" }
+                                    dlg_cancel := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "Cancel" }
+                                    dlg_connect := mod.mp.MpButton{style: mod.mp.ButtonStyle.Prominent, text: "Connect" }
                                 }
                             }
                         }
                     }
 
                     // ── delete confirmation dialog ──
-                    confirm_dialog := mod.widgets.MpDialog{
+                    confirm_dialog := mod.mp.MpDialog{
                         content +: {
                             dialog +: {
                                 header +: {
@@ -3625,15 +3623,15 @@ script_mod! {
                                     }
                                 }
                                 footer +: {
-                                    confirm_cancel := mod.widgets.MpButtonGhost{ text: "Cancel" }
-                                    confirm_ok := mod.widgets.MpButtonProminent{ text: "Delete" }
+                                    confirm_cancel := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "Cancel" }
+                                    confirm_ok := mod.mp.MpButton{style: mod.mp.ButtonStyle.Prominent, text: "Delete" }
                                 }
                             }
                         }
                     }
 
                     // ── row detail dialog ──
-                    detail_dialog := mod.widgets.MpDialog{
+                    detail_dialog := mod.mp.MpDialog{
                         content +: {
                             dialog +: {
                                 header +: {
@@ -3645,30 +3643,20 @@ script_mod! {
                                     }
                                 }
                                 body +: {
-                                    detail_text := mod.widgets.MpTextArea{
+                                    detail_text := mod.mp.MpEditor{
                                         width: Fill
                                         height: 400
-                                        draw_bg +: {
-                                            bg_color: (INPUT_BG)
-                                            border_color: (BORDER)
-                                            focus_color: (BORDER)
-                                            radius: instance(6.0)
-                                        }
-                                        draw_text +: {
-                                            text_style: theme.font_regular{font_size: 12.0}
-                                            color: mod.db_theme.text
-                                        }
                                     }
                                 }
                                 footer +: {
-                                    detail_close := mod.widgets.MpButtonProminent{ text: "Close" }
+                                    detail_close := mod.mp.MpButton{style: mod.mp.ButtonStyle.Prominent, text: "Close" }
                                 }
                             }
                         }
                     }
 
                     // ── CSV import dialog ──
-                    import_dialog := mod.widgets.MpDialog{
+                    import_dialog := mod.mp.MpDialog{
                         content +: {
                             dialog +: {
                                 header +: {
@@ -3693,7 +3681,7 @@ script_mod! {
                                                 color: mod.db_theme.text_muted
                                             }
                                         }
-                                        import_path := mod.widgets.MpInput{
+                                        import_path := mod.mp.MpTextInput{
                                             width: Fill
                                             height: Fit
                                             empty_text: "/path/to/data.csv (header row = column names)"
@@ -3709,8 +3697,8 @@ script_mod! {
                                     }
                                 }
                                 footer +: {
-                                    import_cancel := mod.widgets.MpButtonGhost{ text: "Cancel" }
-                                    import_go := mod.widgets.MpButtonProminent{ text: "Import" }
+                                    import_cancel := mod.mp.MpButton{style: mod.mp.ButtonStyle.Ghost, text: "Cancel" }
+                                    import_go := mod.mp.MpButton{style: mod.mp.ButtonStyle.Prominent, text: "Import" }
                                 }
                             }
                         }
