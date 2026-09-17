@@ -37,6 +37,7 @@ pub mod status;
 pub mod steps;
 pub mod surface;
 pub mod table;
+pub mod titlebars;
 pub mod blocks;
 pub mod canvas;
 pub mod code;
@@ -76,6 +77,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     input::script_mod(vm);
     overlay::script_mod(vm);
     picking::script_mod(vm);
+    titlebars::script_mod(vm);
     popover::script_mod(vm);
     floating::script_mod(vm);
     history::script_mod(vm);
@@ -398,6 +400,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/menu_cards.rs",
         blurb: "The panel a menu drops, and the gutter it reserves only when used",
     },
+    Page {
+        title: "Title Bars",
+        path: "mod.gallery.pages.titlebars",
+        source: "crates/gallery/src/pages/titlebars.rs",
+        blurb: "The bar you drag a window by, minus the region its controls reserve",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -503,6 +511,7 @@ mod tests {
             ("crates/gallery/src/pages/search.rs", "search"),
             ("crates/gallery/src/pages/picking.rs", "picking"),
             ("crates/gallery/src/pages/menu_cards.rs", "menu_cards"),
+            ("crates/gallery/src/pages/titlebars.rs", "titlebars"),
         ]
         .into_iter()
         .collect();

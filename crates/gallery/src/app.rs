@@ -142,6 +142,7 @@ script_mod! {
                         rail_page_42 := RailRow{text: ""}
                         rail_page_43 := RailRow{text: ""}
                         rail_page_44 := RailRow{text: ""}
+                        rail_page_45 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -221,6 +222,7 @@ script_mod! {
                             page_42 := mod.gallery.pages.searching{}
                             page_43 := mod.gallery.pages.picking{}
                             page_44 := mod.gallery.pages.menu_cards{}
+                            page_45 := mod.gallery.pages.titlebars{}
                         }
                     }
                 }
@@ -234,7 +236,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 45] = [
+const PAGE_SLOTS: [&[LiveId]; 46] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -280,10 +282,11 @@ const PAGE_SLOTS: [&[LiveId]; 45] = [
     ids!(page_42),
     ids!(page_43),
     ids!(page_44),
+    ids!(page_45),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 45] = [
+const RAIL_ROWS: [&[LiveId]; 46] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -329,6 +332,7 @@ const RAIL_ROWS: [&[LiveId]; 45] = [
     ids!(rail_page_42),
     ids!(rail_page_43),
     ids!(rail_page_44),
+    ids!(rail_page_45),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1524,6 +1528,51 @@ use makepad_component::mp::hover_card::HoverIntent;
             .set_highlighted(cx, &written, &[]);
     }
 
+    /// Fill the title bars and print the drag arithmetic.
+    ///
+    /// **The arithmetic is the evidence**, because the drag itself cannot run here: a widget cannot move a window, so the
+    /// bar reports a delta and an application applies it. What is printed is the same `drag_region`/`is_draggable` the widget
+    /// calls, plus a scripted walk of `DragState` — which is where the two rules that matter live: each report is measured
+    /// from the **last** one (so a long drag does not drift) and a non-finite movement is **dropped**, not clamped.
+    fn seed_titlebars(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::titlebar::{
+            drag_region, is_draggable, DragState, MpTitlebarWidgetRefExt, TITLEBAR_HEIGHT,
+        };
+
+        for (id, name) in [
+            (ids!(titlebar_plain), "plain"),
+            (ids!(titlebar_controls), "controls"),
+            (ids!(titlebar_narrow), "narrow"),
+            (ids!(titlebar_short), "short"),
+        ] {
+            let bar = self.ui.mp_titlebar(cx, id);
+            bar.set_title(cx, "Makepad Component");
+            println!("TITLEBAR {name} title_set=true height={TITLEBAR_HEIGHT}");
+        }
+
+        // The geometry rule, at two widths a caller would actually use: the draggable region ends where the controls begin.
+        for width in [320.0f64, 180.0] {
+            let (_, end) = drag_region(width, 80.0);
+            println!(
+                "TITLEBAR region width={width} controls=80 draggable=[0,{end}) inside_at_0={} inside_at_end={}",
+                is_draggable(0.0, width, 80.0),
+                is_draggable(end, width, 80.0),
+            );
+        }
+
+        // The drag walk: measured from the last report, and a `NaN` dropped rather than clamped.
+        let mut drag = DragState::default();
+        drag.begin(dvec2(100.0, 100.0));
+        let first = drag.take_delta(dvec2(104.0, 103.0));
+        let second = drag.take_delta(dvec2(110.0, 103.0));
+        let bad = drag.take_delta(dvec2(f64::NAN, 103.0));
+        let after_bad = drag.take_delta(dvec2(114.0, 103.0));
+        println!(
+            "TITLEBAR drag first={first:?} second={second:?} nan={bad:?} after_nan={after_bad:?} still_dragging={}",
+            drag.is_dragging(),
+        );
+    }
+
     /// Fill the three menu panels and print what each decided.
     ///
     /// **The printed lines are the evidence**, because the two decisions that matter are invisible in a picture: whether the
@@ -2532,6 +2581,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_titlebars(cx);
         self.seed_menu_cards(cx);
         self.seed_search(cx);
         self.seed_palette(cx);
@@ -2545,6 +2595,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_titlebars(cx);
         self.seed_menu_cards(cx);
         self.seed_picking(cx);
         self.seed_searching(cx);
@@ -3208,7 +3259,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 45] = [
+    const SLOT_PAGES: [&str; 46] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3254,6 +3305,7 @@ mod tests {
         "mod.gallery.pages.searching",
         "mod.gallery.pages.picking",
         "mod.gallery.pages.menu_cards",
+        "mod.gallery.pages.titlebars",
     ];
 
     #[test]
