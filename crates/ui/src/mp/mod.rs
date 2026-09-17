@@ -63,6 +63,7 @@ pub mod list;
 pub mod markdown;
 pub mod menu;
 pub mod menu_card;
+pub mod menubar;
 pub mod loaders;
 pub mod number_input;
 pub mod pagination;
