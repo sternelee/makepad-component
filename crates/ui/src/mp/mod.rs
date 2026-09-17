@@ -64,6 +64,7 @@ pub mod markdown;
 pub mod menu;
 pub mod menu_card;
 pub mod menubar;
+pub mod menubar_strip;
 pub mod loaders;
 pub mod number_input;
 pub mod pagination;
@@ -138,6 +139,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::markdown::script_mod(vm);
     crate::mp::titlebar::script_mod(vm);
     crate::mp::stats::script_mod(vm);
+    crate::mp::menubar_strip::script_mod(vm);
     crate::mp::menu_card::script_mod(vm);
     crate::mp::description_list::script_mod(vm);
     crate::mp::editor::script_mod(vm);

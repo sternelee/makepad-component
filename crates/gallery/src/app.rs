@@ -97,6 +97,27 @@ script_mod! {
 
                         rail_gap := View{width: Fill, height: 12}
 
+                        // **The rows scroll; the header and the footer do not.** With 47 pages the list is taller than any
+                        // window, and this rail was a plain `flow: Down` panel — so every row past the panel's height was
+                        // clipped and unreachable, and the pinned bottom of the rail (the blurb above the Appearance
+                        // button) was pushed off the edge with them.
+                        //
+                        // The `Fill` filler that used to pin the footer is gone: the scroll takes the `Fill` now, and that
+                        // is what pins the footer. A filler *inside* the scroll would only add empty space at the end of a
+                        // list that is already too long.
+                        //
+                        // The rows keep their ids and their one-id paths still resolve, because `find_within` walks a
+                        // widget's descendants rather than its direct children — so `RAIL_ROWS` and `PAGE_SLOTS` did not
+                        // have to change, and neither did the four rail tables.
+                        rail_scroll := mod.mp.MpScroll{
+                            width: Fill
+                            height: Fill
+                            View{
+                                width: Fill
+                                height: Fit
+                                flow: Down
+                                spacing: 4
+
                         rail_page_0 := RailRow{text: ""}
                         rail_page_1 := RailRow{text: ""}
                         rail_page_2 := RailRow{text: ""}
@@ -144,8 +165,8 @@ script_mod! {
                         rail_page_44 := RailRow{text: ""}
                         rail_page_45 := RailRow{text: ""}
                         rail_page_46 := RailRow{text: ""}
-
-                        rail_filler := View{width: Fill, height: Fill}
+                            }
+                        }
 
                         rail_blurb := Label{
                             width: Fill, height: Fit
@@ -403,6 +424,9 @@ pub struct App {
     /// apply has settled.
     #[rust]
     seeded: bool,
+    /// Whether the rail's geometry has been printed, which happens once — as soon as the rail has drawn.
+    #[rust]
+    rail_printed: bool,
     /// Whether to pin the overlay open on the first event.
     ///
     /// A flag rather than a call in `handle_startup`, because startup runs
@@ -1569,6 +1593,48 @@ use makepad_component::mp::hover_card::HoverIntent;
     /// bar reports a delta and an application applies it. What is printed is the same `drag_region`/`is_draggable` the widget
     /// calls, plus a scripted walk of `DragState` — which is where the two rules that matter live: each report is measured
     /// from the **last** one (so a long drag does not drift) and a non-finite movement is **dropped**, not clamped.
+    /// Print the rail's box against its rows, which is the only evidence that it scrolls.
+    ///
+    /// **`[E]=0` proves nothing here.** A rail that clipped all 47 rows and a rail that scrolls them both log no errors and
+    /// both draw *something* — the difference is whether the content is taller than the box it is in, and that is a
+    /// measurement rather than an absence of complaints.
+    ///
+    /// The rects are read from the first event after layout, not from startup, because a widget's `area().rect()` is unlaid
+    /// before the tree is laid out and an empty rect would compare smaller than anything.
+    /// Returns whether it printed — it keeps being called until it does. **The first event is after *layout* but before the
+    /// first *draw***, and a scroll view's area is assigned as it draws, so reading it there gives an empty rect that compares
+    /// smaller than anything. My first version printed `box=0x0 rows_span=0x0`, which is a diagnostic that ran before the thing
+    /// it measures existed — the same shape as measuring after a mutation instead of before.
+    fn print_rail_geometry(&mut self, cx: &mut Cx) -> bool {
+        let box_rect = self.ui.widget(cx, ids!(rail_scroll)).area().rect(cx);
+        if box_rect.size.x <= 0.0 || box_rect.size.y <= 0.0 {
+            return false;
+        }
+        // **First row's top against last row's bottom**, rather than a union: `Rect` has no `union` here, and the two edges
+        // are the whole question — how much the rows span and whether the last one is inside the box.
+        let first = self.ui.widget(cx, ids!(rail_page_0)).area().rect(cx);
+        let last = self.ui.widget(cx, ids!(rail_page_46)).area().rect(cx);
+        let rows = Rect {
+            pos: dvec2(first.pos.x, first.pos.y),
+            size: dvec2(
+                first.size.x,
+                (last.pos.y + last.size.y) - first.pos.y,
+            ),
+        };
+        println!(
+            "RAIL box={}x{} at y={} rows_span={}x{} at y={} content_taller_than_box={} last_row_inside_box={}",
+            box_rect.size.x,
+            box_rect.size.y,
+            box_rect.pos.y,
+            rows.size.x,
+            rows.size.y,
+            rows.pos.y,
+            rows.size.y > box_rect.size.y,
+            rows.pos.y + rows.size.y <= box_rect.pos.y + box_rect.size.y,
+        );
+        true
+    }
+
     fn seed_titlebars(&mut self, cx: &mut Cx) {
         use makepad_component::mp::titlebar::{
             drag_region, is_draggable, DragState, MpTitlebarWidgetRefExt, TITLEBAR_HEIGHT,
@@ -1677,6 +1743,48 @@ use makepad_component::mp::hover_card::HoverIntent;
     ///
     /// The evidence unit tests cannot give: **this runs in the app**, with the theme installed and the script VM live, so a
     /// panic or a wrong branch here is a real one. The four rules it walks are the ones the component exists for.
+    /// Put the strip on the page and print where each title sits — the geometry a caller anchors a panel to.
+    ///
+    /// **This is the third of the three pieces and the one that connects them**: the bar's rules decide which title is down,
+    /// the strip draws it there, and `title_rect` is what a caller hangs the panel off. The print is that last part, because
+    /// an anchor is a number and no picture shows whether the panel starts at its own title or at the strip.
+    fn seed_menubar_strip(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::menubar::Bar;
+        use makepad_component::mp::menu::Item;
+        use makepad_component::mp::menubar::Menu;
+        use makepad_component::mp::menubar_strip::{MpMenubarStripWidgetRefExt, STRIP_HEIGHT};
+
+        let menus = vec![
+            Menu::new("File", vec![Item::action("New Window")]),
+            Menu::new("Edit", vec![Item::action("Undo")]),
+            Menu::new("View", vec![Item::action("Zoom In")]),
+        ];
+        let titles: Vec<String> = menus.iter().map(|menu| menu.title.clone()).collect();
+        let mut bar = Bar::new(menus);
+        // A menu is down, so the strip has a lit title to draw.
+        let opened = bar.toggle(1);
+
+        let strip = self.ui.mp_menubar_strip(cx, ids!(menu_strip));
+        strip.set_titles(cx, &titles);
+        strip.sync_from(cx, &bar);
+        let width = strip.content_width(cx);
+        // Relative to the first title, so the printed offsets say where each title sits **in the strip** rather than where the
+        // page happens to have put it.
+        let origin = strip.title_rect(cx, 0).map(|rect| rect.pos.x).unwrap_or(0.0);
+        let rects: Vec<String> = (0..titles.len())
+            .filter_map(|index| {
+                strip
+                    .title_rect(cx, index)
+                    .map(|rect| format!("{}@+{:.0}w{:.0}", titles[index], rect.pos.x - origin, rect.size.x))
+            })
+            .collect();
+        println!(
+            "MENUBAR strip titles={:?} open={:?} opening={opened:?} strip_height={STRIP_HEIGHT} content_width={width:.0} rects={rects:?}",
+            strip.titles(),
+            strip.open(),
+        );
+    }
+
     fn run_menubar_preview(&mut self) {
         use makepad_component::mp::menu::Item;
         use makepad_component::mp::menubar::{Bar, Menu, MpMenubarHit, Outcome};
@@ -2618,6 +2726,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_pagination(cx);
         self.seed_frame_meter(cx);
         self.seed_titlebars(cx);
+        self.seed_menubar_strip(cx);
         self.seed_menu_cards(cx);
         self.seed_search(cx);
         self.seed_palette(cx);
@@ -2633,6 +2742,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_editor(cx);
         self.seed_frame_meter(cx);
         self.seed_titlebars(cx);
+        self.seed_menubar_strip(cx);
         self.seed_menu_cards(cx);
         self.seed_picking(cx);
         self.seed_searching(cx);
@@ -3197,6 +3307,11 @@ impl AppMain for App {
     }
 
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
+        if !self.rail_printed {
+            // Keeps asking until the rail has drawn; see the doc on why the first event is too early.
+            self.rail_printed = self.print_rail_geometry(cx);
+        }
+
         if self.want_tooltip {
             // Wait for the trigger to have a real rectangle. An `Area` is empty
             // until the widget that owns it has been laid out, and the first

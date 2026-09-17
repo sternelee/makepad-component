@@ -52,6 +52,10 @@ script_mod! {
         }
 
         Section{
+            Caption{ text: "The strip of titles, with File down — the bar's own rules drive which title is lit" }
+            menu_strip := mod.mp.MpMenubarStrip{width: Fit}
+        }
+        Section{
             Caption{ text: "No icons: the gutter is not reserved, and one row is checked" }
             menu_plain := mod.mp.MpMenuCard{}
         }
