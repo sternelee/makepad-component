@@ -38,6 +38,7 @@ pub mod searching;
 pub mod slider;
 pub mod split;
 pub mod status;
+pub mod strips;
 pub mod steps;
 pub mod surface;
 pub mod table;
@@ -95,6 +96,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     editor::script_mod(vm);
     icon::script_mod(vm);
     status::script_mod(vm);
+    strips::script_mod(vm);
     split::script_mod(vm);
     steps::script_mod(vm);
     table::script_mod(vm);
@@ -454,6 +456,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/tabs.rs",
         blurb: "Tabs that share a width, and the minimum that makes a strip overflow",
     },
+    Page {
+        title: "Strips",
+        path: "mod.gallery.pages.strips",
+        source: "crates/gallery/src/pages/strips.rs",
+        blurb: "A tonal notice, and the tone vocabulary behind it",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -566,6 +574,7 @@ mod tests {
             ("crates/gallery/src/pages/split.rs", "split"),
             ("crates/gallery/src/pages/selects.rs", "selects"),
             ("crates/gallery/src/pages/tabs.rs", "tabs"),
+            ("crates/gallery/src/pages/strips.rs", "strips"),
         ]
         .into_iter()
         .collect();

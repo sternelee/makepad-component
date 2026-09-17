@@ -170,6 +170,7 @@ script_mod! {
                         rail_page_49 := RailRow{text: ""}
                         rail_page_50 := RailRow{text: ""}
                         rail_page_51 := RailRow{text: ""}
+                        rail_page_52 := RailRow{text: ""}
                             }
                         }
 
@@ -256,6 +257,7 @@ script_mod! {
                             page_49 := mod.gallery.pages.split{}
                             page_50 := mod.gallery.pages.selects{}
                             page_51 := mod.gallery.pages.tabs{}
+                            page_52 := mod.gallery.pages.strips{}
                         }
                     }
                 }
@@ -269,7 +271,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 52] = [
+const PAGE_SLOTS: [&[LiveId]; 53] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -322,10 +324,11 @@ const PAGE_SLOTS: [&[LiveId]; 52] = [
     ids!(page_49),
     ids!(page_50),
     ids!(page_51),
+    ids!(page_52),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 52] = [
+const RAIL_ROWS: [&[LiveId]; 53] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -378,6 +381,7 @@ const RAIL_ROWS: [&[LiveId]; 52] = [
     ids!(rail_page_49),
     ids!(rail_page_50),
     ids!(rail_page_51),
+    ids!(rail_page_52),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1574,6 +1578,51 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.ui
             .mp_code_block(cx, ids!(canvas_wire))
             .set_highlighted(cx, &written, &[]);
+    }
+
+    /// Fill the strips and print the tone vocabulary — which is what the component is.
+    ///
+    /// **The mapping from a closed tone to the environment is the evidence.** Each line is one tone: its name, its glyph,
+    /// its theme colour, whether it asks the reader to act, and its height for one line and for two.
+    fn seed_strips(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::strip::{
+            strip_height, StripTone, MpStripWidgetRefExt, PAD, WASH, BORDER,
+        };
+
+        for (id, tone, message, lines) in [
+            (ids!(strip_error), StripTone::Error, "The connection was refused.", 1usize),
+            (ids!(strip_warning), StripTone::Warning, "This table has no primary key.", 1),
+            (
+                ids!(strip_info),
+                StripTone::Info,
+                "Reading 120,000 rows; this may take a moment.",
+                1,
+            ),
+            (ids!(strip_success), StripTone::Success, "Exported 4,182 rows.", 1),
+            (
+                ids!(strip_two_lines),
+                StripTone::Warning,
+                "Two of the columns are nullable and were left out of the index.",
+                2,
+            ),
+        ] {
+            let strip = self.ui.mp_strip(cx, id);
+            strip.set_tone(cx, tone, lines);
+            strip.set_message(cx, message);
+            let color = tone.color(makepad_theme::Theme::of(cx));
+            println!(
+                "STRIP tone={} glyph={:?} color=({:.2},{:.2},{:.2}) demands_action={} height_1={} height_{lines}={}",
+                tone.name(),
+                tone.glyph(),
+                color.x,
+                color.y,
+                color.z,
+                tone.demands_action(),
+                strip_height(1),
+                strip_height(lines),
+            );
+        }
+        println!("STRIP plate wash={WASH} border={BORDER} pad={PAD}");
     }
 
     /// Fill the three tab bars and print the allocation each regime produces.
@@ -2995,6 +3044,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_strips(cx);
         self.seed_tabs(cx);
         self.seed_select_rows(cx);
         self.seed_split(cx);
@@ -3016,6 +3066,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_strips(cx);
         self.seed_tabs(cx);
         self.seed_select_rows(cx);
         self.seed_split(cx);
@@ -3692,7 +3743,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 52] = [
+    const SLOT_PAGES: [&str; 53] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3745,6 +3796,7 @@ mod tests {
         "mod.gallery.pages.split",
         "mod.gallery.pages.selects",
         "mod.gallery.pages.tabs",
+        "mod.gallery.pages.strips",
     ];
 
     #[test]
