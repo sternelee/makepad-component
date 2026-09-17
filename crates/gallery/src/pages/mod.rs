@@ -57,6 +57,7 @@ pub mod menu_cards;
 pub mod motion;
 pub mod overlay;
 pub mod numbers;
+pub mod option_cards;
 pub mod pagination;
 pub mod palette;
 pub mod picking;
@@ -120,6 +121,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     dialogs::script_mod(vm);
     pagination::script_mod(vm);
     numbers::script_mod(vm);
+    option_cards::script_mod(vm);
     palette::script_mod(vm);
     menu::script_mod(vm);
     menu_cards::script_mod(vm);
@@ -478,6 +480,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/collapsible.rs",
         blurb: "A header whose caller owns the state, and a body hidden rather than clipped",
     },
+    Page {
+        title: "Option Cards",
+        path: "mod.gallery.pages.option_cards",
+        source: "crates/gallery/src/pages/option_cards.rs",
+        blurb: "A selection ring drawn as a concentric border, so choosing cannot reflow",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -593,6 +601,7 @@ mod tests {
             ("crates/gallery/src/pages/strips.rs", "strips"),
             ("crates/gallery/src/pages/breadcrumbs.rs", "breadcrumbs"),
             ("crates/gallery/src/pages/collapsible.rs", "collapsible"),
+            ("crates/gallery/src/pages/option_cards.rs", "option_cards"),
         ]
         .into_iter()
         .collect();

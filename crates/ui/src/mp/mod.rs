@@ -71,6 +71,7 @@ pub mod menubar;
 pub mod menubar_strip;
 pub mod loaders;
 pub mod number_input;
+pub mod option_card;
 pub mod pagination;
 pub mod palette;
 pub mod popover;
@@ -155,6 +156,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::strip::script_mod(vm);
     crate::mp::breadcrumb::script_mod(vm);
     crate::mp::collapsible::script_mod(vm);
+    crate::mp::option_card::script_mod(vm);
     crate::mp::menubar_strip::script_mod(vm);
     crate::mp::menu_card::script_mod(vm);
     crate::mp::description_list::script_mod(vm);

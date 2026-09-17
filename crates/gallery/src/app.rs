@@ -173,6 +173,7 @@ script_mod! {
                         rail_page_52 := RailRow{text: ""}
                         rail_page_53 := RailRow{text: ""}
                         rail_page_54 := RailRow{text: ""}
+                        rail_page_55 := RailRow{text: ""}
                             }
                         }
 
@@ -262,6 +263,7 @@ script_mod! {
                             page_52 := mod.gallery.pages.strips{}
                             page_53 := mod.gallery.pages.breadcrumbs{}
                             page_54 := mod.gallery.pages.collapsible{}
+                            page_55 := mod.gallery.pages.option_cards{}
                         }
                     }
                 }
@@ -275,7 +277,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 55] = [
+const PAGE_SLOTS: [&[LiveId]; 56] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -331,10 +333,11 @@ const PAGE_SLOTS: [&[LiveId]; 55] = [
     ids!(page_52),
     ids!(page_53),
     ids!(page_54),
+    ids!(page_55),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 55] = [
+const RAIL_ROWS: [&[LiveId]; 56] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -390,6 +393,7 @@ const RAIL_ROWS: [&[LiveId]; 55] = [
     ids!(rail_page_52),
     ids!(rail_page_53),
     ids!(rail_page_54),
+    ids!(rail_page_55),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1586,6 +1590,47 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.ui
             .mp_code_block(cx, ids!(canvas_wire))
             .set_highlighted(cx, &written, &[]);
+    }
+
+    /// Choose the middle card and print the two rules the page demonstrates.
+    ///
+    /// **The no-reflow rule is a comparison**: `card_size` takes the selection and returns the same size for both, so the
+    /// print shows the two calls rather than one. And the concentric rule is printed as the relation it is — ring less the
+    /// gap and the width is the frame — because that is what a spread shadow would break.
+    fn seed_option_cards(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::option_card::{
+            card_size, is_concentric, ring_alpha, ring_radius, MpOptionCardWidgetRefExt, CARD_HEIGHT,
+            CARD_RADIUS, RING_GAP, RING_WIDTH, ROW_GAP,
+        };
+
+        for (id, label, selected) in [
+            (ids!(card_a), "Ocean", false),
+            (ids!(card_b), "Forest", true),
+            (ids!(card_c), "Ember", false),
+        ] {
+            let card = self.ui.mp_option_card(cx, id);
+            card.set_label(cx, label);
+            card.set_selected(cx, selected);
+        }
+        let _ = self.ui.view(cx, ids!(option_row));
+
+        println!(
+            "OPTION_CARD frame_h={CARD_HEIGHT} radius={CARD_RADIUS} ring_gap={RING_GAP} ring_width={RING_WIDTH} row_gap={ROW_GAP} \
+ring_radius={} concentric={} is_concentric_self={}",
+            ring_radius(CARD_RADIUS),
+            is_concentric(CARD_RADIUS, ring_radius(CARD_RADIUS)),
+            // A spread shadow would round by the frame's radius while sitting outside it — which is the failure, so it is
+            // printed as a contrast rather than described.
+            is_concentric(CARD_RADIUS, CARD_RADIUS),
+        );
+        println!(
+            "OPTION_CARD size_unselected={:?} size_selected={:?} same={} alpha_off={} alpha_on={}",
+            card_size(false),
+            card_size(true),
+            card_size(false) == card_size(true),
+            ring_alpha(false),
+            ring_alpha(true),
+        );
     }
 
     /// Point the two headers the way their sections are, and print the rule the page is really showing.
@@ -3158,6 +3203,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_option_cards(cx);
         self.seed_collapsible(cx);
         self.seed_breadcrumbs(cx);
         self.seed_strips(cx);
@@ -3182,6 +3228,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_option_cards(cx);
         self.seed_collapsible(cx);
         self.seed_breadcrumbs(cx);
         self.seed_strips(cx);
@@ -3861,7 +3908,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 55] = [
+    const SLOT_PAGES: [&str; 56] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3917,6 +3964,7 @@ mod tests {
         "mod.gallery.pages.strips",
         "mod.gallery.pages.breadcrumbs",
         "mod.gallery.pages.collapsible",
+        "mod.gallery.pages.option_cards",
     ];
 
     #[test]
