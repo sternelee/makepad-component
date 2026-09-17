@@ -1785,7 +1785,15 @@ bezel 的 `crates/ui/src/` 是 35 个模块名（`widgets/` 只有 9 个文件�
 ## 这 4 个缺口各自是什么性质，不能一概而论
 
 - **`menu` + `menubar`（合计 1092 行）是真组件**，而且是常用件：一个 `Item::Submenu` 行、一个 `Cursor`（哪些子菜单打开、哪一行是 live，指针与键盘**都**移动它，所以两者不可能对同一行有分歧）、一个 `Hit`（指针做了什么，返回给调用方，**动作仍归调用方**）。我这边的 `mp/combobox.rs` 有面板+行的模型，但**没有子菜单**。这是下一个该做的。
-- **`titlebar` 是平台差异，不是组件缺失**：bezel 在 gpui 里自绘标题栏并自己处理拖拽（`DragState`）；makepad 有 `cx.start_dragging()` 与原生窗口控制。移植过来会得到一个**依赖宿主平台**的组件。
+- **`titlebar` 是**真缺口**——这条我先前写错了，而且是没有查证就写下的。** 我当时写「makepad 有 `cx.start_dragging()`」，查过之后：
+  - `CxOsOp::StartDragging(items)` 是 **拖放文件**，不是拖窗口 ✗ 我记错了；
+  - 但 `CxOsOp` 里有 `HideWindowButtons()` / `ShowWindowButtons()` / `SetWindowTitle(..)`，而
+    `platform/src/window.rs:805` 有 `pub fn reposition(&self, cx, position: Vec2d)` ✓ **所以自绘标题栏是可移植的**：
+    隐藏原生按钮，指针拖动时 `window.reposition(cx, pos)` 即可。
+  - **一个真实的平台警告**：`linux_wayland.rs:935` 对 `RepositionWindow` 是**空实现** —— 所以 Wayland 下自绘标题栏
+    无法用拖拽移动窗口。这是「平台上的一条限制」，不是「整个组件不适用」。
+  
+  结论：`titlebar` 从「不算缺口」改成**真缺口，可做**。
 - **`stats` 是诊断件，依赖 gpui 内部**：它数的是「本窗口的渲染次数」，而那个数字之所以等于帧率，是因为 gpui 对每个未缓存 view 每帧渲染一次；`Painter::woken` 用来区分「哪些是它自己 tick 引起的」。makepad 没有对应的 `woken`，GPU 占用也没有对应测量点。**移植会得到一个只剩 FPS+内存的版本**——那是一个诚实的降级，但必须写清楚降了什么，而不是假装对等。
 
 ## 这一轮由「运行」而不是「阅读」抓到的三个真缺陷
