@@ -438,6 +438,17 @@ impl CanvasItem {
         }
     }
 
+    /// Whether this card is a live *instance* — a terminal, a browser, or an
+    /// agent chat over a terminal. These are the cards the toolbar calls the
+    /// canvas's instances (and what its selector lists); notes, media and the
+    /// music player are documents.
+    pub fn is_instance(&self) -> bool {
+        matches!(
+            self,
+            CanvasItem::Terminal { .. } | CanvasItem::Browser { .. } | CanvasItem::Agent { .. }
+        )
+    }
+
     pub fn world(&self) -> Rect {
         match self {
             CanvasItem::Note { world, .. }

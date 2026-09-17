@@ -435,6 +435,9 @@ script_mod! {
                     suggestion_11 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
                     suggestion_12 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
                     suggestion_13 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_14 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_15 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
+                    suggestion_16 := Label{width: Fill height: 24 padding: Inset{left: 6 right: 6 top: 4 bottom: 4} visible: false draw_text +: {text_style: theme.font_regular{font_size: 12} color: mod.tc.text_primary}}
                 }
             }
         }

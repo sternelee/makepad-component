@@ -48,6 +48,15 @@ pub enum Command {
     Zoom {
         factor: f32,
     },
+    /// `/layout [grid|free]` — arrange the cards in a grid, or hand the
+    /// positions back to the user. No argument toggles.
+    Layout {
+        mode: Option<LayoutArg>,
+    },
+    /// `/maximize` — fill the canvas with the selected card, or put it back.
+    Maximize,
+    /// `/fit` — zoom out until every card is on screen.
+    Fit,
     Help,
     /// Clear all whiteboard shapes.
     Clear,
@@ -62,6 +71,13 @@ pub enum Command {
     Forward {
         text: String,
     },
+}
+
+/// What `/layout` asks for. A bare `/layout` toggles between the two.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LayoutArg {
+    Grid,
+    Free,
 }
 
 pub fn parse(line: &str) -> Command {
@@ -136,6 +152,16 @@ pub fn parse(line: &str) -> Command {
                     return Command::Zoom { factor: f };
                 }
             }
+            Some("layout") => {
+                let mode = match parts.next() {
+                    Some("grid") | Some("tile") | Some("tiles") => Some(LayoutArg::Grid),
+                    Some("free") | Some("manual") => Some(LayoutArg::Free),
+                    _ => None,
+                };
+                return Command::Layout { mode };
+            }
+            Some("maximize") | Some("max") | Some("expand") => return Command::Maximize,
+            Some("fit") => return Command::Fit,
             Some("rename") => {
                 let old = parts.next().unwrap_or("").to_string();
                 let new = parts.next().unwrap_or("").to_string();
@@ -244,6 +270,38 @@ mod tests {
             }
         );
         assert_eq!(parse("/help"), Command::Help);
+    }
+
+    #[test]
+    fn parses_layout_and_zoom_commands() {
+        // A bare /layout toggles; both words and their synonyms name a mode.
+        assert_eq!(parse("/layout"), Command::Layout { mode: None });
+        assert_eq!(
+            parse("/layout grid"),
+            Command::Layout {
+                mode: Some(LayoutArg::Grid)
+            }
+        );
+        assert_eq!(
+            parse("/layout free"),
+            Command::Layout {
+                mode: Some(LayoutArg::Free)
+            }
+        );
+        assert_eq!(
+            parse("/layout tiles"),
+            Command::Layout {
+                mode: Some(LayoutArg::Grid)
+            }
+        );
+        // An unknown word toggles rather than failing.
+        assert_eq!(
+            parse("/layout sideways"),
+            Command::Layout { mode: None }
+        );
+        assert_eq!(parse("/maximize"), Command::Maximize);
+        assert_eq!(parse("/max"), Command::Maximize);
+        assert_eq!(parse("/fit"), Command::Fit);
     }
 
     #[test]

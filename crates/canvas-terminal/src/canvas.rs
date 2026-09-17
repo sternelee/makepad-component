@@ -380,13 +380,16 @@ const PALETTE_COMMANDS: &[(&str, &str)] = &[
     ("/rename ", "Rename a terminal — OLD NEW"),
     ("/status ", "Set a card's status badge — NAME STATUS"),
     ("/zoom ", "Set the canvas zoom — /zoom 1.5"),
+    ("/layout", "Tile the cards in a grid, or back to your own positions"),
+    ("/maximize", "Fill the canvas with the selected card, or put it back"),
+    ("/fit", "Zoom until every card is on screen"),
     ("/grid", "Toggle the grid overlay"),
     ("/clear", "Clear the whiteboard"),
     ("/help", "List every command"),
 ];
 
 /// Rows the palette can show, matching the `suggestion_0..` labels in the DSL.
-const PALETTE_ROWS: usize = 14;
+const PALETTE_ROWS: usize = 17;
 /// Row stride in the palette's list. `main.rs` sets the same height on each
 /// suggestion label: a press is mapped back to a row by this step, so the two
 /// have to stay in step (they are also why the list carries no padding).
@@ -399,6 +402,59 @@ const TAB_ACTIVE_BG: [f32; 4] = [0.20, 0.24, 0.34, 1.0];
 const TAB_INACTIVE_BG: [f32; 4] = [0.14, 0.16, 0.22, 1.0];
 const TAB_BORDER: [f32; 4] = [0.28, 0.32, 0.42, 1.0];
 const TAB_PLUS_W: f64 = 32.0;
+
+/// The floating toolbar: a pill centred over the top of the canvas holding the
+/// selected instance, the layout toggle, the zoom toggle and the settings menu
+/// (the CNVS product's canvas toolbar).
+const TOOLBAR_H: f64 = 34.0;
+/// Gap between the tab bar above it and the pill.
+const TOOLBAR_TOP_GAP: f64 = 10.0;
+/// Padding inside the pill, either side.
+const TOOLBAR_PAD: f64 = 6.0;
+const TOOLBAR_ICON: f64 = 24.0;
+const TOOLBAR_ICON_GAP: f64 = 3.0;
+const TOOLBAR_RADIUS: f64 = 10.0;
+/// The instance label is measured and elided past this, so a long card title
+/// cannot stretch the pill across the canvas.
+const TOOLBAR_NAME_MAX_W: f64 = 168.0;
+const TOOLBAR_BG: [f32; 4] = [0.13, 0.145, 0.19, 0.94];
+const TOOLBAR_BORDER: [f32; 4] = [0.30, 0.34, 0.44, 1.0];
+const TOOLBAR_BTN_BG: [f32; 4] = [0.19, 0.21, 0.28, 1.0];
+const TOOLBAR_BTN_HOVER: [f32; 4] = [0.25, 0.29, 0.38, 1.0];
+/// A control that is doing something right now (grid on, card zoomed, menu
+/// open) reads as a lit button, not just a hovered one.
+const TOOLBAR_BTN_ACTIVE: [f32; 4] = [0.26, 0.36, 0.54, 1.0];
+const TOOLBAR_INK: [f32; 4] = [0.90, 0.92, 0.96, 1.0];
+const TOOLBAR_INK_DIM: [f32; 4] = [0.60, 0.65, 0.76, 1.0];
+const TOOLBAR_DIVIDER: [f32; 4] = [0.30, 0.34, 0.44, 1.0];
+/// The toolbar's popovers (the instance list and the settings list).
+const TOOLBAR_MENU_ROW_H: f64 = 26.0;
+const TOOLBAR_MENU_PAD: f64 = 5.0;
+const TOOLBAR_MENU_RADIUS: f64 = 9.0;
+const TOOLBAR_MENU_BG: [f32; 4] = [0.145, 0.16, 0.215, 0.985];
+const TOOLBAR_MENU_ROW_HOVER: [f32; 4] = [0.24, 0.28, 0.37, 1.0];
+/// Lane down the left of a menu row holding its state mark (a lit dot / ring).
+const TOOLBAR_MENU_MARK: f64 = 18.0;
+
+/// The settings popover, in display order. Each entry is a toggle or an
+/// action; [`CanvasPanel::run_toolbar_setting`] owns what they do.
+const TOOLBAR_SETTINGS: &[&str] = &[
+    "Grid overlay",
+    "Reset zoom",
+    "Fit all cards",
+    "Clear whiteboard",
+];
+
+/// Grid layout (`/layout grid`): the gap between cells and the margin around
+/// the whole arrangement, in screen px — divided by the zoom so the layout
+/// looks the same at any camera scale.
+const LAYOUT_GAP: f64 = 16.0;
+const LAYOUT_MARGIN: f64 = 20.0;
+/// The shape a card wants to be (w/h), for scoring cells against. Roughly the
+/// app's own default card sizes (460×340, 620×440 …) and the 16:10 a terminal
+/// reads best at — *not* the viewport's aspect, which would happily hand a
+/// 4:1 canvas a pair of 4:1 slivers instead of a usable row.
+const LAYOUT_IDEAL_ASPECT: f64 = 1.6;
 
 /// Whiteboard ink color presets (RGBA) shown in the tool palette.
 const INK_COLORS: [[f32; 4]; 6] = [
@@ -468,6 +524,29 @@ fn vec4f(c: [f32; 4]) -> Vec4f {
     }
 }
 
+/// A circle of `center`/`radius` split into `steps` segments: the outline
+/// chops the toolbar's menus use for an unset toggle (no glyphs, so no font
+/// can fail to carry the mark).
+fn ring_segments(center: Vec2d, radius: f64, steps: usize) -> Vec<(Vec2d, Vec2d)> {
+    let steps = steps.max(3);
+    let mut out = Vec::with_capacity(steps);
+    for i in 0..steps {
+        let a = i as f64 / steps as f64 * std::f64::consts::TAU;
+        let b = (i + 1) as f64 / steps as f64 * std::f64::consts::TAU;
+        out.push((
+            Vec2d {
+                x: center.x + radius * a.cos(),
+                y: center.y + radius * a.sin(),
+            },
+            Vec2d {
+                x: center.x + radius * b.cos(),
+                y: center.y + radius * b.sin(),
+            },
+        ));
+    }
+    out
+}
+
 /// Drag state while moving or resizing an item.
 struct DragState {
     item_id: u64,
@@ -512,6 +591,62 @@ enum PaletteHit {
     Tool(usize),
     Color(usize),
     Width(usize),
+}
+
+/// Which control of the floating toolbar a press or a hover landed on.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum ToolbarHit {
+    /// The instance selector: the chevron and the selected card's title.
+    Instance,
+    /// A row of the open instance menu, by index into [`CanvasPanel::instance_ids`].
+    InstanceRow(usize),
+    /// The layout toggle: tile the cards, or hand the positions back.
+    Layout,
+    /// Fill the canvas with the selected card, or put it back.
+    Expand,
+    /// The settings button.
+    Settings,
+    /// A row of the open settings menu, by index into `TOOLBAR_SETTINGS`.
+    SettingsRow(usize),
+}
+
+/// The toolbar's popovers. Only one is open at a time.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum ToolbarMenu {
+    /// The terminal/browser/agent cards, to switch which one is selected.
+    Instances,
+    /// Canvas settings.
+    Settings,
+}
+
+/// How the canvas arranges its cards.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+enum LayoutMode {
+    /// Wherever they were dragged.
+    #[default]
+    Free,
+    /// The grid the toolbar's layout toggle computed (remembered in
+    /// `layout_recall`, so leaving puts every card back).
+    Grid,
+}
+
+/// The toolbar's geometry, published by the draw pass.
+///
+/// A press has no `Cx2d`, and the pill's width depends on a *measured* title,
+/// so the draw pass hands the rects to the press handler the same way the note
+/// check rows are published — one layout, so the two cannot disagree.
+#[derive(Clone)]
+struct ToolbarRects {
+    /// The pill's body: a press anywhere in it is the toolbar's, not the
+    /// canvas's.
+    pill: Rect,
+    name: Rect,
+    layout: Rect,
+    expand: Rect,
+    settings: Rect,
+    /// The open popover's body, and its rows in display order.
+    menu: Option<(ToolbarMenu, Rect)>,
+    rows: Vec<(ToolbarHit, Rect)>,
 }
 
 /// Active Move-tool drag: which shape is being dragged and the grab point.
@@ -562,6 +697,13 @@ struct Workspace {
     agent_scroll: HashMap<u64, f64>,
     /// Per-note body scroll, in world units (so it survives camera zoom).
     note_scroll: HashMap<u64, f64>,
+    /// How the cards are arranged, and where they were before the grid took
+    /// over. Per workspace: each space is arranged on its own.
+    layout_mode: LayoutMode,
+    layout_recall: Vec<(u64, Rect)>,
+    /// The card the toolbar's zoom toggle filled the canvas with, and the
+    /// world rect it had before — put back on the second press.
+    maximized: Option<(u64, Rect)>,
 }
 
 impl Workspace {
@@ -601,6 +743,9 @@ impl Workspace {
             agent_input: String::new(),
             agent_scroll: HashMap::new(),
             note_scroll: HashMap::new(),
+            layout_mode: LayoutMode::default(),
+            layout_recall: Vec::new(),
+            maximized: None,
         }
     }
 }
@@ -650,6 +795,24 @@ pub struct CanvasPanel {
     /// button, or a parked card's tab (and its ✕).
     #[rust]
     hovered_tab: Option<TopBarHit>,
+    /// The toolbar control currently hovered (drives its lit state).
+    #[rust]
+    toolbar_hover: Option<ToolbarHit>,
+    /// The toolbar popover that is open, if any.
+    #[rust]
+    toolbar_menu: Option<ToolbarMenu>,
+    /// The toolbar's geometry from the last draw pass, so a press can hit-test
+    /// it without a `Cx2d` to measure the title with.
+    #[rust]
+    toolbar_rects: Option<ToolbarRects>,
+    /// How the cards are arranged, and where they were before the grid took
+    /// over. Mirrored from the active workspace, like every other field here.
+    #[rust]
+    layout_mode: LayoutMode,
+    #[rust]
+    layout_recall: Vec<(u64, Rect)>,
+    #[rust]
+    maximized: Option<(u64, Rect)>,
     /// Minimized cards, parked whole: they are the top bar's tabs. Keeping the
     /// `CanvasItem` itself (rather than a per-kind copy) means minimizing cannot
     /// lose a note's styling, a media card's kind, or a terminal's live PTY
@@ -953,6 +1116,9 @@ impl CanvasPanel {
             agent_input: std::mem::take(&mut self.agent_input),
             agent_scroll: std::mem::take(&mut self.agent_scroll),
             note_scroll: std::mem::take(&mut self.note_scroll),
+            layout_mode: self.layout_mode,
+            layout_recall: std::mem::take(&mut self.layout_recall),
+            maximized: self.maximized.take(),
         };
         if self.current_workspace < self.workspaces.len() {
             self.workspaces[self.current_workspace] = ws;
@@ -1003,6 +1169,9 @@ impl CanvasPanel {
         self.agent_input = ws.agent_input;
         self.agent_scroll = ws.agent_scroll;
         self.note_scroll = ws.note_scroll;
+        self.layout_mode = ws.layout_mode;
+        self.layout_recall = std::mem::take(&mut ws.layout_recall);
+        self.maximized = ws.maximized.take();
         self.current_workspace = idx;
         // Clear transient cross-workspace interaction state.
         self.drag = None;
@@ -1011,6 +1180,8 @@ impl CanvasPanel {
         self.hovered = None;
         self.hovered_btn = None;
         self.hovered_tab = None;
+        self.toolbar_hover = None;
+        self.toolbar_menu = None;
         self.note_draw = None;
         self.text_editing = false;
         self.note_edit_id = None;
@@ -2847,11 +3018,15 @@ impl CanvasPanel {
     /// press while it is up; the right-side properties panel is UI and must
     /// remain clickable.
     fn is_canvas_ui_hit(&self, cx: &Cx, screen: Vec2d) -> bool {
-        if screen.y <= TAB_BAR_H {
+        if screen.y <= self.viewport_pos.y + TAB_BAR_H {
             return true;
         }
         // The palette is modal: while it is up, nothing behind it is a hit.
         if self.command_open {
+            return true;
+        }
+        // The floating toolbar is chrome, not canvas (its popovers included).
+        if self.toolbar_contains(screen) {
             return true;
         }
         // Right-side properties panel (known geometry fallback in case the
@@ -3055,10 +3230,26 @@ impl CanvasPanel {
                 self.redraw(cx);
                 self.status(cx, &format!("Zoom: {:.0}%", self.camera.zoom * 100.0));
             }
+            Command::Layout { mode } => {
+                let mode = mode.unwrap_or(if self.layout_mode == LayoutMode::Grid {
+                    command::LayoutArg::Free
+                } else {
+                    command::LayoutArg::Grid
+                });
+                self.set_layout_mode(
+                    cx,
+                    match mode {
+                        command::LayoutArg::Grid => LayoutMode::Grid,
+                        command::LayoutArg::Free => LayoutMode::Free,
+                    },
+                );
+            }
+            Command::Maximize => self.toggle_maximize(cx),
+            Command::Fit => self.fit_all(cx),
             Command::Help => {
                 self.status(
                     cx,
-                    "Commands: @agent text · /new agent NAME [pi|claude|codex] · /new terminal NAME · /new browser URL · /new music TITLE · /new note · /open FILE · /focus NAME · /zoom N · /grid · /clear · /help",
+                    "Commands: @agent text · /new agent NAME [pi|claude|codex] · /new terminal NAME · /new browser URL · /new music TITLE · /new note · /open FILE · /focus NAME · /layout [grid|free] · /maximize · /fit · /zoom N · /grid · /clear · /help",
                 );
             }
             Command::Clear => {
@@ -5759,6 +5950,922 @@ impl CanvasPanel {
         out
     }
 
+    // ───────────────────────── the floating toolbar ─────────────────────────
+
+    /// What the toolbar's selector shows, and whether it names a real card.
+    ///
+    /// The selected *instance* (terminal, browser, agent) is the toolbar's
+    /// subject; with none selected the pill says so rather than guessing.
+    fn toolbar_instance_label(&self) -> (String, bool) {
+        if let Some(id) = self.selected {
+            if let Some(item) = self.items.iter().find(|i| i.id() == id) {
+                if item.is_instance() {
+                    return (item.title().to_string(), true);
+                }
+            }
+        }
+        (String::from("No instance"), false)
+    }
+
+    /// The instance cards in canvas order: the selector's menu, and what
+    /// `ToolbarHit::InstanceRow(i)` indexes into.
+    fn instance_ids(&self) -> Vec<u64> {
+        self.items
+            .iter()
+            .filter(|i| i.is_instance())
+            .map(|i| i.id())
+            .collect()
+    }
+
+    /// The world rect the viewport is showing. "Fill the canvas" and "fit"
+    /// both mean this rectangle.
+    fn visible_world_rect(&self) -> Rect {
+        let vp = self.world_viewport();
+        let tl = self.camera.screen_to_world(self.viewport_pos, vp);
+        let br = self
+            .camera
+            .screen_to_world(self.viewport_pos + self.viewport, vp);
+        Rect {
+            pos: tl,
+            size: br - tl,
+        }
+    }
+
+    /// The world rect the grid may tile into: the visible canvas *below* the
+    /// chrome that draws over its top edge — the tab bar and the floating
+    /// toolbar — so no card's title bar is arranged underneath them.
+    fn layout_area(&self) -> Rect {
+        let chrome = (TAB_BAR_H + TOOLBAR_TOP_GAP + TOOLBAR_H + 8.0) / self.camera.zoom as f64;
+        let area = self.visible_world_rect();
+        Rect {
+            pos: Vec2d {
+                x: area.pos.x,
+                y: area.pos.y + chrome,
+            },
+            size: Vec2d {
+                x: area.size.x,
+                y: (area.size.y - chrome).max(1.0),
+            },
+        }
+    }
+
+    /// Columns and rows that lay `n` cards over `viewport` (world units) with
+    /// the least distortion, plus the cell they imply.
+    ///
+    /// This is the "2×2, 3×3 …" rule the toolbar's layout toggle promises: the
+    /// column count whose cells come closest to a card's natural shape, with
+    /// the viewport deciding how much room each cell has — so four cards tile
+    /// 2×2 and nine tile 3×3 in the app's window, two sit side by side, five
+    /// take 3+2, and the same four cards form a row of four on a short wide
+    /// canvas. Pure, so it is testable without a panel.
+    fn grid_shape(n: usize, viewport: Vec2d, gap: f64) -> Option<(usize, usize, f64, f64)> {
+        if n == 0 || viewport.x <= 1.0 || viewport.y <= 1.0 {
+            return None;
+        }
+        let mut best: Option<(usize, usize, f64, f64)> = None;
+        let mut best_score = f64::INFINITY;
+        for cols in 1..=n {
+            let rows = n.div_ceil(cols);
+            let cw = (viewport.x - gap * (cols - 1) as f64) / cols as f64;
+            let ch = (viewport.y - gap * (rows - 1) as f64) / rows as f64;
+            if cw <= 1.0 || ch <= 1.0 {
+                continue;
+            }
+            let score = (cw / ch - LAYOUT_IDEAL_ASPECT).abs();
+            if score < best_score {
+                best_score = score;
+                best = Some((cols, rows, cw, ch));
+            }
+        }
+        best
+    }
+
+    /// Enter or leave the grid arrangement.
+    ///
+    /// Entering remembers every card's rect first, so leaving puts them back
+    /// exactly where the user had them — that is the whole promise of the
+    /// toggle: the tidy arrangement, *or* your own positions.
+    fn set_layout_mode(&mut self, cx: &mut Cx, mode: LayoutMode) {
+        // Both modes invalidate a filled card: the grid moves it, and leaving
+        // the grid restores a rect the maximize would otherwise fight.
+        self.maximized = None;
+        if mode == self.layout_mode {
+            if mode == LayoutMode::Grid {
+                // Re-tiling is useful after cards joined the canvas.
+                self.arrange_grid(cx);
+            } else {
+                self.status(cx, "Layout: your own positions");
+            }
+            return;
+        }
+        match mode {
+            LayoutMode::Grid => {
+                self.layout_recall = self
+                    .items
+                    .iter()
+                    .map(|i| (i.id(), i.world()))
+                    .collect();
+                self.arrange_grid(cx);
+            }
+            LayoutMode::Free => {
+                let recall = std::mem::take(&mut self.layout_recall);
+                for (id, rect) in recall {
+                    if let Some(item) = self.items.iter_mut().find(|i| i.id() == id) {
+                        *item.world_mut() = rect;
+                    }
+                }
+                self.layout_mode = LayoutMode::Free;
+                self.save_canvas();
+                self.redraw(cx);
+                self.status(cx, "Layout: your own positions");
+            }
+        }
+    }
+
+    /// Tile every card over the visible canvas, keeping their reading order
+    /// (top to bottom, then left to right) so tidying up feels like tidying up
+    /// rather than a shuffle.
+    fn arrange_grid(&mut self, cx: &mut Cx) {
+        let n = self.items.len();
+        let zoom = self.camera.zoom as f64;
+        // Gaps and margins are screen-space constants, so the arrangement
+        // looks the same however far the camera is zoomed in.
+        let gap = LAYOUT_GAP / zoom;
+        let margin = LAYOUT_MARGIN / zoom;
+        let area = self.layout_area();
+        let inner = Vec2d {
+            x: (area.size.x - margin * 2.0).max(1.0),
+            y: (area.size.y - margin * 2.0).max(1.0),
+        };
+        let Some((cols, rows, cw, ch)) = Self::grid_shape(n, inner, gap) else {
+            self.status(cx, "Nothing to arrange");
+            return;
+        };
+        let mut order: Vec<(u64, Vec2d)> = self
+            .items
+            .iter()
+            .map(|i| (i.id(), i.world().pos))
+            .collect();
+        order.sort_by(|a, b| {
+            a.1.y
+                .partial_cmp(&b.1.y)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(
+                    a.1.x
+                        .partial_cmp(&b.1.x)
+                        .unwrap_or(std::cmp::Ordering::Equal),
+                )
+        });
+        let origin = area.pos + Vec2d {
+            x: margin,
+            y: margin,
+        };
+        for (i, (id, _)) in order.iter().enumerate() {
+            let col = (i % cols) as f64;
+            let row = (i / cols) as f64;
+            let pos = origin
+                + Vec2d {
+                    x: col * (cw + gap),
+                    y: row * (ch + gap),
+                };
+            if let Some(item) = self.items.iter_mut().find(|it| it.id() == *id) {
+                *item.world_mut() = Rect {
+                    pos,
+                    size: Vec2d { x: cw, y: ch },
+                };
+            }
+        }
+        self.layout_mode = LayoutMode::Grid;
+        self.save_canvas();
+        self.redraw(cx);
+        self.status(cx, &format!("Layout: grid {cols}×{rows} ({n} cards)"));
+    }
+
+    /// Fill the canvas with the selected card, or put it back where it was.
+    fn toggle_maximize(&mut self, cx: &mut Cx) {
+        if let Some((id, rect)) = self.maximized.take() {
+            if let Some(item) = self.items.iter_mut().find(|i| i.id() == id) {
+                *item.world_mut() = rect;
+            }
+            self.save_canvas();
+            self.redraw(cx);
+            self.status(cx, "Restored");
+            return;
+        }
+        let Some(id) = self.selected else {
+            self.status(cx, "Select a card first, then zoom it");
+            return;
+        };
+        // A small inset keeps the card's own frame and title bar off the
+        // window edge while it still reads as filling the canvas.
+        let inset = 8.0 / self.camera.zoom as f64;
+        let target = self.visible_world_rect();
+        let Some(item) = self.items.iter_mut().find(|i| i.id() == id) else {
+            return;
+        };
+        let before = item.world();
+        *item.world_mut() = Rect {
+            pos: target.pos + Vec2d {
+                x: inset,
+                y: inset,
+            },
+            size: target.size - Vec2d {
+                x: inset * 2.0,
+                y: inset * 2.0,
+            },
+        };
+        if self.layout_mode == LayoutMode::Grid {
+            // The filled card is the arrangement now; the tiling's own slots
+            // are stale the moment one card covers them.
+            self.layout_mode = LayoutMode::Free;
+            self.layout_recall.clear();
+        }
+        self.maximized = Some((id, before));
+        self.save_canvas();
+        self.redraw(cx);
+        self.status(cx, "Zoomed to fill the canvas");
+    }
+
+    /// Zoom and pan so every card is on screen at once.
+    fn fit_all(&mut self, cx: &mut Cx) {
+        let mut bounds: Option<Rect> = None;
+        for item in self.items.iter() {
+            let w = item.world();
+            bounds = Some(match bounds {
+                None => w,
+                Some(b) => {
+                    let x0 = b.pos.x.min(w.pos.x);
+                    let y0 = b.pos.y.min(w.pos.y);
+                    let x1 = (b.pos.x + b.size.x).max(w.pos.x + w.size.x);
+                    let y1 = (b.pos.y + b.size.y).max(w.pos.y + w.size.y);
+                    Rect {
+                        pos: Vec2d { x: x0, y: y0 },
+                        size: Vec2d {
+                            x: x1 - x0,
+                            y: y1 - y0,
+                        },
+                    }
+                }
+            });
+        }
+        let Some(bounds) = bounds else {
+            self.status(cx, "Nothing to fit");
+            return;
+        };
+        let pad = 48.0;
+        let zx = (self.viewport.x - pad) / bounds.size.x.max(1.0);
+        let zy = (self.viewport.y - pad) / bounds.size.y.max(1.0);
+        self.camera.zoom = zx.min(zy).clamp(0.1, 8.0) as f32;
+        self.camera.pan = bounds.pos + bounds.size * 0.5;
+        self.save_canvas();
+        self.redraw(cx);
+        self.status(
+            cx,
+            &format!(
+                "Fit {} cards — zoom {:.0}%",
+                self.items.len(),
+                self.camera.zoom * 100.0
+            ),
+        );
+    }
+
+    /// Select a card from the toolbar's instance menu: it takes the selection,
+    /// the keyboard (when it is a terminal), and the front of the canvas.
+    fn select_instance(&mut self, cx: &mut Cx, id: u64) {
+        self.selected = Some(id);
+        if self
+            .items
+            .iter()
+            .find(|i| i.id() == id)
+            .and_then(|i| i.session())
+            .is_some()
+            || self
+                .items
+                .iter()
+                .find(|i| i.id() == id)
+                .and_then(|i| i.agent_session())
+                .is_some()
+        {
+            self.focus_terminal(cx, Some(id));
+        }
+        // Raise it: picking an instance from a list means you want to see it.
+        if let Some(pos) = self.items.iter().position(|i| i.id() == id) {
+            let item = self.items.remove(pos);
+            self.items.push(item);
+        }
+        self.save_canvas();
+        self.redraw(cx);
+    }
+
+    /// Run one row of the settings popover.
+    fn run_toolbar_setting(&mut self, cx: &mut Cx, index: usize) {
+        match TOOLBAR_SETTINGS.get(index) {
+            Some(&"Grid overlay") => {
+                self.grid_enabled = !self.grid_enabled;
+                self.save_canvas();
+                self.redraw(cx);
+                self.status(
+                    cx,
+                    if self.grid_enabled {
+                        "Grid overlay on"
+                    } else {
+                        "Grid overlay off"
+                    },
+                );
+            }
+            Some(&"Reset zoom") => {
+                // zoom_at keeps the middle of the view pinned while the scale
+                // returns to 1.0.
+                let factor = 1.0 / self.camera.zoom.max(0.001);
+                self.camera
+                    .zoom_at(factor, self.view_center(), self.world_viewport());
+                self.save_canvas();
+                self.redraw(cx);
+                self.status(cx, "Zoom: 100%");
+            }
+            Some(&"Fit all cards") => {
+                self.close_toolbar_menu(cx);
+                self.fit_all(cx);
+            }
+            Some(&"Clear whiteboard") => {
+                self.close_toolbar_menu(cx);
+                if self.shapes.is_empty() {
+                    self.status(cx, "Whiteboard already empty");
+                } else {
+                    self.push_undo();
+                    self.shapes.clear();
+                    self.redraw(cx);
+                    self.status(cx, "Whiteboard cleared — ⌘Z undoes it");
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn toggle_toolbar_menu(&mut self, cx: &mut Cx, menu: ToolbarMenu) {
+        self.toolbar_menu = if self.toolbar_menu == Some(menu) {
+            None
+        } else {
+            Some(menu)
+        };
+        self.redraw(cx);
+    }
+
+    fn close_toolbar_menu(&mut self, cx: &mut Cx) {
+        if self.toolbar_menu.take().is_some() {
+            self.redraw(cx);
+        }
+    }
+
+    /// Which toolbar control is under `screen`, from the last draw pass.
+    fn toolbar_hit(&self, screen: Vec2d) -> Option<ToolbarHit> {
+        let r = self.toolbar_rects.as_ref()?;
+        // An open popover owns its rows first: they sit below the pill and may
+        // extend past the controls' own rects.
+        for (hit, rect) in r.rows.iter() {
+            if rect.contains(screen) {
+                return Some(*hit);
+            }
+        }
+        for (hit, rect) in [
+            (ToolbarHit::Instance, r.name),
+            (ToolbarHit::Layout, r.layout),
+            (ToolbarHit::Expand, r.expand),
+            (ToolbarHit::Settings, r.settings),
+        ] {
+            if rect.contains(screen) {
+                return Some(hit);
+            }
+        }
+        None
+    }
+
+    /// Whether `screen` is anywhere on the toolbar — including its padding,
+    /// which is dead space rather than canvas.
+    fn toolbar_contains(&self, screen: Vec2d) -> bool {
+        let Some(r) = self.toolbar_rects.as_ref() else {
+            return false;
+        };
+        if r.pill.contains(screen) {
+            return true;
+        }
+        r.menu
+            .as_ref()
+            .is_some_and(|(_, rect)| rect.contains(screen))
+    }
+
+    /// Run the control (or menu row) a press landed on.
+    fn toolbar_press(&mut self, cx: &mut Cx, hit: ToolbarHit) {
+        match hit {
+            ToolbarHit::Instance => self.toggle_toolbar_menu(cx, ToolbarMenu::Instances),
+            ToolbarHit::Settings => self.toggle_toolbar_menu(cx, ToolbarMenu::Settings),
+            ToolbarHit::Layout => {
+                let mode = if self.layout_mode == LayoutMode::Grid {
+                    LayoutMode::Free
+                } else {
+                    LayoutMode::Grid
+                };
+                self.set_layout_mode(cx, mode);
+            }
+            ToolbarHit::Expand => self.toggle_maximize(cx),
+            ToolbarHit::InstanceRow(i) => {
+                let id = self.instance_ids().get(i).copied();
+                self.close_toolbar_menu(cx);
+                if let Some(id) = id {
+                    self.select_instance(cx, id);
+                    let title = self
+                        .items
+                        .iter()
+                        .find(|it| it.id() == id)
+                        .map(|it| it.title().to_string())
+                        .unwrap_or_default();
+                    self.status(cx, &format!("Selected '{title}'"));
+                }
+            }
+            ToolbarHit::SettingsRow(i) => self.run_toolbar_setting(cx, i),
+        }
+    }
+
+    /// A rounded rectangle drawn from plain quads: one row per pixel of each
+    /// corner, following the circle, plus the band between them.
+    ///
+    /// Hand-rasterised on purpose — the draw helpers here avoid the custom
+    /// pixel-fn shader (it corrupts DrawText later in the same frame), so the
+    /// radius is stepped rather than sampled.
+    fn draw_round_rect(&mut self, cx: &mut Cx2d, rect: Rect, radius: f64, color: [f32; 4]) {
+        let r = radius
+            .min(rect.size.x * 0.5)
+            .min(rect.size.y * 0.5)
+            .max(0.0);
+        if r < 0.5 {
+            self.draw_item_bg_rect(cx, rect, color);
+            return;
+        }
+        let rows = r.ceil() as usize;
+        for i in 0..rows {
+            let dy = i as f64 + 0.5;
+            let inset = r - (r * r - (r - dy) * (r - dy)).max(0.0).sqrt();
+            self.draw_item_bg_rect(
+                cx,
+                Rect {
+                    pos: Vec2d {
+                        x: rect.pos.x + inset,
+                        y: rect.pos.y + i as f64,
+                    },
+                    size: Vec2d {
+                        x: (rect.size.x - inset * 2.0).max(0.5),
+                        y: 1.0,
+                    },
+                },
+                color,
+            );
+            self.draw_item_bg_rect(
+                cx,
+                Rect {
+                    pos: Vec2d {
+                        x: rect.pos.x + inset,
+                        y: rect.pos.y + rect.size.y - 1.0 - i as f64,
+                    },
+                    size: Vec2d {
+                        x: (rect.size.x - inset * 2.0).max(0.5),
+                        y: 1.0,
+                    },
+                },
+                color,
+            );
+        }
+        let mid_y = rect.pos.y + rows as f64;
+        let mid_h = rect.size.y - rows as f64 * 2.0;
+        if mid_h > 0.0 {
+            self.draw_item_bg_rect(
+                cx,
+                Rect {
+                    pos: Vec2d {
+                        x: rect.pos.x,
+                        y: mid_y,
+                    },
+                    size: Vec2d {
+                        x: rect.size.x,
+                        y: mid_h,
+                    },
+                },
+                color,
+            );
+        }
+    }
+
+    /// A two-stroke arrowhead at `tip`, pointing along `dir`.
+    fn draw_arrowhead(
+        &mut self,
+        cx: &mut Cx2d,
+        tip: Vec2d,
+        dir: Vec2d,
+        size: f64,
+        width: f64,
+        color: [f32; 4],
+    ) {
+        let back = Vec2d {
+            x: -dir.x,
+            y: -dir.y,
+        };
+        let perp = Vec2d {
+            x: -dir.y,
+            y: dir.x,
+        };
+        for s in [-1.0, 1.0] {
+            let p = tip + back * size + perp * (size * s);
+            self.draw_segment(cx, tip, p, width, color);
+        }
+    }
+
+    /// The floating toolbar, centred over the top of the canvas: the selected
+    /// instance, then layout, zoom and settings.
+    ///
+    /// It publishes its geometry on the way past, because the pill's width
+    /// depends on a measured title and the press handler has no `Cx2d`.
+    fn draw_toolbar(&mut self, cx: &mut Cx2d) {
+        // Fixed-size chrome: pin the text scale so a card's zoom cannot leak
+        // into the pill (same rule as the tab bar).
+        self.draw_title.font_scale = 1.0;
+        let (label, has_instance) = self.toolbar_instance_label();
+        let chevron_w = 12.0;
+        let name_max = TOOLBAR_NAME_MAX_W - chevron_w - 6.0;
+        let name_text = self.elide_title(cx, &label, name_max);
+        let name_w = self
+            .draw_title
+            .prepare_single_line_run(cx, &name_text)
+            .map(|run| run.width_in_lpxs as f64)
+            .unwrap_or(0.0)
+            .min(name_max);
+        let name_box_w = chevron_w + 6.0 + name_w;
+        let icons_w = TOOLBAR_ICON * 3.0 + TOOLBAR_ICON_GAP * 2.0;
+        let total_w = TOOLBAR_PAD
+            + name_box_w
+            + 14.0
+            + 1.0
+            + 12.0
+            + icons_w
+            + TOOLBAR_PAD;
+        let pill = Rect {
+            pos: Vec2d {
+                x: (self.view_center().x - total_w * 0.5).round(),
+                y: self.viewport_pos.y + TAB_BAR_H + TOOLBAR_TOP_GAP,
+            },
+            size: Vec2d {
+                x: total_w,
+                y: TOOLBAR_H,
+            },
+        };
+        // Body: a border pass, then the fill inset by a pixel.
+        self.draw_round_rect(cx, pill, TOOLBAR_RADIUS, TOOLBAR_BORDER);
+        self.draw_round_rect(
+            cx,
+            Rect {
+                pos: pill.pos + Vec2d { x: 1.0, y: 1.0 },
+                size: pill.size - Vec2d { x: 2.0, y: 2.0 },
+            },
+            TOOLBAR_RADIUS - 1.0,
+            TOOLBAR_BG,
+        );
+
+        let inset = 3.0;
+        let name_rect = Rect {
+            pos: Vec2d {
+                x: pill.pos.x + TOOLBAR_PAD,
+                y: pill.pos.y + inset,
+            },
+            size: Vec2d {
+                x: name_box_w + 8.0,
+                y: TOOLBAR_H - inset * 2.0,
+            },
+        };
+        let divider_x = name_rect.pos.x + name_rect.size.x + 6.0;
+        let icon_y = pill.pos.y + (TOOLBAR_H - TOOLBAR_ICON) * 0.5;
+        let icon_x = divider_x + 1.0 + 10.0;
+        let layout_rect = Rect {
+            pos: Vec2d {
+                x: icon_x,
+                y: icon_y,
+            },
+            size: Vec2d {
+                x: TOOLBAR_ICON,
+                y: TOOLBAR_ICON,
+            },
+        };
+        let expand_rect = Rect {
+            pos: Vec2d {
+                x: icon_x + TOOLBAR_ICON + TOOLBAR_ICON_GAP,
+                y: icon_y,
+            },
+            size: layout_rect.size,
+        };
+        let settings_rect = Rect {
+            pos: Vec2d {
+                x: expand_rect.pos.x + TOOLBAR_ICON + TOOLBAR_ICON_GAP,
+                y: icon_y,
+            },
+            size: layout_rect.size,
+        };
+
+        let hovered = self.toolbar_hover;
+        let menu = self.toolbar_menu;
+
+        // ── the instance selector: a chevron, then the title ──
+        let name_hot = hovered == Some(ToolbarHit::Instance) || menu == Some(ToolbarMenu::Instances);
+        if name_hot {
+            self.draw_round_rect(cx, name_rect, 7.0, TOOLBAR_BTN_HOVER);
+        }
+        let ink = if has_instance {
+            TOOLBAR_INK
+        } else {
+            TOOLBAR_INK_DIM
+        };
+        let c = Vec2d {
+            x: name_rect.pos.x + 6.0,
+            y: name_rect.pos.y + name_rect.size.y * 0.5,
+        };
+        self.draw_segment(
+            cx,
+            Vec2d {
+                x: c.x - 4.0,
+                y: c.y - 2.5,
+            },
+            Vec2d {
+                x: c.x,
+                y: c.y + 1.5,
+            },
+            1.6,
+            ink,
+        );
+        self.draw_segment(
+            cx,
+            Vec2d {
+                x: c.x,
+                y: c.y + 1.5,
+            },
+            Vec2d {
+                x: c.x + 4.0,
+                y: c.y - 2.5,
+            },
+            1.6,
+            ink,
+        );
+        self.draw_title.color = vec4f(ink);
+        self.draw_title.draw_abs(
+            cx,
+            Vec2d {
+                x: c.x + 6.0,
+                y: name_rect.pos.y + (name_rect.size.y - 16.0) * 0.5,
+            },
+            &name_text,
+        );
+
+        // ── divider ──
+        self.draw_item_bg_rect(
+            cx,
+            Rect {
+                pos: Vec2d {
+                    x: divider_x,
+                    y: pill.pos.y + 8.0,
+                },
+                size: Vec2d {
+                    x: 1.0,
+                    y: TOOLBAR_H - 16.0,
+                },
+            },
+            TOOLBAR_DIVIDER,
+        );
+
+        // ── the three controls ──
+        let lit = [
+            self.layout_mode == LayoutMode::Grid,
+            self.maximized.is_some(),
+            menu == Some(ToolbarMenu::Settings),
+        ];
+        for (i, (hit, rect)) in [
+            (ToolbarHit::Layout, layout_rect),
+            (ToolbarHit::Expand, expand_rect),
+            (ToolbarHit::Settings, settings_rect),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let hot = hovered == Some(hit) || lit[i];
+            let body = if lit[i] {
+                TOOLBAR_BTN_ACTIVE
+            } else if hot {
+                TOOLBAR_BTN_HOVER
+            } else {
+                TOOLBAR_BTN_BG
+            };
+            self.draw_round_rect(cx, rect, 7.0, body);
+            let icon_ink = if lit[i] { TOOLBAR_INK } else { ink };
+            self.draw_toolbar_icon(cx, hit, rect, icon_ink, body);
+        }
+
+        // ── the open popover, over everything the pill sits on ──
+        let (menu_body, rows) = match self.toolbar_menu {
+            Some(kind) => {
+                let (body, rows) = self.draw_toolbar_menu(cx, kind, pill);
+                (body.map(|rect| (kind, rect)), rows)
+            }
+            None => (None, Vec::new()),
+        };
+        self.toolbar_rects = Some(ToolbarRects {
+            pill,
+            name: name_rect,
+            layout: layout_rect,
+            expand: expand_rect,
+            settings: settings_rect,
+            menu: menu_body,
+            rows,
+        });
+    }
+
+    /// The toolbar's three icons, drawn from segments and discs: a 2×2 tile
+    /// grid, two arrows pulling apart, and a cog.
+    fn draw_toolbar_icon(
+        &mut self,
+        cx: &mut Cx2d,
+        hit: ToolbarHit,
+        rect: Rect,
+        ink: [f32; 4],
+        body: [f32; 4],
+    ) {
+        let c = rect.pos + rect.size * 0.5;
+        match hit {
+            ToolbarHit::Layout => {
+                // Four outlined tiles, the shape the button makes of the cards.
+                let tile = 6.0;
+                let step = 7.5;
+                for (dx, dy) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                    let pos = Vec2d {
+                        x: c.x + dx * step * 0.5 - tile * 0.5,
+                        y: c.y + dy * step * 0.5 - tile * 0.5,
+                    };
+                    let r = Rect {
+                        pos,
+                        size: Vec2d { x: tile, y: tile },
+                    };
+                    self.draw_round_rect(cx, r, 1.5, ink);
+                    self.draw_round_rect(
+                        cx,
+                        Rect {
+                            pos: r.pos + Vec2d { x: 1.5, y: 1.5 },
+                            size: Vec2d {
+                                x: tile - 3.0,
+                                y: tile - 3.0,
+                            },
+                        },
+                        0.5,
+                        body,
+                    );
+                }
+            }
+            ToolbarHit::Expand => {
+                // Two arrows on the ↗ ↙ diagonal: the corners the card grows to.
+                for (dx, dy) in [(1.0, 1.0), (-1.0, -1.0)] {
+                    let dir = Vec2d { x: dx, y: dy };
+                    let from = c + dir * 2.0;
+                    let tip = c + dir * 6.5;
+                    self.draw_segment(cx, from, tip, 1.6, ink);
+                    self.draw_arrowhead(cx, tip, dir, 3.4, 1.6, ink);
+                }
+            }
+            ToolbarHit::Settings => {
+                // A cog: eight teeth, a body, and a hole.
+                let teeth = 8;
+                for i in 0..teeth {
+                    let ang = i as f64 / teeth as f64 * std::f64::consts::TAU;
+                    let dir = Vec2d {
+                        x: ang.cos(),
+                        y: ang.sin(),
+                    };
+                    self.draw_segment(cx, c + dir * 4.6, c + dir * 7.0, 2.4, ink);
+                }
+                self.draw_filled_disc(cx, c, 5.6, ink);
+                self.draw_filled_disc(cx, c, 2.4, body);
+            }
+            _ => {}
+        }
+    }
+
+    /// The open popover: its body and its rows, in display order. Returns the
+    /// body rect (for hit-testing "inside the menu") and one rect per row.
+    fn draw_toolbar_menu(
+        &mut self,
+        cx: &mut Cx2d,
+        kind: ToolbarMenu,
+        pill: Rect,
+    ) -> (Option<Rect>, Vec<(ToolbarHit, Rect)>) {
+        self.draw_title.font_scale = 1.0;
+        // Each row is (hit, label, marked) — built first, so the body can be
+        // sized to the widest one.
+        let mut rows: Vec<(ToolbarHit, String, bool)> = Vec::new();
+        match kind {
+            ToolbarMenu::Instances => {
+                let ids = self.instance_ids();
+                for (i, id) in ids.iter().enumerate() {
+                    if let Some(item) = self.items.iter().find(|it| it.id() == *id) {
+                        rows.push((
+                            ToolbarHit::InstanceRow(i),
+                            item.title().to_string(),
+                            self.selected == Some(*id),
+                        ));
+                    }
+                }
+                if rows.is_empty() {
+                    rows.push((ToolbarHit::InstanceRow(usize::MAX), "No instances yet".into(), false));
+                }
+            }
+            ToolbarMenu::Settings => {
+                for (i, name) in TOOLBAR_SETTINGS.iter().enumerate() {
+                    let on = match *name {
+                        "Grid overlay" => self.grid_enabled,
+                        _ => false,
+                    };
+                    rows.push((ToolbarHit::SettingsRow(i), (*name).to_string(), on));
+                }
+            }
+        }
+        // Widen to the longest label (bounded): a menu that clips its own rows
+        // is worse than a slightly wide one.
+        let widest = rows
+            .iter()
+            .map(|(_, label, _)| {
+                self.draw_title
+                    .prepare_single_line_run(cx, label)
+                    .map(|run| run.width_in_lpxs as f64)
+                    .unwrap_or(0.0)
+            })
+            .fold(0.0f64, f64::max);
+        let body_w = (TOOLBAR_MENU_MARK + widest + 26.0).clamp(180.0, 300.0);
+        let body_h = TOOLBAR_MENU_PAD * 2.0 + rows.len() as f64 * TOOLBAR_MENU_ROW_H;
+        let body = Rect {
+            pos: Vec2d {
+                x: pill.pos.x,
+                y: pill.pos.y + TOOLBAR_H + 6.0,
+            },
+            size: Vec2d {
+                x: body_w,
+                y: body_h,
+            },
+        };
+        self.draw_round_rect(cx, body, TOOLBAR_MENU_RADIUS, TOOLBAR_BORDER);
+        self.draw_round_rect(
+            cx,
+            Rect {
+                pos: body.pos + Vec2d { x: 1.0, y: 1.0 },
+                size: body.size - Vec2d { x: 2.0, y: 2.0 },
+            },
+            TOOLBAR_MENU_RADIUS - 1.0,
+            TOOLBAR_MENU_BG,
+        );
+        let hovered = self.toolbar_hover;
+        let mut out = Vec::with_capacity(rows.len());
+        for (i, (hit, label, marked)) in rows.iter().enumerate() {
+            let rect = Rect {
+                pos: Vec2d {
+                    x: body.pos.x + TOOLBAR_MENU_PAD * 0.5,
+                    y: body.pos.y + TOOLBAR_MENU_PAD + i as f64 * TOOLBAR_MENU_ROW_H,
+                },
+                size: Vec2d {
+                    x: body.size.x - TOOLBAR_MENU_PAD,
+                    y: TOOLBAR_MENU_ROW_H,
+                },
+            };
+            if hovered == Some(*hit) {
+                self.draw_round_rect(cx, rect, 6.0, TOOLBAR_MENU_ROW_HOVER);
+            }
+            // State mark: a lit accent disc when on, a hollow ring when not.
+            let cx_mark = rect.pos.x + TOOLBAR_MENU_MARK * 0.5 + 3.0;
+            let cy_mark = rect.pos.y + rect.size.y * 0.5;
+            let mark_c = Vec2d {
+                x: cx_mark,
+                y: cy_mark,
+            };
+            if *marked {
+                self.draw_filled_disc(cx, mark_c, 4.0, PAL_ACCENT);
+            } else {
+                for (a, b) in ring_segments(mark_c, 3.6, 12) {
+                    self.draw_segment(cx, a, b, 1.2, TOOLBAR_INK_DIM);
+                }
+            }
+            self.draw_title.color = vec4f(if *marked { TOOLBAR_INK } else { TAB_TITLE_DIM });
+            let text = self.elide_title(cx, label, body.size.x - TOOLBAR_MENU_MARK - 16.0);
+            self.draw_title.draw_abs(
+                cx,
+                Vec2d {
+                    x: rect.pos.x + TOOLBAR_MENU_MARK,
+                    y: rect.pos.y + (rect.size.y - 16.0) * 0.5,
+                },
+                &text,
+            );
+            out.push((*hit, rect));
+        }
+        (Some(body), out)
+    }
+
     /// Render one terminal grid row as color runs.
     #[allow(clippy::too_many_arguments)]
     fn draw_terminal_row(
@@ -7424,16 +8531,31 @@ impl Widget for CanvasPanel {
                     // Same shape as MAKEPAD_TRACE_FONT_LOAD: what the press hit,
                     // in the draw space the app and the pointer share.
                     log!(
-                        "down abs=({:.1},{:.1}) top_bar={:?} ctrl={:?} chat={:?} item={:?}",
+                        "down abs=({:.1},{:.1}) top_bar={:?} ctrl={:?} chat={:?} item={:?} tool={:?}",
                         me.abs.x,
                         me.abs.y,
                         self.top_bar_hit(me.abs),
                         self.control_button_under(me.abs),
                         self.chat_switch_under(me.abs),
                         self.hit_test(me.abs),
+                        self.toolbar_hit(me.abs),
                     );
                 }
                 self.last_mouse = me.abs;
+                // The floating toolbar and its popovers own every press inside
+                // them. A press outside an open popover dismisses it, the way
+                // the command palette does, so the canvas below stays untouched.
+                if let Some(hit) = self.toolbar_hit(me.abs) {
+                    self.toolbar_press(cx, hit);
+                    return;
+                }
+                if self.toolbar_menu.is_some() {
+                    self.close_toolbar_menu(cx);
+                    return;
+                }
+                if self.toolbar_contains(me.abs) {
+                    return;
+                }
                 // A click inside the card/note being edited keeps its hidden
                 // input focused: mark this click for the focus repair, since
                 // the MouseUp would otherwise clear it (empty-rect rule).
@@ -7939,6 +9061,15 @@ impl Widget for CanvasPanel {
                 let world = self.camera.screen_to_world(me.abs, self.world_viewport());
                 let delta = world - drag.grab_world;
                 let item_id = drag.item_id;
+                // A hand-placed card is the user arranging the canvas, so the
+                // grid's slots and its recall are stale the moment one moves:
+                // the layout button has to stop claiming the canvas is tiled.
+                if delta.x != 0.0 || delta.y != 0.0 {
+                    if self.layout_mode == LayoutMode::Grid {
+                        self.layout_mode = LayoutMode::Free;
+                        self.layout_recall.clear();
+                    }
+                }
                 match drag.mode {
                     DragMode::Move => {
                         let item_origin_world = drag.item_origin_world;
@@ -7965,6 +9096,7 @@ impl Widget for CanvasPanel {
                 let hov = self.hit_test(me.abs);
                 let hov_btn = self.control_button_under(me.abs);
                 let hov_tab = self.top_bar_hit(me.abs);
+                let hov_tool = self.toolbar_hit(me.abs);
                 // Move tool: track which shape is under the cursor for
                 // highlight feedback.
                 let hov_shape = if self.tool == NoteTool::Move {
@@ -7976,12 +9108,14 @@ impl Widget for CanvasPanel {
                 if hov != self.hovered
                     || hov_btn != self.hovered_btn
                     || hov_tab != self.hovered_tab
+                    || hov_tool != self.toolbar_hover
                     || hov_shape != self.hovered_shape
                     || hov_pal != self.palette_hover
                 {
                     self.hovered = hov;
                     self.hovered_btn = hov_btn;
                     self.hovered_tab = hov_tab;
+                    self.toolbar_hover = hov_tool;
                     self.hovered_shape = hov_shape;
                     if hov_pal != self.palette_hover {
                         self.palette_hover = hov_pal;
@@ -8846,6 +9980,11 @@ impl Widget for CanvasPanel {
         let pending = self.pending.clone();
         self.draw_canvas_shapes(cx, rect.size, &shapes, pending.as_ref());
 
+        // The floating toolbar sits over the cards. It goes below the child
+        // pass on purpose: the command palette and the properties panel are
+        // modal, and a modal has to be able to cover the toolbar.
+        self.draw_toolbar(cx);
+
         // Children (the palette, the status label, the popup menu).
         while self.view.draw_walk(cx, scope, walk).step().is_some() {}
 
@@ -8903,6 +10042,66 @@ fn file_url(path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn grid_shape_tiles_by_count_and_viewport() {
+        // The app's own window (1400×868): the counts that tile as promised —
+        // a pair side by side, three and four 2×2, nine 3×3 — plus five taking
+        // 3+2 and sixteen 4×4.
+        let vp = Vec2d {
+            x: 1400.0,
+            y: 868.0,
+        };
+        let gap = 16.0;
+        let shape = |n: usize| {
+            let (cols, rows, cw, ch) = CanvasPanel::grid_shape(n, vp, gap).unwrap();
+            assert_eq!(rows, n.div_ceil(cols));
+            (cols, rows, cw.round(), ch.round())
+        };
+        assert_eq!(shape(1), (1, 1, 1400.0, 868.0));
+        assert_eq!(shape(2), (2, 1, 692.0, 868.0));
+        assert_eq!(shape(3), (2, 2, 692.0, 426.0));
+        assert_eq!(shape(4), (2, 2, 692.0, 426.0));
+        assert_eq!(shape(5), (3, 2, 456.0, 426.0));
+        assert_eq!(shape(9), (3, 3, 456.0, 279.0));
+        assert_eq!(shape(16), (4, 4, 338.0, 205.0));
+        // No cards, no grid; a viewport with no room left is refused too.
+        assert!(CanvasPanel::grid_shape(0, vp, gap).is_none());
+        assert!(CanvasPanel::grid_shape(4, Vec2d { x: 0.0, y: 0.0 }, gap).is_none());
+    }
+
+    #[test]
+    fn grid_shape_reads_the_viewports_width() {
+        // The same four cards: two-by-two in the app's window, a row of four
+        // across a short wide canvas, and a single column down a tall one.
+        // The cells decide it — a 4:1 viewport must not hand cards 4:1 slivers.
+        let gap = 16.0;
+        let shape = |w: f64, h: f64| {
+            let (cols, rows, cw, ch) = CanvasPanel::grid_shape(4, Vec2d { x: w, y: h }, gap).unwrap();
+            (cols, rows, cw.round(), ch.round())
+        };
+        assert_eq!(shape(1400.0, 868.0), (2, 2, 692.0, 426.0));
+        assert_eq!(shape(1600.0, 400.0), (4, 1, 388.0, 400.0));
+        assert_eq!(shape(520.0, 1000.0), (1, 4, 520.0, 238.0));
+    }
+
+    #[test]
+    fn ring_segments_walk_the_circle() {
+        let center = Vec2d { x: 10.0, y: 20.0 };
+        let ring = ring_segments(center, 4.0, 8);
+        assert_eq!(ring.len(), 8);
+        // Every vertex sits on the circle, and segments join end to end.
+        for (a, b) in ring.iter() {
+            for p in [a, b] {
+                let d = ((p.x - center.x).powi(2) + (p.y - center.y).powi(2)).sqrt();
+                assert!((d - 4.0).abs() < 1e-9, "vertex off the circle: {d}");
+            }
+        }
+        for i in 1..ring.len() {
+            assert!((ring[i].0.x - ring[i - 1].1.x).abs() < 1e-9);
+            assert!((ring[i].0.y - ring[i - 1].1.y).abs() < 1e-9);
+        }
+    }
 
     #[test]
     fn file_url_encodes_special_characters() {
