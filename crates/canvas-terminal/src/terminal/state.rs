@@ -84,6 +84,18 @@ pub struct TerminalState {
     cur_fg: [f32; 3],
     cur_bg: [f32; 3],
     cur_bold: bool,
+
+    /// Persistent vte state machine.
+    ///
+    /// Must survive across `feed()` calls: PTY output arrives in
+    /// arbitrarily-sized chunks (one per daemon `Output` frame), and an
+    /// escape sequence can be split across a chunk boundary. Building a
+    /// fresh `vte::Parser` per call (as this used to do) silently drops
+    /// whatever half-parsed state was in flight, so the *tail* of a
+    /// truncated sequence lands on a parser that starts back in `Ground`
+    /// state and prints it as literal text — e.g. a truecolor SGR split
+    /// right after `\x1b[38;2;` shows up on screen as `8;148;187m`.
+    parser: vte::Parser,
 }
 
 impl TerminalState {
@@ -103,6 +115,7 @@ impl TerminalState {
             cur_fg: default_fg(),
             cur_bg: default_bg(),
             cur_bold: false,
+            parser: vte::Parser::new(),
         };
         st.ensure_rows();
         st
@@ -115,8 +128,15 @@ impl TerminalState {
     }
 
     pub fn feed(&mut self, bytes: &[u8]) {
-        let mut parser = vte::Parser::new();
+        // Swap the parser out rather than borrowing `self.parser` directly:
+        // `Perform` is implemented on `TerminalState` itself, so
+        // `advance(self, ...)` needs an unaliased `&mut self` while the
+        // parser is also borrowed mutably. `mem::take` (backed by `Parser`'s
+        // `Default` impl) breaks that conflict without losing state between
+        // calls, unlike constructing a fresh parser each time.
+        let mut parser = std::mem::take(&mut self.parser);
         parser.advance(self, bytes);
+        self.parser = parser;
     }
 
     pub fn cursor_visible(&self) -> bool {
@@ -542,4 +562,52 @@ fn index_color(idx: usize) -> [f32; 3] {
     }
     let g = 8 + (idx - 232) * 10;
     [g as f32 / 255.0, g as f32 / 255.0, g as f32 / 255.0]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A truecolor SGR sequence split across two `feed()` calls — exactly
+    /// how PTY output arrives in practice, one daemon `Output` frame at a
+    /// time — must still be interpreted as a color, not printed as the
+    /// literal tail of the escape sequence.
+    #[test]
+    fn truecolor_sgr_split_across_feed_calls_is_not_printed_as_text() {
+        let mut st = TerminalState::new(40, 5);
+        // "\x1b[38;2;8;148;187mX" cut right after the "2;", the exact place
+        // a naive per-call parser drops state and starts printing digits.
+        st.feed(b"\x1b[38;2;");
+        st.feed(b"8;148;187mX");
+
+        let cell = &st.lines[0][0];
+        assert_eq!(cell.ch, 'X', "the escape sequence must not leak into the grid as text");
+        assert_eq!(
+            cell.fg,
+            [8.0 / 255.0, 148.0 / 255.0, 187.0 / 255.0],
+            "the split sequence should still have set the truecolor foreground"
+        );
+    }
+
+    /// Same scenario, split at other byte offsets — covers a split mid
+    /// CSI-entry (before any params) and mid final-parameter digits.
+    #[test]
+    fn truecolor_sgr_split_at_various_offsets_is_not_printed_as_text() {
+        let full = b"\x1b[38;2;8;148;187mX";
+        for split in 1..full.len() {
+            let mut st = TerminalState::new(40, 5);
+            st.feed(&full[..split]);
+            st.feed(&full[split..]);
+            let cell = &st.lines[0][0];
+            assert_eq!(
+                cell.ch, 'X',
+                "split at {split}: escape sequence leaked into the grid as text"
+            );
+            assert_eq!(
+                cell.fg,
+                [8.0 / 255.0, 148.0 / 255.0, 187.0 / 255.0],
+                "split at {split}: truecolor foreground was not applied"
+            );
+        }
+    }
 }
