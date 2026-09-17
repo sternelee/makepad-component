@@ -165,6 +165,7 @@ script_mod! {
                         rail_page_44 := RailRow{text: ""}
                         rail_page_45 := RailRow{text: ""}
                         rail_page_46 := RailRow{text: ""}
+                        rail_page_47 := RailRow{text: ""}
                             }
                         }
 
@@ -246,6 +247,7 @@ script_mod! {
                             page_44 := mod.gallery.pages.menu_cards{}
                             page_45 := mod.gallery.pages.titlebars{}
                             page_46 := mod.gallery.pages.frame_meter{}
+                            page_47 := mod.gallery.pages.timetable{}
                         }
                     }
                 }
@@ -259,7 +261,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 47] = [
+const PAGE_SLOTS: [&[LiveId]; 48] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -307,10 +309,11 @@ const PAGE_SLOTS: [&[LiveId]; 47] = [
     ids!(page_44),
     ids!(page_45),
     ids!(page_46),
+    ids!(page_47),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 47] = [
+const RAIL_ROWS: [&[LiveId]; 48] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -358,6 +361,7 @@ const RAIL_ROWS: [&[LiveId]; 47] = [
     ids!(rail_page_44),
     ids!(rail_page_45),
     ids!(rail_page_46),
+    ids!(rail_page_47),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1556,6 +1560,68 @@ use makepad_component::mp::hover_card::HoverIntent;
             .set_highlighted(cx, &written, &[]);
     }
 
+    /// Fill the two timetable grids and print what each band decided and what a few points hit.
+    ///
+    /// **The hit tests are the evidence**, because the rules that matter are invisible in a picture: a click in the title band
+    /// is not a cell, a click past the last column is not one, and a point exactly on a column boundary belongs to the column
+    /// it is entering. The band heights are printed too, since they come from strings.
+    fn seed_timetable(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::calendar::{
+            cell_at, col_width, grid_height, row_height, shape, CalendarCellData, CalendarConfig, Shape,
+            MpCalendarWidgetRefExt,
+        };
+
+        let full = CalendarConfig {
+            title: "This week".to_string(),
+            footer: "2 sessions booked".to_string(),
+            column_headers: vec!["Mon".into(), "Tue".into(), "Wed".into()],
+            column_subtitles: vec!["12".into(), String::new(), "14".into()],
+            row_labels: vec!["Studio A".into(), "Lunch".into(), "Studio B".into()],
+            row_color_hints: vec!["header".into(), "budget".into(), String::new()],
+        };
+        let bare = CalendarConfig {
+            title: String::new(),
+            footer: String::new(),
+            ..full.clone()
+        };
+
+        for (id, config, name, width) in [
+            (ids!(grid_a), full.clone(), "full", 640.0f64),
+            (ids!(grid_b), bare.clone(), "bare", 420.0),
+        ] {
+            let grid = self.ui.mp_calendar(cx, id);
+            grid.set_config(cx, config.clone());
+            // A cell in the data row, to prove the matrix reaches the widget.
+            grid.set_all_cells(
+                cx,
+                vec![
+                    vec![CalendarCellData::default(); 3],
+                    vec![CalendarCellData::default(); 3],
+                    vec![
+                        CalendarCellData { line1: "Weights".into(), ..CalendarCellData::default() },
+                        CalendarCellData { line1: "HIIT".into(), ..CalendarCellData::default() },
+                        CalendarCellData { line1: "Stretch".into(), ..CalendarCellData::default() },
+                    ],
+                ],
+            );
+            let Shape { columns, rows } = shape(&config);
+            let heights: Vec<f64> = config
+                .row_color_hints
+                .iter()
+                .map(|hint| row_height(hint))
+                .collect();
+            // Three points, one of which must miss: the title band, the first cell, and past the last column.
+            let title_band = cell_at(10.0, 10.0, &config, width);
+            let first_cell = cell_at(10.0, 50.0, &config, width);
+            let past_last = cell_at(width, 50.0, &config, width);
+            println!(
+                "TIMETABLE {name} columns={columns} rows={rows} col_width={:.0} band_heights={heights:?} height={} title_band={title_band:?} first_cell={first_cell:?} past_last_column={past_last:?}",
+                col_width(width, columns),
+                grid_height(&config),
+            );
+        }
+    }
+
     /// Hand the frame meter its two plates and print what the components decide before any frame has run.
     ///
     /// **The live readings are not here.** They print from the widget itself under `MP_STATS_DEBUG`, because a reading taken
@@ -2724,6 +2790,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_timetable(cx);
         self.seed_frame_meter(cx);
         self.seed_titlebars(cx);
         self.seed_menubar_strip(cx);
@@ -2740,6 +2807,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_timetable(cx);
         self.seed_frame_meter(cx);
         self.seed_titlebars(cx);
         self.seed_menubar_strip(cx);
@@ -3411,7 +3479,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 47] = [
+    const SLOT_PAGES: [&str; 48] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3459,6 +3527,7 @@ mod tests {
         "mod.gallery.pages.menu_cards",
         "mod.gallery.pages.titlebars",
         "mod.gallery.pages.frame_meter",
+        "mod.gallery.pages.timetable",
     ];
 
     #[test]

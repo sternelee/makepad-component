@@ -38,6 +38,7 @@ pub mod status;
 pub mod steps;
 pub mod surface;
 pub mod table;
+pub mod timetable;
 pub mod titlebars;
 pub mod blocks;
 pub mod canvas;
@@ -80,6 +81,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     overlay::script_mod(vm);
     picking::script_mod(vm);
     titlebars::script_mod(vm);
+    timetable::script_mod(vm);
     popover::script_mod(vm);
     floating::script_mod(vm);
     history::script_mod(vm);
@@ -414,6 +416,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/frame_meter.rs",
         blurb: "A frame rate that excludes the frames its own tick provoked",
     },
+    Page {
+        title: "Timetable",
+        path: "mod.gallery.pages.timetable",
+        source: "crates/gallery/src/pages/timetable.rs",
+        blurb: "A banded grid whose row heights and meanings come from colour hints",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -521,6 +529,7 @@ mod tests {
             ("crates/gallery/src/pages/menu_cards.rs", "menu_cards"),
             ("crates/gallery/src/pages/titlebars.rs", "titlebars"),
             ("crates/gallery/src/pages/frame_meter.rs", "frame_meter"),
+            ("crates/gallery/src/pages/timetable.rs", "timetable"),
         ]
         .into_iter()
         .collect();

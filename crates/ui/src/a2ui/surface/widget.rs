@@ -16,9 +16,11 @@ use crate::a2ui::{
         A2uiMessageProcessor, ProcessorEvent,
     },
 };
-/// **The last v2 import in this file**: `MpCalendar` has no v3 counterpart yet, so it is the one pool left. Every other
-/// pool now builds a `mp` widget, and the `crate::widgets` path is gone from everything above this line.
-use crate::widgets::calendar::MpCalendar;
+/// **Every pool builds a `mp` widget, and `crate::widgets` is no longer imported anywhere in this file.** The calendar was
+/// the last one, and its absence was why the v2 half could not be deleted; the pool it needed is `mp/calendar.rs`, whose
+/// model is a **configurable banded grid** rather than a month view — see that module's doc on why the protocol's name for it
+/// is misleading.
+use crate::mp::calendar::{MpCalendar, MpCalendarAction};
 
 use crate::mp::avatar_group::MpAvatarGroup;
 

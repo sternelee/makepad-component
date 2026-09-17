@@ -976,3 +976,88 @@ pub(crate) fn get_sample_avatars() -> String {
     ]"##
     .to_string()
 }
+
+/// A fixture for the **calendar grid** — a timetable, not a month view — named `A2UI_SAMPLE=calendar`.
+///
+/// Three columns and three rows with **three different colour hints**, which is the input this component exists to handle:
+/// a `header` row (55pt, showing the column names), a `budget` row (40pt, the compact one) and an un-hinted row (70pt). A
+/// fixture where every hint were the same would set one row height three times and prove nothing about the rule.
+pub(crate) fn get_sample_calendar() -> String {
+    r##"[
+        {
+            "beginRendering": {
+                "surfaceId": "main",
+                "root": "root-column"
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "main",
+                "components": [
+                    {
+                        "id": "root-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["title", "grid"]
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "id": "title",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": "Studio"},
+                                "usageHint": "h1"
+                            }
+                        }
+                    },
+                    {
+                        "id": "grid",
+                        "component": {
+                            "Calendar": {
+                                "title": {"literalString": "This week"},
+                                "footer": {"literalString": "2 sessions booked"},
+                                "columnHeaders": ["Mon", "Tue", "Wed"],
+                                "columnSubtitles": ["12", "13", "14"],
+                                "rowLabels": ["Studio A", "Lunch", "Studio B"],
+                                "rowColorHints": ["header", "budget", ""],
+                                "cells": {"path": "/sessions"}
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "dataModelUpdate": {
+                "surfaceId": "main",
+                "contents": [
+                    {
+                        "key": "sessions",
+                        "valueMap": [
+                            {"key": "0", "valueMap": [
+                                {"key": "0", "valueMap": [{"key": "line1", "valueString": "Yoga"}, {"key": "time", "valueString": "09:00"}]},
+                                {"key": "1", "valueMap": [{"key": "line1", "valueString": "Pilates"}, {"key": "time", "valueString": "09:00"}]},
+                                {"key": "2", "valueMap": [{"key": "line1", "valueString": "Spin"}, {"key": "time", "valueString": "09:00"}]}
+                            ]},
+                            {"key": "1", "valueMap": [
+                                {"key": "0", "valueMap": [{"key": "line1", "valueString": "Closed"}]},
+                                {"key": "1", "valueMap": [{"key": "line1", "valueString": "Closed"}]},
+                                {"key": "2", "valueMap": [{"key": "line1", "valueString": "Closed"}]}
+                            ]},
+                            {"key": "2", "valueMap": [
+                                {"key": "0", "valueMap": [{"key": "line1", "valueString": "Weights"}, {"key": "description", "valueString": "Bring shoes"}]},
+                                {"key": "1", "valueMap": [{"key": "line1", "valueString": "HIIT"}, {"key": "time", "valueString": "18:00"}]},
+                                {"key": "2", "valueMap": [{"key": "line1", "valueString": "Stretch"}]}
+                            ]}
+                        ]
+                    }
+                ]
+            }
+        }
+    ]"##
+    .to_string()
+}
+

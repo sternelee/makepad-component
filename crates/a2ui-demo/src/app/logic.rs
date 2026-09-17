@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use super::audio_player::{decode_audio_file, start_audio_output, AudioPlaybackState};
 use super::sample_data::{
-    get_sample_avatars, get_sample_colors, get_sample_detail, get_sample_icons, get_sample_music_player, get_sample_number,
+    get_sample_avatars, get_sample_calendar, get_sample_colors, get_sample_detail, get_sample_icons, get_sample_music_player, get_sample_number,
     get_sample_product_catalog, get_sample_search, get_sample_steps,
 };
 use super::theme::Theme;
@@ -1456,6 +1456,8 @@ impl AppMain for App {
                 // The group needs **nine members and a limit of four**: without a limit the tail never appears, and the
                 // tail is the whole design question (in addition to the shown faces, or instead of one).
                 Ok("avatars") => self.load_a2ui_json(cx, &get_sample_avatars(), "👥 Reviewers"),
+                // Three different colour hints, so the row-height rule has something to decide.
+                Ok("calendar") => self.load_a2ui_json(cx, &get_sample_calendar(), "🗓 Studio"),
                 Ok("music") => self.load_json_file(cx, "music_test.json", "🎵 Makepad Music Player"),
                 Ok(_) | Err(_) => {
                     if std::path::Path::new("music_test.json").exists() {

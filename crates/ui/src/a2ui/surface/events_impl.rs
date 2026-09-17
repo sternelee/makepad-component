@@ -176,7 +176,20 @@ impl Widget for A2uiSurface {
             let cal_actions = cx.capture_actions(|cx| {
                 cal.handle_event(cx, event, scope);
             });
-            if let Some((row, col)) = cal.cell_clicked(&cal_actions) {
+            // **From the action, not from a `cell_clicked` accessor.** The v3 widget reports `CellClicked` with the cell's
+            // indices *and its first line* — the line is carried so a caller that wants to know what was clicked does not have
+            // to look the indices back up, and it is deliberately **not** put into the protocol payload: a server reading
+            // `calendarCellClick` expects `row` and `col`, and adding a field would change what every existing surface sees.
+            // **`find_widget_action`, not `iter().find_map`** — the iterator over `Actions` yields a type without `cast`, which
+            // is how the other pools read an action and how this one has to. `cal.widget_uid()` is readable here because the
+            // `capture_actions` closure has already returned.
+            let clicked: Option<(usize, usize)> = cal_actions
+                .find_widget_action(cal.widget_uid())
+                .and_then(|action| match action.cast::<MpCalendarAction>() {
+                    MpCalendarAction::CellClicked { row, column, .. } => Some((row, column)),
+                    MpCalendarAction::None => None,
+                });
+            if let Some((row, col)) = clicked {
                 let user_action = crate::a2ui::message::UserAction {
                     surface_id: surface_id.clone(),
                     action: crate::a2ui::message::UserActionPayload {

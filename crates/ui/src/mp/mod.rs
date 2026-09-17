@@ -41,6 +41,7 @@ pub mod avatar;
 pub mod avatar_group;
 pub mod bars;
 pub mod button;
+pub mod calendar;
 pub mod canvas;
 pub mod checkbox;
 pub mod code;
@@ -139,6 +140,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::markdown::script_mod(vm);
     crate::mp::titlebar::script_mod(vm);
     crate::mp::stats::script_mod(vm);
+    crate::mp::calendar::script_mod(vm);
     crate::mp::menubar_strip::script_mod(vm);
     crate::mp::menu_card::script_mod(vm);
     crate::mp::description_list::script_mod(vm);
