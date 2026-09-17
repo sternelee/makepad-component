@@ -143,6 +143,7 @@ script_mod! {
                         rail_page_43 := RailRow{text: ""}
                         rail_page_44 := RailRow{text: ""}
                         rail_page_45 := RailRow{text: ""}
+                        rail_page_46 := RailRow{text: ""}
 
                         rail_filler := View{width: Fill, height: Fill}
 
@@ -223,6 +224,7 @@ script_mod! {
                             page_43 := mod.gallery.pages.picking{}
                             page_44 := mod.gallery.pages.menu_cards{}
                             page_45 := mod.gallery.pages.titlebars{}
+                            page_46 := mod.gallery.pages.frame_meter{}
                         }
                     }
                 }
@@ -236,7 +238,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 46] = [
+const PAGE_SLOTS: [&[LiveId]; 47] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -283,10 +285,11 @@ const PAGE_SLOTS: [&[LiveId]; 46] = [
     ids!(page_43),
     ids!(page_44),
     ids!(page_45),
+    ids!(page_46),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 46] = [
+const RAIL_ROWS: [&[LiveId]; 47] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -333,6 +336,7 @@ const RAIL_ROWS: [&[LiveId]; 46] = [
     ids!(rail_page_43),
     ids!(rail_page_44),
     ids!(rail_page_45),
+    ids!(rail_page_46),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1528,6 +1532,37 @@ use makepad_component::mp::hover_card::HoverIntent;
             .set_highlighted(cx, &written, &[]);
     }
 
+    /// Hand the frame meter its two plates and print what the components decide before any frame has run.
+    ///
+    /// **The live readings are not here.** They print from the widget itself under `MP_STATS_DEBUG`, because a reading taken
+    /// at startup is a reading of no frames — and because the whole claim of this component is about what it counts over
+    /// time, which no `seed` call can demonstrate.
+    fn seed_frame_meter(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::stats::{
+            format_bytes, format_fps, rate, Counter, HOLD, MpStatsWidgetRefExt, UNKNOWN,
+        };
+
+        let _ = self.ui.mp_stats(cx, ids!(stats_meter));
+        let still = self.ui.mp_stats(cx, ids!(stats_still));
+        println!("STATS still_reading={:?} (never ticked, so it is unknown rather than zero)", still.reading());
+
+        // The arithmetic the widget relies on, evaluated here so the page prints it even when nothing is drawing.
+        let mut counter = Counter::default();
+        counter.observe(1000, false);
+        let counted = (1001..=1030u64).filter(|f| counter.observe(*f, *f % 3 == 0)).count();
+        println!(
+            "STATS hold={HOLD}s counted_of_30={counted} (every third frame was the meter's own) rate_over_1s={:?}",
+            format_fps(Some(rate(counted as u32, 1.0))),
+        );
+        println!(
+            "STATS absent_memory={:?} zero_memory={:?} (\u{2014} is not 0)",
+            format_bytes(None),
+            format_bytes(Some(0)),
+        );
+        let unknown: &str = UNKNOWN;
+        assert_ne!(unknown, format_bytes(Some(0)));
+    }
+
     /// Fill the title bars and print the drag arithmetic.
     ///
     /// **The arithmetic is the evidence**, because the drag itself cannot run here: a widget cannot move a window, so the
@@ -2581,6 +2616,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_frame_meter(cx);
         self.seed_titlebars(cx);
         self.seed_menu_cards(cx);
         self.seed_search(cx);
@@ -2595,6 +2631,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_frame_meter(cx);
         self.seed_titlebars(cx);
         self.seed_menu_cards(cx);
         self.seed_picking(cx);
@@ -3259,7 +3296,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 46] = [
+    const SLOT_PAGES: [&str; 47] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3306,6 +3343,7 @@ mod tests {
         "mod.gallery.pages.picking",
         "mod.gallery.pages.menu_cards",
         "mod.gallery.pages.titlebars",
+        "mod.gallery.pages.frame_meter",
     ];
 
     #[test]

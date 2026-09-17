@@ -76,6 +76,7 @@ pub mod search;
 pub mod searchable_list;
 pub mod segmented;
 pub mod slider;
+pub mod stats;
 pub mod status;
 pub mod table;
 pub mod titlebar;
@@ -136,6 +137,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::list::script_mod(vm);
     crate::mp::markdown::script_mod(vm);
     crate::mp::titlebar::script_mod(vm);
+    crate::mp::stats::script_mod(vm);
     crate::mp::menu_card::script_mod(vm);
     crate::mp::description_list::script_mod(vm);
     crate::mp::editor::script_mod(vm);

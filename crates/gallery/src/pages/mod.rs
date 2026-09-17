@@ -19,6 +19,7 @@ pub mod details;
 pub mod editor;
 pub mod feedback;
 pub mod foundation;
+pub mod frame_meter;
 pub mod floating;
 pub mod history;
 pub mod hover_card;
@@ -65,6 +66,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     script_eval!(vm, { mod.gallery = {} });
     script_eval!(vm, { mod.gallery.pages = {} });
     foundation::script_mod(vm);
+    frame_meter::script_mod(vm);
     motion::script_mod(vm);
     bars::script_mod(vm);
     button::script_mod(vm);
@@ -406,6 +408,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/titlebars.rs",
         blurb: "The bar you drag a window by, minus the region its controls reserve",
     },
+    Page {
+        title: "Frame Meter",
+        path: "mod.gallery.pages.frame_meter",
+        source: "crates/gallery/src/pages/frame_meter.rs",
+        blurb: "A frame rate that excludes the frames its own tick provoked",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -512,6 +520,7 @@ mod tests {
             ("crates/gallery/src/pages/picking.rs", "picking"),
             ("crates/gallery/src/pages/menu_cards.rs", "menu_cards"),
             ("crates/gallery/src/pages/titlebars.rs", "titlebars"),
+            ("crates/gallery/src/pages/frame_meter.rs", "frame_meter"),
         ]
         .into_iter()
         .collect();
