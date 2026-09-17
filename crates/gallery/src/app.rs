@@ -1582,6 +1582,94 @@ use makepad_component::mp::hover_card::HoverIntent;
                 "MENUS {name} rows={count} width={width} height={height} gutter={gutter} width_from=panel_width third_row={third:?}"
             );
         }
+
+        // **And the bar's rules, driven in the running app.** The state machine has no widget to photograph, so the preview
+        // is the transitions themselves: a menubar is defined by what one open menu makes the other titles do, and that is
+        // invisible in any still picture. Each line below is one key or one hover, in order.
+        self.run_menubar_preview();
+    }
+
+    /// Drive `mp::menubar::Bar` through the rules that make a bar a bar, printing each transition.
+    ///
+    /// The evidence unit tests cannot give: **this runs in the app**, with the theme installed and the script VM live, so a
+    /// panic or a wrong branch here is a real one. The four rules it walks are the ones the component exists for.
+    fn run_menubar_preview(&mut self) {
+        use makepad_component::mp::menu::Item;
+        use makepad_component::mp::menubar::{Bar, Menu, MpMenubarHit, Outcome};
+
+        let menus = vec![
+            Menu::new(
+                "File",
+                vec![
+                    Item::action("New Window"),
+                    Item::submenu("Open Recent", vec![Item::action("notes.md")]),
+                    Item::Separator,
+                    Item::action("Close").disabled(),
+                ],
+            ),
+            Menu::new("Edit", vec![Item::action("Undo"), Item::action("Redo")]),
+        ];
+        let mut bar = Bar::new(menus.clone());
+        let show = |outcome: &Outcome| match outcome {
+            Outcome::None => "none",
+            Outcome::Changed => "changed",
+            Outcome::Chose(..) => "chose",
+        };
+        // A **hover with nothing open does nothing** — the asymmetry that separates a bar from a row of dropdowns.
+        let idle = bar.hover_switch(1);
+        // Then open, and hover a sibling: that switches with no click.
+        let opened = bar.toggle(0);
+        let switched = bar.hover_switch(1);
+        println!(
+            "MENUBAR hover_closed={} open={} hover_open={} now_open={:?}",
+            show(&idle),
+            show(&opened),
+            show(&switched),
+            bar.open(),
+        );
+
+        // The cursor walks to the submenu row and `right` goes **in** rather than crossing, because a submenu row that
+        // swallowed the key would be a dead key on the only row with somewhere to go.
+        bar.toggle(0);
+        let first = bar.step_item(1);
+        let second = bar.step_item(1);
+        let deeper = bar.go_deeper();
+        println!(
+            "MENUBAR enter={} to_submenu_row={} right_descends={} nested={} still_in_menu={:?}",
+            show(&first),
+            show(&second),
+            show(&deeper),
+            bar.cursor().nested(),
+            bar.open(),
+        );
+
+        // `escape` backs out one level and leaves the bar up; a second one closes it. That is the difference between "back
+        // out" and "cancel everything".
+        let escaped_once = bar.dismiss();
+        let was_open_after_one = bar.is_open();
+        let escaped_twice = bar.dismiss();
+        println!(
+            "MENUBAR escape1={} still_open={was_open_after_one} escape2={} open_after={:?}",
+            show(&escaped_once),
+            show(&escaped_twice),
+            bar.open(),
+        );
+
+        // The pointer moves the same cursor the keyboard does, so the two cannot disagree about which row a submenu hangs
+        // off; and `enter` on a closed bar drops the first menu, so the key always means "act on this control".
+        bar.toggle(0);
+        let pointed = bar.hit(&MpMenubarHit::Point(vec![0]));
+        let live = bar.cursor().row();
+        let chosen = bar.confirm();
+        let closed = !bar.is_open();
+        let opened_from_closed = bar.confirm();
+        println!(
+            "MENUBAR point={} live_row={live:?} enter={} bar_closed_after_choose={closed} enter_when_closed={} open_now={:?}",
+            show(&pointed),
+            show(&chosen),
+            show(&opened_from_closed),
+            bar.open(),
+        );
     }
 
     /// Fill the swatch grids on the picking page, and print the grid's shape and what a few points pick.
