@@ -169,6 +169,7 @@ script_mod! {
                         rail_page_48 := RailRow{text: ""}
                         rail_page_49 := RailRow{text: ""}
                         rail_page_50 := RailRow{text: ""}
+                        rail_page_51 := RailRow{text: ""}
                             }
                         }
 
@@ -254,6 +255,7 @@ script_mod! {
                             page_48 := mod.gallery.pages.dialogs{}
                             page_49 := mod.gallery.pages.split{}
                             page_50 := mod.gallery.pages.selects{}
+                            page_51 := mod.gallery.pages.tabs{}
                         }
                     }
                 }
@@ -267,7 +269,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 51] = [
+const PAGE_SLOTS: [&[LiveId]; 52] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -319,10 +321,11 @@ const PAGE_SLOTS: [&[LiveId]; 51] = [
     ids!(page_48),
     ids!(page_49),
     ids!(page_50),
+    ids!(page_51),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 51] = [
+const RAIL_ROWS: [&[LiveId]; 52] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -374,6 +377,7 @@ const RAIL_ROWS: [&[LiveId]; 51] = [
     ids!(rail_page_48),
     ids!(rail_page_49),
     ids!(rail_page_50),
+    ids!(rail_page_51),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1570,6 +1574,56 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.ui
             .mp_code_block(cx, ids!(canvas_wire))
             .set_highlighted(cx, &written, &[]);
+    }
+
+    /// Fill the three tab bars and print the allocation each regime produces.
+    ///
+    /// **The printed widths are the evidence**, because a tab bar's whole job is arithmetic: whether the tabs share, whether
+    /// the minimum made the strip overflow, and whether the add button took its width off the top. A picture shows a strip;
+    /// only the numbers show which of the three regimes it is in.
+    fn seed_tabs(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::tab_bar::{
+            layout, on_add, scroll_to_show, tab_at, tab_width, Tab, ADD_W, MAX_TAB, MIN_TAB, MpTabBarWidgetRefExt,
+        };
+
+        let make = |count: usize| -> Vec<Tab> {
+            (0..count)
+                .map(|index| {
+                    // One unclosable tab, so the difference is visible rather than only asserted.
+                    if index == 0 {
+                        Tab::new("Home").fixed()
+                    } else {
+                        Tab::new(format!("Query {index}"))
+                    }
+                })
+                .collect()
+        };
+
+        for (id, count, name) in [
+            (ids!(tabs_room), 4usize, "room"),
+            (ids!(tabs_pressure), 12, "pressure"),
+            (ids!(tabs_empty), 0, "empty"),
+        ] {
+            let bar = self.ui.mp_tab_bar(cx, id);
+            bar.set_tabs(cx, make(count));
+            bar.set_active(cx, if count > 0 { Some(1) } else { None });
+            let available = 800.0f64;
+            let strip = layout(&bar.tabs().to_vec(), available, true);
+            println!(
+                "TABS {name} count={} tab_width={} content={:.0} overflows={} add={} first_three={:?} add_at_1={} \
+tab_at_1={:?} scroll_to_last={:.0}",
+                strip.count(),
+                tab_width(count, available - ADD_W),
+                strip.content,
+                strip.overflows(available),
+                strip.add,
+                &strip.widths.iter().take(3).copied().collect::<Vec<_>>(),
+                on_add(1.0, &strip),
+                tab_at(1.0, &strip),
+                scroll_to_show(count.saturating_sub(1), &strip, available),
+            );
+        }
+        println!("TABS bounds min={MIN_TAB} max={MAX_TAB} add={ADD_W}");
     }
 
     /// Drive a **v3** select and print the rules its wrapper states.
@@ -2941,6 +2995,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_tabs(cx);
         self.seed_select_rows(cx);
         self.seed_split(cx);
         self.seed_dialogs(cx);
@@ -2961,6 +3016,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_tabs(cx);
         self.seed_select_rows(cx);
         self.seed_split(cx);
         self.seed_dialogs(cx);
@@ -3636,7 +3692,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 51] = [
+    const SLOT_PAGES: [&str; 52] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3688,6 +3744,7 @@ mod tests {
         "mod.gallery.pages.dialogs",
         "mod.gallery.pages.split",
         "mod.gallery.pages.selects",
+        "mod.gallery.pages.tabs",
     ];
 
     #[test]

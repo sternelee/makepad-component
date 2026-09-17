@@ -83,6 +83,7 @@ pub mod slider;
 pub mod stats;
 pub mod split_pane;
 pub mod status;
+pub mod tab_bar;
 pub mod table;
 pub mod titlebar;
 pub mod text;
@@ -147,6 +148,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::dialog::script_mod(vm);
     crate::mp::split_pane::script_mod(vm);
     crate::mp::select::script_mod(vm);
+    crate::mp::tab_bar::script_mod(vm);
     crate::mp::menubar_strip::script_mod(vm);
     crate::mp::menu_card::script_mod(vm);
     crate::mp::description_list::script_mod(vm);

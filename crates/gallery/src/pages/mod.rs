@@ -41,6 +41,7 @@ pub mod status;
 pub mod steps;
 pub mod surface;
 pub mod table;
+pub mod tabs;
 pub mod timetable;
 pub mod titlebars;
 pub mod blocks;
@@ -97,6 +98,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     split::script_mod(vm);
     steps::script_mod(vm);
     table::script_mod(vm);
+    tabs::script_mod(vm);
     blocks::script_mod(vm);
     canvas::script_mod(vm);
     code::script_mod(vm);
@@ -446,6 +448,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/selects.rs",
         blurb: "A combobox that is never typed into, and the rows it would show",
     },
+    Page {
+        title: "Tabs",
+        path: "mod.gallery.pages.tabs",
+        source: "crates/gallery/src/pages/tabs.rs",
+        blurb: "Tabs that share a width, and the minimum that makes a strip overflow",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -557,6 +565,7 @@ mod tests {
             ("crates/gallery/src/pages/dialogs.rs", "dialogs"),
             ("crates/gallery/src/pages/split.rs", "split"),
             ("crates/gallery/src/pages/selects.rs", "selects"),
+            ("crates/gallery/src/pages/tabs.rs", "tabs"),
         ]
         .into_iter()
         .collect();
