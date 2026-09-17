@@ -79,6 +79,13 @@ pub enum SavedItem {
     Terminal {
         name: String,
         command: String,
+        /// PTY working directory, when known. Absent in canvases saved
+        /// before this field existed, and possibly empty even in newer
+        /// ones (e.g. a re-attached session whose original cwd was never
+        /// observed). A dead session with no cwd on file falls back to
+        /// spawning fresh in the daemon's own working directory.
+        #[serde(default)]
+        cwd: String,
         rect: SavedRect,
     },
     Browser {
@@ -360,6 +367,7 @@ mod tests {
                     SavedItem::Terminal {
                         name: "claude".into(),
                         command: "zsh".into(),
+                        cwd: "/tmp/ws".into(),
                         rect,
                     },
                     SavedItem::Browser {

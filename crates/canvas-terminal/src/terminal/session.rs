@@ -326,6 +326,60 @@ impl TerminalSession {
         })
     }
 
+    /// Relaunch a session the daemon only knows about from its own
+    /// persisted registry (`crate::daemon_persist`) — used when `Attach`
+    /// would fail because a *daemon* restart emptied the in-memory session
+    /// table. Mirrors `spawn`: the daemon rebuilds the PTY from the
+    /// registry's argv/cwd and, when it also remembers a hosted chat CLI,
+    /// arms the chat parser and relaunches with `--resume`/`--session`
+    /// before this call returns.
+    pub fn resume(name: &str, cols: usize, rows: usize) -> Result<Self, String> {
+        ensure_daemon()?;
+        let rt = runtime();
+        let (mut r, w) = rt.block_on(connect_stream())?;
+
+        let (writer_tx, writer_task) = spawn_writer_task(w);
+
+        let resume = ipc::Request::Resume(ipc::ResumeRequest {
+            name: name.to_string(),
+            cols: cols as u16,
+            rows: rows as u16,
+        });
+        rt.block_on(async { writer_tx.send(resume).await })
+            .map_err(|_| "writer closed before Resume".to_string())?;
+
+        let state = Arc::new(Mutex::new(TerminalState::new(cols, rows)));
+        let (notify, rx) = std::sync::mpsc::channel::<bool>();
+
+        let session_id: u64 = rt.block_on(async {
+            loop {
+                match ipc::read_frame(&mut r).await {
+                    Ok(Some(ipc::Frame::Create(c))) => return Ok(c.session_id),
+                    Ok(Some(ipc::Frame::Error(e))) => return Err(e.message),
+                    Ok(Some(_)) => continue,
+                    Ok(None) => return Err("daemon closed the connection".into()),
+                    Err(e) => return Err(format!("read Resume response: {e}")),
+                }
+            }
+        })?;
+
+        let chat = Arc::new(Mutex::new(crate::chat::ChatCardState::new()));
+        let read_task = spawn_read_task(r, Arc::clone(&state), Arc::clone(&chat), notify.clone());
+
+        Ok(Self {
+            name: name.to_string(),
+            command: String::new(),
+            state,
+            chat,
+            session_id,
+            writer_tx,
+            notify,
+            rx,
+            _read_task: read_task,
+            _writer_task: writer_task,
+        })
+    }
+
     /// List the sessions currently held by the daemon (live or exited).
     /// The GUI calls this at startup to re-attach to surviving sessions.
     pub fn list_sessions() -> Result<Vec<ipc::SessionInfo>, String> {

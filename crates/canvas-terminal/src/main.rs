@@ -6,7 +6,9 @@ mod canvas;
 mod chat;
 mod command;
 mod daemon;
+mod daemon_persist;
 mod ipc;
+mod ipc_cli;
 mod items;
 mod note;
 mod persist;
@@ -609,10 +611,11 @@ impl AppMain for App {
 }
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
     // `canvas-terminal --daemon` runs the bundled PTY daemon (no GUI). The
     // GUI spawns itself in this mode detached so terminal sessions survive
     // GUI restarts; see `terminal::session::ensure_daemon`.
-    if std::env::args().any(|a| a == "--daemon") {
+    if args.iter().any(|a| a == "--daemon") {
         std::process::exit(match daemon::run() {
             Ok(()) => 0,
             Err(e) => {
@@ -620,6 +623,13 @@ fn main() {
                 1
             }
         });
+    }
+    // `canvas-terminal ipc <verb>` is the inter-agent/script control surface:
+    // a one-shot CLI client over the daemon protocol, so a CLI agent running
+    // inside a card (see `ipc::ENV_MARKER_VAR`) can message, wait on, or
+    // read a sibling card without linking against the GUI. See `ipc_cli`.
+    if args.len() > 1 && args[1] == "ipc" {
+        std::process::exit(ipc_cli::run(&args[2..]));
     }
     app_main();
 }

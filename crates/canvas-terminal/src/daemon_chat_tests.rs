@@ -414,3 +414,169 @@ fn flipping_back_to_grid_stops_the_chat_parser() {
         "the ring must stop growing once the parser is off"
     );
 }
+
+/// A registry file written *before* the daemon starts (standing in for one
+/// left behind by a previous daemon lifetime) is loaded at startup, and
+/// `Resume` can relaunch a session this daemon process never itself
+/// `Create`d — the actual daemon-restart-recovery path.
+#[test]
+fn resume_relaunches_a_session_known_only_from_a_preexisting_registry_file() {
+    let label = unique_label();
+    let registry_path = crate::daemon_persist::path_for_label(&label);
+    let mut registry = crate::daemon_persist::SavedRegistry::empty();
+    registry.upsert(crate::daemon_persist::SavedSession {
+        name: "resumable".into(),
+        argv: vec!["cat".into()],
+        cwd: None,
+        chat_provider: None,
+        cli_session_id: None,
+    });
+    registry.save(&registry_path).expect("seed registry");
+
+    start_daemon_sync(&label);
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let resume = ipc::Request::Resume(ipc::ResumeRequest {
+        name: "resumable".into(),
+        cols: 80,
+        rows: 24,
+    });
+    match rt.block_on(rpc(&label, resume)) {
+        Ok(ipc::Frame::Create(c)) => assert!(c.session_id > 0),
+        other => panic!("expected Resume to behave like Create, got {other:?}"),
+    }
+
+    match rt.block_on(rpc(&label, ipc::Request::List)) {
+        Ok(ipc::Frame::List(r)) => {
+            let entry = r
+                .sessions
+                .iter()
+                .find(|s| s.name == "resumable")
+                .expect("resumed session listed");
+            assert!(entry.alive, "resumed session should be alive: {entry:?}");
+        }
+        other => panic!("expected List reply, got {other:?}"),
+    }
+
+    let _ = std::fs::remove_file(&registry_path);
+}
+
+/// `AgentWait` resolves as soon as a `TurnDone` event flips the daemon's own
+/// `busy` tracking back to `false` — event-driven, not polled.
+#[test]
+fn agent_wait_resolves_when_a_turn_completes() {
+    let label = unique_label();
+    start_daemon_sync(&label);
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let emitter_lines = [
+        r#"{"type":"session","version":3,"id":"sid-wait","cwd":"/tmp"}"#,
+        r#"{"type":"message_start","message":{"role":"user","content":[{"type":"text","text":"q"}]}}"#,
+        r#"{"type":"turn_end","message":{"role":"assistant","usage":{"totalTokens":1}},"toolResults":[]}"#,
+    ];
+    let _ = spawn_emitter_session(&rt, &label, "waiter", &emitter_lines);
+    let switch = ipc::Request::ChatSwitch(ipc::ChatSwitchRequest {
+        session: "waiter".into(),
+        cli: "pi".into(),
+        chat: true,
+        script: ipc::SwitchScript::None,
+        resume: None,
+    });
+    let _ = rt.block_on(rpc(&label, switch));
+
+    // Registered before the emitter's `sleep 0.4` finishes, so this proves
+    // the wait is resolved by the later event, not satisfied immediately.
+    let wait = ipc::Request::AgentWait(ipc::AgentWaitRequest {
+        session: "waiter".into(),
+        until: vec![ipc::AgentWaitState::Idle],
+        timeout_ms: 5_000,
+    });
+    match rt.block_on(rpc(&label, wait)) {
+        Ok(ipc::Frame::AgentStatus(status)) => {
+            assert!(!status.busy, "expected idle after TurnDone: {status:?}");
+            assert!(!status.timed_out);
+        }
+        other => panic!("expected AgentStatus, got {other:?}"),
+    }
+}
+
+/// A timed-out `AgentWait` reports `timed_out: true` with the last-known
+/// status rather than hanging or erroring.
+#[test]
+fn agent_wait_reports_timeout_without_hanging() {
+    let label = unique_label();
+    start_daemon_sync(&label);
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let create = ipc::Request::Create(ipc::CreateRequest {
+        name: "idler".into(),
+        cwd: None,
+        argv: vec!["cat".into()],
+        cols: 80,
+        rows: 24,
+    });
+    let _ = rt.block_on(rpc(&label, create));
+    // No chat parser ever turned on: this session can never become "working",
+    // so waiting for it is guaranteed to time out.
+    let wait = ipc::Request::AgentWait(ipc::AgentWaitRequest {
+        session: "idler".into(),
+        until: vec![ipc::AgentWaitState::Working],
+        timeout_ms: 200,
+    });
+    match rt.block_on(rpc(&label, wait)) {
+        Ok(ipc::Frame::AgentStatus(status)) => {
+            assert!(status.timed_out, "expected a timeout: {status:?}");
+        }
+        other => panic!("expected AgentStatus, got {other:?}"),
+    }
+}
+
+/// `AgentList` reports `busy` for every live session with the chat parser
+/// on.
+#[test]
+fn agent_list_reports_busy_sessions() {
+    let label = unique_label();
+    start_daemon_sync(&label);
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    let emitter_lines = [
+        r#"{"type":"session","version":3,"id":"sid-list","cwd":"/tmp"}"#,
+        r#"{"type":"message_start","message":{"role":"user","content":[{"type":"text","text":"q"}]}}"#,
+    ];
+    let _ = spawn_emitter_session(&rt, &label, "lister", &emitter_lines);
+    let switch = ipc::Request::ChatSwitch(ipc::ChatSwitchRequest {
+        session: "lister".into(),
+        cli: "pi".into(),
+        chat: true,
+        script: ipc::SwitchScript::None,
+        resume: None,
+    });
+    let _ = rt.block_on(rpc(&label, switch));
+
+    // `UserMessage` (busy=true) arrives after the emitter's `sleep 0.4`;
+    // poll AgentList until it reflects that, bounded by a deadline.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let agents = match rt.block_on(rpc(&label, ipc::Request::AgentList)) {
+            Ok(ipc::Frame::AgentList(r)) => r.agents,
+            other => panic!("expected AgentList, got {other:?}"),
+        };
+        if agents.iter().any(|a| a.name == "lister" && a.busy) {
+            break;
+        }
+        assert!(Instant::now() < deadline, "lister never reported busy");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}

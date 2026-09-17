@@ -376,6 +376,11 @@ pub enum CanvasItem {
         title: String,
         /// Presence/status indicator for agent-style terminal cards.
         status: AgentStatus,
+        /// PTY working directory, when known (empty when it was never
+        /// observed, e.g. a re-attached session). Carried so a saved canvas
+        /// can relaunch this terminal in the right place if its daemon
+        /// session is gone by the time the canvas is restored.
+        cwd: String,
         session: Option<Box<TerminalSession>>,
     },
     Browser {
@@ -505,6 +510,14 @@ impl CanvasItem {
     pub fn agent_cwd(&self) -> Option<&str> {
         match self {
             CanvasItem::Agent { cwd, .. } => Some(cwd),
+            _ => None,
+        }
+    }
+
+    /// The PTY working directory of a plain terminal card, when known.
+    pub fn terminal_cwd(&self) -> Option<&str> {
+        match self {
+            CanvasItem::Terminal { cwd, .. } => Some(cwd),
             _ => None,
         }
     }

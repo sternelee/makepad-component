@@ -78,7 +78,11 @@ fn saved_item(item: &CanvasItem) -> Option<crate::persist::SavedItem> {
                     title, world: _, ..
                 } => Some(crate::persist::SavedItem::Terminal {
                     name: title.clone(),
-                    command: String::new(),
+                    command: item
+                        .session()
+                        .map(|s| s.command.clone())
+                        .unwrap_or_default(),
+                    cwd: item.terminal_cwd().unwrap_or_default().to_string(),
                     rect: rect,
                 }),
                 CanvasItem::Agent {
@@ -1492,7 +1496,9 @@ impl CanvasPanel {
     pub fn spawn_terminal(&mut self, cx: &mut Cx, name: &str, cwd: Option<&str>, command: &str) {
         let (world, cols, rows) = self.new_terminal_geometry();
         match crate::terminal::TerminalSession::spawn(name, command, cwd, cols, rows) {
-            Ok(session) => self.place_terminal(cx, world, session),
+            Ok(session) => {
+                self.place_terminal(cx, world, session, cwd.unwrap_or_default().to_string())
+            }
             Err(e) => {
                 log!("canvas: failed to spawn terminal '{name}': {e}");
                 self.status(cx, &format!("Failed to spawn {name}: {e}"));
@@ -1560,7 +1566,7 @@ impl CanvasPanel {
             match crate::terminal::TerminalSession::list_sessions() {
                 Ok(infos) if infos.iter().any(|s| s.alive) => {
                     for info in infos.iter().filter(|s| s.alive) {
-                        self.attach_terminal(cx, &info.name);
+                        self.attach_terminal(cx, &info.name, "");
                     }
                 }
                 _ => self.spawn_terminal(cx, "claude", None, "zsh"),
@@ -1600,9 +1606,45 @@ impl CanvasPanel {
             let parked_title = item.title().to_string();
             let parked_kind = saved_item_kind(item);
             match item {
-                crate::persist::SavedItem::Terminal { name, rect, .. } => {
+                crate::persist::SavedItem::Terminal {
+                    name,
+                    command,
+                    cwd,
+                    rect,
+                } => {
+                    let world = to_world(rect);
                     if live.iter().any(|n| n == name) {
-                        self.attach_terminal_in(cx, name, to_world(rect));
+                        self.attach_terminal_in(cx, name, world, cwd);
+                    } else {
+                        // Session gone: try the daemon's own registry first
+                        // (it may remember the exact argv even if this
+                        // canvas file predates the `cwd` field), then fall
+                        // back to a fresh shell in the saved cwd. Either way
+                        // the card comes back instead of silently vanishing.
+                        let cwd_opt = if cwd.is_empty() { None } else { Some(cwd.as_str()) };
+                        let (cols, rows) =
+                            self.term_grid_size_from(world.size.x, world.size.y);
+                        let resumed = crate::terminal::TerminalSession::resume(name, cols, rows);
+                        match resumed {
+                            Ok(session) => self.place_terminal(cx, world, session, cwd.clone()),
+                            Err(_) => {
+                                let shell = if command.is_empty() {
+                                    std::env::var("SHELL").unwrap_or_else(|_| "zsh".to_string())
+                                } else {
+                                    command.clone()
+                                };
+                                match crate::terminal::TerminalSession::spawn(
+                                    name, &shell, cwd_opt, cols, rows,
+                                ) {
+                                    Ok(session) => {
+                                        self.place_terminal(cx, world, session, cwd.clone())
+                                    }
+                                    Err(e) => log!(
+                                        "canvas: failed to restore terminal '{name}': {e}"
+                                    ),
+                                }
+                            }
+                        }
                     }
                 }
                 crate::persist::SavedItem::Agent {
@@ -1737,15 +1779,18 @@ impl CanvasPanel {
     }
 
     /// Attach to a live session at a specific saved rect (no cascade).
-    pub fn attach_terminal_in(&mut self, cx: &mut Cx, name: &str, world: Rect) {
+    /// `cwd` is carried through from the saved canvas purely so it keeps
+    /// round-tripping (attach itself does not need it — the process is
+    /// already running wherever it started).
+    pub fn attach_terminal_in(&mut self, cx: &mut Cx, name: &str, world: Rect, cwd: &str) {
         let (cols, rows) = self.term_grid_size_from(world.size.x, world.size.y);
         match crate::terminal::TerminalSession::attach(name, cols, rows) {
-            Ok(session) => self.place_terminal(cx, world, session),
+            Ok(session) => self.place_terminal(cx, world, session, cwd.to_string()),
             Err(e) => log!("canvas: failed to attach terminal '{name}': {e}"),
         }
     }
 
-    pub fn attach_terminal(&mut self, cx: &mut Cx, name: &str) {
+    pub fn attach_terminal(&mut self, cx: &mut Cx, name: &str, cwd: &str) {
         let (mut world, cols, rows) = self.new_terminal_geometry();
         // Cascade each restored card by the number of terminals already on
         // the canvas, so several re-attached sessions don't stack exactly.
@@ -1757,7 +1802,7 @@ impl CanvasPanel {
         world.pos.x += n * 26.0;
         world.pos.y += n * 22.0;
         match crate::terminal::TerminalSession::attach(name, cols, rows) {
-            Ok(session) => self.place_terminal(cx, world, session),
+            Ok(session) => self.place_terminal(cx, world, session, cwd.to_string()),
             Err(e) => log!("canvas: failed to attach terminal '{name}': {e}"),
         }
     }
@@ -1782,6 +1827,7 @@ impl CanvasPanel {
         cx: &mut Cx,
         world: Rect,
         session: crate::terminal::TerminalSession,
+        cwd: String,
     ) {
         let id = self.next_item_id;
         self.next_item_id += 1;
@@ -1791,6 +1837,7 @@ impl CanvasPanel {
             world,
             title: name,
             status: crate::items::AgentStatus::default(),
+            cwd,
             session: Some(Box::new(session)),
         });
         self.selected = Some(id);
@@ -2342,6 +2389,7 @@ impl CanvasPanel {
                     world,
                     title,
                     status: crate::items::AgentStatus::Online,
+                    cwd: cwd.unwrap_or_default(),
                     session: Some(session),
                 },
             );

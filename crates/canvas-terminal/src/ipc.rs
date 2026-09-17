@@ -45,6 +45,13 @@ pub fn label() -> String {
         .unwrap_or_else(|| LABEL.to_owned())
 }
 
+/// Set to `"1"` in every PTY the daemon spawns. Mirrors herdr's
+/// `HERDR_ENV=1`: a process running inside a canvas-terminal card checks this
+/// before shelling out to `canvas-terminal ipc ...` to talk to a sibling
+/// card, so a process running *outside* canvas-terminal never mistakes a
+/// stray socket for one it owns.
+pub const ENV_MARKER_VAR: &str = "CANVAS_TERMINAL_ENV";
+
 /// Per-frame byte ceiling (16 MiB). Terminal reads are chunked well below
 /// this; the guard exists only to reject a corrupted length prefix.
 const MAX_FRAME: usize = 16 * 1024 * 1024;
@@ -63,11 +70,26 @@ const TAG_RENAME_REQ: u8 = 0x07;
 const TAG_CHAT_SEND_REQ: u8 = 0x08;
 const TAG_CHAT_SWITCH_REQ: u8 = 0x09;
 const TAG_CHAT_SYNC_REQ: u8 = 0x0a;
+// `Resume` — relaunch a session the daemon only knows about from its own
+// persisted registry (see `crate::daemon_persist`); used after a *daemon*
+// restart, when `Attach` would fail because the in-memory session table is
+// empty. Appended after the chat tags: existing tag values are never
+// renumbered once shipped, so an old client talking to a new daemon (or vice
+// versa) degrades to "unknown request/response" instead of misreading a
+// frame.
+const TAG_RESUME_REQ: u8 = 0x0b;
+// Agent automation requests (inter-agent/script control surface): status
+// snapshots and an event-driven wait, mirroring herdr's `agent.list` /
+// `agent.wait`. Additive, like everything above.
+const TAG_AGENT_WAIT_REQ: u8 = 0x0c;
+const TAG_AGENT_LIST_REQ: u8 = 0x0d;
 
 const TAG_CREATE_RES: u8 = 0x81;
 const TAG_ATTACH_RES: u8 = 0x82;
 const TAG_LIST_RES: u8 = 0x86;
 const TAG_CHAT_SYNC_RES: u8 = 0x88;
+const TAG_AGENT_STATUS_RES: u8 = 0x89;
+const TAG_AGENT_LIST_RES: u8 = 0x8a;
 const TAG_OUTPUT: u8 = 0x10;
 const TAG_CHAT_EVENT: u8 = 0x30;
 const TAG_ENDED: u8 = 0x20;
@@ -113,6 +135,63 @@ pub struct RenameRequest {
     pub name: String,
 }
 
+/// `Resume` — relaunch `name` from the daemon's persisted registry (argv,
+/// cwd, and — when it was hosting a chat CLI — the provider and the CLI's
+/// own session id). Response is a plain `Create` on success: the caller
+/// treats a resumed session exactly like a freshly created one from there.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ResumeRequest {
+    pub name: String,
+    pub cols: u16,
+    pub rows: u16,
+}
+
+/// Which lifecycle states `AgentWait` should resolve on. Deliberately a
+/// small vocabulary for v1: `Blocked`/`Done` need the CLI adapters to
+/// surface an approval/completion signal they do not emit yet (see the
+/// project plan's "Out of scope" notes). `Idle` means the session's chat
+/// parser is off or reports `busy == false`; `Working` means `busy == true`.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentWaitState {
+    Idle,
+    Working,
+}
+
+/// `AgentWait` — resolve when the named session's status matches one of
+/// `until`, the session exits, or `timeout_ms` elapses. Event-driven on the
+/// daemon side (a waiter list resolved from the PTY reader thread), not
+/// polled — mirrors herdr's `agent.wait`.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentWaitRequest {
+    pub session: String,
+    pub until: Vec<AgentWaitState>,
+    pub timeout_ms: u64,
+}
+
+/// One session's agent status, reported by both `AgentWait`'s resolution
+/// and `AgentList`'s snapshot.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentStatusInfo {
+    pub name: String,
+    pub alive: bool,
+    pub busy: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cli: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cli_session_id: Option<String>,
+    /// True when `AgentWait` resolved because `timeout_ms` elapsed rather
+    /// than an observed state change.
+    #[serde(default)]
+    pub timed_out: bool,
+}
+
+/// `AgentList` response — a status snapshot per live session.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentListResponse {
+    pub agents: Vec<AgentStatusInfo>,
+}
+
 // ── response payloads ──────────────────────────────────────────────────────
 
 /// `Create` response — the newly assigned session id.
@@ -121,12 +200,21 @@ pub struct CreateResponse {
     pub session_id: u64,
 }
 
-/// `List` response — one entry per live or recently-live session.
+/// `List` response — one entry per live, recently-live, or daemon-known
+/// (see `crate::daemon_persist`) session.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SessionInfo {
     pub name: String,
+    /// 0 when the session has no live/recent in-memory record at all (a
+    /// registry-only entry from a prior daemon lifetime) — `Resume` assigns
+    /// a fresh id once it actually spawns.
     pub session_id: u64,
     pub alive: bool,
+    /// True when `Resume` can relaunch this session by name even though it
+    /// is not currently live (daemon restart recovery). Always `false` for
+    /// a live session.
+    #[serde(default)]
+    pub resumable: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -234,6 +322,14 @@ pub enum Request {
     ChatSwitch(ChatSwitchRequest),
     /// Replay the chat event ring after `after_seq`.
     ChatSync(ChatSyncRequest),
+    /// Relaunch a session the daemon's own registry remembers, even though
+    /// no live PTY exists for it (daemon restart recovery).
+    Resume(ResumeRequest),
+    /// Resolve when a session's agent status matches, it exits, or a
+    /// timeout elapses. The inter-agent/script control surface.
+    AgentWait(AgentWaitRequest),
+    /// Snapshot every live session's agent status.
+    AgentList,
 }
 
 /// A daemon→client message.
@@ -262,6 +358,10 @@ pub enum Frame {
         session_id: u64,
         item: Sequenced,
     },
+    /// Resolution of an `AgentWait`, or a one-session status query.
+    AgentStatus(AgentStatusInfo),
+    /// Snapshot answering `AgentList`.
+    AgentList(AgentListResponse),
     Error(ErrorResponse),
 }
 
@@ -370,6 +470,15 @@ pub async fn write_request<W: AsyncWrite + Unpin>(w: &mut W, req: &Request) -> i
             let p = serde_json::to_vec(r)?;
             write_frame_raw(w, TAG_CHAT_SYNC_REQ, &p).await
         }
+        Request::Resume(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_RESUME_REQ, &p).await
+        }
+        Request::AgentWait(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_WAIT_REQ, &p).await
+        }
+        Request::AgentList => write_frame_raw(w, TAG_AGENT_LIST_REQ, &[]).await,
     }
 }
 
@@ -395,6 +504,9 @@ pub async fn read_request<R: AsyncRead + Unpin>(r: &mut R) -> io::Result<Option<
         TAG_CHAT_SEND_REQ => Request::ChatSend(serde_json::from_slice(&p)?),
         TAG_CHAT_SWITCH_REQ => Request::ChatSwitch(serde_json::from_slice(&p)?),
         TAG_CHAT_SYNC_REQ => Request::ChatSync(serde_json::from_slice(&p)?),
+        TAG_RESUME_REQ => Request::Resume(serde_json::from_slice(&p)?),
+        TAG_AGENT_WAIT_REQ => Request::AgentWait(serde_json::from_slice(&p)?),
+        TAG_AGENT_LIST_REQ => Request::AgentList,
         _ => return Err(io_invalid(&format!("unknown request tag {tag:#x}"))),
     };
     Ok(Some(req))
@@ -449,6 +561,14 @@ pub async fn write_frame<W: AsyncWrite + Unpin>(w: &mut W, frame: &Frame) -> io:
             p.extend_from_slice(&session_id.to_be_bytes());
             p.extend_from_slice(&body);
             write_frame_raw(w, TAG_CHAT_EVENT, &p).await
+        }
+        Frame::AgentStatus(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_STATUS_RES, &p).await
+        }
+        Frame::AgentList(r) => {
+            let p = serde_json::to_vec(r)?;
+            write_frame_raw(w, TAG_AGENT_LIST_RES, &p).await
         }
         Frame::Error(r) => {
             let p = serde_json::to_vec(r)?;
@@ -506,6 +626,8 @@ pub async fn read_frame<R: AsyncRead + Unpin>(r: &mut R) -> io::Result<Option<Fr
                 item: serde_json::from_slice(rest)?,
             }
         }
+        TAG_AGENT_STATUS_RES => Frame::AgentStatus(serde_json::from_slice(&p)?),
+        TAG_AGENT_LIST_RES => Frame::AgentList(serde_json::from_slice(&p)?),
         TAG_ERROR => Frame::Error(serde_json::from_slice(&p)?),
         _ => return Err(io_invalid(&format!("unknown response tag {tag:#x}"))),
     };

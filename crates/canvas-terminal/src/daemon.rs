@@ -27,6 +27,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::chat::event::Sequenced;
 use crate::chat::{ChatMode, CliAdapter};
+use crate::daemon_persist::{SavedRegistry, SavedSession};
 use rmux_ipc::{LocalEndpoint, LocalListener};
 use rmux_pty::{ChildCommand, PtyChild, PtyIo, PtyMaster, Signal, TerminalSize};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -59,6 +60,11 @@ struct ChatState {
     events: std::collections::VecDeque<Sequenced>,
     /// The CLI's own session id, when it reported one (used to resume).
     cli_session_id: Option<String>,
+    /// Whether the hosted CLI is mid-turn, folded from the same events
+    /// `chat/fold.rs::ChatCardState` folds client-side (`UserMessage` ->
+    /// `true`, `TurnDone`/`Exited` -> `false`). The daemon keeps its own
+    /// copy so `AgentWait`/`AgentList` work without any client attached.
+    busy: bool,
 }
 
 impl ChatState {
@@ -75,6 +81,7 @@ impl ChatState {
             seq: 0,
             events: std::collections::VecDeque::new(),
             cli_session_id: None,
+            busy: false,
         }
     }
 
@@ -88,12 +95,21 @@ impl ChatState {
                     let line = std::mem::take(&mut self.line_buf);
                     for event in self.adapter.parse_line(&line) {
                         self.seq += 1;
-                        if let crate::chat::ChatEvent::SessionInfo {
-                            session_id: Some(id),
-                            ..
-                        } = &event
-                        {
-                            self.cli_session_id = Some(id.clone());
+                        match &event {
+                            crate::chat::ChatEvent::SessionInfo {
+                                session_id: Some(id),
+                                ..
+                            } => {
+                                self.cli_session_id = Some(id.clone());
+                            }
+                            crate::chat::ChatEvent::UserMessage { .. } => {
+                                self.busy = true;
+                            }
+                            crate::chat::ChatEvent::TurnDone { .. }
+                            | crate::chat::ChatEvent::Exited => {
+                                self.busy = false;
+                            }
+                            _ => {}
                         }
                         let item = Sequenced {
                             seq: self.seq,
@@ -121,6 +137,76 @@ impl ChatState {
 /// The session table. Sessions are removed when their child exits (see
 /// [`end_session`]), so it is bounded by live PTYs.
 type Sessions = Arc<Mutex<HashMap<u64, Session>>>;
+
+/// The daemon's own record of session *identity* (argv/cwd/chat provider),
+/// persisted to disk so it survives a daemon restart — unlike `Sessions`,
+/// which is purely in-memory. See `crate::daemon_persist`.
+///
+/// Carries its own resolved path (label-scoped; see
+/// `daemon_persist::path_for_label`) rather than always writing
+/// `daemon_persist::default_path()`, so an isolated daemon (tests, or a
+/// second instance on a non-default label) can never race on or clobber the
+/// default installation's registry file.
+struct KnownRegistry {
+    registry: SavedRegistry,
+    path: std::path::PathBuf,
+}
+type Known = Arc<Mutex<KnownRegistry>>;
+
+/// Save `known` to disk, best-effort. Called after every request that
+/// changes a session's identity; failures are logged, never fatal (the
+/// registry is a resume cache, not a document).
+fn persist_known(known: &Known) {
+    let (snapshot, path) = match known.lock() {
+        Ok(guard) => (guard.registry.clone(), guard.path.clone()),
+        Err(_) => return,
+    };
+    if let Err(e) = snapshot.save(&path) {
+        eprintln!("canvas-terminal daemon: failed to persist session registry: {e}");
+    }
+}
+
+/// Outstanding `AgentWait` calls, keyed by session name (stable across a
+/// `Resume` respawn, unlike the session id). Resolved event-driven — from
+/// the PTY reader thread when `busy` changes, and from `end_session` when
+/// the session exits — never polled.
+type Waiters = Arc<Mutex<HashMap<String, Vec<(Vec<ipc::AgentWaitState>, tokio::sync::oneshot::Sender<ipc::AgentStatusInfo>)>>>>;
+
+/// Snapshot one session's agent status for `AgentWait`/`AgentList`.
+fn agent_status_info(s: &Session) -> ipc::AgentStatusInfo {
+    ipc::AgentStatusInfo {
+        name: s.name.clone(),
+        alive: s.alive,
+        busy: s.chat.as_ref().is_some_and(|c| c.busy),
+        cli: s.chat.as_ref().map(|c| c.adapter.name().to_owned()),
+        cli_session_id: s.chat.as_ref().and_then(|c| c.cli_session_id.clone()),
+        timed_out: false,
+    }
+}
+
+/// Resolve every outstanding waiter for `name` whose `until` matches
+/// `info.busy` (or unconditionally, when `force` is set — used for "the
+/// session just exited, it will never change again").
+fn resolve_waiters(waiters: &Waiters, name: &str, info: &ipc::AgentStatusInfo, force: bool) {
+    let Ok(mut map) = waiters.lock() else { return };
+    let Some(list) = map.remove(name) else { return };
+    let mut remaining = Vec::with_capacity(list.len());
+    for (until, sender) in list {
+        let matches = force
+            || until.iter().any(|want| match want {
+                ipc::AgentWaitState::Idle => !info.busy,
+                ipc::AgentWaitState::Working => info.busy,
+            });
+        if matches {
+            let _ = sender.send(info.clone());
+        } else {
+            remaining.push((until, sender));
+        }
+    }
+    if !remaining.is_empty() {
+        map.insert(name.to_owned(), remaining);
+    }
+}
 
 struct Session {
     id: u64,
@@ -187,14 +273,25 @@ async fn daemon_main(label: &str) -> io::Result<()> {
 
     let sessions: Sessions = Arc::new(Mutex::new(HashMap::new()));
     let next_id = Arc::new(AtomicU64::new(1));
+    // Load whatever the previous daemon process (or this one, on a prior
+    // start) recorded about session identity. A missing/corrupt/foreign
+    // file just means "nothing known yet" — fresh shells, same as today.
+    let sessions_path = crate::daemon_persist::path_for_label(label);
+    let known: Known = Arc::new(Mutex::new(KnownRegistry {
+        registry: SavedRegistry::load(&sessions_path).unwrap_or_else(SavedRegistry::empty),
+        path: sessions_path,
+    }));
+    let waiters: Waiters = Arc::new(Mutex::new(HashMap::new()));
 
     loop {
         match listener.accept().await {
             Ok((stream, _peer)) => {
                 let sessions = Arc::clone(&sessions);
                 let next_id = Arc::clone(&next_id);
+                let known = Arc::clone(&known);
+                let waiters = Arc::clone(&waiters);
                 tokio::spawn(async move {
-                    handle_client(stream, sessions, next_id).await;
+                    handle_client(stream, sessions, next_id, known, waiters).await;
                 });
             }
             Err(e) => eprintln!("canvas-terminal daemon: accept error: {e}"),
@@ -355,7 +452,13 @@ fn endpoint_display(endpoint: &LocalEndpoint) -> String {
 /// Per-connection handler. One connection drives one session: it issues
 /// `Create`/`Attach`, then `Write`/`Resize`/`Kill` while receiving `Output`
 /// frames streamed back over the same connection.
-async fn handle_client<S>(stream: S, sessions: Sessions, next_id: Arc<AtomicU64>)
+async fn handle_client<S>(
+    stream: S,
+    sessions: Sessions,
+    next_id: Arc<AtomicU64>,
+    known: Known,
+    waiters: Waiters,
+)
 where
     S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
 {
@@ -374,7 +477,9 @@ where
 
     loop {
         match ipc::read_request(&mut r).await {
-            Ok(Some(req)) => handle_request(req, &sessions, &next_id, &control_tx).await,
+            Ok(Some(req)) => {
+                handle_request(req, &sessions, &next_id, &control_tx, &known, &waiters).await
+            }
             Ok(None) => break,
             Err(e) => {
                 eprintln!("canvas-terminal daemon: read error: {e}");
@@ -394,10 +499,26 @@ async fn handle_request(
     sessions: &Sessions,
     next_id: &Arc<AtomicU64>,
     tx: &mpsc::Sender<ipc::Frame>,
+    known: &Known,
+    waiters: &Waiters,
 ) {
     match req {
-        ipc::Request::Create(c) => match spawn_session(&c, sessions, next_id, tx.clone()) {
+        ipc::Request::Create(c) => match spawn_session(&c, sessions, next_id, tx.clone(), known, waiters)
+        {
             Ok(id) => {
+                // Record identity (argv/cwd) so a daemon restart can
+                // `Resume` this session by name even with no chat CLI
+                // ever involved.
+                if let Ok(mut k) = known.lock() {
+                    k.registry.upsert(SavedSession {
+                        name: c.name.clone(),
+                        argv: c.argv.clone(),
+                        cwd: c.cwd.clone(),
+                        chat_provider: None,
+                        cli_session_id: None,
+                    });
+                }
+                persist_known(known);
                 let _ = tx
                     .send(ipc::Frame::Create(ipc::CreateResponse { session_id: id }))
                     .await;
@@ -506,28 +627,56 @@ async fn handle_request(
                     // Refuse to rename a dead session: it can't be attached
                     // anyway, and its name is freed on the next `Create`.
                     Some(s) if s.alive => {
+                        let old_name = s.name.clone();
                         s.name = r.name.clone();
-                        Ok(())
+                        Ok(old_name)
                     }
                     _ => Err(format!("no live session {}", r.session_id)),
                 }
             };
-            if let Err(message) = outcome {
-                let _ = tx
-                    .send(ipc::Frame::Error(ipc::ErrorResponse { message }))
-                    .await;
+            match outcome {
+                Ok(old_name) => {
+                    if let Ok(mut k) = known.lock() {
+                        k.registry.rename(&old_name, &r.name);
+                    }
+                    persist_known(known);
+                }
+                Err(message) => {
+                    let _ = tx
+                        .send(ipc::Frame::Error(ipc::ErrorResponse { message }))
+                        .await;
+                }
             }
         }
         ipc::Request::List => {
             let infos = {
                 let Ok(map) = sessions.lock() else { return };
-                map.values()
+                let mut infos: Vec<ipc::SessionInfo> = map
+                    .values()
                     .map(|s| ipc::SessionInfo {
                         name: s.name.clone(),
                         session_id: s.id,
                         alive: s.alive,
+                        resumable: !s.alive,
                     })
-                    .collect::<Vec<_>>()
+                    .collect();
+                // A fresh daemon (post-restart) has no in-memory record at
+                // all for a session the registry remembers; surface it as
+                // resumable so a caller like `restore_canvas` can `Resume`
+                // it by name instead of silently dropping the card.
+                if let Ok(k) = known.lock() {
+                    for saved in &k.registry.sessions {
+                        if !infos.iter().any(|i| i.name == saved.name) {
+                            infos.push(ipc::SessionInfo {
+                                name: saved.name.clone(),
+                                session_id: 0,
+                                alive: false,
+                                resumable: true,
+                            });
+                        }
+                    }
+                }
+                infos
             };
             let _ = tx
                 .send(ipc::Frame::List(ipc::ListResponse { sessions: infos }))
@@ -622,18 +771,31 @@ async fn handle_request(
                         }
                         match write_err {
                             Some(e) => Err(format!("write failed: {e}")),
-                            None => Ok(ipc::ChatSyncResponse {
-                                events: Vec::new(),
-                                chat: r.chat,
-                                cli: Some(r.cli.clone()),
-                                session_id: resume.clone(),
-                            }),
+                            None => Ok((
+                                ipc::ChatSyncResponse {
+                                    events: Vec::new(),
+                                    chat: r.chat,
+                                    cli: Some(r.cli.clone()),
+                                    session_id: resume.clone(),
+                                },
+                                cli_name,
+                                resume,
+                            )),
                         }
                     }
                 }
             };
             match outcome {
-                Ok(resp) => {
+                Ok((resp, cli_name, resume)) => {
+                    // Only a switch *into* chat means the session is really
+                    // hosting that CLI; a switch back to the grid view
+                    // leaves the last known provider/session id untouched.
+                    if r.chat {
+                        if let Ok(mut k) = known.lock() {
+                            k.registry.set_chat(&r.session, Some(cli_name), resume);
+                        }
+                        persist_known(known);
+                    }
                     let _ = tx.send(ipc::Frame::ChatSync(resp)).await;
                 }
                 Err(message) => {
@@ -677,7 +839,148 @@ async fn handle_request(
                 }
             }
         }
+        ipc::Request::Resume(r) => {
+            // Daemon-restart recovery: no live PTY exists for `r.name`
+            // (otherwise the caller would `Attach`), but the daemon's own
+            // registry may still remember how to relaunch it. Reuses
+            // `spawn_session` exactly like `Create`, then — when the
+            // registry also remembers a hosted CLI — arms the chat parser
+            // and types the adapter's resume launch line, the same way
+            // `canvas.rs`'s old restore-from-scratch path used to.
+            let saved = {
+                let Ok(k) = known.lock() else { return };
+                k.registry.get(&r.name).cloned()
+            };
+            let Some(saved) = saved else {
+                let _ = tx
+                    .send(ipc::Frame::Error(ipc::ErrorResponse {
+                        message: format!("no known session named '{}'", r.name),
+                    }))
+                    .await;
+                return;
+            };
+            let argv = if saved.argv.is_empty() {
+                default_shell_argv()
+            } else {
+                saved.argv.clone()
+            };
+            let create = ipc::CreateRequest {
+                name: r.name.clone(),
+                cwd: saved.cwd.clone(),
+                argv,
+                cols: r.cols,
+                rows: r.rows,
+            };
+            match spawn_session(&create, sessions, next_id, tx.clone(), known, waiters) {
+                Ok(id) => {
+                    if let Some(provider) = saved.chat_provider.clone() {
+                        let adapter = CliAdapter::from_comm(&provider);
+                        let resume = saved.cli_session_id.clone();
+                        let line = format!("{}\n", adapter.launch(ChatMode::Chat, resume.as_deref()));
+                        let write_result = with_session_mut::<_, io::Error>(sessions, id, |s| {
+                            s.chat = Some(ChatState::new(adapter));
+                            if let Some(chat) = s.chat.as_mut() {
+                                chat.cli_session_id = resume.clone();
+                            }
+                            s.master.write_all(line.as_bytes())
+                        });
+                        if let Some(Err(e)) = write_result {
+                            eprintln!("canvas-terminal daemon: resume relaunch write failed: {e}");
+                        }
+                    }
+                    let _ = tx
+                        .send(ipc::Frame::Create(ipc::CreateResponse { session_id: id }))
+                        .await;
+                }
+                Err(msg) => {
+                    let _ = tx
+                        .send(ipc::Frame::Error(ipc::ErrorResponse { message: msg }))
+                        .await;
+                }
+            }
+        }
+        ipc::Request::AgentList => {
+            let agents = {
+                let Ok(map) = sessions.lock() else { return };
+                map.values().map(agent_status_info).collect::<Vec<_>>()
+            };
+            let _ = tx
+                .send(ipc::Frame::AgentList(ipc::AgentListResponse { agents }))
+                .await;
+        }
+        ipc::Request::AgentWait(r) => {
+            // Fast path: already satisfied, resolve without registering a
+            // waiter at all.
+            let current = {
+                let Ok(map) = sessions.lock() else { return };
+                map.values().find(|s| s.name == r.session).map(agent_status_info)
+            };
+            let Some(current) = current else {
+                let _ = tx
+                    .send(ipc::Frame::Error(ipc::ErrorResponse {
+                        message: format!("no session named '{}'", r.session),
+                    }))
+                    .await;
+                return;
+            };
+            let already = r.until.iter().any(|want| match want {
+                ipc::AgentWaitState::Idle => !current.busy,
+                ipc::AgentWaitState::Working => current.busy,
+            });
+            if already || !current.alive {
+                let _ = tx.send(ipc::Frame::AgentStatus(current)).await;
+                return;
+            }
+            let (wtx, wrx) = tokio::sync::oneshot::channel();
+            {
+                let Ok(mut w) = waiters.lock() else { return };
+                w.entry(r.session.clone())
+                    .or_default()
+                    .push((r.until.clone(), wtx));
+            }
+            let timeout = std::time::Duration::from_millis(r.timeout_ms.max(1));
+            match tokio::time::timeout(timeout, wrx).await {
+                Ok(Ok(info)) => {
+                    let _ = tx.send(ipc::Frame::AgentStatus(info)).await;
+                }
+                Ok(Err(_)) => {
+                    // The sender side was dropped without resolving — should
+                    // not happen, but report it rather than hang the caller.
+                    let _ = tx
+                        .send(ipc::Frame::Error(ipc::ErrorResponse {
+                            message: "wait cancelled".into(),
+                        }))
+                        .await;
+                }
+                Err(_) => {
+                    // Timed out: drop our now-stale waiter entry and report
+                    // the last-known status with `timed_out` set.
+                    if let Ok(mut w) = waiters.lock() {
+                        if let Some(list) = w.get_mut(&r.session) {
+                            list.retain(|(_, sender)| !sender.is_closed());
+                        }
+                    }
+                    let mut info = {
+                        let Ok(map) = sessions.lock() else { return };
+                        map.values()
+                            .find(|s| s.name == r.session)
+                            .map(agent_status_info)
+                            .unwrap_or(current)
+                    };
+                    info.timed_out = true;
+                    let _ = tx.send(ipc::Frame::AgentStatus(info)).await;
+                }
+            }
+        }
     }
+}
+
+/// Fallback argv when a registry entry predates argv being recorded (or was
+/// created by `set_chat` alone, which does not know argv). Mirrors the
+/// GUI's own default shell choice (`terminal/session.rs::shell_command`).
+fn default_shell_argv() -> Vec<String> {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    vec![shell, "-lc".to_string(), "zsh".to_string()]
 }
 
 fn spawn_session(
@@ -685,6 +988,8 @@ fn spawn_session(
     sessions: &Sessions,
     next_id: &Arc<AtomicU64>,
     subscriber: mpsc::Sender<ipc::Frame>,
+    known: &Known,
+    waiters: &Waiters,
 ) -> Result<u64, String> {
     if c.argv.is_empty() {
         return Err("argv must not be empty".into());
@@ -697,6 +1002,12 @@ fn spawn_session(
         cmd = cmd.current_dir(cwd);
     }
     cmd = cmd.size(TerminalSize::new(c.cols, c.rows));
+    // Every card's PTY carries this so a CLI running inside it (including
+    // one card's hosted agent) can tell it is safe to shell out to
+    // `canvas-terminal ipc ...` and reach sibling cards — the control
+    // surface behind inter-agent communication. Mirrors herdr's
+    // `HERDR_ENV=1`.
+    cmd = cmd.env(ipc::ENV_MARKER_VAR, "1");
 
     let spawned = cmd.spawn().map_err(|e| format!("spawn failed: {e}"))?;
     let (master, child) = spawned.into_parts();
@@ -732,14 +1043,20 @@ fn spawn_session(
         map.insert(id, session);
     }
 
-    spawn_pty_reader(id, reader_io, Arc::clone(sessions));
+    spawn_pty_reader(
+        id,
+        reader_io,
+        Arc::clone(sessions),
+        Arc::clone(known),
+        Arc::clone(waiters),
+    );
     Ok(id)
 }
 
 /// Dedicated OS thread that reads PTY output, appends it to the session ring,
 /// and fans `Output` frames out to subscribers. On EOF/error it marks the
 /// session dead, reaps the child, and emits `Ended`.
-fn spawn_pty_reader(id: u64, io: PtyIo, sessions: Sessions) {
+fn spawn_pty_reader(id: u64, io: PtyIo, sessions: Sessions, known: Known, waiters: Waiters) {
     std::thread::Builder::new()
         .name(format!("ct-pty-{id}"))
         .spawn(move || {
@@ -747,10 +1064,10 @@ fn spawn_pty_reader(id: u64, io: PtyIo, sessions: Sessions) {
             loop {
                 match io.read(&mut buf) {
                     Ok(0) | Err(_) => {
-                        end_session(&sessions, id);
+                        end_session(&sessions, id, &waiters);
                         return;
                     }
-                    Ok(n) => fanout_output(&sessions, id, buf[..n].to_vec()),
+                    Ok(n) => fanout_output(&sessions, id, buf[..n].to_vec(), &known, &waiters),
                 }
             }
         })
@@ -759,8 +1076,8 @@ fn spawn_pty_reader(id: u64, io: PtyIo, sessions: Sessions) {
 
 /// Append bytes to the session ring and fan `Output` (always) and
 /// `ChatEvent`s (when the chat parser is on) to subscribers.
-fn fanout_output(sessions: &Sessions, id: u64, bytes: Vec<u8>) {
-    let (subs, chat_events) = {
+fn fanout_output(sessions: &Sessions, id: u64, bytes: Vec<u8>, known: &Known, waiters: &Waiters) {
+    let (subs, chat_events, learned, status_after) = {
         let Ok(mut map) = sessions.lock() else { return };
         let Some(s) = map.get_mut(&id) else { return };
         s.push_ring(&bytes);
@@ -770,8 +1087,36 @@ fn fanout_output(sessions: &Sessions, id: u64, bytes: Vec<u8>) {
             .filter(|chat| chat.on)
             .map(|chat| chat.feed(&bytes))
             .unwrap_or_default();
-        (s.subscribers.clone(), chat_events)
+        // A `SessionInfo` event with a session id is the daemon's only
+        // chance to learn the CLI's own conversation id from the live
+        // stream (as opposed to the composer-driven `ChatSwitch` path,
+        // which may not know it yet on a first launch). Record it so a
+        // later daemon restart can `Resume` into the same conversation.
+        let learned = chat_events.iter().find_map(|item| match &item.event {
+            crate::chat::ChatEvent::SessionInfo {
+                cli,
+                session_id: Some(session_id),
+            } => Some((s.name.clone(), cli.clone(), session_id.clone())),
+            _ => None,
+        });
+        // Only worth checking waiters when this chunk actually produced chat
+        // events (busy only changes on `UserMessage`/`TurnDone`/`Exited`).
+        let status_after = if chat_events.is_empty() {
+            None
+        } else {
+            Some(agent_status_info(s))
+        };
+        (s.subscribers.clone(), chat_events, learned, status_after)
     };
+    if let Some((name, cli, session_id)) = learned {
+        if let Ok(mut k) = known.lock() {
+            k.registry.set_chat(&name, Some(cli), Some(session_id));
+        }
+        persist_known(known);
+    }
+    if let Some(info) = status_after {
+        resolve_waiters(waiters, &info.name, &info, false);
+    }
 
     let mut keep: Vec<mpsc::Sender<ipc::Frame>> = Vec::with_capacity(subs.len());
     for st in subs {
@@ -805,17 +1150,22 @@ fn fanout_output(sessions: &Sessions, id: u64, bytes: Vec<u8>) {
 }
 
 /// Mark a session dead, reap its child, and emit `Ended` to subscribers.
-fn end_session(sessions: &Sessions, id: u64) {
-    let subs = {
+/// Also force-resolves any outstanding `AgentWait` for this session: it will
+/// never change status again, so a wait on it should not hang until timeout.
+fn end_session(sessions: &Sessions, id: u64, waiters: &Waiters) {
+    let ended = {
         let Ok(mut map) = sessions.lock() else { return };
         let Some(s) = map.get_mut(&id) else { return };
         s.alive = false;
         let _ = s.child.try_wait(); // reap
-        std::mem::take(&mut s.subscribers)
+        let subs = std::mem::take(&mut s.subscribers);
+        (subs, agent_status_info(s))
     };
+    let (subs, info) = ended;
     for st in subs {
         let _ = st.try_send(ipc::Frame::Ended { session_id: id });
     }
+    resolve_waiters(waiters, &info.name, &info, true);
 }
 
 /// Remove a session from the table entirely (used by `Kill`).

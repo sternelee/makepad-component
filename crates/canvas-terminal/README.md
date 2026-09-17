@@ -25,6 +25,14 @@
 - ✅ 拖拽 PDF 到画布原生渲染（makepad `PdfPageView`，首页按卡片尺寸 letterbox），标题栏带打印按钮（`lp` 发送系统打印队列）
 - ✅ 拖拽 HTML 到画布内嵌浏览器预览（CEF `file://` 槽位，完整网页渲染）
 - ✅ 拖拽文本文件（txt/md/代码/配置等 40+ 扩展名）为等宽文本卡片，支持滚轮滚动、截断标记
+- ✅ 会话恢复：daemon 自身持久化一份会话注册表（名字/argv/cwd/托管的 CLI），
+  即使 daemon 进程重启（而不仅仅是 GUI 重启），也能按名 `Resume` 出会话——
+  普通终端卡片恢复到原来的工作目录，agent 卡片继续用 `--resume`/`--session`
+  接上原来的对话。
+- ✅ Agent 互相通信：`canvas-terminal ipc` 子命令（`list`/`send`/`wait`/`read`）
+  是 daemon 协议之上的一层薄 CLI；daemon 给每个卡片的 PTY 都注入
+  `CANVAS_TERMINAL_ENV=1`，卡片里跑的 CLI agent 据此判断可以安全地调用这个
+  子命令去给同画布里的另一张卡片发消息、等它读到空闲、或读它的转录。
 
 ## 运行
 
@@ -60,6 +68,25 @@ cargo run -p canvas-terminal -- --daemon
 | `/help` | 显示用法 |
 | 其他文本 | 发送到当前激活的终端 |
 
+## Agent 互相通信（`canvas-terminal ipc`）
+
+卡片内的 CLI agent（或任意脚本）可以直接调用同一个二进制来控制画布上的其他
+卡片，不需要链接 GUI 代码，只是 daemon 协议之上的一层薄客户端：
+
+```bash
+canvas-terminal ipc list                               # 列出所有会话及其 busy 状态
+canvas-terminal ipc send --to NAME --text "go on"      # 给名为 NAME 的会话发一条消息
+canvas-terminal ipc wait --for NAME --until idle       # 等到 NAME 变为 idle（阻塞，daemon 端事件驱动，非轮询）
+canvas-terminal ipc read --from NAME --lines 50        # 读取 NAME 的转录（折叠后的纯文本）
+```
+
+`wait`/`send`/`list`/`read` 内部分别对应 daemon 新增的 `AgentWait` /
+`ChatSend` / `AgentList` / `ChatSync` 请求；`wait` 的退出码：`0` 已到达目标
+状态、`1` 超时（`--timeout-ms`，默认 30000）、`2` 用法或请求错误。daemon 会
+给它启动的每个 PTY 注入 `CANVAS_TERMINAL_ENV=1`，一个跑在卡片里的 agent 可以
+先检查这个变量再决定是否调用 `ipc`（同一台机器上、canvas-terminal 之外的
+进程不会误用这个 socket）。
+
 ## 交互
 
 - **平移**：鼠标滚轮 / 触控板滑动（默认），或中键拖拽。
@@ -76,14 +103,16 @@ cargo run -p canvas-terminal -- --daemon
 
 ```
 crates/canvas-terminal/
-├── src/main.rs          # Makepad script_mod! DSL、App 入口；`--daemon` 时转运行 daemon
-├── src/daemon.rs        # PTY daemon 运行时：持有 PTY、IPC 监听、会话表、scrollback ring
+├── src/main.rs          # Makepad script_mod! DSL、App 入口；`--daemon`/`ipc` 时转运行对应模式
+├── src/daemon.rs        # PTY daemon 运行时：持有 PTY、IPC 监听、会话表、scrollback ring、agent 状态与 wait
+├── src/daemon_persist.rs # daemon 自己的会话注册表（名字/argv/cwd/托管 CLI），独立于 GUI 的画布存档
 ├── src/ipc.rs           # GUI ↔ daemon 线协议（length-prefixed，控制帧 JSON / 字节帧内联）
+├── src/ipc_cli.rs       # `canvas-terminal ipc <verb>`：daemon 协议之上的一次性 CLI 客户端
 ├── src/canvas.rs        # CanvasPanel：画布、项管理、事件、绘制、媒体槽位
 ├── src/items.rs         # CanvasItem、NoteShape、NoteTool、AgentStatus、MediaKind
 ├── src/command.rs       # 命令栏解析
 └── src/terminal/        # 终端会话与渲染
-    ├── session.rs       # IPC 客户端：连 daemon、Create/Attach、喂本地 vte 网格
+    ├── session.rs       # IPC 客户端：连 daemon、Create/Attach/Resume、喂本地 vte 网格
     └── state.rs         # vte 解析的本地终端网格（alacritty 语义）
 ```
 
@@ -99,9 +128,16 @@ daemon 模式运行。终端会话由这个 daemon 持有（跨平台 PTY 走 `r
 daemon，会以 detach 方式重新执行自己并加上 `--daemon`，之后所有终端的 PTY 都由
 它管理——不依赖系统安装的 rmux，也无需单独的 daemon 二进制。GUI 退出后 daemon
 继续存活，下次启动时 GUI 会自动 `List` 存活会话并按名 `Attach`，回放 scrollback
-后继续实时输出（已退出的会话不会恢复）。`/rename` 会同步 daemon 里的会话名，
-关闭终端卡片（✕）会 `Kill` 对应会话。本地终端网格（`TerminalState`，vte 解析）
-仍在 GUI 侧维护，daemon 只负责持有 PTY、转发字节、缓存重放缓冲。
+后继续实时输出。`/rename` 会同步 daemon 里的会话名，关闭终端卡片（✕）会 `Kill`
+对应会话。本地终端网格（`TerminalState`，vte 解析）仍在 GUI 侧维护，daemon 只
+负责持有 PTY、转发字节、缓存重放缓冲。
+
+daemon 自己也持久化一份会话身份注册表（`daemon-sessions.json`，与 GUI 的
+`workspace.json` 分开存放）：`Create`/`Rename`/学到 agent 的 CLI 会话 id 时都
+会写入。哪怕 daemon 进程本身重启（不只是 GUI），`List` 也会把注册表里"活的
+会话表里没有、但注册表还记得"的名字标成 `resumable`，调用 `Resume` 就能按
+记录的 argv/cwd 重新拉起会话，并在 agent 卡片的情况下自动用
+`--resume`/`--session` 接回原来的 CLI 会话。
 
 ## 已知限制
 
