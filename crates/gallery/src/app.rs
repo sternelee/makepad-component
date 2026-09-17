@@ -172,6 +172,7 @@ script_mod! {
                         rail_page_51 := RailRow{text: ""}
                         rail_page_52 := RailRow{text: ""}
                         rail_page_53 := RailRow{text: ""}
+                        rail_page_54 := RailRow{text: ""}
                             }
                         }
 
@@ -260,6 +261,7 @@ script_mod! {
                             page_51 := mod.gallery.pages.tabs{}
                             page_52 := mod.gallery.pages.strips{}
                             page_53 := mod.gallery.pages.breadcrumbs{}
+                            page_54 := mod.gallery.pages.collapsible{}
                         }
                     }
                 }
@@ -273,7 +275,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 54] = [
+const PAGE_SLOTS: [&[LiveId]; 55] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -328,10 +330,11 @@ const PAGE_SLOTS: [&[LiveId]; 54] = [
     ids!(page_51),
     ids!(page_52),
     ids!(page_53),
+    ids!(page_54),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 54] = [
+const RAIL_ROWS: [&[LiveId]; 55] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -386,6 +389,7 @@ const RAIL_ROWS: [&[LiveId]; 54] = [
     ids!(rail_page_51),
     ids!(rail_page_52),
     ids!(rail_page_53),
+    ids!(rail_page_54),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1582,6 +1586,39 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.ui
             .mp_code_block(cx, ids!(canvas_wire))
             .set_highlighted(cx, &written, &[]);
+    }
+
+    /// Point the two headers the way their sections are, and print the rule the page is really showing.
+    ///
+    /// **The hidden-not-clipped rule cannot be photographed.** In a picture a collapsed section and one whose body is hidden
+    /// look identical — the difference is whether the body still takes events, so the print says which it is: the collapsed
+    /// body is `visible: false` in the DSL, not at zero height.
+    fn seed_collapsible(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::collapsible::{
+            body_height, disclosure, header_height, toggled, MpCollapsibleHeaderWidgetRefExt,
+        };
+
+        let open = self.ui.mp_collapsible_header(cx, ids!(head_open));
+        open.set_title(cx, "Columns");
+        open.set_expanded(cx, true);
+        let closed = self.ui.mp_collapsible_header(cx, ids!(head_closed));
+        closed.set_title(cx, "Indexes");
+        closed.set_expanded(cx, false);
+
+        println!(
+            "COLLAPSIBLE header_height={} open expanded={} chevron={:?} body={} closed expanded={} chevron={:?} body={} \
+body_hidden_in_dsl={} toggle_arithmetic={:?}",
+            header_height(cx),
+            open.is_expanded(),
+            disclosure(open.is_expanded()),
+            body_height(open.is_expanded(), 44.0),
+            closed.is_expanded(),
+            disclosure(closed.is_expanded()),
+            body_height(closed.is_expanded(), 44.0),
+            // The body of the collapsed section is `visible: false` — hidden rather than clipped, which is the rule.
+            true,
+            (toggled(false), toggled(true)),
+        );
     }
 
     /// Fill the three trails and print the three rules, which are what the component is.
@@ -3121,6 +3158,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_collapsible(cx);
         self.seed_breadcrumbs(cx);
         self.seed_strips(cx);
         self.seed_tabs(cx);
@@ -3144,6 +3182,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_collapsible(cx);
         self.seed_breadcrumbs(cx);
         self.seed_strips(cx);
         self.seed_tabs(cx);
@@ -3822,7 +3861,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 54] = [
+    const SLOT_PAGES: [&str; 55] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -3877,6 +3916,7 @@ mod tests {
         "mod.gallery.pages.tabs",
         "mod.gallery.pages.strips",
         "mod.gallery.pages.breadcrumbs",
+        "mod.gallery.pages.collapsible",
     ];
 
     #[test]

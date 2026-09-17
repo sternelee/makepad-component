@@ -49,6 +49,7 @@ pub mod blocks;
 pub mod breadcrumbs;
 pub mod canvas;
 pub mod code;
+pub mod collapsible;
 pub mod combobox;
 pub mod tree;
 pub mod menu;
@@ -106,6 +107,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     breadcrumbs::script_mod(vm);
     canvas::script_mod(vm);
     code::script_mod(vm);
+    collapsible::script_mod(vm);
     combobox::script_mod(vm);
     tree::script_mod(vm);
     avatar::script_mod(vm);
@@ -470,6 +472,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/breadcrumbs.rs",
         blurb: "A trail whose current crumb is derived and is not a link",
     },
+    Page {
+        title: "Collapsible",
+        path: "mod.gallery.pages.collapsible",
+        source: "crates/gallery/src/pages/collapsible.rs",
+        blurb: "A header whose caller owns the state, and a body hidden rather than clipped",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -584,6 +592,7 @@ mod tests {
             ("crates/gallery/src/pages/tabs.rs", "tabs"),
             ("crates/gallery/src/pages/strips.rs", "strips"),
             ("crates/gallery/src/pages/breadcrumbs.rs", "breadcrumbs"),
+            ("crates/gallery/src/pages/collapsible.rs", "collapsible"),
         ]
         .into_iter()
         .collect();

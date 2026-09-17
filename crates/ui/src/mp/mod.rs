@@ -47,6 +47,7 @@ pub mod canvas;
 pub mod checkbox;
 pub mod code;
 pub mod color_picker;
+pub mod collapsible;
 pub mod combobox;
 pub mod control;
 pub mod date;
@@ -153,6 +154,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     crate::mp::tab_bar::script_mod(vm);
     crate::mp::strip::script_mod(vm);
     crate::mp::breadcrumb::script_mod(vm);
+    crate::mp::collapsible::script_mod(vm);
     crate::mp::menubar_strip::script_mod(vm);
     crate::mp::menu_card::script_mod(vm);
     crate::mp::description_list::script_mod(vm);
