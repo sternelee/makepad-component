@@ -20,11 +20,22 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 log = "0.4"
 
-# A2A/SSE streaming support
-ureq = { version = "2.9", features = ["json"] }
-uuid = { version = "1.0", features = ["v4"] }
-
 [features]
-default = ["plot"]
+default = ["plot", "net"]
 # makepad-plot has been migrated to the Makepad 2.0 script_mod! API.
 plot = ["dep:makepad-plot"]
+# The A2A client and the SSE host: a socket, and the blocking threads that read it. **Inert on the web**, where
+# the dependencies below do not exist — `a2ui/mod.rs` gates those three modules on both this and the target.
+net = []
+
+# **The socket, declared only where a socket exists.** `ureq` needs a TLS stack and `uuid`'s `v4` needs
+# `getrandom`; on `wasm32-unknown-unknown` neither is available, and `getrandom` refuses to compile without a
+# `js` feature that this crate has no business asking for.
+#
+# Declaring them here rather than as optional dependencies behind `net` is deliberate: a feature that enabled
+# `dep:ureq` would have to *be* enabled on the web too (features union, and `net` is a default), so the
+# dependency would still be built. Target-scoping the dependency makes the platform the decider, which is the
+# only arrangement in which a wasm consumer needs to know nothing.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ureq = { version = "2.9", features = ["json"] }
+uuid = { version = "1.0", features = ["v4"] }

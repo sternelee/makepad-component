@@ -34,23 +34,39 @@
 //! processor.process_message(message);
 //! ```
 
+// **The three that need a socket, and the threads that read it.** Everything else in this module is the protocol
+// and its renderer, which are arithmetic and need nothing from the host at all — so gating these three is what
+// lets the whole renderer, chart bridge included, build for a browser.
+//
+// **Both conditions, and the second is not redundant.** `net` is the caller's switch; `not(target_arch = "wasm32")`
+// is the platform's, because the socket dependencies are not declared for the web at all (see `Cargo.toml`). A
+// caller who leaves `net` on — which is the default — still gets a clean wasm build, which is the whole point:
+// the platform decides, so no consumer has to know.
+#[cfg(all(feature = "net", not(target_arch = "wasm32")))]
 mod a2a_client;
 pub mod chart_bridge;
 mod data_model;
+#[cfg(all(feature = "net", not(target_arch = "wasm32")))]
 mod host;
 mod message;
 mod processor;
 mod registry;
+#[cfg(all(feature = "net", not(target_arch = "wasm32")))]
 mod sse;
 mod surface;
 mod value;
 
+#[cfg(all(feature = "net", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "net", not(target_arch = "wasm32")))]
 pub use a2a_client::*;
 pub use data_model::*;
+#[cfg(all(feature = "net", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "net", not(target_arch = "wasm32")))]
 pub use host::*;
 pub use message::*;
 pub use processor::*;
 pub use registry::*;
+#[cfg(all(feature = "net", not(target_arch = "wasm32")))]
 pub use sse::*;
 pub use surface::*;
 pub use value::*;

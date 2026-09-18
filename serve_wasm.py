@@ -1,48 +1,122 @@
 #!/usr/bin/env python3
-"""
-Simple HTTP server with CORS headers required for Makepad WebAssembly.
-Usage: python3 serve_wasm.py [port]
+"""Serve a makepad wasm build, with the headers it needs.
+
+    python3 serve_wasm.py [port] [app]        # defaults: 8080 gallery
+
+`app` is the crate name, which is also the directory `cargo makepad wasm build -p <app>`
+writes into: `target/makepad-wasm-app/release/<app>`.
+
+## Why this is a script and not `python3 -m http.server`
+
+Two headers, and neither is optional in the general case:
+
+- `Cross-Origin-Opener-Policy: same-origin` and
+  `Cross-Origin-Embedder-Policy: require-corp` are what make a document
+  **cross-origin isolated**, which is the only state in which `SharedArrayBuffer` exists. A
+  build made with `--threads` allocates its memory as a `SharedArrayBuffer` and will not
+  start without them — and it fails by hanging rather than by saying so, which is a bad
+  afternoon. A build without `--threads` does not need them and is unharmed by them, so they
+  are always sent rather than being a flag to remember.
+- `.wasm` and `.bin` need their right types: `application/wasm` and
+  `application/octet-stream`. A server that guesses `text/plain` makes the browser refuse the
+  module, and one that omits the type for `.bin` breaks `--split` builds.
+
+## And no caching, which is the third thing
+
+`Cache-Control: no-store` on everything. This is a development server: the whole point is to
+rebuild and reload, and a cached `.wasm` from a previous build is the single most confusing
+failure available here — the source says one thing, the browser runs another, and the fix
+looks like it did nothing.
 """
 
 import http.server
+import os
 import socketserver
 import sys
-import os
+from pathlib import Path
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
-WASM_DIR = "./target/makepad-wasm-app/release/component-zoo"
+APP = sys.argv[2] if len(sys.argv) > 2 else "gallery"
 
-class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=WASM_DIR, **kwargs)
+ROOT = Path(__file__).resolve().parent
+# Both the plain and the `small`/`release` profiles, since `cargo makepad wasm build` writes to
+# whichever the caller asked for and there is no way to tell from here which they meant.
+CANDIDATES = [
+    ROOT / "target" / "makepad-wasm-app" / "release" / APP,
+    ROOT / "target" / "makepad-wasm-app" / "small" / APP,
+    ROOT / "target" / "makepad-wasm-app" / APP,
+]
 
+# What a makepad wasm build emits, so a wrong directory is caught here rather than as a blank
+# page: finding the directory is not the same as finding the app in it.
+NEEDED = ["index.html", f"{APP}.wasm"]
+
+TYPES = {
+    ".wasm": "application/wasm",
+    ".js": "text/javascript",
+    ".css": "text/css",
+    ".html": "text/html",
+    ".json": "application/json",
+    ".bin": "application/octet-stream",
+    ".ttf": "application/font-sfnt",
+    ".otf": "application/font-sfnt",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".wasm.secondary": "application/wasm",
+}
+
+
+class Handler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
-        # Required headers for SharedArrayBuffer (needed by Makepad wasm)
-        self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
-        self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
+        self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
+        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+        # See the module doc: a cached wasm from a previous build is the most confusing failure this
+        # server can produce.
+        self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
     def guess_type(self, path):
-        """Set correct MIME types"""
-        if path.endswith('.wasm'):
-            return 'application/wasm'
-        elif path.endswith('.js'):
-            return 'text/javascript'
-        elif path.endswith('.css'):
-            return 'text/css'
-        elif path.endswith('.ttf'):
-            return 'application/font-sfnt'
-        elif path.endswith('.svg'):
-            return 'image/svg+xml'
+        text = str(path)
+        for suffix, mime in TYPES.items():
+            if text.endswith(suffix):
+                return mime
         return super().guess_type(path)
 
-if __name__ == "__main__":
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    def log_message(self, fmt, *args):
+        # Quieter than the default: a page load is dozens of requests and the useful lines are the
+        # ones that are not 200s.
+        code = args[1] if len(args) > 1 else "?"
+        if str(code).startswith(("4", "5")):
+            super().log_message(fmt, *args)
 
-    with socketserver.TCPServer(("", PORT), CORSRequestHandler) as httpd:
-        print(f"Serving component-zoo at http://localhost:{PORT}")
-        print(f"Press Ctrl+C to stop")
+
+def main():
+    app_dir = next((c for c in CANDIDATES if all((c / n).exists() for n in NEEDED)), None)
+    if app_dir is None:
+        print(f"No wasm build of {APP!r} found. Looked in:", file=sys.stderr)
+        for candidate in CANDIDATES:
+            print(f"  {candidate.relative_to(ROOT)}", file=sys.stderr)
+        print("\nBuild it first:\n", file=sys.stderr)
+        print(f"  cargo makepad wasm install-toolchain        # once", file=sys.stderr)
+        print(f"  cargo makepad wasm build -p {APP} --release\n", file=sys.stderr)
+        return 1
+
+    handler = lambda *args, **kwargs: Handler(*args, directory=str(app_dir), **kwargs)
+    socketserver.TCPServer.allow_reuse_address = True
+    with socketserver.TCPServer(("", PORT), handler) as httpd:
+        print(f"Serving {app_dir.relative_to(ROOT)} at http://localhost:{PORT}/")
+        print("  \u00b7 ?page=<title|index> opens one page, the way GALLERY_PAGE does natively")
+        print("  \u00b7 COOP/COEP sent, so a --threads build can allocate its SharedArrayBuffer")
+        print("  \u00b7 Ctrl-C to stop")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
-            print("\nServer stopped")
+            print()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

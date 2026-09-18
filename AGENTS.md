@@ -186,8 +186,28 @@ cargo fmt --all -- --check
 ```bash
 cargo install --force --git https://github.com/makepad/makepad.git --branch rik cargo-makepad
 cargo makepad wasm install-toolchain
-cargo makepad wasm build -p component-zoo --release
-python3 serve_wasm.py 8080   # serves with COOP/COEP headers required by Makepad wasm
+cargo makepad wasm build -p gallery --release     # the v3 gallery, not component-zoo
+python3 serve_wasm.py 8080 [app]                  # COOP/COEP headers required by Makepad wasm
+
+### wasm-readiness rules (browser preview)
+
+- **`std::time::Instant` and `std::time::SystemTime` panic on `wasm32-unknown-unknown`** —
+  the std implementation is `unsupported` and it fails **at the call, not at the build**,
+  so a green build says nothing. Neither appears in the library core; anything that needs
+  a clock must be target-gated.
+- **No `std::fs`, `std::process`, `std::net`, or blocking `std::thread`.** The only
+  blocking threads are inside the `net` feature.
+- **`crates/ui`'s socket is a feature.** `ureq` (TLS) and `uuid`'s `v4` (`getrandom`) do
+  not build for wasm, and only `a2ui::{a2a_client, host, sse}` use them, so they sit
+  behind `net` (on by default). The browser build asks for the crate with
+  `default-features = false` **in a target-scoped dependency**, which is how one crate is
+  built two ways without either build knowing.
+- **`std::env::var` returns `Err` on the web rather than failing**, so the `GALLERY_*`
+  knobs are inert in a browser, not broken. The page is named with `?page=<title|index>`
+  there — see `page_from_url` in `crates/gallery/src/app.rs`.
+- **`cargo makepad wasm build` generates `index.html`** (with the crash reporter and the
+  early error hooks), so there is no hand-written host page to keep in step. It writes
+  `target/makepad-wasm-app/<profile>/<app>/`.
 ```
 
 ## 5. Coding Style & Conventions

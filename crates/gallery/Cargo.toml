@@ -20,3 +20,21 @@ makepad-widgets = { workspace = true }
 # `makepad_component::mp::date` and is tested; what a library cannot know is **which
 # zone the reader is in**, and that is the one thing this asks the OS for.
 libc = "0.2"
+
+# **The page is named in the URL on the web.** `GALLERY_PAGE` is how every other consumer drives this app, and a
+# browser has no environment to set — so the browser names the page the way a browser can: `?page=Loaders`. That
+# needs the browser's own API and nothing else from it, which is why this is four features and not a platform layer.
+#
+# Both crates are already in the lockfile — makepad's web platform is built on them — so this adds no dependency
+# graph, only a second consumer of one that is there.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+# `Date` is how a page asks its own timezone, which is the one OS fact this app needs (see
+# `local_utc_offset_seconds`). `UrlSearchParams`/`Location` are the `?page=` deep link.
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["Location", "UrlSearchParams", "Window"] }
+# **No override for `makepad-component` here, and that is the point.** The library declares its socket
+# dependencies per-target, so a wasm build of it drops them on its own and the browser needs to know nothing. An
+# override here would look like it was doing the work while Cargo's feature unification quietly ignored it —
+# which is exactly the bug this arrangement replaced.
+

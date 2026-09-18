@@ -716,22 +716,59 @@ makepad-component/
 
 ---
 
-## WebAssembly Build
+## WebAssembly build (the gallery in a browser tab)
+
+The gallery runs on `wasm32-unknown-unknown` — the same app, the same 58 pages:
 
 ```bash
-# Install cargo-makepad (if not installed)
+# Once: cargo-makepad and the wasm toolchain
 cargo install --force --git https://github.com/makepad/makepad.git --branch rik cargo-makepad
-
-# Install wasm toolchain
 cargo makepad wasm install-toolchain
 
-# Build for web
-cargo makepad wasm build -p component-zoo --release
-
-# Serve locally
-python3 serve_wasm.py 8080
-# Open http://localhost:8080
+# Build and serve
+cargo makepad wasm build -p gallery --release
+python3 serve_wasm.py 8080          # http://localhost:8080
 ```
+
+`serve_wasm.py [port] [app]` serves `target/makepad-wasm-app/release/<app>`, so any
+app in the workspace can be previewed the same way. It sends the COOP/COEP headers a
+`--threads` build needs for its `SharedArrayBuffer`, sends the right MIME types for
+`.wasm` and `.bin`, and disables caching — a cached `.wasm` from a previous build is
+the most confusing failure that server can produce.
+
+### Naming a page in the browser
+
+`?page=<title or index>` opens one page, the way `GALLERY_PAGE` does natively:
+
+```
+http://localhost:8080/?page=Loaders
+http://localhost:8080/?page=12
+```
+
+Both spellings are the same affordance — naming the page — and the URL is the only
+one a browser has.
+
+### The two things a browser changes, and why
+
+- **The socket is off.** `ureq` needs a TLS stack and `uuid`'s `v4` needs `getrandom`;
+  neither builds for `wasm32-unknown-unknown`. They are used by exactly three modules
+  — `a2ui::{a2a_client, host, sse}` — so they sit behind the **`net`** feature, which
+  is on by default and off in the browser build (`default-features = false` on the
+  wasm target only). Every component, and the A2UI renderer itself, is arithmetic and
+  builds anywhere.
+- **There is no environment**, so the page name comes from the URL instead.
+
+### wasm rules worth knowing before editing
+
+- **`std::time::Instant` and `SystemTime` panic on `wasm32-unknown-unknown`** — the
+  std implementation is `unsupported`, and it fails at the call, not at the build. The
+  library core has neither; keep it that way, and gate anything that needs a clock.
+- **No `std::fs`, `std::process`, `std::net`, or blocking `std::thread`.** The only
+  blocking threads in this workspace are in the `net` feature.
+- **`std::env::var` is not an error on the web** — it returns `Err`, so an
+  environment-driven knob simply takes its default. That is why `GALLERY_PAGE` needs
+  no special case and the other `GALLERY_*` knobs are inert in a browser rather than
+  broken.
 
 ---
 

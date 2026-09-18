@@ -553,6 +553,23 @@ impl MatchEvent for App {
     }
 }
 
+/// The page named in the URL, for a target that has no environment.
+///
+/// `?page=<index or title>`, matching what `GALLERY_PAGE` accepts so the two are interchangeable. A browser is the
+/// only target this exists for: everywhere else the environment is the affordance, and this returns nothing.
+#[cfg(target_arch = "wasm32")]
+fn page_from_url() -> Option<String> {
+    let search = web_sys::window()?.location().search().ok()?;
+    let params = web_sys::UrlSearchParams::new_with_str(&search).ok()?;
+    params.get("page").filter(|want| !want.is_empty())
+}
+
+/// Nothing, off the web — there the environment *is* the affordance.
+#[cfg(not(target_arch = "wasm32"))]
+fn page_from_url() -> Option<String> {
+    None
+}
+
 impl App {
     /// Which page to open on.
     ///
@@ -562,7 +579,10 @@ impl App {
     /// rail row, and an app that can only be driven by a pointer cannot be
     /// verified in a script. Naming the page is the whole affordance.
     fn opening_page(&self) -> usize {
-        let Some(want) = std::env::var("GALLERY_PAGE").ok() else {
+        // **The environment first, the URL second — the same affordance, whichever a target has.** A browser has no
+        // environment to set, so on the web the page is named in the URL instead: `?page=Loaders`. Both mean "name the
+        // page", and naming it is the only way this app can be driven without a pointer (see the doc above on why).
+        let Some(want) = std::env::var("GALLERY_PAGE").ok().or_else(page_from_url) else {
             return crate::pages::FIRST;
         };
         if let Ok(index) = want.parse::<usize>() {
@@ -3979,10 +3999,25 @@ impl AppMain for App {
 
 /// How far the local zone is ahead of UTC, in seconds.
 ///
-/// The one thing the date module cannot be asked for, because it is not arithmetic —
-/// it is a fact about where the machine is. Asked of the OS with `localtime_r`, which
-/// is POSIX; a Windows build would need `_get_timezone`, and saying so here is better
-/// than a silent zero.
+/// The one thing the date module cannot be asked for, because it is not arithmetic — it is a fact about where
+/// the machine is. **Three platforms, three answers, and no shared one**: `localtime_r` on POSIX, the browser's
+/// own `Date` on the web, and `_get_timezone` on Windows. The date module takes the offset as an *argument*
+/// precisely so that this stays the only place that has to know.
+///
+/// A browser is not a POSIX process: there is no `libc::time` to call and no `tm_gmtoff` to read. The
+/// equivalent is JavaScript's own zone offset, reached through the `Date` the page already has.
+#[cfg(target_arch = "wasm32")]
+fn local_utc_offset_seconds() -> i64 {
+    // **`get_timezone_offset` is minutes *behind* UTC, and that is the opposite sign to `tm_gmtoff`.** In
+    // UTC+2 it returns `-120`, while the POSIX branch would report `+7200`. Getting this backwards is a
+    // calendar one day out for half the world, which is why the negation is spelled out rather than folded
+    // into the multiplication.
+    let minutes_behind_utc = js_sys::Date::new_0().get_timezone_offset();
+    -(minutes_behind_utc as i64) * 60
+}
+
+/// The POSIX answer, for everything that is not a browser.
+#[cfg(not(target_arch = "wasm32"))]
 fn local_utc_offset_seconds() -> i64 {
     // Safety: `localtime_r` writes into the `tm` this owns and reads a time this owns;
     // neither pointer escapes.
