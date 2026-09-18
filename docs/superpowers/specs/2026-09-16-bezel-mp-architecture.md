@@ -2081,3 +2081,67 @@ rating、orb、toggle、breadcrumb 之外的项目名等），以及阶段 6—�
 需要 owner 明确同意。这一条我此前已 `pause_goal` 并给出三个选项，用户恢复了目标但没有回答，
 所以它仍然悬着。**它与「类似 gpui-bezel 的组件库 + gallery 预览」这个目标无关**：那些组件 bezel 也没有。
 
+# 浏览器预览：gallery 在 wasm32-unknown-unknown 上编译通过（2026-09-17）
+
+目标是「参考 bezel 做浏览器预览」。bezel 的做法是：**gallery 应用编到 `wasm32-unknown-unknown`**，
+**平台相关的东西用 cfg/feature 摘掉**（它的 terminal crate「sits off the web build」，tree-sitter 是 C
+所以在 build.rs 里预先算好高亮），再用一个薄薄的 web 壳（`apps/web`，`#![cfg(target_family = "wasm")]`）
+装进网站。makepad 这边的路径是 `cargo makepad wasm build` + COOP/COEP 头。
+
+**结果**：`cargo check --target wasm32-unknown-unknown -p gallery` **通过**（全部 58 页），
+native 侧 **16/16 crate 依旧全过**。
+
+## 便宜的诊断：先查 OS 调用，而不是等链接错误
+
+按 bezel skill 里那三条 wasm 禁忌去 grep gallery 的依赖 crate
+（`std::fs` / `std::process` / `std::net` / `SystemTime` / `Instant` / 阻塞 `thread`）：
+
+| crate | 命中 |
+| --- | --- |
+| `theme` `motion` `syntax` `markdown` `editor` `canvas` `blocks` `makepad-plot` | **0** |
+| `ui` | 只有 `std::env::var`（无害）与 `SystemTime`（见下） |
+| `gallery` | 只有 `std::env::var`（无害）与 `localtime_r`（见下） |
+
+**库内核本来就是 wasm-clean 的** —— 两个问题都在边缘上，靠读代码定位，省掉了一轮链接错误。
+
+## 两个「看起来是这样、其实不是」的发现
+
+### 1. 消费者关不掉 socket —— 必须由平台决定
+
+`crates/ui` 依赖 `ureq`（TLS）与 `uuid` 的 `v4`（`getrandom`），两者都编不过 wasm ✗，
+而它们只被 `a2ui::{a2a_client, host, sse}` 三个模块用到。
+
+**第一版修法是显然的那个**：加一个默认开启的 `net` feature，gallery 在 wasm 目标上用
+`default-features = false` ✗ —— **没用** ✗。原因值得记下来：
+**Cargo 会把「目标限定的依赖」与「普通依赖」的 feature 并集起来** ✗，所以 gallery 同时以两种方式
+请求了 `makepad-component`，`net` 依旧开着，`getrandom` 依旧在树里，报错位置一字未变。
+
+**可行的做法是把依赖按目标声明**（`ureq`/`uuid` 放在 `cfg(not(target_arch = "wasm32"))` 下 ✓），
+模块用 `all(feature = "net", not(target_arch = "wasm32"))` 双条件 ✓ —— 于是 `net` 变成一个纯开关 ✓，
+**wasm 消费者什么都不用知道** ✓。这是关键差别：另一种做法要求每个消费者都把一个很微妙的 manifest
+idiom 写对。
+
+### 2. 浏览器不是 POSIX 进程
+
+gallery 只向 OS 问一件事——本地 UTC 偏移（给日历用）——用 `localtime_r` ✓。那个函数原本就写着
+「Windows 需要 `_get_timezone`」✓，**web 是第三个答案**：`js_sys::Date` ✓，而且它的符号
+**与 `tm_gmtoff` 相反**（返回的是「落后 UTC 多少分钟」）✓。代码里把那个负号写出来了 ✓，
+因为弄反就是半个地球的日历差一天 ✓。
+
+## 另外两处
+
+- **`?page=<title|index>`**：`GALLERY_PAGE` 是所有人驱动这个 app 的方式 ✓，而浏览器设不了环境变量 ✗。
+  URL 是同一个 affordance ✓，接受与 `GALLERY_PAGE` 相同的写法 ✓（`?page=Loaders` 或 `?page=12` ✓）。
+  只需要四个 `web-sys` feature ✓。
+- **`serve_wasm.py` 之前服务的是 v2 的 `component-zoo`** ✗ —— 所以 v3 gallery 根本没有服务器 ✗。
+  重写成 `[port] [app]` ✓，找不到构建时**说清它在哪找过、怎么构建** ✓，并且**关掉缓存** ✓
+  （上次构建留下的 `.wasm` 是这台服务器能制造的最迷惑的故障 ✓：源码说一套、浏览器跑另一套 ✓）。
+  `.bin` 现在按 `application/octet-stream` 发 ✓（`--split` 构建需要 ✓），COOP/COEP 为什么不能省也写进了 doc ✓。
+
+## 还没做完的部分
+
+`cargo makepad wasm install-toolchain`（装 nightly + 各目标）在下载 15 个组件时很慢 ✓ —— 而
+**已经装好的 nightly 里本来就有 `wasm32-unknown-unknown`** ✓，所以它其实是在重装同一套东西 ✓。
+编译验证用的是 **stable** 的 wasm 目标 ✓（已装 ✓），所以**「编译通过」这一半的证据是完整的** ✓。
+剩下的是链接 + 起服务 + 在真浏览器里验证（用 CDP 读 console，而不是靠截图 —— 截图在这个环境是全黑的）。
+
