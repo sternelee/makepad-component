@@ -59,6 +59,7 @@ pub mod overlay;
 pub mod numbers;
 pub mod option_cards;
 pub mod sheets;
+pub mod pages;
 pub mod pagination;
 pub mod palette;
 pub mod picking;
@@ -121,6 +122,7 @@ pub fn script_mod(vm: &mut ScriptVm) {
     content::script_mod(vm);
     dialogs::script_mod(vm);
     pagination::script_mod(vm);
+    pages::script_mod(vm);
     numbers::script_mod(vm);
     option_cards::script_mod(vm);
     sheets::script_mod(vm);
@@ -494,6 +496,12 @@ pub const PAGES: &[Page] = &[
         source: "crates/gallery/src/pages/sheets.rs",
         blurb: "An edge-pinned panel whose extent is read across the edge it travels from",
     },
+    Page {
+        title: "Pages",
+        path: "mod.gallery.pages.pages",
+        source: "crates/gallery/src/pages/pages.rs",
+        blurb: "A bounded measure, a baseline-aligned count, and a subtitle that may not exist",
+    },
 ];
 
 /// The page the gallery opens on.
@@ -611,6 +619,7 @@ mod tests {
             ("crates/gallery/src/pages/collapsible.rs", "collapsible"),
             ("crates/gallery/src/pages/option_cards.rs", "option_cards"),
             ("crates/gallery/src/pages/sheets.rs", "sheets"),
+            ("crates/gallery/src/pages/pages.rs", "pages"),
         ]
         .into_iter()
         .collect();

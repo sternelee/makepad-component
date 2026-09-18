@@ -175,6 +175,7 @@ script_mod! {
                         rail_page_54 := RailRow{text: ""}
                         rail_page_55 := RailRow{text: ""}
                         rail_page_56 := RailRow{text: ""}
+                        rail_page_57 := RailRow{text: ""}
                             }
                         }
 
@@ -266,6 +267,7 @@ script_mod! {
                             page_54 := mod.gallery.pages.collapsible{}
                             page_55 := mod.gallery.pages.option_cards{}
                             page_56 := mod.gallery.pages.sheets{}
+                            page_57 := mod.gallery.pages.pages{}
                         }
                     }
                 }
@@ -279,7 +281,7 @@ script_mod! {
 /// A table rather than five `ids!` at each use site: the rail, the visibility
 /// pass and the `Page::path` strings all have to agree, and a table can be
 /// asserted against.
-const PAGE_SLOTS: [&[LiveId]; 57] = [
+const PAGE_SLOTS: [&[LiveId]; 58] = [
     ids!(page_0),
     ids!(page_1),
     ids!(page_2),
@@ -337,10 +339,11 @@ const PAGE_SLOTS: [&[LiveId]; 57] = [
     ids!(page_54),
     ids!(page_55),
     ids!(page_56),
+    ids!(page_57),
 ];
 
 /// The gallery's DSL path for each rail row.
-const RAIL_ROWS: [&[LiveId]; 57] = [
+const RAIL_ROWS: [&[LiveId]; 58] = [
     ids!(rail_page_0),
     ids!(rail_page_1),
     ids!(rail_page_2),
@@ -398,6 +401,7 @@ const RAIL_ROWS: [&[LiveId]; 57] = [
     ids!(rail_page_54),
     ids!(rail_page_55),
     ids!(rail_page_56),
+    ids!(rail_page_57),
 ];
 
 #[derive(Script, ScriptHook)]
@@ -1594,6 +1598,49 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.ui
             .mp_code_block(cx, ids!(canvas_wire))
             .set_highlighted(cx, &written, &[]);
+    }
+
+    /// Fill the page headers and print the measure's arithmetic and the baseline rule.
+    ///
+    /// **The measure is the component**, so the print is the measure: what it does to a wide viewport, what the padding does
+    /// to a narrow one, and whether the two insets plus the content really are the viewport. Plus the count's baseline offset,
+    /// which makepad has no alignment for and which is therefore computed.
+    fn seed_pages(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::page::{
+            centred_inset, content_width, count_offset, count_text, MpPageHeaderWidgetRefExt,
+            COUNT_LINE, MAX_MEASURE, PAGE_PAD_BOTTOM, PAGE_PAD_TOP, PAGE_PAD_X, TITLE_LINE,
+        };
+
+        let named = self.ui.mp_page_header(cx, ids!(demo_header));
+        named.set_title(cx, "Terminals");
+        named.set_count(cx, Some(4));
+        let none = self.ui.mp_page_header(cx, ids!(demo_none));
+        none.set_title(cx, "Nothing to count");
+        none.set_count(cx, None);
+        let zero = self.ui.mp_page_header(cx, ids!(demo_zero));
+        zero.set_title(cx, "Counting zero");
+        zero.set_count(cx, Some(0));
+
+        for viewport in [2400.0f64, 1280.0, 600.0, 200.0] {
+            let content = content_width(viewport);
+            let inset = centred_inset(viewport, content);
+            println!(
+                "PAGE viewport={viewport:.0} content={content:.0} inset={inset:.0} adds_up={}",
+                (content + inset * 2.0 - viewport).abs() < 1e-9 || content >= viewport,
+            );
+        }
+        println!(
+            "PAGE measure={MAX_MEASURE} pad_x={PAGE_PAD_X} pad_top={PAGE_PAD_TOP} pad_bottom={PAGE_PAD_BOTTOM} \
+baseline_offset={:.1} title_line={TITLE_LINE} count_line={COUNT_LINE}",
+            count_offset(TITLE_LINE, COUNT_LINE),
+        );
+        println!(
+            "PAGE count some_4={:?} none={:?} some_0={:?} none_is_zero={}",
+            count_text(Some(4)),
+            count_text(None),
+            count_text(Some(0)),
+            count_text(None) == count_text(Some(0)),
+        );
     }
 
     /// Open the sheets and print the travel, the corner rule and the dismissal test.
@@ -3263,6 +3310,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_feedback(cx);
         self.seed_content(cx);
         self.seed_pagination(cx);
+        self.seed_pages(cx);
         self.seed_sheets(cx);
         self.seed_option_cards(cx);
         self.seed_collapsible(cx);
@@ -3289,6 +3337,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         self.seed_code(cx);
         self.seed_document(cx);
         self.seed_editor(cx);
+        self.seed_pages(cx);
         self.seed_sheets(cx);
         self.seed_option_cards(cx);
         self.seed_collapsible(cx);
@@ -3970,7 +4019,7 @@ mod tests {
     /// assert the two agree. Without this the order can drift silently, and it
     /// did: `GALLERY_PAGE=Loaders` opened the Layout page, because the two
     /// lists disagreed about which slot was which.
-    const SLOT_PAGES: [&str; 57] = [
+    const SLOT_PAGES: [&str; 58] = [
         "mod.gallery.pages.palette",
         "mod.gallery.pages.typography",
         "mod.gallery.pages.metrics",
@@ -4028,6 +4077,7 @@ mod tests {
         "mod.gallery.pages.collapsible",
         "mod.gallery.pages.option_cards",
         "mod.gallery.pages.sheets",
+        "mod.gallery.pages.pages",
     ];
 
     #[test]
