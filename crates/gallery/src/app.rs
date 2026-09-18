@@ -3367,7 +3367,24 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
     /// Rows come from Rust because that is where a table's data lives; a table
     /// declared in the DSL with a hundred literal rows would be a table nobody
     /// could use for anything.
+    /// The table's page, plus **the virtualisation evidence**: what a slice of a long table costs at several scrolls.
+    ///
+    /// The Table page's own table is short, so drawing it whole is right. The printed ranges are for a table of ten thousand
+    /// rows, which is the case the capability exists for: the whole point is that the draw is a screenful and not the table.
     fn seed_tables(&mut self, cx: &mut Cx) {
+        use makepad_component::mp::table::{visible_range, ROW_H, VIRTUAL_MARGIN};
+        for scroll in [0.0f64, 300.0, 30_000.0, 300_000.0] {
+            let (first, last) = visible_range(scroll, 600.0, 10_000);
+            println!(
+                "TABLE viewport=600 rows=10000 scroll={scroll:.0} row_h={ROW_H} drawing={}..{last} of 10000 ({}) margin={VIRTUAL_MARGIN}",
+                first,
+                last - first,
+            );
+        }
+        // An unknown viewport draws everything, which is what the table did before the capability existed.
+        let all = visible_range(0.0, f64::NAN, 10_000);
+        println!("TABLE unknown_viewport draws={}..{} of 10000 (the fallback)", all.0, all.1);
+
         let table = self.ui.mp_table(cx, ids!(build_table));
         table.set_columns(
             cx,

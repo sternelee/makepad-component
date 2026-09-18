@@ -136,7 +136,12 @@ pub enum MpTableAction {
 /// The row height, and the header's. Named because the painter and the hit test
 /// both need them and a table whose rows are one height to the eye and another
 /// to the pointer is a bug nobody can see in a screenshot.
-const ROW_H: f64 = 30.0;
+/// One row's height.
+///
+/// **Public, because a caller computing a scroll offset needs it**: [`visible_range`] is arithmetic on this number, and a
+/// caller that wants to scroll to row `n` has to multiply by the same one. Hiding it would leave every caller guessing at the
+/// table's rhythm — the kind of duplication that goes wrong silently.
+pub const ROW_H: f64 = 30.0;
 const HEAD_H: f64 = 28.0;
 /// The gap between a cell's text and its column's edge.
 const CELL_PAD: f64 = 10.0;
@@ -145,6 +150,37 @@ const CELL_PAD: f64 = 10.0;
 fn row_height(index: usize) -> f64 {
     let _ = index;
     ROW_H
+}
+
+/// How many extra rows are drawn beyond the visible span, so a partially visible edge is complete.
+///
+/// One row each side. A half-visible row at the top or bottom of the viewport has to be drawn — it is on screen — and asking
+/// for exactly the visible span would leave it out.
+pub const VIRTUAL_MARGIN: usize = 1;
+
+/// The rows a viewport of `viewport` shows at `scroll`, as a half-open `[first, last)` range.
+///
+/// **The capability bezel calls `virtual_list`**, and the reason it exists: a table with ten thousand rows that draws all of
+/// them costs ten thousand draws to show twenty. The range is arithmetic on three numbers, so it is a function with tests
+/// rather than a loop bound buried in a paint.
+///
+/// `scroll` is the offset the caller's scroll container is at — the table cannot know it, since it is drawn at its content's
+/// full height and clipped by whoever wraps it, which is why the caller passes both numbers in.
+///
+/// A `scroll` or `viewport` that is not a finite number draws **everything**: an unknown viewport is not a reason to draw
+/// nothing, and a table that silently went blank because a scroll container reported a `NaN` would be a hard afternoon.
+pub fn visible_range(scroll: f64, viewport: f64, count: usize) -> (usize, usize) {
+    if count == 0 {
+        return (0, 0);
+    }
+    if !scroll.is_finite() || !viewport.is_finite() || viewport <= 0.0 {
+        return (0, count);
+    }
+    let row = ROW_H.max(1.0);
+    let first = ((scroll / row).floor() as isize - VIRTUAL_MARGIN as isize).max(0) as usize;
+    let shown = (viewport / row).ceil() as usize + VIRTUAL_MARGIN * 2 + 1;
+    let last = (first + shown).min(count);
+    (first.min(count), last)
 }
 
 /// A row's or column's rectangle, in the table's own coordinates.
@@ -191,6 +227,12 @@ pub struct MpTable {
     /// Which row the pointer is over, so the hover wash can be drawn.
     #[rust]
     hovered: Option<usize>,
+    /// The caller's scroll offset and visible height, for the virtualised draw. `None` draws every row, which is what a table
+    /// with a handful of rows should cost.
+    #[rust]
+    scroll: Option<f64>,
+    #[rust]
+    viewport: Option<f64>,
 }
 
 impl MpTable {
@@ -220,6 +262,27 @@ impl MpTable {
                 MpTableAction::None => None,
             }
         })
+    }
+
+    /// Tell the table how much of itself is on screen, so it draws only that.
+    ///
+    /// **The caller has to say**, because the table is drawn at its content's full height and clipped by whatever wraps it —
+    /// the widget cannot see its own clip. Passing `None` for either draws every row, which is the right default: a table with
+    /// a dozen rows should not pay for virtualisation, and one inside a scroll container that has not measured itself yet
+    /// should not go blank.
+    pub fn set_viewport(&mut self, cx: &mut Cx, scroll: Option<f64>, viewport: Option<f64>) {
+        if self.scroll == scroll && self.viewport == viewport {
+            return;
+        }
+        self.scroll = scroll;
+        self.viewport = viewport;
+        self.redraw(cx);
+    }
+
+    /// The rows the next paint will draw, for a caller that wants to ask rather than look.
+    pub fn rows_on_screen(&self) -> (usize, usize) {
+        let viewport = self.viewport.unwrap_or(f64::INFINITY);
+        visible_range(self.scroll.unwrap_or(0.0), viewport, self.rows.len())
     }
 
     /// How tall the table wants to be, so a caller can size a scroll container
@@ -431,7 +494,10 @@ impl Widget for MpTable {
         // The rows. One hairline per row rather than a stroke per cell: the eye
         // reads a table's rows, not its cells.
         self.draw_cell.color = body_ink;
-        for row in 0..self.rows.len() {
+        // **Only the rows on screen.** Ten thousand rows that all draw costs ten thousand draws to show twenty; the range is
+        // computed from the caller's scroll offset and visible height, and it is `0..len` when either is unknown.
+        let (first_row, last_row) = self.rows_on_screen();
+        for row in first_row..last_row {
             let b = self.row_box(row);
             let y = b.y + (b.h - body_box) * 0.5;
             for (i, col) in self.columns.iter().enumerate() {
@@ -673,6 +739,112 @@ mod tests {
         let all_fixed = table(vec![TableColumn::new("a").width(50.0)], 0);
         let cols = all_fixed.column_boxes(500.0);
         assert!((cols[0].1 - 50.0).abs() < 1e-9);
+    }
+
+
+    #[test]
+    fn test_a_viewport_draws_a_slice_of_a_long_table_and_not_the_whole_thing() {
+        // **The capability bezel calls `virtual_list`.** Ten thousand rows that all draw costs ten thousand draws to show
+        // twenty; the range comes from three numbers.
+        let (first, last) = visible_range(0.0, 200.0, 10_000);
+        assert_eq!(first, 0, "the top of a table starts at its first row");
+        // 200 points of viewport at 28 a row is about eight rows, plus the margin on each side and one for the partial.
+        assert!(last >= 8 && last <= 14, "the slice is not about a screenful: {last}");
+        assert!(last < 10_000, "the whole table was drawn");
+        // Scrolling moves the window down and keeps it about the same size. **The hardcoded 100 here was my mistake**: the
+        // row height is `ROW_H`, not the header's `HEAD_H`, and I had used 28 — the header's — as if it were a row's.
+        let rows_down = 100.0;
+        let (first_scrolled, last_scrolled) = visible_range(rows_down * ROW_H, 200.0, 10_000);
+        assert_eq!(
+            first_scrolled,
+            100 - VIRTUAL_MARGIN,
+            "the window is not {rows_down} rows down"
+        );
+        assert_eq!(
+            last_scrolled - first_scrolled,
+            last - first,
+            "the window changed size while scrolling"
+        );
+    }
+
+    #[test]
+    fn test_a_partly_visible_row_at_either_edge_is_drawn() {
+        // **The margin, and why it is not zero.** A half-visible row at the top or bottom of the viewport is on screen and has
+        // to be drawn; a range of exactly the visible span would leave it out and the table would show a gap at its edges.
+        assert_eq!(VIRTUAL_MARGIN, 1);
+        // Scrolled half a row down: row 0 is still partly visible, so it must be in the range.
+        let (first, _) = visible_range(ROW_H * 0.5, 200.0, 1000);
+        assert_eq!(first, 0, "the half-visible first row was left out");
+        // Scrolled one and a half rows down the partially visible row is row 1, and the range starts one row above it —
+        // that is what the margin of one means. (I first asserted `first == 1` here, reading the margin as "the first
+        // intersecting row" when it is "one row *beyond* the intersecting rows".)
+        let (first, _) = visible_range(ROW_H * 1.5, 200.0, 1000);
+        assert_eq!(first, 1 - VIRTUAL_MARGIN, "the margin above the first intersecting row is gone");
+        assert!(first <= 1, "the partially visible row 1 is outside the range");
+    }
+
+    #[test]
+    fn test_the_range_covers_every_row_that_intersects_the_viewport() {
+        // The property that makes the slice correct rather than merely small: for any scroll, every row whose box overlaps the
+        // viewport is inside the range. A margin of zero would fail this at both edges.
+        for scroll in [0.0f64, 1.0, 27.9, 28.0, 100.0, 500.5, 5000.0] {
+            let viewport = 300.0;
+            let count = 1000;
+            let (first, last) = visible_range(scroll, viewport, count);
+            for row in 0..count {
+                let top = HEAD_H + row as f64 * ROW_H;
+                let bottom = top + ROW_H;
+                let intersects = bottom > scroll + HEAD_H && top < scroll + viewport + HEAD_H;
+                if intersects {
+                    assert!(
+                        row >= first && row < last,
+                        "scroll {scroll}: row {row} is on screen but outside {first}..{last}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_scrolling_past_the_end_draws_nothing_rather_than_everything() {
+        // A range that wrapped back to the whole table when the caller scrolled past its last row would be the worst kind of
+        // failure — the table would redraw ten thousand rows exactly when it was off screen.
+        let count = 100;
+        let end = HEAD_H + count as f64 * ROW_H;
+        let (first, last) = visible_range(end, 200.0, count);
+        assert!(first <= count && last <= count, "the range ran past the table: {first}..{last}");
+        assert!(last - first <= 2, "an off-screen table drew {} rows", last - first);
+        // And an empty table has an empty range whatever the scroll.
+        assert_eq!(visible_range(0.0, 200.0, 0), (0, 0));
+        assert_eq!(visible_range(900.0, 200.0, 0), (0, 0));
+    }
+
+    #[test]
+    fn test_an_unknown_viewport_draws_everything_rather_than_nothing() {
+        // **An unknown viewport is not a reason to draw nothing.** A table that silently went blank because a scroll container
+        // reported a `NaN` would be a hard afternoon to debug, and the honest fallback costs what it did before the
+        // capability existed.
+        assert_eq!(visible_range(0.0, f64::NAN, 500), (0, 500));
+        assert_eq!(visible_range(f64::NAN, 200.0, 500), (0, 500));
+        assert_eq!(visible_range(0.0, f64::INFINITY, 500), (0, 500));
+        assert_eq!(visible_range(0.0, 0.0, 500), (0, 500), "a zero viewport is unknown, not empty");
+        assert_eq!(visible_range(0.0, -10.0, 500), (0, 500));
+        // ...and the widget's default state is exactly that, so a table with no viewport set draws every row.
+        assert_eq!(visible_range(0.0, f64::INFINITY, 12), (0, 12));
+    }
+
+    #[test]
+    fn test_the_slice_never_asks_for_a_row_the_table_does_not_have() {
+        // The bound that keeps a caller's stale scroll from indexing past the end: after rows are removed the offset can be
+        // longer than the table, and the range has to clamp rather than trust it.
+        for count in [0usize, 1, 5, 100] {
+            for scroll in [0.0f64, 100.0, 10_000.0, 1e9] {
+                let (first, last) = visible_range(scroll, 200.0, count);
+                assert!(first <= count, "count {count} scroll {scroll}: first {first}");
+                assert!(last <= count, "count {count} scroll {scroll}: last {last}");
+                assert!(first <= last, "count {count} scroll {scroll}: {first}..{last} is inverted");
+            }
+        }
     }
 
 }
