@@ -2048,3 +2048,36 @@ Status       step_row step_output error_strip warning_strip
 **顺带发现的一个机会**：`MpTabBar` 落地后，`crates/dbpro/src/tab_bar.rs` 那 439 行的自研标签栏可以被它替掉，
 以及 canvas-terminal 的标签栏需求（本 session 早期提到过）也可以用它。这两处是「新组件立刻有真实消费者」的证据。
 
+# 对等审计收尾：bezel 的 API 全部有了对应物（2026-09-17）
+
+第三次审计（用 bezel 的 API 量）留下的 6 个真缺口，现在**全部关闭**：
+
+| bezel 的名字 | v3 落地 | 运行时证据 |
+| --- | --- | --- |
+| `tab_bar` / `tab` | `mp/tab_bar.rs`（8 测试），gallery 第 52 页 | `TABS pressure count=12 tab_width=120 content=1474 overflows=true` |
+| `error_strip` / `warning_strip` | `mp/strip.rs`（7 测试），第 53 页 | `STRIP tone=error color=(1.00,0.39,0.40) demands_action=true` |
+| `breadcrumb`(+item+separator) | `mp/breadcrumb.rs`（8 测试），第 54 页 | `is_current=[false,false,false,true] separators=3 widths=[158,158,158,26]` |
+| `disclosure` / `collapsible_header` | `mp/collapsible.rs`（5 测试），第 55 页 | `open chevron="▾" body=44 closed chevron="▸" body=0` |
+| `option_card` / `option_card_row` | `mp/option_card.rs`（5 测试），第 56 页 | `size_unselected=(14,156,180) size_selected=(14,156,180) same=true` |
+| `sheet` | `mp/sheet.rs`（7 测试），第 57 页 + `makepad_motion::SHEET_IN` | `bottom seated=(0,560 1280x240)`；`corners left=[false,true,true,false]` |
+| `page_column` / `page_header` / `page_subtitle` | `mp/page.rs`（5 测试），第 58 页 | `viewport=600 content=552`（窄窗由 padding 定）；`baseline_offset=6.4` |
+| `virtual_list` | `mp/table.rs` 的 `visible_range`（6 测试），Table 页 | `scroll=30000 drawing=999..1022 of 10000 (23)` |
+
+**逐名核对**（67 个 API 名字，脚本打印每一行映射）：**0 个没有对应物** ✓。
+（脚本最后一次报的 `option_card_row` 是**脚本自身的假阳性**：它把 `MpOptionCardRow` 的后缀 `Row` 归一化掉了，
+所以查不到 `OptionCardRow`；`mod.mp.MpOptionCardRow` 确实存在 ✓。）
+
+## 全量验证（不是抽样）
+
+- **58 个 gallery 页面逐个打开，全部 `[E]=0`**（此前只抽查过约 20 页）✓
+- **16/16 crate `cargo check` 通过**，0 失败 ✓
+- `makepad-component` **512** 测试 + 4 注册顺序 + 7 icons；`gallery` 10；`makepad-motion` **54**；
+  其余 crate 各自的测试保持通过 ✓
+
+## 仍未做，且**不属于本目标**的部分
+
+仓库自身的 v2 → v3 迁移：**26 个 v2 组件在 v3 没有对应物**（accordion / alert / card / modal / sheet 之外的一批、
+rating、orb、toggle、breadcrumb 之外的项目名等），以及阶段 6——删除 v2 半边（约 36,000 行）**不可逆**，
+需要 owner 明确同意。这一条我此前已 `pause_goal` 并给出三个选项，用户恢复了目标但没有回答，
+所以它仍然悬着。**它与「类似 gpui-bezel 的组件库 + gallery 预览」这个目标无关**：那些组件 bezel 也没有。
+
