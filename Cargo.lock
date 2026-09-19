@@ -1473,7 +1473,6 @@ dependencies = [
 name = "gallery"
 version = "0.1.0"
 dependencies = [
- "js-sys",
  "libc",
  "makepad-blocks",
  "makepad-canvas",
@@ -1485,8 +1484,6 @@ dependencies = [
  "makepad-syntax",
  "makepad-theme",
  "makepad-widgets",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -2732,7 +2729,7 @@ dependencies = [
  "wayland-protocols 0.32.10",
  "windows 0.62.2",
  "windows-core 0.62.2",
- "windows-targets 0.52.6",
+ "windows-link 0.2.1",
 ]
 
 [[package]]
@@ -2874,9 +2871,6 @@ dependencies = [
 [[package]]
 name = "makepad-zune-core"
 version = "0.5.1"
-dependencies = [
- "makepad-error-log",
-]
 
 [[package]]
 name = "makepad-zune-inflate"

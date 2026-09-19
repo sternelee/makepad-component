@@ -16,25 +16,22 @@ makepad-canvas = { path = "../canvas" }
 makepad-blocks = { path = "../blocks" }
 makepad-plot = { path = "../makepad-plot" }
 makepad-widgets = { workspace = true }
-# For the local timezone offset only. The date arithmetic lives in
-# `makepad_component::mp::date` and is tested; what a library cannot know is **which
-# zone the reader is in**, and that is the one thing this asks the OS for.
+# For the local timezone offset only (the non-web branch; see `local_utc_offset_seconds`). The
+# date arithmetic lives in `makepad_component::mp::date` and is tested; what a library cannot
+# know is **which zone the reader is in**, and that is the one thing this asks the OS for.
 libc = "0.2"
 
-# **The page is named in the URL on the web.** `GALLERY_PAGE` is how every other consumer drives this app, and a
-# browser has no environment to set — so the browser names the page the way a browser can: `?page=Loaders`. That
-# needs the browser's own API and nothing else from it, which is why this is four features and not a platform layer.
+# **The page is named in the URL on the web, and the two browser facts — `?page=` and the
+# timezone — reach the app through makepad's own wasm ABI, not wasm-bindgen.** `GALLERY_PAGE` is
+# how every other consumer drives this app, and a browser has no environment to set; the browser
+# names the page the way a browser can: `?page=Loaders`.
 #
-# Both crates are already in the lockfile — makepad's web platform is built on them — so this adds no dependency
-# graph, only a second consumer of one that is there.
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "0.2"
-# `Date` is how a page asks its own timezone, which is the one OS fact this app needs (see
-# `local_utc_offset_seconds`). `UrlSearchParams`/`Location` are the `?page=` deep link.
-js-sys = "0.3"
-web-sys = { version = "0.3", features = ["Location", "UrlSearchParams", "Window"] }
-# **No override for `makepad-component` here, and that is the point.** The library declares its socket
-# dependencies per-target, so a wasm build of it drops them on its own and the browser needs to know nothing. An
-# override here would look like it was doing the work while Cargo's feature unification quietly ignored it —
-# which is exactly the bug this arrangement replaced.
+# `web-sys`/`js-sys` would compile to `__wbindgen_placeholder__` imports that only wasm-bindgen's
+# generated glue can satisfy — and makepad's bridge instantiates the module with its own `{ env }`
+# import object, so the glue never runs and every page dies at
+# `Import #13 "__wbindgen_placeholder__": module is not an object or function`. The bridge (in the
+# makepad clone's `libs/wasm_bridge/src/wasm_bridge.js`) instead provides `js_query_param` and
+# `js_local_timezone_offset` as plain `env` imports, which `app.rs` declares with
+# `#[link(wasm_import_module = "env")]`. Nothing in the tree may pull wasm-bindgen into a
+# `wasm32-unknown-unknown` build.
 

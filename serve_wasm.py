@@ -30,9 +30,11 @@ looks like it did nothing.
 """
 
 import http.server
+import json
 import os
 import socketserver
 import sys
+import urllib.parse
 from pathlib import Path
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
@@ -48,8 +50,14 @@ CANDIDATES = [
 ]
 
 # What a makepad wasm build emits, so a wrong directory is caught here rather than as a blank
-# page: finding the directory is not the same as finding the app in it.
-NEEDED = ["index.html", f"{APP}.wasm"]
+# page: finding the directory is not the same as finding the app in it. The wasm is named with a
+# content hash (`gallery.613ff5c5….wasm`), so the wasm check is a glob, not a literal.
+def has_wasm(app_dir):
+    return any(app_dir.glob(f"{APP}.*.wasm"))
+
+
+def complete(app_dir):
+    return (app_dir / "index.html").exists() and has_wasm(app_dir)
 
 TYPES = {
     ".wasm": "application/wasm",
@@ -78,6 +86,47 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
+    def do_POST(self):
+        # makepad's crash reporter in `web.js` POSTs every browser-side error here. A static
+        # handler answers 501 and the report — the one artifact that says *why* the page is a
+        # blank "Loading.." — is dropped unread. This is a development server; its job is to make
+        # failure readable, so the payload is decoded and printed instead.
+        if self.path.split("?")[0] != "/api/crash":
+            self.send_error(404, "only /api/crash accepts POST")
+            return
+        length = int(self.headers.get("Content-Length") or 0)
+        body = self.rfile.read(length).decode("utf-8", "replace") if length else "(empty body)"
+        print("\n=== crash report ===", flush=True)
+        try:
+            report = json.loads(body)
+            for key, value in report.items():
+                print(f"{key}: {value}", flush=True)
+        except json.JSONDecodeError:
+            print(body, flush=True)
+        print("====================\n", flush=True)
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+        self.end_headers()
+        self.wfile.write(b"ok")
+
+    def do_GET(self):
+        # The inline fallback reporter in the generated `index.html` GETs this with the report
+        # urlencoded into `data`; same reason to print it rather than 404 it.
+        if self.path.startswith("/$report_error"):
+            query = urllib.parse.urlparse(self.path).query
+            params = urllib.parse.parse_qs(query)
+            data = params.get("data", ["(no data)"])[0]
+            print("\n=== crash report (inline fallback) ===", flush=True)
+            print(urllib.parse.unquote(data), flush=True)
+            print("======================================\n", flush=True)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"ok")
+            return
+        super().do_GET()
+
     def guess_type(self, path):
         text = str(path)
         for suffix, mime in TYPES.items():
@@ -94,7 +143,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 
 def main():
-    app_dir = next((c for c in CANDIDATES if all((c / n).exists() for n in NEEDED)), None)
+    app_dir = next((c for c in CANDIDATES if complete(c)), None)
     if app_dir is None:
         print(f"No wasm build of {APP!r} found. Looked in:", file=sys.stderr)
         for candidate in CANDIDATES:

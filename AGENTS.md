@@ -199,15 +199,38 @@ python3 serve_wasm.py 8080 [app]                  # COOP/COEP headers required b
   blocking threads are inside the `net` feature.
 - **`crates/ui`'s socket is a feature.** `ureq` (TLS) and `uuid`'s `v4` (`getrandom`) do
   not build for wasm, and only `a2ui::{a2a_client, host, sse}` use them, so they sit
-  behind `net` (on by default). The browser build asks for the crate with
-  `default-features = false` **in a target-scoped dependency**, which is how one crate is
-  built two ways without either build knowing.
+  behind `net` (on by default). The deps are declared
+  `[target.'cfg(not(target_arch = "wasm32"))'.dependencies]`, so a wasm build drops
+  them on its own. A `default-features = false` target-scoped override in the
+  consumer does **not** work: Cargo unions features across target-scoped and plain
+  deps, so `net` stays on and `getrandom` stays in the tree.
+- **wasm-bindgen cannot be used with makepad's web platform.** The bridge
+  (`makepad/libs/wasm_bridge/src/wasm_bridge.js`) instantiates the module with its own
+  `{ env }` import object, so `web-sys`/`js-sys` `__wbindgen_placeholder__` imports are
+  never satisfied and every page dies at startup
+  (`Import #13 "__wbindgen_placeholder__": module is not an object or function`,
+  reported via `POST /api/crash`). Page facts (`?page=`, the timezone) go through two
+  bridge-provided env imports instead — `js_query_param` and
+  `js_local_timezone_offset` — declared in `crates/gallery/src/app.rs` with
+  `#[link(wasm_import_module = "env")]`. Keep the wasm tree free of wasm-bindgen:
+  `cargo tree --target wasm32-unknown-unknown -p gallery -i wasm-bindgen` must print
+  nothing.
 - **`std::env::var` returns `Err` on the web rather than failing**, so the `GALLERY_*`
   knobs are inert in a browser, not broken. The page is named with `?page=<title|index>`
   there — see `page_from_url` in `crates/gallery/src/app.rs`.
 - **`cargo makepad wasm build` generates `index.html`** (with the crash reporter and the
   early error hooks), so there is no hand-written host page to keep in step. It writes
-  `target/makepad-wasm-app/<profile>/<app>/`.
+  `target/makepad-wasm-app/<profile>/<app>/` — the wasm is content-hashed
+  (`gallery.<hash>.wasm`), which `serve_wasm.py` globs for. Its crash reports are
+  `POST /api/crash`; the server decodes and prints them, because a dropped report is how
+  a blank "Loading.." page stays unexplainable.
+- **`--no-threads` for embedded previews.** The default build needs shared memory
+  (`--shared-memory` + atomics), which requires `crossOriginIsolated` — true in a normal
+  browser served with COOP/COEP, but false in an embedded webview (ZCode's in-app
+  browser), where every worker spawn dies with
+  `SharedArrayBuffer transfer requires self.crossOriginIsolated`.
+  `cargo makepad wasm build -p gallery --release --no-threads` runs the pool inline and
+  works everywhere.
 ```
 
 ## 5. Coding Style & Conventions

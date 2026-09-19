@@ -553,15 +553,58 @@ impl MatchEvent for App {
     }
 }
 
-/// The page named in the URL, for a target that has no environment.
+/// Seconds since the Unix epoch, from whichever clock the target owns.
 ///
+/// **`std::time::SystemTime` panics on `wasm32-unknown-unknown`** — its std implementation is
+/// `unsupported`, and it fails at the call, not at the build. The web branch reads the bridge's
+/// `js_time_now` env import (seconds, the same clock makepad's platform animates from); the
+/// native branch reads the OS clock. This is the app's one clock read, for the calendar's
+/// "today" — see `seed_date`.
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
+extern "C" {
+    fn js_time_now() -> f64;
+}
+
+#[cfg(target_arch = "wasm32")]
+fn epoch_seconds_now() -> i64 {
+    (unsafe { js_time_now() }) as i64
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn epoch_seconds_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// The page named in the URL, for a target that has no environment.
 /// `?page=<index or title>`, matching what `GALLERY_PAGE` accepts so the two are interchangeable. A browser is the
 /// only target this exists for: everywhere else the environment is the affordance, and this returns nothing.
+///
+/// The host function is makepad's own bridge (`libs/wasm_bridge/src/wasm_bridge.js`), reached through a plain `env`
+/// import. `web-sys` here would emit `__wbindgen_placeholder__` imports that nothing in a makepad page satisfies —
+/// see the Cargo.toml note.
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
+extern "C" {
+    fn js_query_param(key_ptr: *const u8, key_len: u32, out_ptr: *mut u8, out_cap: u32) -> i32;
+}
+
 #[cfg(target_arch = "wasm32")]
 fn page_from_url() -> Option<String> {
-    let search = web_sys::window()?.location().search().ok()?;
-    let params = web_sys::UrlSearchParams::new_with_str(&search).ok()?;
-    params.get("page").filter(|want| !want.is_empty())
+    // The longest page title is 15 ASCII bytes ("Command Palette"); 128 leaves room for a
+    // percent-decoded value without pretending this is a general-purpose channel. A value that
+    // does not fit (or a missing `page`) opens the first page, the same as no query at all.
+    let mut out = [0u8; 128];
+    let len = unsafe {
+        js_query_param(b"page".as_ptr(), 4, out.as_mut_ptr(), out.len() as u32)
+    };
+    if len <= 0 {
+        return None;
+    }
+    String::from_utf8(out[..len as usize].to_vec()).ok()
 }
 
 /// Nothing, off the web — there the environment *is* the affordance.
@@ -2990,10 +3033,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
     /// testable, and it keeps "today" the app's business rather than a widget's.
     fn seed_date(&mut self, cx: &mut Cx) {
         use makepad_component::mp::date::{date_from_epoch_seconds, YearMonth};
-        let seconds = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs() as i64)
-            .unwrap_or(0);
+        let seconds = epoch_seconds_now();
         // **Not `seconds / 86400`.** That is the UTC day, and on this machine (UTC+8)
         // it is the *previous* day for the first eight hours of every local day: the
         // page printed `today=2026-09-16` while the system clock said `2026-09-17`.
@@ -4004,16 +4044,22 @@ impl AppMain for App {
 /// own `Date` on the web, and `_get_timezone` on Windows. The date module takes the offset as an *argument*
 /// precisely so that this stays the only place that has to know.
 ///
-/// A browser is not a POSIX process: there is no `libc::time` to call and no `tm_gmtoff` to read. The
-/// equivalent is JavaScript's own zone offset, reached through the `Date` the page already has.
+/// A browser is not a POSIX process: there is no `libc::time` to call and no `tm_gmtoff` to read. The equivalent is
+/// the page's own zone offset, reached through the makepad bridge's `js_local_timezone_offset` env import (a plain
+/// host function, for the same reason `js_query_param` is — see the Cargo.toml note).
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
+extern "C" {
+    fn js_local_timezone_offset() -> i32;
+}
+
 #[cfg(target_arch = "wasm32")]
 fn local_utc_offset_seconds() -> i64 {
-    // **`get_timezone_offset` is minutes *behind* UTC, and that is the opposite sign to `tm_gmtoff`.** In
+    // **`getTimezoneOffset` is minutes *behind* UTC, and that is the opposite sign to `tm_gmtoff`.** In
     // UTC+2 it returns `-120`, while the POSIX branch would report `+7200`. Getting this backwards is a
     // calendar one day out for half the world, which is why the negation is spelled out rather than folded
     // into the multiplication.
-    let minutes_behind_utc = js_sys::Date::new_0().get_timezone_offset();
-    -(minutes_behind_utc as i64) * 60
+    -(unsafe { js_local_timezone_offset() } as i64) * 60
 }
 
 /// The POSIX answer, for everything that is not a browser.

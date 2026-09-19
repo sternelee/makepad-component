@@ -748,15 +748,21 @@ http://localhost:8080/?page=12
 Both spellings are the same affordance — naming the page — and the URL is the only
 one a browser has.
 
-### The two things a browser changes, and why
+### The three things a browser changes, and why
 
 - **The socket is off.** `ureq` needs a TLS stack and `uuid`'s `v4` needs `getrandom`;
   neither builds for `wasm32-unknown-unknown`. They are used by exactly three modules
-  — `a2ui::{a2a_client, host, sse}` — so they sit behind the **`net`** feature, which
-  is on by default and off in the browser build (`default-features = false` on the
-  wasm target only). Every component, and the A2UI renderer itself, is arithmetic and
-  builds anywhere.
+  — `a2ui::{a2a_client, host, sse}` — so their dependencies are declared per-target
+  (`cfg(not(target_arch = "wasm32"))`) and a wasm build drops them on its own. Every
+  component, and the A2UI renderer itself, is arithmetic and builds anywhere.
 - **There is no environment**, so the page name comes from the URL instead.
+- **wasm-bindgen cannot be used here.** makepad's bridge instantiates the module with
+  its own `{ env }` import object, so the `__wbindgen_placeholder__` imports that
+  `web-sys`/`js-sys` emit are never satisfied — every page dies at startup. The two
+  browser facts the gallery needs (the `?page=` value and the calendar's timezone)
+  go through bridge-provided env imports instead (`js_query_param`,
+  `js_local_timezone_offset` in `libs/wasm_bridge/src/wasm_bridge.js` of the makepad
+  clone, declared in `crates/gallery/src/app.rs`).
 
 ### wasm rules worth knowing before editing
 
@@ -769,6 +775,9 @@ one a browser has.
   environment-driven knob simply takes its default. That is why `GALLERY_PAGE` needs
   no special case and the other `GALLERY_*` knobs are inert in a browser rather than
   broken.
+- **A blank "Loading.." page has a readable cause**: the generated `index.html` ships a
+  crash reporter that `POST`s every browser-side error to `/api/crash`, and
+  `serve_wasm.py` prints those reports decoded.
 
 ---
 
