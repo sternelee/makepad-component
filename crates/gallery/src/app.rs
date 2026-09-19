@@ -506,8 +506,8 @@ impl MatchEvent for App {
         // overlay that can only be shown by a pointer cannot be verified from a
         // script. It is also the only way to see the *hardest* property this
         // page exists for — that the plate draws over the card below it.
-        self.want_tooltip = std::env::var("GALLERY_TOOLTIP").is_ok();
-        self.want_popover = std::env::var("GALLERY_POPOVER").is_ok();
+        self.want_tooltip = knob("GALLERY_TOOLTIP", "tooltip").is_some();
+        self.want_popover = knob("GALLERY_POPOVER", "popover").is_some();
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
@@ -579,32 +579,56 @@ fn epoch_seconds_now() -> i64 {
         .unwrap_or(0)
 }
 
-/// The page named in the URL, for a target that has no environment.
-/// `?page=<index or title>`, matching what `GALLERY_PAGE` accepts so the two are interchangeable. A browser is the
-/// only target this exists for: everywhere else the environment is the affordance, and this returns nothing.
-///
-/// The host function is makepad's own bridge (`libs/wasm_bridge/src/wasm_bridge.js`), reached through a plain `env`
-/// import. `web-sys` here would emit `__wbindgen_placeholder__` imports that nothing in a makepad page satisfies —
-/// see the Cargo.toml note.
+/// One named query-string parameter, read through makepad's own bridge
+/// (`libs/wasm_bridge/src/wasm_bridge.js`) via a plain `env` import. `web-sys` here would emit
+/// `__wbindgen_placeholder__` imports that nothing in a makepad page satisfies — see the
+/// Cargo.toml note.
 #[cfg(target_arch = "wasm32")]
 #[link(wasm_import_module = "env")]
 extern "C" {
     fn js_query_param(key_ptr: *const u8, key_len: u32, out_ptr: *mut u8, out_cap: u32) -> i32;
 }
 
+/// The page named in the URL, for a target that has no environment.
+/// `?page=<index or title>`, matching what `GALLERY_PAGE` accepts so the two are interchangeable. A browser is the
+/// only target this exists for: everywhere else the environment is the affordance, and this returns nothing.
 #[cfg(target_arch = "wasm32")]
 fn page_from_url() -> Option<String> {
-    // The longest page title is 15 ASCII bytes ("Command Palette"); 128 leaves room for a
-    // percent-decoded value without pretending this is a general-purpose channel. A value that
-    // does not fit (or a missing `page`) opens the first page, the same as no query at all.
-    let mut out = [0u8; 128];
+    url_knob("page").filter(|want| !want.is_empty())
+}
+
+/// One gallery knob, from whichever target names it.
+///
+/// **The environment natively, the URL in a browser** — the same law `opening_page` follows for
+/// `GALLERY_PAGE` / `?page=`. Every probe this app drives by an env var (the scripted steps the
+/// synthetic pointer cannot produce: `GALLERY_FLOAT`, `GALLERY_HOVER`, `GALLERY_COMBOBOX`, …)
+/// answers to the same name lowercased in the query string: `?float=press:10,20,release`. That
+/// is what makes a probe reproducible in a browser, where no environment exists to set.
+fn knob(env_name: &str, url_name: &str) -> Option<String> {
+    if let Ok(value) = std::env::var(env_name) {
+        return Some(value);
+    }
+    url_knob(url_name)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn url_knob(name: &str) -> Option<String> {
+    // 512 bytes: page titles are short, but the probe scripts (`?float=`'s step list) are not.
+    // A value that does not fit is treated as absent — the same "naming nothing beats naming a
+    // wrong thing" rule the page deep link follows.
+    let mut out = [0u8; 512];
     let len = unsafe {
-        js_query_param(b"page".as_ptr(), 4, out.as_mut_ptr(), out.len() as u32)
+        js_query_param(name.as_ptr(), name.len() as u32, out.as_mut_ptr(), out.len() as u32)
     };
     if len <= 0 {
         return None;
     }
     String::from_utf8(out[..len as usize].to_vec()).ok()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn url_knob(_name: &str) -> Option<String> {
+    None
 }
 
 /// Nothing, off the web — there the environment *is* the affordance.
@@ -751,7 +775,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         // Eight states of capacity: enough that a script can exceed it and still have a
         // readable stack.
         let mut history: SnapshotHistory<String> = SnapshotHistory::with_capacity("doc:0".to_string(), 8);
-        let script = std::env::var("GALLERY_HISTORY").unwrap_or_else(|_| {
+        let script = knob("GALLERY_HISTORY", "history").unwrap_or_else(|| {
             // The default session: five edits, undo twice, then a different edit — which
             // is the shape that abandons a redo branch.
             "push:doc:1,push:doc:2,push:doc:3,push:doc:4,push:doc:5,undo,undo,push:doc:9"
@@ -890,7 +914,7 @@ use makepad_component::mp::hover_card::HoverIntent;
             .map(|s| s.to_string())
             .collect(),
         );
-        let script = std::env::var("GALLERY_COMBOBOX").unwrap_or_default();
+        let script = knob("GALLERY_COMBOBOX", "combobox").unwrap_or_default();
         for step in script.split(',').map(str::trim).filter(|s| !s.is_empty()) {
             match step.split_once(':') {
                 Some(("type", text)) => self.combobox.type_text(text),
@@ -1006,7 +1030,7 @@ use makepad_component::mp::hover_card::HoverIntent;
             }
         }
         if changed {
-            let script = std::env::var("GALLERY_COMBOBOX").unwrap_or_default();
+            let script = knob("GALLERY_COMBOBOX", "combobox").unwrap_or_default();
             self.paint_combobox(cx, &script);
         }
     }
@@ -1022,7 +1046,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         use makepad_component::mp::hover_card::{Change, HoverIntent, Presence};
 
         let mut intent = HoverIntent::default();
-        let script = std::env::var("GALLERY_HOVER").unwrap_or_else(|_| {
+        let script = knob("GALLERY_HOVER", "hover").unwrap_or_else(|| {
             // A sweep that must amount to nothing, a rest that opens, a gap crossing, reading
             // the card, and leaving. The same sequence the module's own test walks.
             "trigger:150,outside:60,trigger:150,outside:60,trigger:150,outside:60,\
@@ -1126,7 +1150,7 @@ use makepad_component::mp::hover_card::HoverIntent;
         self.ui.mp_floating(cx, ids!(float_panel)).set_pos(cx, start);
         let mut machine = Floating::new(start);
 
-        let script = std::env::var("GALLERY_FLOAT").unwrap_or_else(|_| {
+        let script = knob("GALLERY_FLOAT", "float").unwrap_or_else(|| {
             // Sub-threshold, then a real drag, then back. The second step must decide nothing:
             // that is the shaky-click rule.
             // `;` between steps and `,` inside a coordinate. The first version used `,` for
@@ -1456,7 +1480,7 @@ use makepad_component::mp::hover_card::HoverIntent;
 
         let source = "# A note\n\nAn editor over the document model. Click in it, or drive it from the \\
                       environment.\n\n- a bullet\n- another\n\n";
-        let script = std::env::var("GALLERY_EDITOR").unwrap_or_else(|_| {
+        let script = knob("GALLERY_EDITOR", "editor").unwrap_or_else(|| {
             // A session that exercises every rule: type at a caret, split with Enter, merge with Backspace,
             // indent, move, and undo twice — which has to land on the text and then on the split. It ends with the
             // slash menu: `/`, a query that narrows it, a walk down it, and Enter to take the row.
@@ -3195,7 +3219,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
             "Close Window",
         ];
         self.palette_commands = COMMANDS.iter().map(|s| s.to_string()).collect();
-        let query = std::env::var("GALLERY_PALETTE_QUERY").unwrap_or_default();
+        let query = knob("GALLERY_PALETTE_QUERY", "palette_query").unwrap_or_default();
         if !query.is_empty() {
             self.ui
                 .text_input(cx, ids!(palette_field))
@@ -3204,7 +3228,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         // Move the cursor off the first row before applying, when the environment
         // asks for it, so a run can show the cursor *following a row* rather than
         // merely starting on it. This is the case the module exists for.
-        if std::env::var("GALLERY_PALETTE_CURSOR_DOWN").is_ok() && !query.is_empty() {
+        if knob("GALLERY_PALETTE_CURSOR_DOWN", "palette_cursor_down").is_some() && !query.is_empty() {
             let first_view =
                 makepad_component::mp::search::rank(&self.palette_commands, &query);
             if first_view.len() > 1 {
@@ -3217,7 +3241,7 @@ on_divider_centre={} on_divider_edge={} on_divider_past={} pane_10={}",
         // `Duplicate` at position 1; `du` filters every row before it away, so the
         // position has to move to 0 while the command stays `Duplicate`. A cursor
         // held as a position would have stayed at 1 and been out of range.
-        if let Ok(second) = std::env::var("GALLERY_PALETTE_QUERY2") {
+        if let Some(second) = knob("GALLERY_PALETTE_QUERY2", "palette_query2") {
             println!(
                 "PALETTE before-second-query cursor_pos={:?} active_original={:?}",
                 self.palette_ranked.iter().position(|i| Some(*i) == self.palette_active),

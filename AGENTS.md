@@ -216,8 +216,14 @@ python3 serve_wasm.py 8080 [app]                  # COOP/COEP headers required b
   `cargo tree --target wasm32-unknown-unknown -p gallery -i wasm-bindgen` must print
   nothing.
 - **`std::env::var` returns `Err` on the web rather than failing**, so the `GALLERY_*`
-  knobs are inert in a browser, not broken. The page is named with `?page=<title|index>`
-  there — see `page_from_url` in `crates/gallery/src/app.rs`.
+  knobs are inert in a browser, not broken. Every probe answers to its name
+  lowercased in the query string instead — `?page=`, `?float=`, `?hover=`,
+  `?combobox=`, `?history=`, `?editor=`, `?tooltip=`, `?popover=`,
+  `?palette_query=…` — through `knob()` in `crates/gallery/src/app.rs` (env first,
+  URL second, the same law as `GALLERY_PAGE` / `?page=`). That is what makes a
+  scripted probe reproducible in a browser: `http://localhost:8080/?page=Floating
+  Panel&float=press:60,60,move:80,80,release` drives the same machine the env var
+  drives natively.
 - **`cargo makepad wasm build` generates `index.html`** (with the crash reporter and the
   early error hooks), so there is no hand-written host page to keep in step. It writes
   `target/makepad-wasm-app/<profile>/<app>/` — the wasm is content-hashed

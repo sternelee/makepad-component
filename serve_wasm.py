@@ -51,9 +51,10 @@ CANDIDATES = [
 
 # What a makepad wasm build emits, so a wrong directory is caught here rather than as a blank
 # page: finding the directory is not the same as finding the app in it. The wasm is named with a
-# content hash (`gallery.613ff5c5….wasm`), so the wasm check is a glob, not a literal.
+# content hash after the *binary* (`gallery.613ff5c5….wasm`, `makepad-example-uizoo.….wasm`) —
+# which is not always the name the caller passed to `-p` — so the check is "any wasm at all".
 def has_wasm(app_dir):
-    return any(app_dir.glob(f"{APP}.*.wasm"))
+    return any(app_dir.glob("*.wasm"))
 
 
 def complete(app_dir):
