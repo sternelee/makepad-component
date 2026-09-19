@@ -2145,3 +2145,75 @@ gallery 只向 OS 问一件事——本地 UTC 偏移（给日历用）——用
 编译验证用的是 **stable** 的 wasm 目标 ✓（已装 ✓），所以**「编译通过」这一半的证据是完整的** ✓。
 剩下的是链接 + 起服务 + 在真浏览器里验证（用 CDP 读 console，而不是靠截图 —— 截图在这个环境是全黑的）。
 
+
+# 浏览器预览：应用真的跑起来了，字体链路全通（2026-09-19）
+
+上一节停在「编译通过、还没在浏览器里验证」。这一节把它补到「**应用在浏览器里启动、渲染、交互、
+深链、标题全验证通过**」，并且把测试可用性补齐。验证全部在真实浏览器会话里做（逐页截图 + console
+探针），不是靠 `cargo check`。
+
+## 三个让页面死掉的 bug（前两个在 makepad 克隆里，第三个在我们自己的代码里）
+
+1. **`__wbindgen_placeholder__` 导入永远无人满足**。第一版 `?page=`/时区用 `web-sys`/`js-sys`
+   实现 ✗ —— 它们编译出 wasm-bindgen 的占位导入，而 **makepad 的桥接用自己的 `{ env }` 导入对象实例化模块**，
+   所以那个 glue 永远不会执行，每个页面死在 `Import #13`。修法：彻底去掉 wasm-bindgen ✗→✓，
+   在桥接层（`libs/wasm_bridge/src/wasm_bridge.js`）加两个一行宿主函数 —— `js_query_param`
+   （命名查询参数，UTF-8 进/出）和 `js_local_timezone_offset`（分钟，`Date.getTimezoneOffset` 的符号约定）——
+   gallery 用 `#[link(wasm_import_module = "env")]` 声明。**规则：wasm 树里禁止 wasm-bindgen**，
+   `cargo tree -i wasm-bindgen` 必须为空。
+2. **`retained_upload_limit` 的 `Instant` 探针在 wasm 上 panic**（它自己的文档写明这个测量
+   gate 不了任何东西）→ wasm 分支直接取上限。
+3. **`seed_date` 用了 `SystemTime::now()`** —— AGENTS.md 警告过的那类，`unsupported` 在调用时
+   panic 而非编译时。web 分支改读桥接的 `js_time_now`（秒）。时钟读取按目标分流成
+   `epoch_seconds_now()`。
+
+还有一处历史 bug：`draw_text.rs` 的默认字族引用 `self:../../widgets/resources/...`，是 draw
+还叫 `platform/draw` 时代写的路径，crate 挪走后差一级，web 上解析出 checkout 外面 → `crate_resource_unmapped`。
+
+## 字体链路：逐环探针打通的三个平台级问题
+
+修完上面三个，应用启动、色板/按钮/头像全渲染 —— 但**所有文字缺失**。用 makepad 自带的 uizoo
+复现了同样的症状（排除 gallery 自己的接线），然后在整条链路上埋探针，一轮一轮钉死了三个断点：
+
+1. **字体取回后从不被处理**（`web.js`）。`EventSink::emit` 只置 wasm 内的信号标志，而 web 侧
+   读标志的两个途径 —— `js_wake_ui` 微任务（没人调度）和 `setInterval` 信号轮询 —— 在节流环境里
+   不可靠（内嵌 webview 的 16ms interval 实测 1 秒只触发 2 次）。**响应交付后现在直接
+   `ToWasmSignal` + `do_wasm_pump`**，完成信号在收到它的那个任务里就被服务。
+2. **MSDF worker 在无原子 wasm 上不存在**（`fonts.rs`）。字形 Distance Field 栅格化跑在
+   `spawn_worker` 里，wasm 无 atomics 时返回 `Unsupported`，任务无限排队。现在 spawn 失败时
+   **在 UI 线程内联执行同一段栅格化**（`dispatch_msdf_jobs` 回退路径）。
+3. （观测到但未修的）字形**绘制**仍不出 —— 见下。
+
+探针的最终读数：`http res done ×3`（HTTP 字节入资源表）→ `font bytes got=true ×3`（字体定义注册）→
+按钮开始按真实字体度量排版（宽度正确）。全程零错误、零 shader 悬挂、GL 干净。
+
+**仍未解：字形不上屏。** 布局对、绘制缺，且 uizoo 同样复现 —— 平台级。嫌疑集中在 GPU 字形管线
+（slug 曲线纹理上传 / 文本绘制提交），所有异步环节都被这个内嵌 webview 的节流影响过。
+**区分「webview 节流」与「真 bug」只差一个数据点：在普通前台浏览器打开
+`http://localhost:8080` 看文字是否显示。** 若正常则一切就绪；若仍无文字，下一站是
+slug 曲线纹理上传链路。
+
+## 测试可用性：浏览器成为一等测试目标（对齐 bezel 的 `?s=&e=`）
+
+bezel 的可测性建立在「URL 能精确命名要看的东西」上。本 gallery 此前只有 `?page=` 一个 URL
+旋钮，**十个行为探针**（合成指针无法产生的那类手势/输入序列）只认环境变量，浏览器里无法复现。
+
+`knob()`（`crates/gallery/src/app.rs`）让**每个探针在 URL 上有第二张脸**：env 优先、URL 兜底，
+同一份探针脚本两个目标通用：
+
+```
+http://localhost:8080/?page=Floating Panel&float=press:60,60,move:80,80,release
+http://localhost:8080/?page=Command Palette&palette_query=de&palette_cursor_down=1
+```
+
+`?float= ?hover= ?combobox= ?history= ?editor= ?tooltip= ?popover= ?palette_query=` 全部可用。
+bezel 的 postMessage 切页（iframe 嵌入模式）暂未做 —— 没有文档站消费者，等有需求时按同样接缝补。
+
+## 验证记录
+
+- `--no-threads` 是嵌入预览的构建方式：默认构建要 shared memory（`crossOriginIsolated` 才存在），
+  内嵌 webview 里该值为 false，线程构建必死。
+- `serve_wasm.py` 现在解码 `POST /api/crash`（makepad 崩溃报告器）—— 一个被丢弃的报告就是
+  一页永远解释不清的空白 "Loading.."。构建检测 glob 任意 wasm（哈希名跟随 **bin 名**，
+  不一定是 `-p` 参数）。
+- 回归：gallery 10 测试全绿；wasm/native 双目标 `cargo check` 通过。
